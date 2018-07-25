@@ -1,0 +1,20 @@
+﻿  DLLMain.cpp
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(167): warning C4302: 'type cast': truncation from 'const char *' to 'WORD'
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(206): warning C4244: 'initializing': conversion from 'DWORD' to 'WORD', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(220): warning C4302: 'type cast': truncation from 'const char *' to 'WORD'
+x:\documents\visual studio 2017\projects\2b hook\2b hook\menu.h(7): warning C4244: 'initializing': conversion from 'QWORD' to 'int', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\features.h(148): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\utils.h(184): warning C4101: 'Entry': unreferenced local variable
+  Hooks.cpp
+  c:\program files (x86)\windows kits\10\include\10.0.15063.0\um\dinput.h: DIRECTINPUT_VERSION undefined. Defaulting to version 0x0800
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(167): warning C4302: 'type cast': truncation from 'const char *' to 'WORD'
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(206): warning C4244: 'initializing': conversion from 'DWORD' to 'WORD', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\importtablehook.h(220): warning C4302: 'type cast': truncation from 'const char *' to 'WORD'
+x:\documents\visual studio 2017\projects\2b hook\2b hook\menu.h(7): warning C4244: 'initializing': conversion from 'QWORD' to 'int', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\features.h(148): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+x:\documents\visual studio 2017\projects\2b hook\2b hook\utils.h(184): warning C4101: 'Entry': unreferenced local variable
+x:\documents\visual studio 2017\projects\2b hook\2b hook\hooks.cpp(26): warning C4101: 's': unreferenced local variable
+  x:\documents\visual studio 2017\projects\2b hook\2b hook\hooks.cpp(411): TODO: "probs find a better way to do this (aka not alloc mem every time and put into a fucc!"
+x:\documents\visual studio 2017\projects\2b hook\2b hook\hooks.cpp(569): warning C4244: '+=': conversion from 'float' to 'LONGLONG', possible loss of data
+  Generating Code...
+  2B Hook.vcxproj -> X:\Documents\Visual Studio 2017\Projects\2B Hook\x64\Debug\2B Hook.dll

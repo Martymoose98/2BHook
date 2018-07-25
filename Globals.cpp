@@ -1,7 +1,5 @@
 #include "Globals.h"
 
-Math* g_pMath = new Math;
-
 CalculateLevelFn CalculateLevel;
 GetEntityFromHandleFn GetEntityFromHandle;
 SetLocalPlayerFn SetLocalPlayer;
