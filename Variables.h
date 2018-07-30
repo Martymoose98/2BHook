@@ -179,6 +179,29 @@ typedef struct Variables_t
 		"[57] ~ Self Destruct Effect"
 	};
 
+	constexpr static const char* GameSounds[]
+	{
+		"core_noise",
+		"core_new_game",
+		"core_level_up",
+		"core_novel_click_nomal",
+		"core_novel_click_loading",
+		"core_novel_click_pod",
+		"core_novel_ward",
+		"core_pl_dress_effect",
+		"core_pl_curtain_close",
+		"core_pl_AS_hold_spark",
+		"core_pl_gameover_noize"
+		"core_pl_low_life_loop"
+		"core_pl_AS_hologram_loop"
+		"wp3000_blackbox_sonar_hand_start",
+		"wp3000_blackbox_sonar_hand_end",
+		"wp3000_valcan_shot_em",
+		"M1040_Park_Guide_1st",
+		"M1040_Park_Guide_2nd",
+		"bg3020_c4bomb_exp"
+	}
+
 } Variables;
 
 extern Variables Vars;

@@ -174,6 +174,9 @@ HRESULT InitD3D11()
 
 	g_pDevice->GetImmediateContext(&g_pDeviceContext);
 
+	ImGui::CreateContext();
+	ImGui::StyleColorsDark();
+
 	if (!ImGui_ImplDX11_Init(g_hWnd, g_pDevice, g_pDeviceContext))
 	{
 		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!");
@@ -270,7 +273,7 @@ void Setup()
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = *g_pGraphics->m_Display.m_ppSwapChain;
 	g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
-	g_pCGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;//(CGraphicDeviceDx11*)(*((byte**)g_pUserManager) + 0x140);
+	g_pCGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 	g_pAntiVSync = (byte*)g_pMemory->FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40");
 	g_pAntiFramerateCap_Sleep = (byte*)g_pMemory->FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24 ?") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;

@@ -44,7 +44,13 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
-		(*(__int64(*)(void*))(0x140AF7770))((void*)0x58940000);
+		//DWORD crc = HashStringCRC32("Ba2014", 6);
+		//SceneState* p = (SceneState*)FindSceneState((PCRITICAL_SECTION)0x141ECF350, crc, "Ba2014", 6);
+		//((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &p);
+
+		//(*(signed __int64(*)(MappedModel*, const char*))(0x14086FCC0))(pCameraEnt->m_pMappedModel, "DLC_mesh_es0202");
+
+		//(*(__int64(*)(void*))(0x140AF7770))((void*)0x58940000);
 		//(*(void(*)(Entity_t*, int))(0x1401EF120))(g_pLocalPlayer, 1); //SetE3TimeTrial
 	}	
 
@@ -105,7 +111,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		}
 
 		LOG("size %d\n", pHandles->GetSize());
-		Features::TeleportAllEnemiesToPoint(pCameraEnt->m_vPosition);
+		Features::TeleportAllEnemiesToEncirclePoint(pCameraEnt->m_vPosition, 100);
 	}
 
 	if (GetAsyncKeyState(VK_F6) & 1)
@@ -371,7 +377,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
 			ImGui::Checkbox("SpeedMeister", &Vars.Gameplay.bSpeedMeister);
 			ImGui::SameLine();
-			ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when uncapped framerate this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
+			ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when the framerate is uncapped this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
 			ImGui::Separator();
 			ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
 			ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
@@ -387,7 +393,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		ImGui::End();
 	}
 	ImGui::Render();
-
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 	// renderer doesn't work rn fml
 	//g_pRenderer->SaveState();
 	//g_pRenderer->DrawRectOutline(100, 100, 500, 500, 0xFFFFFFFF);
@@ -415,14 +421,17 @@ HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXG
 
 	HRESULT hr = oCreateSwapChain(pThis, pDevice, pDesc, ppSwapChain);
 
-	g_pSwapChain = *ppSwapChain;
+	if (SUCCEEDED(hr))
+	{
+		g_pSwapChain = *ppSwapChain;
 
-	delete g_pSwapChainHook;
+		delete g_pSwapChainHook;
 
-	g_pSwapChainHook = new VirtualTableHook((QWORD***)ppSwapChain);
-	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
+		g_pSwapChainHook = new VirtualTableHook((QWORD***)ppSwapChain);
+		oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
 
-	ImGui_ImplDX11_InvalidateDeviceObjects();
+		ImGui_ImplDX11_InvalidateDeviceObjects();
+	}
 
 	return hr;
 }
@@ -586,6 +595,15 @@ DWORD hkXInputGetState(DWORD dwUserIndex, PXINPUT_STATE pState)
 
 	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_A)
 		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_A;
+
+	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_X)
+		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_X;
+
+	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_Y)
+		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_Y;
+
+	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_B)
+		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_B;
 
 	return ret;
 }
