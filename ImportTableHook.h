@@ -155,11 +155,12 @@ public:
 	ImportTableHook(const char* szModule, const char* szFunction, LPCVOID pHookFunction)
 		: m_pNewFunction(pHookFunction)
 	{
-		Hook(szModule, szFunction);
+		Hook(szModule, szFunction);			
 	}
 
 	~ImportTableHook()
 	{
+		Unhook();
 		VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), this->m_dwOldProtect, NULL);
 	}
 
