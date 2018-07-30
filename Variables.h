@@ -200,7 +200,7 @@ typedef struct Variables_t
 		"M1040_Park_Guide_1st",
 		"M1040_Park_Guide_2nd",
 		"bg3020_c4bomb_exp"
-	}
+	};
 
 } Variables;
 
