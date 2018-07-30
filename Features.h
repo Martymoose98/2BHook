@@ -155,8 +155,8 @@ public:
 		{
 			Entity_t* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
-			g_pMath->SinCos(rad, &sin, &cos);
-			g_pMath->AngleVectors(pEntity->m_matModelToWorld.GetAxis(3), &vForward);
+			Math::SinCos(rad, &sin, &cos);
+			Math::AngleVectors(pEntity->m_matModelToWorld.GetAxis(3), &vForward);
 
 			vEndpoint = vPosition + (vForward * flRadius);
 

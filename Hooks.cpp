@@ -137,13 +137,9 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	if (GetAsyncKeyState(VK_F10) & 0x8000)
 	{
 		Vector3 vAng = g_pLocalPlayer->m_matModelToWorld.GetAxis(3); //*(Vector3*)((byte*)g_pCamera + 0x3f0);
+		Vector3 vForward;
 
-		float sp, sy, cp, cy;
-
-		g_pMath->SinCos(vAng[PITCH], &sp, &cp);
-		g_pMath->SinCos(vAng[YAW], &sy, &cy);
-
-		Vector3 vForward = Vector3(cp*cy, cp*sy, -sp);
+		Math::AngleVectors(vAng, &vForward);
 
 		//*(Vector3*)((byte*)g_pCamera + 0x3f0) = vAngles3;
 
