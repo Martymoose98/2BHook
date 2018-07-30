@@ -1,2 +1,8 @@
 .vs
 Build
+*.tlog
+*.log
+*.obj
+*.enc
+*.pdb
+*.idb
