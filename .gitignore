@@ -1,8 +1,2 @@
-
-*.obj
-x64/Debug/hooks.obj.enc
-*.tlog
-*.log
-*.enc
-*.pdb
-x64/Debug/vc141.idb
+.vs
+Build
