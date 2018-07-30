@@ -95,7 +95,7 @@
     <ClCompile Include="ImGui\imgui_draw.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="ImGui\examples\directx11_example\imgui_impl_dx11.cpp">
+    <ClCompile Include="ImGui\imgui_impl_dx11.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
   </ItemGroup>

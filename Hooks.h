@@ -3,7 +3,7 @@
 #include <d3d11.h>
 #include <Xinput.h>
 #include "ImGui/imgui.h"
-#include "ImGui/examples/directx11_example/imgui_impl_dx11.h"
+#include "ImGui/imgui_impl_dx11.h"
 #include "Renderer.h"
 #include "Menu.h"
 #include "Variables.h"

@@ -147,9 +147,9 @@
     <ClCompile Include="DLLMain.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Hooks.cpp" />
-    <ClCompile Include="ImGui\examples\directx11_example\imgui_impl_dx11.cpp" />
     <ClCompile Include="ImGui\imgui.cpp" />
     <ClCompile Include="ImGui\imgui_draw.cpp" />
+    <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
     <ClCompile Include="Log.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="VirtualTableHook.cpp" />
