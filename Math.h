@@ -434,11 +434,12 @@ enum
 class Math
 {
 public:
-
-	Math()
+	static Math* Get()
 	{
-		srand((unsigned int)time(NULL));
+		static Math* Instance = new Math();
+		return Instance;
 	}
+
 
 	//void inline SinCos(float radians, float* sine, float* cosine)
 	//{
@@ -455,13 +456,13 @@ public:
 	//	}
 	//}
 
-	void inline SinCos(float radians, float* sine, float* cosine)
+	static void inline SinCos(float radians, float* sine, float* cosine)
 	{
 		*sine = sin(radians);
 		*cosine = cos(radians);
 	}
 
-	void AngleVectors(const Vector3& angles, Vector3* forward)
+	static void AngleVectors(const Vector3& angles, Vector3* forward)
 	{
 
 		float sp, sy, cp, cy;
@@ -477,7 +478,7 @@ public:
 		}
 	}
 
-	void AngleVectors(const Vector3& angles, Vector3* forward, Vector3* right, Vector3* up)
+	static void AngleVectors(const Vector3& angles, Vector3* forward, Vector3* right, Vector3* up)
 	{
 
 		float sr, sp, sy, cr, cp, cy;
@@ -508,34 +509,34 @@ public:
 		}
 	}
 
-	float DotProduct(Vector3 &v1, float* v2)
+	static float DotProduct(Vector3 &v1, float* v2)
 	{
 		return v1.x*v2[0] + v1.y*v2[1] + v1.z*v2[2];
 	}
 
-	float Dot(const Vector3 &v1, Vector3 &v2)
+	static float Dot(const Vector3 &v1, Vector3 &v2)
 	{
 		return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
 	}
 
-	void VectorTransform(Vector3 &in1, Matrix3x4& in2, Vector3 &out)
+	static void VectorTransform(Vector3 &in1, Matrix3x4& in2, Vector3 &out)
 	{
 		out.x = DotProduct(in1, in2.m[0]) + in2.m[0][3];
 		out.y = DotProduct(in1, in2.m[1]) + in2.m[1][3];
 		out.z = DotProduct(in1, in2.m[2]) + in2.m[2][3];
 	}
 
-	float VecLength(Vector3& vec)
+	static float VecLength(Vector3& vec)
 	{
 		return (float)fastsqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 	}
 
-	float VecDist(Vector3& fVec1, Vector3& fVec2)
+	static float VecDist(Vector3& fVec1, Vector3& fVec2)
 	{
 		return (float)fastsqrtf(pow(fVec1.x - fVec2.x, 2) + pow(fVec1.y - fVec2.y, 2) + pow(fVec1.z - fVec2.z, 2));
 	}
 
-	float GetFov(Vector3 angle, Vector3 src, Vector3 dst)
+	static float GetFov(Vector3 angle, Vector3 src, Vector3 dst)
 	{
 		Vector3 ang, aim;
 		ang = CalcAngle(src, dst);
@@ -548,7 +549,7 @@ public:
 		return RADTODEG(acos(u_dot_v / mag));
 	}
 
-	Vector3 CalcAngle(Vector3 PlayerPos, Vector3 EnemyPos)
+	static Vector3 CalcAngle(Vector3 PlayerPos, Vector3 EnemyPos)
 	{
 		Vector3 AimAngles;
 		Vector3 delta = PlayerPos - EnemyPos;
@@ -563,7 +564,7 @@ public:
 		return AimAngles;
 	}
 
-	void VectorAngles(const Vector3& dir, Vector3 &angles)
+	static void VectorAngles(const Vector3& dir, Vector3 &angles)
 	{
 		float hyp = (float)fastsqrtf((dir.x * dir.x) + (dir.y * dir.y)); //SUPER SECRET IMPROVEMENT CODE NAME DONUT STEEL
 		angles.x = atanf(dir.z / hyp) * M_RADPI;
@@ -573,7 +574,7 @@ public:
 			angles.y += 180.0f;
 	}
 
-	void ClampAngle(Vector3& angles)
+	static void ClampAngle(Vector3& angles)
 	{
 		if (angles.x < -89.0f)
 			angles.x = 89.0f;
@@ -587,7 +588,7 @@ public:
 			angles.z = 0.0f;
 	}
 
-	void VectorNormalize(Vector3& v)
+	static void VectorNormalize(Vector3& v)
 	{
 		float l = VecLength(v);
 		if (l != 0.0f)
@@ -600,14 +601,14 @@ public:
 		}
 	}
 
-	void SmoothAngle(Vector3& ViewAngle, Vector3& DestAngles, float smooth)
+	static void SmoothAngle(Vector3& ViewAngle, Vector3& DestAngles, float smooth)
 	{
 		Vector3 vecDelta = ViewAngle - DestAngles;
 		ClampAngle(vecDelta);
 		DestAngles = ViewAngle - vecDelta / 100.0f * smooth; // 50.0f is ur smooth value
 	}
 
-	void MakeVector(const Vector3& angle, Vector3& vector)
+	static void MakeVector(const Vector3& angle, Vector3& vector)
 	{
 		float pitch = float(angle[0] * M_PI / 180);
 		float yaw = float(angle[1] * M_PI / 180);
@@ -617,7 +618,7 @@ public:
 		vector[2] = float(-sin(pitch));
 	}
 
-	Vector3 AngleToDirection(Vector3 angle)
+	static Vector3 AngleToDirection(Vector3 angle)
 	{
 		// Convert angle to radians 
 		angle.x = DEGTORAD(angle.x);
@@ -637,7 +638,7 @@ public:
 		return direction;
 	}
 
-	void VectorITransform(Vector3& in1, const Matrix3x4& in2, Vector3& out)
+	static void VectorITransform(Vector3& in1, const Matrix3x4& in2, Vector3& out)
 	{
 		float in1t[3];
 
@@ -650,11 +651,10 @@ public:
 		out.z = in1t[0] * in2.m[0][2] + in1t[1] * in2.m[1][2] + in1t[2] * in2.m[2][2];
 	}
 
-	void VectorIRotate(Vector3& in1, const Matrix3x4& in2, Vector3& out)
+	static void VectorIRotate(Vector3& in1, const Matrix3x4& in2, Vector3& out)
 	{
 		out.x = in1.x * in2.m[0][0] + in1.y * in2.m[1][0] + in1.z * in2.m[2][0];
 		out.y = in1.x * in2.m[0][1] + in1.y * in2.m[1][1] + in1.z * in2.m[2][1];
 		out.z = in1.x * in2.m[0][2] + in1.y * in2.m[1][2] + in1.z * in2.m[2][2];
 	}
 };
-extern Math* g_pMath;
