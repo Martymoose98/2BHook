@@ -72,8 +72,10 @@ public:
 		switch (player)
 		{
 		case PROTAGONIST_2B:
-			crc = HashStringCRC32("PL/2B", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "PL/2B", 8); // Load/A29S | Load/A22B	
+			//crc = HashStringCRC32("PL/2B", 8);
+			//pScene = (SceneState*)FindSceneState(&cs, crc, "PL/2B", 8);
+			crc = HashStringCRC32("Load/A29S", 10);
+			pScene = (SceneState*)FindSceneState(&cs, crc, "Load/A29S", 10); // Load/A29S | Load/A22B	
 			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
 			break;
 
@@ -145,6 +147,9 @@ public:
 
 	static void TeleportAllEnemiesToEncirclePoint(const Vector3& vPosition, float flRadius)
 	{
+		if (!g_pEnemyManager->m_handles.m_count)
+			return;
+
 		float step = (2.0f * M_PI) / g_pEnemyManager->m_handles.m_count;
 		float rad = 0.0f;
 		D3DXVECTOR2 xz(vPosition.x, vPosition.z);
@@ -163,7 +168,8 @@ public:
 			xz.x += cos * (vEndpoint.x - vPosition.x) - sin * (vEndpoint.z - vPosition.z); // + vPosition.x;
 			xz.y += sin * (vEndpoint.x - vPosition.x) + cos * (vEndpoint.z - vPosition.z); // + vPosition.z;
 
-			pEntity->m_vPosition = Vector3Aligned(xz.x, vPosition.y, xz.y);
+			pEntity->m_vPosition.x = xz.x;
+			pEntity->m_vPosition.z = xz.y;
 		}
 	}
 };
