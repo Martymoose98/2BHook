@@ -158,6 +158,11 @@ public:
 		Hook(szModule, szFunction);
 	}
 
+	~ImportTableHook()
+	{
+		VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), this->m_dwOldProtect, NULL);
+	}
+
 	const void* Hook(const char* szModule, const char* szFunction)
 	{
 		PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)ProcessEnvironmentBlock->ImageBaseAddress;
@@ -208,6 +213,7 @@ public:
 									if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 									{
 										this->m_pIAT = &pImportAddressTable[i];
+										VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
 										this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
 										this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
 										return this->m_pOriginalFunction;
@@ -220,6 +226,7 @@ public:
 							if ((WORD)szFunction == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 							{
 								this->m_pIAT = &pImportAddressTable[i];
+								VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
 								this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
 								this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
 								return this->m_pOriginalFunction;
@@ -233,6 +240,7 @@ public:
 						if (!strcmp(szFunctionName, szFunction))
 						{
 							this->m_pIAT = &pImportAddressTable[i];
+							VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
 							this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
 							this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
 							return this->m_pOriginalFunction;
@@ -303,4 +311,5 @@ private:
 	PIMAGE_THUNK_DATA m_pIAT;
 	LPCVOID m_pOriginalFunction;
 	LPCVOID m_pNewFunction;
+	DWORD m_dwOldProtect;
 };

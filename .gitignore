@@ -6,3 +6,4 @@ Build
 *.enc
 *.pdb
 *.idb
+*.user
