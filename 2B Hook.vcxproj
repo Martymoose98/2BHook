@@ -46,8 +46,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(IncludePath);$(DXSDK_DIR)Include</IncludePath>
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
-    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
-    <OutDir>Build\$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
@@ -112,6 +110,7 @@
     <ClCompile Include="VirtualTableHook.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <MASM Include="CreateEntityHook.asm" />
     <MASM Include="fastsqrt.asm">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
