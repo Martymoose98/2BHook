@@ -106,5 +106,8 @@
     <MASM Include="ModelPartsHook.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
+    <MASM Include="CreateEntityHook.asm">
+      <Filter>Assembly Files</Filter>
+    </MASM>
   </ItemGroup>
 </Project>
