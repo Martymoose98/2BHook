@@ -16,7 +16,7 @@ static void DisplayEntityHandles()
 		handles[i] = hCurrent;
 		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
 
-		sprintf_s(ppszHandles[i], 64, "NPC: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEnityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
+		sprintf_s(ppszHandles[i], 64, "NPC: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
 	}
 
 	for (; i < g_pNPCManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count; ++i)
@@ -26,7 +26,7 @@ static void DisplayEntityHandles()
 		handles[i] = hCurrent;
 		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
 
-		sprintf_s(ppszHandles[i], 64, "Enemy %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEnityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
+		sprintf_s(ppszHandles[i], 64, "Enemy %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
 	}
 
 	for (; i < count; ++i)
@@ -36,7 +36,7 @@ static void DisplayEntityHandles()
 		handles[i] = hCurrent;
 		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
 
-		sprintf_s(ppszHandles[i], 64, "Yorha: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEnityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
+		sprintf_s(ppszHandles[i], 64, "Yorha: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ModelType : 0);
 	}
 
 	ImGui::ListBox("NPC, Yorha & Enemy Handles", &Vars.Gameplay.iSelectedEntityHandle, ppszHandles, count);
@@ -46,7 +46,7 @@ static void DisplayEntityHandles()
 		Entity_t* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
 
 		if (pNPC)
-			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC); // NPC.changeSetTypeFollow
+			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC);
 	}
 
 	ImGui::SameLine();
@@ -56,7 +56,7 @@ static void DisplayEntityHandles()
 		Entity_t* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
 
 		if (pNPC)
-			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC); // NPC.changeSetTypeFollow
+			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);
 	}
 
 	//if (ImGui::Button("Set Player"))

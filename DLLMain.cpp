@@ -26,6 +26,7 @@ CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE XorRdxRdx[] = { 0x48, 0x31, 0xD2 };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 BYTE RsiJumpHook[] = { 0x48, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD6, 0x90 };
+BYTE RdiJumpHook[] = { 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7, 0x90 };
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 BYTE opcodes_query_performance_counter[] = { 0x90, 0x90, 0xE9, 0x00, 0x00, 0x00, 0x00 };
 
@@ -74,6 +75,27 @@ void InitHooks()
 	bp_save_file_io.Patched = FALSE;
 
 	g_pMemory->PatchBytes(&bp_save_file_io);
+
+	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
+	QWORD qwContainingFunc = g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
+
+	*(QWORD*)&RdiJumpHook[2] = (QWORD)hkCreateEntityThunk;
+
+	bp_CreateEntity[0].Address = (VOID*)(qwContainingFunc + 0x676);
+	bp_CreateEntity[0].nBytes = 13;
+	bp_CreateEntity[0].pNewOpcodes = RdiJumpHook;
+	bp_CreateEntity[0].pOldOpcodes = NULL; 
+	bp_CreateEntity[0].Patched = FALSE;
+
+	// g_pMemory->PatchBytes(&bp_CreateEntity[0]); //doesn't seem to do much
+
+	bp_CreateEntity[1].Address = (VOID*)(qwContainingFunc + 0x135);
+	bp_CreateEntity[1].nBytes = 13;
+	bp_CreateEntity[1].pNewOpcodes = RdiJumpHook;
+	bp_CreateEntity[1].pOldOpcodes = NULL;
+	bp_CreateEntity[1].Patched = FALSE;
+
+	g_pMemory->PatchBytes(&bp_CreateEntity[1]); 
 
 	*(QWORD*)&RsiJumpHook[2] = (QWORD)hkModelParts;
 

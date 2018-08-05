@@ -26,6 +26,8 @@ typedef void(__fastcall* ReadSaveDataFn)(CSaveDataDevice* pSave);
 typedef void(__fastcall* WriteSaveDataFn)(CSaveDataDevice* pSave);
 typedef void(__fastcall* DeleteSaveDataFn)(CSaveDataDevice* pSave);
 
+typedef void*(__fastcall* CreateEntityFn)(void* pUnknown, EntityInfo* pInfo, unsigned int modeltype, int flags, CHeapInstance** ppHeaps);
+
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern PresentFn oPresent;
@@ -36,7 +38,9 @@ extern ClearRenderTargetViewFn oClearRenderTargetView;
 extern QueryPerformaceCounterFn oQueryPerformanceCounter;
 extern SetCursorPosFn oSetCursorPos;
 extern XInputGetStateFn oXInputGetState;
+extern CreateEntityFn oCreateEntity;
 extern WNDPROC oWndProc;
+
 
 HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
 HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain);
@@ -45,6 +49,8 @@ void __fastcall hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT 
 void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4]);
 void __fastcall hkSaveFileIO(CSaveDataDevice* pSave);
 extern "C" void __fastcall hkModelParts(Entity_t* pEntity);
+extern "C" void* __fastcall hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int modeltype, int flags, CHeapInstance** ppHeaps);
+extern "C" void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int modeltype, int flags, CHeapInstance** ppHeaps);
 LRESULT __fastcall WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL __fastcall hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);
 BOOL __fastcall hkSetCursorPos(int X, int Y);

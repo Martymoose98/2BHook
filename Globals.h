@@ -59,10 +59,11 @@ typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef bool(__fastcall* DestroyBuddyFn)(Entity_t* pBuddy);
 typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Entity_t* pNPC);
 typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Entity_t* pNPC);
-typedef unsigned int(__fastcall* HashStringCRC32Fn)(const char* szName, __int64 length);
-typedef unsigned int(__fastcall* FNV1HashFn)(const char* szString);
 typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Entity_t** ppSourceEntity); // also second arg is another custom struct
 typedef __int64(__fastcall* PlaySoundFn)(Sound* pSound);
+typedef unsigned int(__fastcall* HashStringCRC32Fn)(const char* szName, __int64 length);
+typedef unsigned int(__fastcall* FNV1HashFn)(const char* szString);
+typedef __int64(__fastcall* HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
 typedef void*(__fastcall* FindSceneStateFn)(CRITICAL_SECTION* pCriticalSection, unsigned int crc, const char* szName, __int64 length); // not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
 typedef bool(__fastcall* SceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef bool(__fastcall* SceneStateSystem_SetInternalFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
@@ -175,6 +176,7 @@ extern ImportTableHook* g_pClipCursorHook;
 extern ImportTableHook* g_pXInputGetStateHook;
 
 extern BYTE_PATCH_MEMORY bp_save_file_io;
+extern BYTE_PATCH_MEMORY bp_CreateEntity[2];
 extern BYTE_PATCH_MEMORY bp_query_performance_counter;
 extern BYTE_PATCH_MEMORY bp_AntiVSync;
 extern BYTE_PATCH_MEMORY bp_Framecap;
