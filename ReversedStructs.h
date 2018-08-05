@@ -37,6 +37,8 @@ typedef ULONGLONG QWORD;
 
 typedef DWORD EntityHandle;
 
+enum TypeId {};
+
 class Entity_t;
 
 /*
@@ -123,9 +125,7 @@ struct Unknown_t;
 struct EntityInfo
 {
 	Unknown_t* m_pUnknown;						//0x0000 | i don't really know what this is (confirmed a struct pointer) maybe a void*
-	const char m_szEnityType[8];				//0x0008
-	const char m_szEntitySubType[4];			//0x0010 | idk Ex. ":PL"
-	char _0x0014[20];							//0x0014
+	char m_szEntityType[32];					//0x0008
 	unsigned int m_ModelType;					//0x0028
 	BYTE m_Flags;								//0x002C  | An Entity cannot have this flag or'd with 3 game crashes (possibly a destroyed flag)
 	char alignment[3];							//0x002D
@@ -134,8 +134,11 @@ struct EntityInfo
 	char* m_pszData[2];							//0x0038
 	Entity_t* m_pEntity;						//0x0048
 	const char** m_pszDat;						//0x0050  | struct pointer
-	DWORD* m_pUnk;								//0x0058  | dword array 2 members
+	DWORD* m_pUnk;								//0x0058  | dword array 2 members (0x1415F6B50)
 	Entity_t* m_pParent;						//0x0060
+	BOOL bSetInfo;								//0x0068
+	DWORD _0x006C;								//0x006C
+	DWORD _0x0070;								//0x0070
 };
 IS_OFFSET_CORRECT(EntityInfo, m_pParent, 0x60)
 
@@ -174,7 +177,52 @@ struct MappedModel
 	DWORD dw0xC0;		//0x00C0
 };
 
-class BehaviorAppBase;
+class BehaviorAppBase 
+{
+public:
+	typedef DWORD TimeLimitedFlag;
+};
+
+class BehaviorExtension
+{
+
+};
+
+class CModelExtendWorkBase 
+{
+	virtual void function0();
+	virtual void function1();
+};
+
+class CModelExtendWork : public CModelExtendWorkBase
+{
+	virtual void function2();
+	virtual void function3();
+
+	float flUnk;		//0x08
+	DWORD _0x0010;		//0x10
+	DWORD _0x0014;		//0x14
+	char _0x0018[12];	//0x18
+	Entity_t* m_pParent;//0x2C	
+};
+
+class ExWaypoint : public BehaviorExtension
+{
+	
+};
+
+class ExBaseInfo : public BehaviorExtension
+{
+public:
+	virtual void function0();
+	virtual void function1();
+	virtual void function2();
+	virtual void function3();
+	virtual void function4();
+	virtual void function5();
+
+
+};
 
 class CXmlBinary
 {
@@ -304,19 +352,23 @@ public:
 	Vector3Aligned m_vPosition;				//0x00050
 	Matrix4x4 m_matModelToWorld;			//0x00060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
 	char _0x005C[160];						//0x000A0
-	void* m_pModelExtendWorkVtbl;			//0x00140 //ModelExtendWork
-	char _0x0148[24];						//0x00148
-	BehaviorAppBase* m_pBehaviorAppBase;	//0x00160
+	CModelExtendWork m_pModelExtendWork;	//0x00140
 	char _0x0168[560];						//0x00168
+											//0x00180	lib::StaticArray<Pl0000Mouse::MouseKeyMap,3,4>
+											//0x001B8	lib::StaticArray<MouseInput,3,4>
+											//0x00310	lib::StaticArray<Pl0000KeyBoard::KeyMap,22,4>
+											//0x003E0	lib::StaticArray<KeyInput,22,4>
 	MappedModel* m_pMappedModel;			//0x00398
 	ModelPart* m_pModelParts;				//0x003A0 
 	DWORD m_nModelParts;					//0x003A8
 	char _0x03AC[388];						//0x003AC
+	CModelExtendWork* m_pModelExtend;		//0x00518
 	void* m_pScene;							//0x00530 | when null scene is transparent
 	QWORD qw0x00538;						//0x00538
 	ModelInfo* m_pModelInfo;				//0x00540
-	Unknown_t* m_pUnknowns[3];				//0x00548 
-	QWORD qw0x00560;						//0x00560
+	Unknown_t* m_pUnknown0x548;				//0x00548
+	void* m_pWMB_Buffer;					//0x00550
+	Unknown_t* qw0x00560;					//0x00560
 	int m_iVerticeUpdateCount;				//0x00568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
 	char _0x056C[12];						//0x0056C
 	Vector3 m_vUnknown;						//0x00578
@@ -339,17 +391,24 @@ public:
 	float fl0x60C;							//0x0060C
 	EntityInfo* m_pInfo;					//0x00610 
 	CXmlBinary m_xmlBinary;					//0x00618
-	char _0x061C[568];						//0x0061C
+	char _0x0620[144];						//0x00620
+	StaticArray<std::pair<TypeId, BehaviorExtension*>, 16, 8> m_BehaviourExtensions;//0x006B0 | lib::StaticArray<std::pair<enum  lib::TypeId,BehaviorExtension *>,16,8>  BehaviorExtension is an interface
+	char _0x07D0[136];						//0x007D0
+	//ExActionState							//0x00830  ExActionState
 	int m_iHealth;							//0x00858
 	int m_iMaxHealth;						//0x0085C
-	char _0x08D0[16];						//0x008D0
+	char _0x0860[124];						//0x00860
 	void* m_waypointVtbl;					//0x008E0
-	char _0x0858[3140];						//0x00860
+	char _0x08E8[192];						//0x008E8
+	StaticArray<BehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
+	char _0x09D8[2788];						//0x009D8
 	int m_iLevel;							//0x014BC
 	BOOL m_bLevelUp;						//0x014C0 | pretty sure
 	char _0x14C4[44];						//0x014C4
 	void* m_pCObjHitVtable;					//0x014F0 | start cObjHit
-	char _0x014EC[2944];					//0x014F8
+	char _0x014EC[2936];					//0x014F8
+	float fl0x02070;						//0x02070
+	char _0x02074[4];						//0x02074
 	ExExpInfo m_LevelsContainer;			//0x02078
 	char _0x02B70[56056];					//0x02B70
 	int m_iHealth2;							//0x10668
@@ -370,9 +429,11 @@ public:
 };
 typedef Entity_t Pl0000;
 IS_OFFSET_CORRECT(Entity_t, m_vPosition, 0x50)
+IS_OFFSET_CORRECT(Entity_t, m_pModelExtendWork, 0x140)
 IS_OFFSET_CORRECT(Entity_t, m_Flags, 0x598)
 IS_OFFSET_CORRECT(Entity_t, m_ModelType, 0x5B8)
 IS_OFFSET_CORRECT(Entity_t, m_pInfo, 0x610)
+IS_OFFSET_CORRECT(Entity_t, m_BehaviourExtensions, 0x6B0)
 IS_OFFSET_CORRECT(Entity_t, m_iHealth, 0x858)
 IS_OFFSET_CORRECT(Entity_t, m_pCObjHitVtable, 0x14F0)
 IS_OFFSET_CORRECT(Entity_t, m_LevelsContainer, 0x2078)
@@ -454,10 +515,17 @@ class CVertexBuffer;
 class CVertexLayout;
 class CConstantBuffer;
 
+struct Keyboard_t
+{
+	IDirectInputDevice8A* pKeyboard;
+	BOOL bAcquired;
+	HKL Layout;
+};
+
 struct Mouse_t
 {
 	HWND hWnd;
-	IDirectInputDevice8A *pMouse;
+	IDirectInputDevice8A* pMouse;
 	BOOL bMouseAquired;
 	BOOL bShowCursor;
 	BOOL bShowCursorOld;
@@ -597,6 +665,9 @@ struct CSaveSlot
 	BOOL InUse;
 };
 
+/*
+Size of the struct is 0xD0 (208) bytes
+*/
 struct CSaveDataDevice
 {
 	void* m_pVtable;				//0x0000
@@ -640,10 +711,20 @@ struct CSaveDataDevice
 	DWORD dwUnk0xD4;				//0x00D4 | this is a member of unk0xc8
 };
 
+class CUserInfoBase
+{
+	virtual ~CUserInfoBase();
+};
+
 class CUserInfo
 {
-	void* m_pVtbl;
-	char _0x08[24];
+	virtual ~CUserInfo();
+
+	BOOL bActive;	//0x08
+	char _0x0C[4];	//0x0C
+	int idk;		//0x10
+	int index[2];	//0x14
+	char _0x1C[4];  //0x1C	
 };
 
 class CHeapInstance
@@ -651,6 +732,23 @@ class CHeapInstance
 	void* m_pVtbl;
 	CRITICAL_SECTION m_CriticalSection;		 //0x0008
 	const char* m_szId;						 //0x0028 | doesn't line up  
+};
+
+class HeapAlloc_t
+{
+	LPVOID Pointer;
+	BOOL Succeeded;
+};
+
+template<typename T>
+struct ConstructionInfo
+{
+	DWORD modeltype;
+	char alignment[4];
+	T* (* Construtor)(CHeapInstance**);
+	QWORD id;
+	const char* szName;
+	void* pUnk;
 };
 
 typedef int DlcInstalled_t;
@@ -661,7 +759,7 @@ class CGameContentDeviceSteam
 public:
 	void* m_pVtbl;														//0x0000
 	CCallback<CGameContentDevice, DlcInstalled_t, false> m_Callback;	//0x0008  | id is 1005
-	DWORD unk0x010;														//0x0010
+	DWORD unk0x018;														//0x0018
 
 };
 
@@ -786,22 +884,28 @@ IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428)
 IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0xC78)
 IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
 
+/* Size of struct 0x108 (264) bytes	*/
 class CUserManager
 {
 public:
 	void* m_pVtable;						 //0x0000
 	CRITICAL_SECTION m_CriticalSection;		 //0x0008
 	BOOL bUnknown;							 //0x0030
-	char alignment[8];						 //0x0034
-	CUserInfo m_UsersInfo[4];				 //0x0040
-	char unk0x00C0[24];						 //0x00C0
-	CGameBootProcess* m_pBootProcess;		 //0x00D8
-	void* unk;								 //0x00E0
+	char alignment[4];						 //0x0034
+	CUserInfo m_UsersInfo[4];				 //0x0038
+	int m_iActiveUser;						 //0x00B8
+	char unk0x00BC[28];						 //0x00BC
+	CGameBootProcess* m_pBootProcess;		 //0x00D8 | func ptr? naw
+	void* unk;								 //0x00E0 | func ptr? naw
 	CGameContentDevice* m_pGameContentDevice;//0x00E8
 	CSaveDataDevice* m_pSaveDataDevice;		 //0x00F0
-	char _0x00DF8[216];						 //0x00F8
+	void* _0x00F8;							 //0x00F8
+	DWORD _0x0100;							 //0x0100
+	char _0x00DF8[204];						 //0x0104
 	char* m_szState;						 //0x01D0
 };
-IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x40)
+IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38)
+IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8)
 IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8)
+IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0)
 IS_OFFSET_CORRECT(CUserManager, m_szState, 0x1D0)

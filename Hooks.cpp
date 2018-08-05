@@ -1,7 +1,5 @@
 #include "Hooks.h"
 
-WNDPROC oWndProc;
-
 PresentFn oPresent;
 CreateSwapChainFn oCreateSwapChain;
 DrawIndexedFn oDrawIndexed;
@@ -10,6 +8,8 @@ ClearRenderTargetViewFn oClearRenderTargetView;
 QueryPerformaceCounterFn oQueryPerformanceCounter;
 SetCursorPosFn oSetCursorPos;
 XInputGetStateFn oXInputGetState;
+CreateEntityFn oCreateEntity;
+WNDPROC oWndProc;
 
 HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
@@ -44,6 +44,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
+		g_pMemory->RestoreMemory(&bp_CreateEntity[1]);
 		//DWORD crc = HashStringCRC32("Ba2014", 6);
 		//SceneState* p = (SceneState*)FindSceneState((PCRITICAL_SECTION)0x141ECF350, crc, "Ba2014", 6);
 		//((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &p);
@@ -497,6 +498,20 @@ void __fastcall hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT 
 void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4])
 {
 	oClearRenderTargetView(pThis, pRenderTargetView, ColorRGBA);
+}
+
+void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int modeltype, int flags, CHeapInstance** ppHeaps)
+{
+	ConstructionInfo<void>* pConstruct = (*(ConstructionInfo<void>* (*)(int))(0x1401A2C20))(modeltype);
+
+	LOG("Created %s -> %s (%x)\n", pInfo->m_szEntityType, pConstruct->szName, modeltype);
+
+	void* pEntity = oCreateEntity(pUnknown, pInfo, modeltype, flags, ppHeaps); //0x1401A2B40
+
+	if (!pEntity)
+		LOG("Creation Failed!");
+
+	return pEntity;
 }
 
 void __fastcall hkSaveFileIO(CSaveDataDevice* pSavedata)

@@ -237,7 +237,7 @@ public:
 					else
 					{
 						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.Function))->Name;
-
+						
 						if (!strcmp(szFunctionName, szFunction))
 						{
 							this->m_pIAT = &pImportAddressTable[i];

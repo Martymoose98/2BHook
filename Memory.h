@@ -14,9 +14,17 @@
 
 #define INRANGE(x, a, b) ((x) >= (a) && (x) <= (b))
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
-#define GetByte(x) (GetBits((x)[0]) << 4 | GetBits((x)[1]))
+#define GetByte(x) ((GetBits((x)[0]) << 4) | GetBits((x)[1]))
 
-#define MakePtr(cast, ptr, addValue) (cast)((DWORD)(ptr) + (DWORD)(addValue))
+
+#define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (DWORD)(rva)))
+#define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (DWORD)(rva)))
+
+#ifdef _WIN64
+#define MakePtr MakePtr64
+#else
+#define MakePtr MakePtr32
+#endif
 
 #define NOPMemory(dst, size) memset((VOID*)(dst), 0x90, size)
 

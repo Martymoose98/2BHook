@@ -72,8 +72,9 @@ ImportTableHook* g_pQueryPerformanceCounterHook;
 ImportTableHook* g_pClipCursorHook;
 ImportTableHook* g_pXInputGetStateHook;
 
-BYTE_PATCH_MEMORY bp_query_performance_counter;
 BYTE_PATCH_MEMORY bp_save_file_io;
+BYTE_PATCH_MEMORY bp_CreateEntity[2];
+BYTE_PATCH_MEMORY bp_query_performance_counter;
 BYTE_PATCH_MEMORY bp_AntiVSync;
 BYTE_PATCH_MEMORY bp_Framecap;
 BYTE_PATCH_MEMORY bp_NoTutorialDialogs;

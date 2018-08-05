@@ -172,4 +172,10 @@ public:
 			pEntity->m_vPosition.z = xz.y;
 		}
 	}
+
+	// test
+	static void ApplyA2Wig()
+	{
+		//sub_1404F9AA0((__int64)&qword_14160DFE0, &szA2Wig);
+	}
 };
