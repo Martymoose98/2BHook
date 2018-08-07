@@ -19,8 +19,6 @@ typedef struct Variables_t
 		int iSelectedEntityHandle;
 		bool bGhostModel;
 		int nMaxModelVertices = 0;
-		bool bSwapCharacter = false;
-		int iSwapCharacter;
 		bool bFreezePlayer = false;
 		bool bNoTutorialDialogs = false;
 		bool bSpeedMeister = false;

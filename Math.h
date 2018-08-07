@@ -377,7 +377,7 @@ public:
 
 	inline Vector3& GetAxis(int i)
 	{
-		return *(Vector3*)&this->m[i][0]; //((*this)[i]);
+		return *(Vector3*)((*this)[i]);
 	}
 };
 
