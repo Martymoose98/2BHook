@@ -364,20 +364,12 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				sprintf_s(szModelPart, "ModelPart Color: (%s)", pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
 				ImGui::ColorPicker4(szModelPart, (float*)&pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_vColor);
 
-				//if (!Vars.Gameplay.bRainbowModel)
-				//	ImGui::ColorPicker4("Model Tint Color", (float*)&pCameraEnt->m_pModelInfo->m_vTint);
+				if (!Vars.Gameplay.bRainbowModel)
+					ImGui::ColorPicker4("Model Tint Color", (float*)&pCameraEnt->m_pModelInfo->m_vTint);
 
 				ImGui::InputFloat3("Model Scale (X,Y,Z)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(1));
 				ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(3));
 			}
-#if 0
-			ImGui::SliderInt((Vars.Gameplay.iSwapCharacter == PROTAGONIST_NONE) ? "Swap Active Protagonist (Default)" : (Vars.Gameplay.iSwapCharacter == PROTAGONIST_2B) ? "Swap Active Protagonist (2B)" : (Vars.Gameplay.iSwapCharacter == PROTAGONIST_A2) ? "Swap Active Protagonist (A2)" :
-				(Vars.Gameplay.iSwapCharacter == PROTAGONIST_9S) ? "Swap Active Protagonist (9S)" : "Swap Active Protagonist (Unknown)", &Vars.Gameplay.iSwapCharacter, 0, 3);
-
-
-			if (ImGui::Button("Apply Protagonist"))
-				Vars.Gameplay.bSwapCharacter = true;
-#endif
 
 			ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
 			ImGui::Checkbox("SpeedMeister", &Vars.Gameplay.bSpeedMeister);
@@ -551,63 +543,23 @@ void __fastcall hkSaveFileIO(CSaveDataDevice* pSavedata)
 	if (!pSavedata)
 		return;
 
-	if (Vars.Gameplay.bSwapCharacter && !pSavedata->qwFlags)
-		pSavedata->qwFlags |= SAVE_FLAGS_READ;
-
 	switch (pSavedata->dwFlags)
 	{
 	case SAVE_FLAGS_READ_SLOTS:
-	{
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095DD80))(pSavedata);
+		(*(ReadSaveSlotsFn)(0x14095DD80))(pSavedata);
 		return;
-	}
 	case SAVE_FLAGS_READ:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E020))(pSavedata);
+		(*(ReadSaveDataFn)(0x14095E020))(pSavedata);
 
 		Vars.Misc.nSlot = pSavedata->nSlot;
 		Vars.Gameplay.nMaxModelVertices = 0;
 		Vars.Misc.bLoading = true;
-
-		if (Vars.Gameplay.bSwapCharacter)
-		{
-
-			//wchar_t* p = (wchar_t*)((QWORD)g_pUserManager + 0x188);
-			//*p++ = 'A';
-			//*p = '2';
-
-			//char* pszActiveProtagonist[3];
-			//pszActiveProtagonist[0] = (char*)((*(byte**)((*(byte**)0x14158CC88) + 0x100)) + 0x38); // this pointer changes based on what protagonist is active sooo fuck! Actually idk what's going on tbh
-			//pszActiveProtagonist[1] = (char*)((*(byte**)((*(byte**)0x14158CC58) + 0x350)) + 0x16C);
-			//pszActiveProtagonist[2] = (char*)((*(byte**)((*(byte**)0x14158CC58) + 0x350)) + 0x3EC);
-
-			switch (Vars.Gameplay.iSwapCharacter)
-			{
-			case PROTAGONIST_2B:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/2B", 5); //"PL/2B_Armed_NoMask"
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/2B", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/2B", 5);
-				break;
-			case PROTAGONIST_A2:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/A2", 5);
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/A2", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/A2", 5);
-				break;
-			case PROTAGONIST_9S:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/9S", 5);
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/9S", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/9S", 5);
-				break;
-			default:
-				break;
-			}
-			Vars.Gameplay.bSwapCharacter = false;
-		}
 		return;
 	case SAVE_FLAGS_WRITE:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E330))(pSavedata);
+		(*(WriteSaveDataFn)(0x14095E330))(pSavedata);
 		return;
 	case SAVE_FLAGS_DELETE:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E7B0))(pSavedata);
+		(*(DeleteSaveDataFn)(0x14095E7B0))(pSavedata);
 		return;
 	default:
 		Vars.Misc.bLoading = false;

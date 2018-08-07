@@ -361,13 +361,15 @@ public:
 	MappedModel* m_pMappedModel;			//0x00398
 	ModelPart* m_pModelParts;				//0x003A0 
 	DWORD m_nModelParts;					//0x003A8
-	char _0x03AC[388];						//0x003AC
+	char _0x03AC[364];						//0x003AC
 	CModelExtendWork* m_pModelExtend;		//0x00518
+	char _0x0520[16];						//0x00520
 	void* m_pScene;							//0x00530 | when null scene is transparent
 	QWORD qw0x00538;						//0x00538
 	ModelInfo* m_pModelInfo;				//0x00540
 	Unknown_t* m_pUnknown0x548;				//0x00548
 	void* m_pWMB_Buffer;					//0x00550
+	void* m_p0x00558;						//0x00558
 	Unknown_t* qw0x00560;					//0x00560
 	int m_iVerticeUpdateCount;				//0x00568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
 	char _0x056C[12];						//0x0056C
@@ -430,6 +432,9 @@ public:
 typedef Entity_t Pl0000;
 IS_OFFSET_CORRECT(Entity_t, m_vPosition, 0x50)
 IS_OFFSET_CORRECT(Entity_t, m_pModelExtendWork, 0x140)
+IS_OFFSET_CORRECT(Entity_t, m_pMappedModel, 0x398)
+IS_OFFSET_CORRECT(Entity_t, m_pModelExtend, 0x518)
+IS_OFFSET_CORRECT(Entity_t, m_pModelInfo, 0x540)
 IS_OFFSET_CORRECT(Entity_t, m_Flags, 0x598)
 IS_OFFSET_CORRECT(Entity_t, m_ObjectId, 0x5B8)
 IS_OFFSET_CORRECT(Entity_t, m_pInfo, 0x610)
