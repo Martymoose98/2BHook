@@ -173,9 +173,16 @@ public:
 		}
 	}
 
-	// test
-	static void ApplyA2Wig()
+	static void MoveSun()
 	{
+		Sun* sun = (Sun*)0x14160EB40;
+		sun->m_vPosition.x += 3;
+	}
+
+	// test
+	static void ApplyA2Wig(EntityInfo* pInfo)
+	{
+		//hkCreateEntity((void*)0x1415f6b50, pInfo, 0x10000, -1, (CHeapInstance**)0x1418f6158);
 		//sub_1404F9AA0((__int64)&qword_14160DFE0, &szA2Wig);
 	}
 };

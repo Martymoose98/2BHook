@@ -70,6 +70,7 @@ typedef bool(__fastcall* SceneStateSystem_SetInternalFn)(/*hap::scene_state::Sce
 typedef BOOL(__fastcall* SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
 typedef __int64(__fastcall* CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(__fastcall* QuestState_RequestStateInternalFn)(DWORD *pQuestId);
+typedef ConstructionInfo<void>*(__fastcall* GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
 
 // XInput Function Defs
 
@@ -106,6 +107,7 @@ extern GetEntityFromHandleFn GetEntityFromHandle;
 extern SetLocalPlayerFn SetLocalPlayer;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
+extern GetConstructorFn GetConstructionInfo;
 extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
 extern FNV1HashFn FNV1Hash;
@@ -120,7 +122,7 @@ extern XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 extern XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
 extern int* g_piMoney;
-extern DWORD* g_pdwExperience;
+extern int* g_piExperience;
 
 extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
@@ -141,8 +143,7 @@ extern BYTE* g_pAntiFramerateCap_Spinlock;
 extern BYTE* g_pAntiFramerateCap_Test4;
 extern IDirectInput8A* g_pDirectInput8;
 extern IDirectInputDevice8A* g_pKeyboard;
-extern IDirectInputDevice8A* g_pMouse;
-extern Mouse_t* g_pGameMouse;
+extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
 extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
@@ -170,6 +171,8 @@ extern CGraphicDeviceDx11* g_pCGraphicDevice;
 extern VirtualTableHook* g_pFactoryHook;
 extern VirtualTableHook* g_pSwapChainHook;
 extern VirtualTableHook* g_pDeviceContextHook;
+extern VirtualTableHook* g_pMouseHook;
+extern VirtualTableHook* g_pKeyboardHook;
 
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
 extern ImportTableHook* g_pClipCursorHook;

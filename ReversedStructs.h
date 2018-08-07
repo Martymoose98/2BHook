@@ -126,7 +126,7 @@ struct EntityInfo
 {
 	Unknown_t* m_pUnknown;						//0x0000 | i don't really know what this is (confirmed a struct pointer) maybe a void*
 	char m_szEntityType[32];					//0x0008
-	unsigned int m_ModelType;					//0x0028
+	unsigned int m_ObjectId;					//0x0028
 	BYTE m_Flags;								//0x002C  | An Entity cannot have this flag or'd with 3 game crashes (possibly a destroyed flag)
 	char alignment[3];							//0x002D
 	EntityHandle m_hParent;						//0x0030
@@ -379,7 +379,7 @@ public:
 	DWORD m_Flags;							//0x00598
 	DWORD dw0x0059C;						//0x0059C
 	char _0x5A0[24];						//0x005A0
-	unsigned int m_ModelType;				//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regualar, mech suit, and static -1)
+	unsigned int m_ObjectId;				//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regualar, mech suit, and static -1)
 	unsigned int unk0x005BC;				//0x005BC
 	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
 	BYTE unk0x05C4;							//0x005C4 | disable dynamic skirt?
@@ -431,7 +431,7 @@ typedef Entity_t Pl0000;
 IS_OFFSET_CORRECT(Entity_t, m_vPosition, 0x50)
 IS_OFFSET_CORRECT(Entity_t, m_pModelExtendWork, 0x140)
 IS_OFFSET_CORRECT(Entity_t, m_Flags, 0x598)
-IS_OFFSET_CORRECT(Entity_t, m_ModelType, 0x5B8)
+IS_OFFSET_CORRECT(Entity_t, m_ObjectId, 0x5B8)
 IS_OFFSET_CORRECT(Entity_t, m_pInfo, 0x610)
 IS_OFFSET_CORRECT(Entity_t, m_BehaviourExtensions, 0x6B0)
 IS_OFFSET_CORRECT(Entity_t, m_iHealth, 0x858)
@@ -469,7 +469,6 @@ struct Sun
 	char _0x0008[56];		 //0x0008
 	Vector4 m_vColor;		 //0x0040
 	float m_flBloom;		 //0x0044
-
 };
 
 /*
@@ -526,7 +525,7 @@ struct Mouse_t
 {
 	HWND hWnd;
 	IDirectInputDevice8A* pMouse;
-	BOOL bMouseAquired;
+	BOOL bAcquired;
 	BOOL bShowCursor;
 	BOOL bShowCursorOld;
 	int field_1C;
@@ -727,18 +726,20 @@ class CUserInfo
 	char _0x1C[4];  //0x1C	
 };
 
-class CHeapInstance
-{
-	void* m_pVtbl;
-	CRITICAL_SECTION m_CriticalSection;		 //0x0008
-	const char* m_szId;						 //0x0028 | doesn't line up  
-};
-
 class HeapAlloc_t
 {
 	LPVOID Pointer;
 	BOOL Succeeded;
 };
+
+class CHeapInstance
+{
+	void* m_pVtbl;
+	CRITICAL_SECTION m_CriticalSection;		//0x0008
+	HeapAlloc_t* m_pAllocation;				//0x0028
+	//const char* m_szId;						 //0x0028 | doesn't line up  
+};
+
 
 template<typename T>
 struct ConstructionInfo
@@ -749,6 +750,20 @@ struct ConstructionInfo
 	QWORD id;
 	const char* szName;
 	void* pUnk;
+};
+
+struct Create_t
+{
+	const char* m_szName;			//0x0000
+	unsigned int m_ModelTypes[2];	//0x0008
+	void* m_p0x0010;				//0x0010
+	void* m_p0x0018;				//0x0018
+	void* m_p0x0020;				//0x0020
+	int m_iUnk;						//0x0028
+	char alignment[4];				//0x002C
+	void* m_p0x0030;				//0x0030
+	Vector4 m_vec[2];				//0x0038
+	void* m_p0x0058;				//0x0058
 };
 
 typedef int DlcInstalled_t;

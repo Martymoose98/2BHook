@@ -5,6 +5,7 @@ GetEntityFromHandleFn GetEntityFromHandle;
 SetLocalPlayerFn SetLocalPlayer;
 ChangePlayerFn ChangePlayer;
 DestroyBuddyFn DestroyBuddy;
+GetConstructorFn GetConstructionInfo;
 FindSceneStateFn FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
 FNV1HashFn FNV1Hash;
@@ -17,7 +18,7 @@ XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
 int* g_piMoney;
-DWORD* g_pdwExperience;
+int* g_piExperience;
 
 HWND g_hWnd;
 HINSTANCE g_hInstance;
@@ -38,8 +39,7 @@ BYTE* g_pAntiFramerateCap_Spinlock;
 BYTE* g_pAntiFramerateCap_Test4;
 IDirectInput8A* g_pDirectInput8;
 IDirectInputDevice8A* g_pKeyboard;
-IDirectInputDevice8A* g_pMouse;
-Mouse_t* g_pGameMouse;
+Mouse_t* g_pMouse;
 CGraphics* g_pGraphics;
 ID3D11Device* g_pDevice;
 ID3D11DeviceContext* g_pDeviceContext;
@@ -67,6 +67,8 @@ CGraphicDeviceDx11* g_pCGraphicDevice;
 VirtualTableHook* g_pFactoryHook;
 VirtualTableHook* g_pSwapChainHook;
 VirtualTableHook* g_pDeviceContextHook;
+VirtualTableHook* g_pMouseHook;
+VirtualTableHook* g_pKeyboardHook;
 
 ImportTableHook* g_pQueryPerformanceCounterHook;
 ImportTableHook* g_pClipCursorHook;
