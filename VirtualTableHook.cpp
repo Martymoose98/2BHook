@@ -43,7 +43,7 @@ void VirtualTableHook::Unhook()
 		*m_ClassBase = m_OldVirtualTable;
 }
 
-void VirtualTableHook::ReHook()
+void VirtualTableHook::Rehook()
 {
 	if (m_ClassBase)
 		*m_ClassBase = m_NewVirtualTable;

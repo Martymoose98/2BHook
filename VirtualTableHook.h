@@ -16,7 +16,7 @@ public:
 	bool Initialize(QWORD*** pppqwClassBase);
 
 	void Unhook();
-	void ReHook();
+	void Rehook();
 
 	QWORD GetFunctionCount() const;
 	QWORD GetFunctionAddress(UINT uIndex) const;

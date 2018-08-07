@@ -26,7 +26,7 @@ CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE XorRdxRdx[] = { 0x48, 0x31, 0xD2 };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 BYTE RsiJumpHook[] = { 0x48, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD6, 0x90 };
-BYTE RdiJumpHook[] = { 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7, 0x90 };
+BYTE RdiJumpHook[] = { 0x90, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7 }; //0x57,
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 BYTE opcodes_query_performance_counter[] = { 0x90, 0x90, 0xE9, 0x00, 0x00, 0x00, 0x00 };
 
@@ -35,6 +35,7 @@ void InitHooks()
 	g_pFactoryHook = new VirtualTableHook((QWORD**)g_pFactory);
 	g_pSwapChainHook = new VirtualTableHook((QWORD**)g_pSwapChain);
 	g_pDeviceContextHook = new VirtualTableHook((QWORD**)g_pDeviceContext);
+	g_pMouseHook = new VirtualTableHook((QWORD**)g_pMouse->pMouse);
 
 #if NO_IAT_HOOKS
 	QueryPerformaceCounterFn QueryPerformanceCounterStub = (QueryPerformaceCounterFn)GetProcAddress(GetModuleHandle("kernel32.dll"), "QueryPerformanceCounter");
@@ -65,6 +66,8 @@ void InitHooks()
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
 	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((QWORD)hkDrawIndexed, 12);
 	oClearRenderTargetView = (ClearRenderTargetViewFn)g_pDeviceContextHook->HookFunction((QWORD)hkClearRenderTargetView, 50);
+	oMouseAcquire = (AcquireFn)g_pMouseHook->HookFunction((QWORD)hkMouseAcquire, 7);
+	oMouseGetDeviceState = (GetDeviceStateFn)g_pMouseHook->HookFunction((QWORD)hkMouseGetDeviceState, 9);
 
 	*(QWORD*)&opcodes_save_file_io[2] = (QWORD)hkSaveFileIO;
 
@@ -79,7 +82,7 @@ void InitHooks()
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
 	QWORD qwContainingFunc = g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
 
-	*(QWORD*)&RdiJumpHook[2] = (QWORD)hkCreateEntityThunk;
+	*(QWORD*)&RdiJumpHook[3] = (QWORD)hkCreateEntityThunk;
 
 	bp_CreateEntity[0].Address = (VOID*)(qwContainingFunc + 0x676);
 	bp_CreateEntity[0].nBytes = 13;
@@ -286,11 +289,12 @@ void Setup()
 	DestroyBuddy = (DestroyBuddyFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
 	HashStringCRC32 = (HashStringCRC32Fn)g_pMemory->FindPattern(NULL, "40 57 83 C8 FF");
+	GetConstructionInfo = (GetConstructorFn)g_pMemory->FindPattern(NULL, "33 D2 44 8B C9");
 	g_piMoney = (int*)g_pMemory->FindPatternPtr64(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
-	g_pdwExperience = (DWORD*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
+	g_piExperience = (int*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
 	g_pKeyboard = *(IDirectInputDevice8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
-	g_pGameMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
+	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);	
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = *g_pGraphics->m_Display.m_ppSwapChain;
@@ -317,7 +321,7 @@ void Setup()
 
 	if (!oWndProc)
 	{
-		LOG("2B Hook Failed Initalization!\nCould not get old wndproc function pointer!");
+		LOG("2B Hook Failed Initalization!\nCould not get old wndproc function pointer!\n");
 		return;
 	}
 

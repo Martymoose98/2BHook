@@ -6,6 +6,8 @@ DrawIndexedFn oDrawIndexed;
 PSSetShaderResourcesFn oPSSetShaderResources;
 ClearRenderTargetViewFn oClearRenderTargetView;
 QueryPerformaceCounterFn oQueryPerformanceCounter;
+AcquireFn oMouseAcquire;
+GetDeviceStateFn oMouseGetDeviceState;
 SetCursorPosFn oSetCursorPos;
 XInputGetStateFn oXInputGetState;
 CreateEntityFn oCreateEntity;
@@ -39,12 +41,14 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	if (pCutscene)
 	{
 		char* current_cutscene = (char*)(pCutscene + 0x1F4);
-		LOG("Current Cutscene: %s\n", current_cutscene);
+		//	LOG("Current Cutscene: %s\n", current_cutscene);
 	}
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
-		g_pMemory->RestoreMemory(&bp_CreateEntity[1]);
+		(*(int(*)(void*))(0x1401AE580))(g_pLocalPlayer);
+		//(*(void*(*)())(0x1430AC860))();
+
 		//DWORD crc = HashStringCRC32("Ba2014", 6);
 		//SceneState* p = (SceneState*)FindSceneState((PCRITICAL_SECTION)0x141ECF350, crc, "Ba2014", 6);
 		//((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &p);
@@ -53,7 +57,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 		//(*(__int64(*)(void*))(0x140AF7770))((void*)0x58940000);
 		//(*(void(*)(Entity_t*, int))(0x1401EF120))(g_pLocalPlayer, 1); //SetE3TimeTrial
-	}	
+	}
 
 
 	//if (GetAsyncKeyState(VK_F4) & 1)
@@ -104,7 +108,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_F11) & 1)
 	{
-		Array<EntityHandle>* pHandles = g_pEnemyManager->GetHandles3(); 
+		Array<EntityHandle>* pHandles = g_pEnemyManager->GetHandles3();
 
 		for (QWORD i = 0; i < pHandles->m_count; ++i)
 		{
@@ -226,7 +230,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			{
 				if (Vars.Gameplay.bTemporaryLevel)
 				{
-					Level_t* pLevel = CalculateLevel(&g_pLocalPlayer->m_LevelsContainer, *g_pdwExperience);
+					Level_t* pLevel = CalculateLevel(&g_pLocalPlayer->m_LevelsContainer, *g_piExperience);
 					pLevel->m_iLevel = Vars.Gameplay.iLevel;
 				}
 				else
@@ -236,7 +240,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 					else if (Vars.Gameplay.iLevel < 1)
 						Vars.Gameplay.iLevel = 1;
 
-					*g_pdwExperience = (DWORD)g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
+					*g_piExperience = g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
 				}
 			}
 
@@ -247,7 +251,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				*g_piMoney = MAX_MONEY;
 
 			ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
-		
+
 			if (ImGui::Button("Play Sound"))
 			{
 				Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
@@ -350,7 +354,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			ImGui::Checkbox("Ghost Model", &Vars.Gameplay.bGhostModel);
 
-			
+
 			if (pCameraEnt)
 			{
 				char szModelPart[64];
@@ -360,8 +364,8 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				sprintf_s(szModelPart, "ModelPart Color: (%s)", pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
 				ImGui::ColorPicker4(szModelPart, (float*)&pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_vColor);
 
-				if (!Vars.Gameplay.bRainbowModel)
-					ImGui::ColorPicker4("Model Tint Color", (float*)&pCameraEnt->m_pModelInfo->m_vTint);
+				//if (!Vars.Gameplay.bRainbowModel)
+				//	ImGui::ColorPicker4("Model Tint Color", (float*)&pCameraEnt->m_pModelInfo->m_vTint);
 
 				ImGui::InputFloat3("Model Scale (X,Y,Z)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(1));
 				ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(3));
@@ -500,16 +504,44 @@ void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11Render
 	oClearRenderTargetView(pThis, pRenderTargetView, ColorRGBA);
 }
 
-void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int modeltype, int flags, CHeapInstance** ppHeaps)
+HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis)
 {
-	ConstructionInfo<void>* pConstruct = (*(ConstructionInfo<void>* (*)(int))(0x1401A2C20))(modeltype);
+	g_pMouseHook->Unhook();
 
-	LOG("Created %s -> %s (%x)\n", pInfo->m_szEntityType, pConstruct->szName, modeltype);
+	HRESULT hr = oMouseAcquire(pThis);
 
-	void* pEntity = oCreateEntity(pUnknown, pInfo, modeltype, flags, ppHeaps); //0x1401A2B40
+	g_pMouseHook->Rehook();
+
+	return hr;
+}
+
+HRESULT __fastcall hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
+{
+	if (Vars.Menu.bOpened)
+		return DIERR_INPUTLOST;
+
+	g_pMouseHook->Unhook();
+
+	HRESULT hr = oMouseGetDeviceState(pThis, cbData, lpvData);
+
+	g_pMouseHook->Rehook();
+
+	return hr;
+}
+
+void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps)
+{
+	ConstructionInfo<void>* pConstruct = GetConstructionInfo(objectId);
+	
+	void* pEntity = NULL;
+
+	if (strcmp("Em4000", pConstruct->szName) && strcmp("EmParts", pConstruct->szName))//if (strcmp("NPC", pConstruct->szName))
+		pEntity = oCreateEntity(pUnknown, pInfo, objectId, flags, ppHeaps); //0x1401A2B40
 
 	if (!pEntity)
-		LOG("Creation Failed!");
+		LOG("Failed to create %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
+	else
+		LOG("Created %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
 
 	return pEntity;
 }
@@ -600,7 +632,7 @@ BOOL __fastcall hkSetCursorPos(int X, int Y)
 {
 	if (Vars.Menu.bOpened)
 		return FALSE;
-	
+
 	return oSetCursorPos(X, Y);
 }
 
