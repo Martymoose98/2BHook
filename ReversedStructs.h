@@ -542,7 +542,7 @@ struct Mouse_t
 	float fl_field_30;
 };
 
-enum eConrollerButtons
+enum eControllerButtons
 {
 	DPAD_LEFT = 0x1,
 	DPAD_RIGHT = 0x2,
@@ -841,7 +841,7 @@ class CAchievementDevice
 	QWORD qw0x18;
 	QWORD qw0x20;
 	CRITICAL_SECTION m_CriticalSection;
-	DWORD dw0x50;	// linked to the critical section
+	DWORD bCriticalSectionValid;
 	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
 	DWORD dw0x60;
 };
@@ -982,18 +982,19 @@ class CUserManager
 public:
 	void* m_pVtable;							//0x0000
 	CRITICAL_SECTION m_CriticalSection;			//0x0008
-	BOOL bUnknown;								//0x0030
+	BOOL m_bCriticalSectionValid;				//0x0030
 	char alignment[4];							//0x0034
 	CUserInfo m_UsersInfo[4];					//0x0038
 	int m_iActiveUser;							//0x00B8
-	char unk0x00BC[28];							//0x00BC
+	char unk0x00BC[12];							//0x00BC
+	DWORD dwUnknown;							//0x00C8
+	char unk0x00CC[12];							//0x00CC
 	CGameBootProcess* m_pBootProcess;			//0x00D8
 	CUserSignInProcess* m_pUserSignInProcess;	//0x00E0
 	CGameContentDevice* m_pGameContentDevice;	//0x00E8
 	CSaveDataDevice* m_pSaveDataDevice;			//0x00F0
 	CAchievementDevice* m_pAchivementDevice;	//0x00F8
 	DWORD _0x100;								//0x0100
-	DWORD _0x104;								//0x0104
 };
 IS_SIZE_CORRECT(CUserManager, 264)
 IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38)
