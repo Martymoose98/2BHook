@@ -774,6 +774,11 @@ struct Create_t
 class HandlerBase;
 typedef int DlcInstalled_t;
 
+/*
+This struct is completely guessed. The only thing correct is the size
+
+Size of is 0xC (12) bytes
+*/
 class CallbackInstalled
 {
 	DlcInstalled_t m_installed;
