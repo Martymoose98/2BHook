@@ -30,6 +30,7 @@
 
 // visual studio says correct offsets are wrong before compalation on interfaces rifk
 #define IS_OFFSET_CORRECT(s, m, offset) CASSERT(offsetof(s, m) == (offset), ReversedStructs)
+#define IS_SIZE_CORRECT(s, size) CASSERT(sizeof(s) == (size), ReversedStructs)
 
 #define ENTITY_REAL_VTABLE
 
@@ -150,7 +151,7 @@ struct ModelInfo
 };
 
 /*
-Model Part 
+Model Part
 size = 0x70 (112) bytes
 */
 struct ModelPart
@@ -177,7 +178,7 @@ struct MappedModel
 	DWORD dw0xC0;		//0x00C0
 };
 
-class BehaviorAppBase 
+class BehaviorAppBase
 {
 public:
 	typedef DWORD TimeLimitedFlag;
@@ -188,7 +189,7 @@ class BehaviorExtension
 
 };
 
-class CModelExtendWorkBase 
+class CModelExtendWorkBase
 {
 	virtual void function0();
 	virtual void function1();
@@ -208,7 +209,7 @@ class CModelExtendWork : public CModelExtendWorkBase
 
 class ExWaypoint : public BehaviorExtension
 {
-	
+
 };
 
 class ExBaseInfo : public BehaviorExtension
@@ -448,7 +449,7 @@ IS_OFFSET_CORRECT(Entity_t, m_hUnknown2, 0x16CEC)
 IS_OFFSET_CORRECT(Entity_t, m_dwAccessory, 0x1708C)
 IS_OFFSET_CORRECT(Entity_t, m_hUnknown3, 0x1746C)
 
-class CCamera  
+class CCamera
 {
 public:
 	void* m_vtable;				//0x0000
@@ -483,7 +484,7 @@ size = 0x20 (32) bytes
 struct SceneStateHead
 {
 
-};	
+};
 
 // this has a doubly linked list for sure prbably a different struct tho
 // that is 32 bytes that is the head
@@ -553,7 +554,7 @@ enum eConrollerButtons
 	Y = 0x80,
 	START = 0x100,
 	BACK = 0x200,
-	LEFT_SHOULDER = 0x400, 
+	LEFT_SHOULDER = 0x400,
 	LEFT_THUMB = 0x1000,
 	RIGHT_SHOULDER = 0x2000,
 	RIGHT_THUMB = 0x8000
@@ -580,6 +581,8 @@ pointers but not a swapchain pointer nor an adapter pointer. Perhaps, I just hav
 disovered them. In addition I haven't found a global pointer that directly points to
 this structure. This is a virtual class after further investigation. Correctly
 renamed the class to it's proper name. It seems there might be a nested struct too.
+
+ Size of struct 0x110 (272) bytes
  */
 class CGraphicDeviceDx11
 {
@@ -608,13 +611,11 @@ public:
 	IDXGIFactory* pFactory2;				//0x0078 | same pointer as first
 	char _0x0080[96];						//0x0080 | pointers in here
 	BOOL isWindowed;						//0x00E0
-	float flUnk;							//0x00E4
+	float flFrameRate;						//0x00E4
 	char _0x00E8[24];						//0x00E8
 	wchar_t* pszGraphicsAdapterName;		//0x0100 (array?) maybe DXGI_OUTPUT_DESC*
-	unsigned int iCurrentAdapterNameIndex;	//0x0108
-	char _0x0108[20];						//0x010C
-
-};//Size=0x0120 at most 0x160
+	QWORD qwCurrentAdapterNameIndex;		//0x0108
+};
 
 class CGraphicContextDx11
 {
@@ -675,11 +676,13 @@ Size of the struct is 0xD0 (208) bytes
 struct CSaveDataDevice
 {
 	void* m_pVtable;				//0x0000
-	QWORD qwUnk0x08;				//0x0008
+	DWORD dwUnk0x08;				//0x0008
+	char _0x000C[4];				//0x000C
 	CSaveSlot* pSaveSlots;			//0x0010
-	DWORD nMaxSlot;					//0x0018
-	DWORD dwUnk0x1C;				//0x001C
-	char unk0x0020[16];				//0x0020
+	QWORD nMaxSlot;					//0x0018
+	QWORD qw0x0020;					//0x0020
+	int i0x0028;					//0x0028
+	char _0x002C[4];				//0x002C
 	union
 	{
 		QWORD qwFlags;				//0x0030
@@ -693,7 +696,7 @@ struct CSaveDataDevice
 	char unk0x003C[4];				//0x003C | Aligment maybe
 	HANDLE hFile;					//0x0040
 	OVERLAPPED overlapped;			//0x0048
-	DWORD nBytesToIO;				//0x0068
+	DWORD nBytesToIO;				//0x0068 | maybe nBytesToIO and nBytesIO are a struct
 	DWORD nBytesIO;					//0x006C
 	void* pSlotDataBuffer;			//0x0070
 	QWORD qwSlotDataBufferSize;		//0x0078
@@ -702,12 +705,9 @@ struct CSaveDataDevice
 	void* pSystemDataBuffer;		//0x0090 | includes screen dimensions
 	QWORD qwSystemDataBufferSize;	//0x0098
 	void* pBuffer;					//0x00A0
-	DWORD nBytesIO_SystemData;		//0x00A8
-	DWORD dwUnk0xAC;				//0x00AC | Aligment maybe
-	DWORD nBytesIO_GameData;		//0x00B0
-	DWORD dwUnk0xB4;				//0x00B4 | Aligment maybe
-	DWORD nBytesIO_SaveData;		//0x00B8
-	DWORD dwUnk0xBC;				//0x00BC
+	QWORD nBytesIO_SystemData;		//0x00A8
+	QWORD nBytesIO_GameData;		//0x00B0
+	QWORD nBytesIO_SaveData;		//0x00B8
 	DWORD dwUnk0xC0;				//0x00C0
 	DWORD dwUnk0xC4;				//0x00C4
 	QWORD qwUnk0xC8;				//0x00C8 | this is an inline struct
@@ -751,7 +751,7 @@ struct ConstructionInfo
 {
 	DWORD modeltype;
 	char alignment[4];
-	T* (* Construtor)(CHeapInstance**);
+	T* (*Construtor)(CHeapInstance**);
 	QWORD id;
 	const char* szName;
 	void* pUnk;
@@ -771,34 +771,101 @@ struct Create_t
 	void* m_p0x0058;				//0x0058
 };
 
+class HandlerBase;
 typedef int DlcInstalled_t;
-class CGameContentDevice;
 
+class CallbackInstalled
+{
+	DlcInstalled_t m_installed;
+	BOOL m_bInstalled;
+	DWORD dwUnk;
+};
+
+/*
+Size of is 0x38 (56) bytes
+*/
 class CGameContentDeviceSteam
 {
 public:
-	void* m_pVtbl;														//0x0000
-	CCallback<CGameContentDevice, DlcInstalled_t, false> m_Callback;	//0x0008  | id is 1005
-	DWORD unk0x018;														//0x0018
-
+	void* m_pVtbl;															//0x0000
+	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008  | id is 1005
+	CallbackInstalled* m_pItems;											//0x0028
+	QWORD m_nItems;															//0x0030
 };
+IS_SIZE_CORRECT(CGameContentDeviceSteam, 56)
 
+/*
+Size of is 0x48 (72) bytes
+*/
 class CGameContentDevice
 {
 public:
 	void* m_pVtbl;														//0x0000
-	QWORD unk0x08;														//0x0008
-	DWORD unk0x10;														//0x0010
-	DWORD unk0x14;														//0x0014
-	void* m_pNext; //?? points to next device							//0x0018
+	HandlerBase* m_pHandler;											//0x0008
+	QWORD unk0x10;														//0x0010
+	DWORD unk0x18;														//0x0018
 	void(__fastcall* sub_1407EBE30)(__int64 a1, int *a2);				//0x0020
 	void(__fastcall* sub_1407EBEE0)(int a1);							//0x0028
 	CHeapInstance** m_ppHeap;											//0x0030 | probably a parent pointer
 	CGameContentDeviceSteam* m_pSteamContent;							//0x0038
 	DWORD unk0x40;														//0x0040
 };
+IS_SIZE_CORRECT(CGameContentDevice, 72)
 
-class CGameBootProcess;
+/*
+Size of is 0x20 (32) bytes
+*/
+class CAchievementDeviceSteam
+{
+	void* m_pVtable;					//0x00
+	ISteamUser019* m_pUser;				//0x08
+	ISteamUserStats011* m_pUserStats;	//0x10
+	void* m_pUnknown;					//0x18
+};
+IS_SIZE_CORRECT(CAchievementDeviceSteam, 32)
+
+/*
+Size of is 0x68 (104) bytes
+*/
+class CAchievementDevice
+{
+	QWORD qw0x00;
+	QWORD qw0x08;
+	DWORD dw0x10;
+	DWORD dw0x14;
+	QWORD qw0x18;
+	QWORD qw0x20;
+	CRITICAL_SECTION m_CriticalSection;
+	DWORD dw0x50;	// linked to the critical section
+	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
+	DWORD dw0x60;
+};
+IS_SIZE_CORRECT(CAchievementDevice, 104)
+
+/*
+Size of is 0x20 (32) bytes
+*/
+class CUserSignInProcess
+{
+public:
+	void* m_pVtbl;			//0x00
+	void* pUnk0x08;			//0x08
+	char unknown[16];		//0x10
+};
+IS_SIZE_CORRECT(CUserSignInProcess, 32)
+
+/* 
+This struct is an oddball and is quite fucked
+
+Size of is 0x18 (24) bytes
+*/
+class CGameBootProcess
+{
+public:
+	void* m_pVtbl;			//0x00
+	char unknown[16];		//0x08
+};
+IS_SIZE_CORRECT(CGameBootProcess, 24)
 
 class YorhaManager
 {
@@ -865,7 +932,7 @@ public:
 	virtual Entity_t* function20(Vector3Aligned* pvPosition, int a2);
 	virtual bool function21(Entity_t* pEntity);
 	virtual bool function22(EntityInfo* pInfo); //calls/returns vfunc 21
-    virtual bool function23(EntityHandle* pHandle); //calls/returns vfunc 21
+	virtual bool function23(EntityHandle* pHandle); //calls/returns vfunc 21
 	virtual bool function24(Entity_t* pEntity);
 	virtual bool function25(EntityInfo* pInfo);//calls/returns vfunc 24
 	virtual bool function26(EntityHandle* pHandle); //calls/returns vfunc 24
@@ -908,24 +975,23 @@ IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
 class CUserManager
 {
 public:
-	void* m_pVtable;						 //0x0000
-	CRITICAL_SECTION m_CriticalSection;		 //0x0008
-	BOOL bUnknown;							 //0x0030
-	char alignment[4];						 //0x0034
-	CUserInfo m_UsersInfo[4];				 //0x0038
-	int m_iActiveUser;						 //0x00B8
-	char unk0x00BC[28];						 //0x00BC
-	CGameBootProcess* m_pBootProcess;		 //0x00D8 | func ptr? naw
-	void* unk;								 //0x00E0 | func ptr? naw
-	CGameContentDevice* m_pGameContentDevice;//0x00E8
-	CSaveDataDevice* m_pSaveDataDevice;		 //0x00F0
-	void* _0x00F8;							 //0x00F8
-	DWORD _0x0100;							 //0x0100
-	char _0x00DF8[204];						 //0x0104
-	char* m_szState;						 //0x01D0
+	void* m_pVtable;							//0x0000
+	CRITICAL_SECTION m_CriticalSection;			//0x0008
+	BOOL bUnknown;								//0x0030
+	char alignment[4];							//0x0034
+	CUserInfo m_UsersInfo[4];					//0x0038
+	int m_iActiveUser;							//0x00B8
+	char unk0x00BC[28];							//0x00BC
+	CGameBootProcess* m_pBootProcess;			//0x00D8
+	CUserSignInProcess* m_pUserSignInProcess;	//0x00E0
+	CGameContentDevice* m_pGameContentDevice;	//0x00E8
+	CSaveDataDevice* m_pSaveDataDevice;			//0x00F0
+	CAchievementDevice* m_pAchivementDevice;	//0x00F8
+	DWORD _0x100;								//0x0100
+	DWORD _0x104;								//0x0104
 };
+IS_SIZE_CORRECT(CUserManager, 264)
 IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38)
 IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8)
 IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8)
 IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0)
-IS_OFFSET_CORRECT(CUserManager, m_szState, 0x1D0)

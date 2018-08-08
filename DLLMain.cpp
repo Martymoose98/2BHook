@@ -384,16 +384,12 @@ void Unhook()
 	g_pMemory->RestoreMemory(&bp_save_file_io);
 	g_pMemory->RestoreMemory(&bp_query_performance_counter);
 
-	g_pQueryPerformanceCounterHook->Unhook();
-	g_pClipCursorHook->Unhook();
-	g_pFactoryHook->Unhook();
-	g_pSwapChainHook->Unhook();
-	g_pDeviceContextHook->Unhook();
 	delete g_pQueryPerformanceCounterHook;
 	delete g_pClipCursorHook;
 	delete g_pFactoryHook;
 	delete g_pSwapChainHook;
 	delete g_pDeviceContextHook;
+	delete g_pMouseHook;
 	delete g_pMemory;
 
 	SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
