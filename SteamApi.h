@@ -1,5 +1,7 @@
 #pragma once
 
+typedef int HSteamPipe;
+typedef int HSteamUser;
 typedef unsigned long long SteamAPICall_t;
 
 class CCallbackBase
@@ -107,3 +109,8 @@ private:
 
 void SteamAPI_RegisterCallback(CCallbackBase* pCallback, int iCallback);
 void SteamAPI_UnregisterCallback(CCallbackBase* pCallback);
+
+struct GameOverlayActivated_t { bool m_bActive; };
+
+class ISteamUser019;
+class ISteamUserStats011;
