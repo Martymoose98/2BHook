@@ -36,7 +36,9 @@ void InitHooks()
 	g_pFactoryHook = new VirtualTableHook((QWORD**)g_pFactory);
 	g_pSwapChainHook = new VirtualTableHook((QWORD**)g_pSwapChain);
 	g_pDeviceContextHook = new VirtualTableHook((QWORD**)g_pDeviceContext);
+	g_pKeyboardHook = new VirtualTableHook((QWORD**)g_pKeyboard->pKeyboard);
 	g_pMouseHook = new VirtualTableHook((QWORD**)g_pMouse->pMouse);
+	
 
 #if NO_IAT_HOOKS
 	QueryPerformaceCounterFn QueryPerformanceCounterStub = (QueryPerformaceCounterFn)GetProcAddress(GetModuleHandle("kernel32.dll"), "QueryPerformanceCounter");
@@ -67,6 +69,8 @@ void InitHooks()
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
 	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((QWORD)hkDrawIndexed, 12);
 	oClearRenderTargetView = (ClearRenderTargetViewFn)g_pDeviceContextHook->HookFunction((QWORD)hkClearRenderTargetView, 50);
+	oKeyboardAcquire = (AcquireFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardAcquire, 7);
+	oKeyboardGetDeviceState = (GetDeviceStateFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardGetDeviceState, 9);
 	oMouseAcquire = (AcquireFn)g_pMouseHook->HookFunction((QWORD)hkMouseAcquire, 7);
 	oMouseGetDeviceState = (GetDeviceStateFn)g_pMouseHook->HookFunction((QWORD)hkMouseGetDeviceState, 9);
 
@@ -293,7 +297,7 @@ void Setup()
 	g_piMoney = (int*)g_pMemory->FindPatternPtr64(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
 	g_piExperience = (int*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
-	g_pKeyboard = *(IDirectInputDevice8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
+	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);	
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
@@ -392,8 +396,11 @@ void Unhook()
 	delete g_pFactoryHook;
 	delete g_pSwapChainHook;
 	delete g_pDeviceContextHook;
+	delete g_pKeyboardHook;
 	delete g_pMouseHook;
 	delete g_pMemory;
+
+	ImGui_ImplDX11_Shutdown();
 
 	SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
 
