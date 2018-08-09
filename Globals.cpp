@@ -24,7 +24,7 @@ HWND g_hWnd;
 HINSTANCE g_hInstance;
 HANDLE* g_pHeaps;
 
-Entity_t* g_pLocalPlayer;
+Pl0000* g_pLocalPlayer;
 EntityHandle* g_pLocalPlayerHandle;
 CUserManager* g_pUserManager;
 YorhaManager* g_pYorhaManager;

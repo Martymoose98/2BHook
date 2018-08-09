@@ -54,7 +54,7 @@ void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11Render
 HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis);
 HRESULT __fastcall hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
 void __fastcall hkSaveFileIO(CSaveDataDevice* pSave);
-extern "C" void __fastcall hkModelParts(Entity_t* pEntity);
+extern "C" void __fastcall hkModelParts(Pl0000* pEntity);
 extern "C" void* __fastcall hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 extern "C" void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 LRESULT __fastcall WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
