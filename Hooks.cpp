@@ -24,7 +24,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	g_pQueryPerformanceCounterHook->Rehook();
 
 	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
-	Entity_t* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
+	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
 	SceneState s;
 	//Entity_t* pBuddy = oGetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 	//QWORD v[3];
@@ -318,7 +318,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
 			{
-				Entity_t* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+				Pl0000* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 
 				if (pBuddy)
 					DestroyBuddy(pBuddy);
@@ -357,6 +357,8 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			if (pCameraEnt)
 			{
+				ImGui::InputFloat3("Position (X,Y,Z)", (float*)&pCameraEnt->m_vPosition);
+
 				char szModelPart[64];
 				sprintf_s(szModelPart, "ModelPart: (%s)", pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
 				ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelPart, 0, pCameraEnt->m_nModelParts - 1);

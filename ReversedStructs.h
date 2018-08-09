@@ -18,7 +18,7 @@
 #define SAVE_SLOT1DATA 1
 #define SAVE_SLOT2DATA 2
 
-#define ARRAY_FLAGS_FREE 1
+#define FLAGS_FREE 1
 
 #define _MM_RSHUFFLE(mask, x, y, z, w) \
 	 (x) = ((mask & 0xC) >> 2);		   \
@@ -40,7 +40,7 @@ typedef DWORD EntityHandle;
 
 enum TypeId {};
 
-class Entity_t;
+class Pl0000;
 
 /*
 Nier Automata's lib::Array<T>
@@ -69,6 +69,18 @@ public:
 	T m_items[size];	//0x0020
 };
 
+/*
+Nier Automata's lib::AllocatedArray<T>
+*/
+template<typename T>
+class AllocatedArray
+{
+public:
+	T* m_pItems;	//0x0008 
+	QWORD m_count;	//0x0010
+	QWORD m_size;	//0x0018
+};
+
 struct Sound
 {
 	const char* m_szName;
@@ -78,7 +90,7 @@ struct Sound
 
 struct SoundEmitter
 {
-	Entity_t* m_pEntity; // this is some lower interface like behaviour
+	Pl0000* m_pEntity; // this is some lower interface like behaviour
 	int m_index;		 // have no fucking clue what this is checks if its -1 so it's an int
 };
 
@@ -90,35 +102,6 @@ public:
 	void* punk;			//0x0008
 	void* punk2;		//0x0010
 	void* pFunction;	//0x0018
-};
-
-/*
-Level structure used for level and when you level up
-size = 28 bytes
-*/
-struct Level_t
-{
-	int m_iMinimumExperience;		//0x0000 
-	int m_iHealth;					//0x0004 new max health 
-	int m_iBaseAttack;				//0x0008 idk about this one for sure
-	int m_iDefense;					//0x000C
-	int m_iLevel;					//0x0010 new level
-	int unk0x14;					//0x0014
-	int unk0x18;					//0x0018
-};
-
-
-/*
-Size [8 byte aligned] = 2808 (0xAF8) bytes
-Size [4 byte aligned] = 2804 (0xAF4) bytes
-*/
-struct ExExpInfo
-{
-	void* m_vtable;			//0x0000
-	void** unk;				//0x0008
-	QWORD unk0x10;			//0x0010
-	QWORD unk0x18;			//0x0018
-	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
 };
 
 struct Unknown_t;
@@ -133,10 +116,10 @@ struct EntityInfo
 	EntityHandle m_hParent;						//0x0030
 	char _0x0038[4];							//0x0034
 	char* m_pszData[2];							//0x0038
-	Entity_t* m_pEntity;						//0x0048
+	Pl0000* m_pEntity;						//0x0048
 	const char** m_pszDat;						//0x0050  | struct pointer
 	DWORD* m_pUnk;								//0x0058  | dword array 2 members (0x1415F6B50)
-	Entity_t* m_pParent;						//0x0060
+	Pl0000* m_pParent;						//0x0060
 	BOOL bSetInfo;								//0x0068
 	DWORD _0x006C;								//0x006C
 	DWORD _0x0070;								//0x0070
@@ -204,7 +187,7 @@ class CModelExtendWork : public CModelExtendWorkBase
 	DWORD _0x0010;		//0x10
 	DWORD _0x0014;		//0x14
 	char _0x0018[12];	//0x18
-	Entity_t* m_pParent;//0x2C	
+	Pl0000* m_pParent;//0x2C	
 };
 
 class ExWaypoint : public BehaviorExtension
@@ -221,8 +204,59 @@ public:
 	virtual void function3();
 	virtual void function4();
 	virtual void function5();
+};
 
+/*
+Level structure used for level and when you level up
+size = 28 bytes
+*/
+struct Level_t
+{
+	int m_iMinimumExperience;		//0x0000 
+	int m_iHealth;					//0x0004 new max health 
+	int m_iBaseAttack;				//0x0008 idk about this one for sure
+	int m_iDefense;					//0x000C
+	int m_iLevel;					//0x0010 new level
+	int unk0x14;					//0x0014
+	int unk0x18;					//0x0018
+};
 
+/*
+Size [8 byte aligned] = 2808 (0xAF8) bytes
+Size [4 byte aligned] = 2804 (0xAF4) bytes
+*/
+struct ExExpInfo
+{
+	void* m_vtable;			//0x0000
+	void** unk;				//0x0008
+	QWORD unk0x10;			//0x0010
+	QWORD unk0x18;			//0x0018
+	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
+};
+
+class ExLockOn : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
+};
+
+class ExCatch : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
+};
+
+class ExAttack : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
+};
+
+class ExDamage : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
+};
+
+class ExAttackCombo : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
 };
 
 class CXmlBinary
@@ -231,12 +265,23 @@ class CXmlBinary
 };
 
 /*
+Size of struct 0x670 (1648) bytes 
+*/
+class CObj
+{
+	void* m_pVtbl;	//0x0000
+	char pad[1640];	//0x0008
+};
+
+/*
 NieR:Automata's Entity class idk if it's the right name (actual Pl0000). Just started to
 reverse this and this structure is fucking huge!
 */
-class Entity_t
+class Pl0000
 {
 public:
+	typedef int PassiveSkill;
+
 #ifdef ENTITY_REAL_VTABLE
 	virtual void function0() PURE;
 	virtual void function1() PURE;
@@ -278,7 +323,7 @@ public:
 	virtual void function37_off() PURE;
 	virtual void function38_on() PURE;
 	virtual void function39() PURE;
-	virtual __int64 __fastcall EmitSound(const char *szName, Entity_t* pSourceEntity, __int64 a4, __int64 a5, unsigned int a6) PURE;
+	virtual __int64 __fastcall EmitSound(const char *szName, Pl0000* pSourceEntity, __int64 a4, __int64 a5, unsigned int a6) PURE;
 	virtual void function41() PURE;
 	virtual void function42() PURE;
 	virtual void function43() PURE;
@@ -415,7 +460,9 @@ public:
 	ExExpInfo m_LevelsContainer;			//0x02078
 	char _0x02B70[56056];					//0x02B70
 	int m_iHealth2;							//0x10668
-	char _0x1066C[21736];					//0x1066C
+	char _0x1066C[10324];					//0x1066C
+	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
+	char _0x130E0[10868];					//0x130E0
 	EntityHandle m_hUnknown;				//0x15B54 | one of these unknown handles are probably your tamed animal lel
 	char _0x15B58[880];						//0x15B58
 	StaticArray<EntityHandle, 64> m_Handles;//0x15EC8
@@ -423,31 +470,34 @@ public:
 	EntityHandle m_hBuddy;					//0x1646C | Localplayer = 0x1000C00, Buddy = 0x1020400
 	char _0x16470[272];						//0x16470
 	StaticArray<EntityHandle, 4> m_Handles2;//0x16580
-	char _0x165B0[1852];					//0x165B0
+	char _0x165B0[72];						//0x165B0
+	StaticArray<Pl0000::PassiveSkill, 100> m_PassiveSkills;	//0x165F8
+	char _0x167A8[1348];					//0x167A8
 	EntityHandle m_hUnknown2;				//0x16CEC
 	char _0x16CF0[924];						//0x16CF0
 	DWORD m_dwAccessory;					//0x1708C
 	char _0x17090[988];						//0x17090
 	EntityHandle m_hUnknown3;				//0x1746C
 };
-typedef Entity_t Pl0000;
-IS_OFFSET_CORRECT(Entity_t, m_vPosition, 0x50)
-IS_OFFSET_CORRECT(Entity_t, m_pModelExtendWork, 0x140)
-IS_OFFSET_CORRECT(Entity_t, m_pMappedModel, 0x398)
-IS_OFFSET_CORRECT(Entity_t, m_pModelExtend, 0x518)
-IS_OFFSET_CORRECT(Entity_t, m_pModelInfo, 0x540)
-IS_OFFSET_CORRECT(Entity_t, m_Flags, 0x598)
-IS_OFFSET_CORRECT(Entity_t, m_ObjectId, 0x5B8)
-IS_OFFSET_CORRECT(Entity_t, m_pInfo, 0x610)
-IS_OFFSET_CORRECT(Entity_t, m_BehaviourExtensions, 0x6B0)
-IS_OFFSET_CORRECT(Entity_t, m_iHealth, 0x858)
-IS_OFFSET_CORRECT(Entity_t, m_pCObjHitVtable, 0x14F0)
-IS_OFFSET_CORRECT(Entity_t, m_LevelsContainer, 0x2078)
-IS_OFFSET_CORRECT(Entity_t, m_hUnknown, 0x15B54)
-IS_OFFSET_CORRECT(Entity_t, m_hBuddy, 0x1646C)
-IS_OFFSET_CORRECT(Entity_t, m_hUnknown2, 0x16CEC)
-IS_OFFSET_CORRECT(Entity_t, m_dwAccessory, 0x1708C)
-IS_OFFSET_CORRECT(Entity_t, m_hUnknown3, 0x1746C)
+typedef Pl0000 Entity2B;
+IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50)
+IS_OFFSET_CORRECT(Pl0000, m_pModelExtendWork, 0x140)
+IS_OFFSET_CORRECT(Pl0000, m_pMappedModel, 0x398)
+IS_OFFSET_CORRECT(Pl0000, m_pModelExtend, 0x518)
+IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540)
+IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598)
+IS_OFFSET_CORRECT(Pl0000, m_ObjectId, 0x5B8)
+IS_OFFSET_CORRECT(Pl0000, m_pInfo, 0x610)
+IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0)
+IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858)
+IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0)
+IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078)
+IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0)
+IS_OFFSET_CORRECT(Pl0000, m_hUnknown, 0x15B54)
+IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1646C)
+IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CEC)
+IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1708C)
+IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1746C)
 
 class CCamera
 {
@@ -457,12 +507,12 @@ public:
 	Matrix4x4 m_mat1;			//0x0010
 	float m_flZoom;				//0x0050
 	char _0x0054[84];			//0x0054
-	Entity_t* m_pEntity;		//0x00A8
+	Pl0000* m_pEntity;			//0x00A8
 	DWORD dwUnk;				//0x00B0
 	char _0x00B4[28];			//0x00B4
 	EntityHandle m_hEntity;		//0x00D0
 	DWORD alignment;			//0x00D4
-	Entity_t* m_pEntites[2];	//0x00E0
+	Pl0000* m_pEntites[2];		//0x00E0
 	QWORD unknown;				//0x00F0
 	Matrix4x4 m_mat2;			//0x00F8
 };
@@ -724,11 +774,12 @@ class CUserInfo
 {
 	virtual ~CUserInfo();
 
-	BOOL bActive;	//0x08
-	char _0x0C[4];	//0x0C
-	int idk;		//0x10
-	int index[2];	//0x14
-	char _0x1C[4];  //0x1C	
+	BOOL m_bLoggedOn;	//0x08
+	char _0x0C[4];		//0x0C
+	int idk;			//0x10
+	BOOL m_bInit;		//0x14
+	int index;			//0x18
+	char _0x1C[4];		//0x1C	
 };
 
 class HeapAlloc_t
@@ -791,6 +842,8 @@ Size of is 0x38 (56) bytes
 */
 class CGameContentDeviceSteam
 {
+	// virtual void function1(CGameContentDevice* pGameContentDevice, CUserManager* pUserManager);//  (*(void (__fastcall **)(void *, CGameContentDevice *, CUserManager *))(*(_QWORD *)pGameSteamContent + 16i64))(pGameSteamContent, pGameContent, pUserManager2);
+
 public:
 	void* m_pVtbl;															//0x0000
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008  | id is 1005
@@ -883,9 +936,9 @@ class FlightSuitManager
 {
 public:
 	virtual void function0(); //maybe constructor
-	virtual EntityHandle GetHandle(Entity_t* pEntity);
+	virtual EntityHandle GetHandle(Pl0000* pEntity);
 	virtual Array<EntityHandle>* GetHandles();
-	virtual Entity_t* GetClosestEntity(Vector3Aligned* pvPosition, Entity_t* pEntity);
+	virtual Pl0000* GetClosestEntity(Vector3Aligned* pvPosition, Pl0000* pEntity);
 	virtual unsigned int CountEntitiesWithinDistance(Vector3Aligned* pvPosition, float max_distance);
 	virtual void function4();
 
@@ -898,7 +951,7 @@ class NPCManager
 {
 public:
 	virtual void function0(); //maybe constructor
-	virtual EntityInfo* sub_1439C5CA0(Entity_t* pEntity);
+	virtual EntityInfo* sub_1439C5CA0(Pl0000* pEntity);
 	virtual Array<EntityHandle>* GetHandles();
 	virtual __int64 GetField428();
 	virtual DWORD* GetField42C(OUT DWORD* a1);
@@ -926,25 +979,25 @@ public:
 	virtual Array<EntityHandle>* GetHandles();
 	virtual unsigned int GetHandleIndex();
 	virtual Array<EntityHandle>* GetHandles2();
-	virtual Entity_t* GetEntity();  // from the 0x14bc handle
-	virtual Entity_t* GetEntity2(); // from the 0x14bc handle
+	virtual Pl0000* GetEntity();  // from the 0x14bc handle
+	virtual Pl0000* GetEntity2(); // from the 0x14bc handle
 	virtual void* GetAddressOfField858(); //probably another Array<EntityHandle>
 	virtual void SetField14B8(float a1);
 	virtual Array<EntityHandle>* GetHandles3();
-	virtual Entity_t* function17(Vector3Aligned* pvPosition, int a2);
+	virtual Pl0000* function17(Vector3Aligned* pvPosition, int a2);
 	virtual Array<EntityHandle>* GetHandles4();
-	virtual Entity_t* function19(Vector3Aligned* pvPosition, int a2);
-	virtual Entity_t* function20(Vector3Aligned* pvPosition, int a2);
-	virtual bool function21(Entity_t* pEntity);
+	virtual Pl0000* function19(Vector3Aligned* pvPosition, int a2);
+	virtual Pl0000* function20(Vector3Aligned* pvPosition, int a2);
+	virtual bool function21(Pl0000* pEntity);
 	virtual bool function22(EntityInfo* pInfo); //calls/returns vfunc 21
 	virtual bool function23(EntityHandle* pHandle); //calls/returns vfunc 21
-	virtual bool function24(Entity_t* pEntity);
+	virtual bool function24(Pl0000* pEntity);
 	virtual bool function25(EntityInfo* pInfo);//calls/returns vfunc 24
 	virtual bool function26(EntityHandle* pHandle); //calls/returns vfunc 24
 	virtual bool IsEntityValid(); //return GetEntity() != 0;
 	virtual EntityHandle function28(EntityInfo* pInfo); //calls/returns IsEntityValid (vfunc 27)
 	virtual void function29(EntityHandle* pHandle);
-	virtual bool function30(Entity_t* pEntity);
+	virtual bool function30(Pl0000* pEntity);
 	virtual bool function31(EntityInfo* pInfo); //calls/returns vfunc 30
 	virtual bool function32(EntityHandle* pHandle); //calls/returns vfunc 30
 	virtual void function33();
@@ -980,15 +1033,16 @@ IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
 class CUserManager
 {
 public:
-	void* m_pVtable;							//0x0000
+	virtual CUserManager* Clear(BYTE bFlags);
+
 	CRITICAL_SECTION m_CriticalSection;			//0x0008
 	BOOL m_bCriticalSectionValid;				//0x0030
 	char alignment[4];							//0x0034
 	CUserInfo m_UsersInfo[4];					//0x0038
 	int m_iActiveUser;							//0x00B8
-	char unk0x00BC[12];							//0x00BC
+	int m_iUserIndices[3];						//0x00BC
 	DWORD dwUnknown;							//0x00C8
-	char unk0x00CC[12];							//0x00CC
+	QWORD qw0x00D0;								//0x00D0	
 	CGameBootProcess* m_pBootProcess;			//0x00D8
 	CUserSignInProcess* m_pUserSignInProcess;	//0x00E0
 	CGameContentDevice* m_pGameContentDevice;	//0x00E8
@@ -999,5 +1053,6 @@ public:
 IS_SIZE_CORRECT(CUserManager, 264)
 IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38)
 IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8)
+IS_OFFSET_CORRECT(CUserManager, m_iUserIndices, 0xBC)
 IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8)
 IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0)

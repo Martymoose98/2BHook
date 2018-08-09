@@ -14,7 +14,7 @@ static void DisplayEntityHandles()
 		ppszHandles[i] = new char[64];
 		EntityHandle hCurrent = g_pNPCManager->m_handles.m_pItems[i];
 		handles[i] = hCurrent;
-		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
+		Pl0000* pCurrent = GetEntityFromHandle(&hCurrent);
 
 		sprintf_s(ppszHandles[i], 64, "NPC: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
 	}
@@ -24,7 +24,7 @@ static void DisplayEntityHandles()
 		ppszHandles[i] = new char[64];
 		EntityHandle hCurrent = g_pEnemyManager->m_handles.m_pItems[i];
 		handles[i] = hCurrent;
-		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
+		Pl0000* pCurrent = GetEntityFromHandle(&hCurrent);
 
 		sprintf_s(ppszHandles[i], 64, "Enemy %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
 	}
@@ -34,7 +34,7 @@ static void DisplayEntityHandles()
 		ppszHandles[i] = new char[64];
 		EntityHandle hCurrent = g_pYorhaManager->m_handles.m_pItems[i];
 		handles[i] = hCurrent;
-		Entity_t* pCurrent = GetEntityFromHandle(&hCurrent);
+		Pl0000* pCurrent = GetEntityFromHandle(&hCurrent);
 
 		sprintf_s(ppszHandles[i], 64, "Yorha: %s | Handle: %x | Model: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
 	}
@@ -43,7 +43,7 @@ static void DisplayEntityHandles()
 
 	if (ImGui::Button("Set NPC Follow"))
 	{
-		Entity_t* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
+		Pl0000* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
 
 		if (pNPC)
 			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC);
@@ -53,7 +53,7 @@ static void DisplayEntityHandles()
 
 	if (ImGui::Button("Set NPC Idle"))
 	{
-		Entity_t* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
+		Pl0000* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
 
 		if (pNPC)
 			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);

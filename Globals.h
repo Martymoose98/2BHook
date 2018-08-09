@@ -50,16 +50,16 @@ enum eDepthState
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(__fastcall* CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef Entity_t*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef Pl0000*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id); //returns a sItem* maybe?
 typedef bool(__fastcall* AddItemFn)(__int64 thisrcx, int item_id);
 typedef bool(__fastcall* UseItemFn)(__int64 thisrcx, int item_id);
-typedef void(__fastcall* ChangePlayerFn)(Entity_t* pEntity);
+typedef void(__fastcall* ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
-typedef bool(__fastcall* DestroyBuddyFn)(Entity_t* pBuddy);
-typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Entity_t* pNPC);
-typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Entity_t* pNPC);
-typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Entity_t** ppSourceEntity); // also second arg is another custom struct
+typedef bool(__fastcall* DestroyBuddyFn)(Pl0000* pBuddy);
+typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
+typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
+typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
 typedef __int64(__fastcall* PlaySoundFn)(Sound* pSound);
 typedef unsigned int(__fastcall* HashStringCRC32Fn)(const char* szName, __int64 length);
 typedef unsigned int(__fastcall* FNV1HashFn)(const char* szString);
@@ -128,7 +128,7 @@ extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_pHeaps;
 
-extern Entity_t* g_pLocalPlayer;
+extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
 extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
