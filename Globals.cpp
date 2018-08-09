@@ -38,7 +38,7 @@ BYTE* g_pAntiFramerateCap_Sleep;
 BYTE* g_pAntiFramerateCap_Spinlock;
 BYTE* g_pAntiFramerateCap_Test4;
 IDirectInput8A* g_pDirectInput8;
-IDirectInputDevice8A* g_pKeyboard;
+Keyboard_t* g_pKeyboard;
 Mouse_t* g_pMouse;
 CGraphics* g_pGraphics;
 ID3D11Device* g_pDevice;
@@ -67,8 +67,8 @@ CGraphicDeviceDx11* g_pCGraphicDevice;
 VirtualTableHook* g_pFactoryHook;
 VirtualTableHook* g_pSwapChainHook;
 VirtualTableHook* g_pDeviceContextHook;
-VirtualTableHook* g_pMouseHook;
 VirtualTableHook* g_pKeyboardHook;
+VirtualTableHook* g_pMouseHook;
 
 ImportTableHook* g_pQueryPerformanceCounterHook;
 ImportTableHook* g_pClipCursorHook;

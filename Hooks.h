@@ -37,6 +37,8 @@ extern CreateSwapChainFn oCreateSwapChain;
 extern DrawIndexedFn oDrawIndexed;
 extern PSSetShaderResourcesFn oPSSetShaderResources;
 extern ClearRenderTargetViewFn oClearRenderTargetView;
+extern AcquireFn oKeyboardAcquire;
+extern GetDeviceStateFn oKeyboardGetDeviceState;
 extern AcquireFn oMouseAcquire;
 extern GetDeviceStateFn oMouseGetDeviceState;
 extern QueryPerformaceCounterFn oQueryPerformanceCounter;
@@ -51,6 +53,8 @@ HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXG
 void __fastcall hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView *const *ppShaderResourceViews);
 void __fastcall hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation);
 void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4]);
+HRESULT __fastcall hkKeyboardAcquire(IDirectInputDevice8A* pThis);
+HRESULT __fastcall hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
 HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis);
 HRESULT __fastcall hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
 void __fastcall hkSaveFileIO(CSaveDataDevice* pSave);

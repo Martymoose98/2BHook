@@ -142,7 +142,7 @@ extern BYTE* g_pAntiFramerateCap_Sleep;
 extern BYTE* g_pAntiFramerateCap_Spinlock;
 extern BYTE* g_pAntiFramerateCap_Test4;
 extern IDirectInput8A* g_pDirectInput8;
-extern IDirectInputDevice8A* g_pKeyboard;
+extern Keyboard_t* g_pKeyboard;
 extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
 extern ID3D11Device* g_pDevice;

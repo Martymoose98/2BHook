@@ -6,6 +6,8 @@ DrawIndexedFn oDrawIndexed;
 PSSetShaderResourcesFn oPSSetShaderResources;
 ClearRenderTargetViewFn oClearRenderTargetView;
 QueryPerformaceCounterFn oQueryPerformanceCounter;
+AcquireFn oKeyboardAcquire;
+GetDeviceStateFn oKeyboardGetDeviceState;
 AcquireFn oMouseAcquire;
 GetDeviceStateFn oMouseGetDeviceState;
 SetCursorPosFn oSetCursorPos;
@@ -496,6 +498,31 @@ void __fastcall hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT 
 void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4])
 {
 	oClearRenderTargetView(pThis, pRenderTargetView, ColorRGBA);
+}
+
+HRESULT __fastcall hkKeyboardAcquire(IDirectInputDevice8A* pThis)
+{
+	g_pKeyboardHook->Unhook();
+
+	HRESULT hr = oKeyboardAcquire(pThis);
+
+	g_pKeyboardHook->Rehook();
+
+	return hr;
+}
+
+HRESULT __fastcall hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
+{
+	if (Vars.Menu.bOpened)
+		return DIERR_INPUTLOST;
+
+	g_pKeyboardHook->Unhook();
+
+	HRESULT hr = oKeyboardGetDeviceState(pThis, cbData, lpvData);
+
+	g_pKeyboardHook->Rehook();
+
+	return hr;
 }
 
 HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis)
