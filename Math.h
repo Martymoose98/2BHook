@@ -2,6 +2,7 @@
 
 #include <Windows.h>
 #include <xmmintrin.h>
+#include <immintrin.h>
 #include <ostream>
 #include <time.h>
 #include <math.h>
@@ -21,8 +22,20 @@ http://www.codeproject.com/Articles/69941/Best-Square-Root-Method-Algorithm-Func
 Phone can suck a dick, this is the fastest square root possible on a computer without needing to quantum compute
 */
 
-EXTERN_C double inline __fastcall fastsqrt(double n);
-EXTERN_C float inline __fastcall fastsqrtf(float n);
+EXTERN_C double __forceinline __fastcall fastsqrt(double n);
+EXTERN_C float __forceinline __fastcall fastsqrtf(float n);
+EXTERN_C void __forceinline __fastcall sincos(float radians, float* sine, float* cosine);
+
+double __forceinline __fastcall ssesqrt(double n)
+{
+	return _mm_cvtsd_f64(_mm_sqrt_pd(_mm_set_sd(n))); // FIXME? _mm_sqrt_pd - computes the square root of packed double-precision (64-bit) floating-point elements in a, and store the results in dst. i only need the first element
+}
+
+//Supa fast SSE float square root
+float __forceinline __fastcall ssesqrt(float n)
+{
+	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(n)));
+}
 
 class Vector3
 {
@@ -444,22 +457,6 @@ public:
 		static Math* Instance = new Math();
 		return Instance;
 	}
-
-
-	//void inline SinCos(float radians, float* sine, float* cosine)
-	//{
-	//	__asm
-	//	{
-	//		fld	DWORD PTR[radians]
-	//		fsincos
-
-	//		mov edx, DWORD PTR[cosine]
-	//		mov eax, DWORD PTR[sine]
-
-	//		fstp DWORD PTR[edx]
-	//		fstp DWORD PTR[eax]
-	//	}
-	//}
 
 	static void inline SinCos(float radians, float* sine, float* cosine)
 	{

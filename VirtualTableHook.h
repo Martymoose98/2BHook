@@ -15,6 +15,8 @@ public:
 	bool Initialize(QWORD** ppqwClassBase);
 	bool Initialize(QWORD*** pppqwClassBase);
 
+	void Relocate(QWORD** ppqwClassBase);
+
 	void Unhook();
 	void Rehook();
 

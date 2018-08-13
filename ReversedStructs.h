@@ -301,7 +301,7 @@ public:
 	virtual void function15() PURE;
 	virtual void function16() PURE;
 	virtual void function17() PURE;
-	virtual void Animate(__int64 id, QWORD mode) PURE;
+	virtual void Animate(unsigned int id, int mode, int a4, int a5) PURE;
 	virtual void function19() PURE;
 	virtual void function20() PURE;
 	virtual void function21() PURE;
@@ -647,8 +647,10 @@ public:
 	__int32 iScreenHeight;					//0x000C 
 	float flScreenHz;						//0x0010 / fps / 60hz capped
 	BOOL isFullscreen;						//0x0014
-	DWORD dwUnk0x018;						//0x0018
-	char _0x0014[12];						//0x001C
+	BOOL bUnk0x018;							//0x0018
+	BOOL bUnk0x01C;							//0x001C
+	BOOL bUnk0x020;							//0x0020
+	char _0x0024[4];						//0x0024
 	ID3D11Device* pID3D11Device;			//0x0028
 	IDXGIFactory* pFactory;					//0x0030
 	char _0x0038[8];						//0x0038
@@ -694,8 +696,10 @@ public:
 	void* m_pConstantBuffer[2];				//0x0018
 	char _0x0030[40];						//0x0030
 	IDXGISwapChain** m_ppSwapChain;			//0x0058
-	char _0x0060[16];						//0x0060
-	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0068
+	char _0x0060[8];						//0x0060
+	int m_iUnk;								//0x0068
+	char _0x006C[4];						//0x006C
+	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0070
 };
 
 // Size = 0xF0 (240) bytes
@@ -782,7 +786,7 @@ class CUserInfo
 	char _0x1C[4];		//0x1C	
 };
 
-class HeapAlloc_t
+struct HeapAlloc_t
 {
 	LPVOID Pointer;
 	BOOL Succeeded;
@@ -790,12 +794,17 @@ class HeapAlloc_t
 
 class CHeapInstance
 {
-	void* m_pVtbl;
+	void* m_pVtbl;							//0x0000
 	CRITICAL_SECTION m_CriticalSection;		//0x0008
 	HeapAlloc_t* m_pAllocation;				//0x0028
-	//const char* m_szId;						 //0x0028 | doesn't line up  
+	//const char* m_szId;					//0x0028 | doesn't line up  
 };
 
+struct CpkMount
+{
+	const char* m_szName;
+	int m_iType;
+};
 
 template<typename T>
 struct ConstructionInfo
