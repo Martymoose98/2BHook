@@ -48,7 +48,11 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
-		(*(int(*)(void*))(0x1401AE580))(g_pLocalPlayer);
+		CpkMount cpk = { "data105a", 0x1F };
+		bool bLoaded = (*(bool(*)(CpkMount*))(0x140644000))(&cpk);// = (*(void* (*)(unsigned int iCpkType, char *szPath))(0x140956D70))(0x1F, "G:\\Nier Automata\\\\data\\data105a.cpk") != NULL;
+
+		LOG("Loaded 105a.cpk %s\n", bLoaded ? "YES" : "NO");
+
 		//(*(void*(*)())(0x1430AC860))();
 
 		//DWORD crc = HashStringCRC32("Ba2014", 6);
@@ -98,14 +102,14 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_F4) & 1)
 	{
-		pCameraEnt->Animate(Vars.Gameplay.iAnimation, 0);	// 0 plays, 1 stops?, 2 freezes
+		pCameraEnt->Animate(Vars.Gameplay.iAnimation, 0, 0, 0);	// 0 plays, 1 stops?, 2 freezes
 		//(*(EntityInfo *(__fastcall*)(Entity_t*))(0x140245C30))(pCameraEnt); //Buddy_UNK
 	}
 #endif
 
 	if (GetAsyncKeyState(VK_F5) & 1)
 	{
-		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0);
+		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
 	}
 
 	if (GetAsyncKeyState(VK_F11) & 1)
@@ -300,7 +304,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			if (ImGui::Button("Play Animation"))
 			{
-				pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0);
+				pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 1, 0);
 			}
 
 			if (ImGui::Button("Change Player"))
@@ -414,8 +418,6 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	return oPresent(pThis, SyncInterval, Flags); //Anti-VSync Here bud (Vars.Misc.bAntiVSync) ? 0 : SyncInterval
 }
 
-
-TODO("probs find a better way to do this (aka not alloc mem every time and put into a fucc!");
 HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
 	pDesc->BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -425,11 +427,7 @@ HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXG
 	if (SUCCEEDED(hr))
 	{
 		g_pSwapChain = *ppSwapChain;
-
-		delete g_pSwapChainHook;
-
-		g_pSwapChainHook = new VirtualTableHook((QWORD***)ppSwapChain);
-		oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
+		g_pSwapChainHook->Relocate((QWORD**)g_pSwapChain);
 
 		ImGui_ImplDX11_InvalidateDeviceObjects();
 	}
