@@ -26,6 +26,7 @@ HANDLE* g_pHeaps;
 
 Pl0000* g_pLocalPlayer;
 EntityHandle* g_pLocalPlayerHandle;
+EntityInfoList* g_pEntityInfoList;
 CUserManager* g_pUserManager;
 YorhaManager* g_pYorhaManager;
 NPCManager* g_pNPCManager;

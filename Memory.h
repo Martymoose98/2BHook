@@ -343,6 +343,7 @@ public:
 
 		InitializeCriticalSection(&cs);
 		EnterCriticalSection(&cs);
+
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
 		memcpy(pBytePatch->Address, pBytePatch->pOldOpcodes, pBytePatch->nBytes);
@@ -371,7 +372,7 @@ public:
 	static ISBADCODEPTR_STATUS IsBadCodePtr(const void* p)
 	{
 		MEMORY_BASIC_INFORMATION mbi;
-		ISBADCODEPTR_STATUS ret = VALID_PTR;
+		ISBADCODEPTR_STATUS status = VALID_PTR;
 
 		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
@@ -379,18 +380,18 @@ public:
 			return VIRTUAL_QUERY_FAILED;
 
 		if (mbi.State == MEM_FREE)
-			ret |= MEMORY_FREED;
+			status |= MEMORY_FREED;
 
 		if (mbi.Protect & PAGE_GUARD)
-			ret |= GUARD_PAGE;
+			status |= GUARD_PAGE;
 
 		if (mbi.Protect & PAGE_NOACCESS)
-			ret |= NO_ACCESS_PAGE;
+			status |= NO_ACCESS_PAGE;
 
 		if (mbi.Protect & PAGE_EXECUTE)
-			ret |= EXECUTE_ONLY_PAGE;
+			status |= EXECUTE_ONLY_PAGE;
 
-		return ret;
+		return status;
 	}
 private:
 };

@@ -52,8 +52,8 @@ typedef ULONGLONG QWORD;
 typedef Level_t*(__fastcall* CalculateLevelFn)(ExExpInfo* pInfo, int experience);
 typedef Pl0000*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id); //returns a sItem* maybe?
-typedef bool(__fastcall* AddItemFn)(__int64 thisrcx, int item_id);
-typedef bool(__fastcall* UseItemFn)(__int64 thisrcx, int item_id);
+typedef bool(__fastcall* AddItemFn)(__int64 pItemManager, int item_id);
+typedef bool(__fastcall* UseItemFn)(__int64 pItemManager, int item_id);
 typedef void(__fastcall* ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef bool(__fastcall* DestroyBuddyFn)(Pl0000* pBuddy);
@@ -130,6 +130,7 @@ extern HANDLE* g_pHeaps;
 
 extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
+extern EntityInfoList* g_pEntityInfoList;
 extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;

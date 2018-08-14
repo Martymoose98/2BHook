@@ -27,7 +27,6 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
 	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
-	SceneState s;
 	//Entity_t* pBuddy = oGetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 	//QWORD v[3];
 
@@ -48,10 +47,18 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
-		CpkMount cpk = { "data105a", 0x1F };
-		bool bLoaded = (*(bool(*)(CpkMount*))(0x140644000))(&cpk);// = (*(void* (*)(unsigned int iCpkType, char *szPath))(0x140956D70))(0x1F, "G:\\Nier Automata\\\\data\\data105a.cpk") != NULL;
+		for (size_t i = 0; i < g_pEntityInfoList->m_dwSize; ++i)
+		{
+			EntityInfo* pInfo = g_pEntityInfoList->m_pItems[i].second;
+			
+			if (pInfo)
+				LOG("Entity: %s Handle: %x Address: %llx\n",pInfo->m_szEntityType, pInfo->m_hParent, pInfo->m_pEntity);
+		}
 
-		LOG("Loaded 105a.cpk %s\n", bLoaded ? "YES" : "NO");
+	//	CpkMount cpk = { "data105a", 0x1F };
+	//	bool bLoaded = (*(bool(*)(CpkMount*))(0x140644000))(&cpk);// = (*(void* (*)(unsigned int iCpkType, char *szPath))(0x140956D70))(0x1F, "G:\\Nier Automata\\\\data\\data105a.cpk") != NULL;
+
+	//	LOG("Loaded 105a.cpk %s\n", bLoaded ? "YES" : "NO");
 
 		//(*(void*(*)())(0x1430AC860))();
 
