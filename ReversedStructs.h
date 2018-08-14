@@ -116,15 +116,26 @@ struct EntityInfo
 	EntityHandle m_hParent;						//0x0030
 	char _0x0038[4];							//0x0034
 	char* m_pszData[2];							//0x0038
-	Pl0000* m_pEntity;						//0x0048
+	Pl0000* m_pEntity;							//0x0048
 	const char** m_pszDat;						//0x0050  | struct pointer
 	DWORD* m_pUnk;								//0x0058  | dword array 2 members (0x1415F6B50)
-	Pl0000* m_pParent;						//0x0060
+	Pl0000* m_pParent;							//0x0060
 	BOOL bSetInfo;								//0x0068
 	DWORD _0x006C;								//0x006C
 	DWORD _0x0070;								//0x0070
 };
 IS_OFFSET_CORRECT(EntityInfo, m_pParent, 0x60)
+
+
+class EntityInfoList //std::map<EntityHandle, EntityInfo*>* ??
+{
+public:
+	DWORD m_dwItems;								//0x0000
+	DWORD m_dwSize;									//0x0004
+	DWORD m_dwBase;									//0x0008
+	DWORD m_dwShift;								//0x000C
+	std::pair<EntityHandle, EntityInfo*>* m_pItems; //0x0010
+};
 
 struct ModelInfo
 {
@@ -139,7 +150,7 @@ size = 0x70 (112) bytes
 */
 struct ModelPart
 {
-	Vector4 m_vUnknown0;		//0x0008
+	Vector4 m_vUnknown0;		//0x0000
 	Vector4 m_vColor;			//0x0010
 	Vector4 m_vUnknown20;		//0x0020
 	Vector4 m_vUnknown30;		//0x0030
@@ -445,7 +456,9 @@ public:
 	//ExActionState							//0x00830  ExActionState
 	int m_iHealth;							//0x00858
 	int m_iMaxHealth;						//0x0085C
-	char _0x0860[124];						//0x00860
+	char _0x0860[96];						//0x00860
+	EntityHandle m_hPod;					//0x008C0
+	char _0x08C4[24];						//0x008C4
 	void* m_waypointVtbl;					//0x008E0
 	char _0x08E8[192];						//0x008E8
 	StaticArray<BehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
@@ -470,7 +483,7 @@ public:
 	EntityHandle m_hBuddy;					//0x1646C | Localplayer = 0x1000C00, Buddy = 0x1020400
 	char _0x16470[272];						//0x16470
 	StaticArray<EntityHandle, 4> m_Handles2;//0x16580
-	char _0x165B0[72];						//0x165B0
+	char _0x165B0[72];						//0x165B0 | const hap::hap_action::PuidMixin
 	StaticArray<Pl0000::PassiveSkill, 100> m_PassiveSkills;	//0x165F8
 	char _0x167A8[1348];					//0x167A8
 	EntityHandle m_hUnknown2;				//0x16CEC
@@ -552,14 +565,25 @@ struct SceneState
 	size_t m_ReferenceCount;	//not sure
 };
 
-class CSceneStateSystem
+class CScenePosSystem
+{
+	void* m_vtbl;							//0x0000
+	void* m_p0x0008;						//0x0008
+	void* m_TokenStateSystem;				//0x0010 | hap::scene_state::SceneStateSystem::`vftable'{for `hap::TokenCategory'};
+};
+
+class CSceneStateSystem //const hap::scene_state::SceneStateSystem
 {
 public:
-	void* m_vtable;					//0x0000
-	char _0x0008[88];				//0x0008
-	Array<SceneState> m_oldstates;	//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
-	char _0x00[16];					//0x0080
-	Array<SceneState> m_states;		//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	void* m_vtable;							//0x0000
+	void* m_p0x08;							//0x0008
+	void* m_p0x10;							//0x0010
+	void* m_p0x18;							//0x0018
+	CScenePosSystem m_pPosSystem;			//0x0028
+	char _0x0038[40];						//0x0038
+	Array<SceneState> m_oldstates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	char _0x00[16];							//0x0080
+	Array<SceneState> m_states;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 };
 IS_OFFSET_CORRECT(CSceneStateSystem, m_states, 0x90)
 

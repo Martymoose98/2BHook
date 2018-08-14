@@ -8,17 +8,17 @@
 
 #pragma comment(lib, "d3dx9.lib")
 
-#define DEBUG_STACK_TIMER(name) DebugStackTimer name(__FUNCTION__)
+#define STACK_TIMER(name) StackTimer name(__FUNCTION__)
 
-typedef struct DebugStackTimer
+typedef struct StackTimer
 {
-	DebugStackTimer(const char* szName)
+	StackTimer(const char* szName)
 	{
 		m_szName = szName;
 		m_start = clock();
 	}
 
-	~DebugStackTimer()
+	~StackTimer()
 	{
 		m_end = clock();
 		m_duration = (double)(m_end - m_start) / CLOCKS_PER_SEC;
@@ -78,6 +78,16 @@ static bool WorldToScreen(CONST D3DXVECTOR3* pvIn, D3DXVECTOR2* pvOut)
 	pvOut->x = x;
 	pvOut->y = y;
 	return true;
+}
+
+static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
+{
+	return (handle & 0x00FFFF00) >> 8;
+}
+
+static inline EntityHandle GenerateEntityHandle(unsigned short index)
+{
+	return 0x1000000 | (index << 8);
 }
 
 /*
