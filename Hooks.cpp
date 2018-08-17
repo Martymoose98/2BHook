@@ -27,7 +27,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
 	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
-	//Entity_t* pBuddy = oGetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+	//Entity_t* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 	//QWORD v[3];
 
 	ZeroMemory(&Vars.Menu.Input.emulate, sizeof(XINPUT_STATE)); // need to zero out the input state before emulating new inputs
@@ -404,23 +404,24 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		}
 		ImGui::End();
 	}
+
+	Vector2 vScreen;
+	
+	if (g_pLocalPlayer && WorldToScreen(g_pLocalPlayer->m_vPosition, vScreen))
+	{
+		ImGui::Begin("esp");
+		ImGui::SetWindowPos(*(ImVec2*)&vScreen);
+		ImGui::SetWindowSize(ImVec2(100, 100));
+		ImGui::End();
+		//g_pRenderer->DrawRectOutline((int)vScreen.x, (int)vScreen.y, 100, 300, 0xffaaaaa);
+	}
+
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-	// renderer doesn't work rn fml
-	//g_pRenderer->SaveState();
-	//g_pRenderer->DrawRectOutline(100, 100, 500, 500, 0xFFFFFFFF);
-	//g_pRenderer->RestoreState();
 
 #if 0	
 	g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);// idk if we need this line since we don't draw
 #endif
-
-	/*D3DXVECTOR2 vScreen = { 0, 0 };
-
-	if (WorldToScreen((CONST D3DXVECTOR3*)&g_pLocalPlayer->m_vPosition, &vScreen))
-	{
-		g_pRenderer->DrawRectOutline((int)vScreen.x, (int)vScreen.y, 100, 300, 0xffaaaaa);
-	}*/
 
 	return oPresent(pThis, SyncInterval, Flags); //Anti-VSync Here bud (Vars.Misc.bAntiVSync) ? 0 : SyncInterval
 }

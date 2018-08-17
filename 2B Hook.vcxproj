@@ -82,6 +82,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Color.h" />
+    <ClInclude Include="cpk.h" />
     <ClInclude Include="Features.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Hooks.h" />

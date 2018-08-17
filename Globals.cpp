@@ -48,8 +48,6 @@ ID3D11RenderTargetView* g_pRenderTargetView;
 ID3D11RasterizerState* g_pRenderWireframeState;
 ID3D11RasterizerState* g_pRenderSolidState;
 ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
-ID3D11PixelShader* g_pPixelShaderRed;
-ID3D11PixelShader* g_pPixelShaderGreen;
 ID3D11Buffer* g_pVertexBuffers;
 D3D11_BUFFER_DESC g_VertexBufferDesc;
 UINT g_VertexBuffersOffset;
@@ -63,7 +61,7 @@ UINT g_StartSlot;
 IDXGISwapChain* g_pSwapChain;
 IDXGISwapChain* g_pSecondarySwapChain;
 IDXGIFactory* g_pFactory;
-CGraphicDeviceDx11* g_pCGraphicDevice;
+CGraphicDeviceDx11* g_pGraphicDevice;
 
 VirtualTableHook* g_pFactoryHook;
 VirtualTableHook* g_pSwapChainHook;

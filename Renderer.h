@@ -28,7 +28,7 @@ public:
 	HRESULT SaveState();
 	HRESULT RestoreState();
 
-	HRESULT GenerateShader(ID3D11Device* pD3DDevice, ID3D11PixelShader** pShader, ID3DBlob** ppBlob, float r, float g, float b);
+	HRESULT GeneratePixelShader(ID3D11Device* pD3DDevice, ID3D11PixelShader** pShader, ID3DBlob** ppBlob, float r, float g, float b);
 
 	void DrawRectOutline(int x, int y, int w, int h, D3DCOLOR color);
 
@@ -41,7 +41,14 @@ private:
 
 	ID3D11Device* m_pDevice;
 	ID3D11DeviceContext* m_pDeviceContext;
+	ID3D11VertexShader* m_pVertexShader;
+	ID3D11VertexShader* m_poVertexShader;
 	ID3D11Buffer* m_pVertexBuffer;
+	ID3D11Buffer* m_poVertexBuffer;
+	ID3D11PixelShader* m_pPixelShader;
+	ID3D11PixelShader* m_poPixelShader;
+	ID3D11Buffer* m_pPixelBuffer;
+	ID3D11Buffer* m_poPixelBuffer;
 	ID3D11InputLayout* m_pInputLayout;
 	ID3D11InputLayout* m_poInputLayout;
 };
