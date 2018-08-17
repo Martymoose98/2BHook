@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "Memory.h"
+#include "cpk.h"
 #include "Log.h"
 #include "Hooks.h"
 #include "VirtualTableHook.h"
@@ -277,6 +278,7 @@ void Setup()
 	//	LOG("Please load a save first!\n");
 	//	Sleep(300);
 	//}
+	g_pEntityInfoList = (EntityInfoList*)g_pMemory->FindPatternPtr64(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
 	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr64(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
@@ -307,7 +309,7 @@ void Setup()
 	if (IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
 
-	g_pCGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
+	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 	g_pAntiVSync = (byte*)g_pMemory->FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40");
 	g_pAntiFramerateCap_Sleep = (byte*)g_pMemory->FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24 ?") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;

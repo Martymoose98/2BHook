@@ -40,12 +40,11 @@ bool Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceCont
 	
 	ID3DBlob* pBlob = NULL;
 
-//	if (!g_pPixelShaderRed)
-//		GenerateShader(g_pDevice, &g_pPixelShaderRed, 0.7f, 0.2f, 0.3f);
+	if (FAILED(hr = GeneratePixelShader(g_pDevice, &m_pPixelShader, &pBlob, 0.2f, 0.7f, 0.3f)))
+		return hr;
 
-	if (!g_pPixelShaderGreen)
-		if (FAILED(hr = GenerateShader(g_pDevice, &g_pPixelShaderGreen, &pBlob, 0.2f, 0.7f, 0.3f)))
-			return hr;
+	//if (FAILED(hr = GeneratePixelShader(g_pDevice, &m_pVertexShader, &pBlob, 0.2f, 0.7f, 0.3f)))
+	//	return hr;
 
 	if (FAILED(hr = m_pDevice->CreateInputLayout(layout, _ARRAYSIZE(layout), pBlob->GetBufferPointer(), pBlob->GetBufferSize(), &this->m_pInputLayout)))
 		return hr;
@@ -56,7 +55,7 @@ bool Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceCont
 	return true;
 }
 
-HRESULT Renderer::GenerateShader(ID3D11Device* pD3DDevice, ID3D11PixelShader** pShader, ID3DBlob** ppBlob, float r, float g, float b)
+HRESULT Renderer::GeneratePixelShader(ID3D11Device* pD3DDevice, ID3D11PixelShader** pShader, ID3DBlob** ppBlob, float r, float g, float b)
 {
 	char szCast[] =
 		"struct VS_OUT"
@@ -97,6 +96,10 @@ HRESULT Renderer::SaveState()
 
 	m_pDeviceContext->IAGetInputLayout(&this->m_poInputLayout);
 	m_pDeviceContext->IASetInputLayout(this->m_pInputLayout);
+
+	m_pDeviceContext->VSGetShader(&this->m_poVertexShader, NULL, 0);
+	m_pDeviceContext->VSSetShader(this->m_pVertexShader, NULL, 0);
+
 
 	return S_OK;
 }

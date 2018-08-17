@@ -152,8 +152,6 @@ extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
 extern ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
-extern ID3D11PixelShader* g_pPixelShaderRed;
-extern ID3D11PixelShader* g_pPixelShaderGreen;
 extern ID3D11Buffer* g_pVertexBuffers;
 extern D3D11_BUFFER_DESC g_VertexBufferDesc;
 extern UINT g_VertexBuffersOffset;
@@ -167,7 +165,7 @@ extern UINT g_StartSlot;
 extern IDXGISwapChain* g_pSwapChain;
 extern IDXGISwapChain* g_pSecondarySwapChain;
 extern IDXGIFactory* g_pFactory;
-extern CGraphicDeviceDx11* g_pCGraphicDevice;
+extern CGraphicDeviceDx11* g_pGraphicDevice;
 
 extern VirtualTableHook* g_pFactoryHook;
 extern VirtualTableHook* g_pSwapChainHook;

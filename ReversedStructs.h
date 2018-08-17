@@ -126,7 +126,6 @@ struct EntityInfo
 };
 IS_OFFSET_CORRECT(EntityInfo, m_pParent, 0x60)
 
-
 class EntityInfoList //std::map<EntityHandle, EntityInfo*>* ??
 {
 public:
@@ -135,6 +134,7 @@ public:
 	DWORD m_dwBase;									//0x0008
 	DWORD m_dwShift;								//0x000C
 	std::pair<EntityHandle, EntityInfo*>* m_pItems; //0x0010
+	CRITICAL_SECTION m_CriticalSection;				//0x0018
 };
 
 struct ModelInfo
@@ -159,8 +159,8 @@ struct ModelPart
 	DWORD m_dwUnknown50;		//0x0050
 	QWORD m_qwUnknown58;		//0x0058
 	DWORD m_dwUnknown60;		//0x0060
-	BOOL m_bShow;				//0x0064
-	BOOL m_bUpdate;				//0x0068
+	BOOL m_bShow;				//0x0064 | ?
+	BOOL m_bUpdate;				//0x0068 | ?
 	DWORD m_qwUnknown6C;		//0x006C
 };
 
@@ -180,7 +180,8 @@ public:
 
 class BehaviorExtension
 {
-
+public:
+	//void* m_vtable;	//0x0000
 };
 
 class CModelExtendWorkBase
@@ -198,7 +199,7 @@ class CModelExtendWork : public CModelExtendWorkBase
 	DWORD _0x0010;		//0x10
 	DWORD _0x0014;		//0x14
 	char _0x0018[12];	//0x18
-	Pl0000* m_pParent;//0x2C	
+	Pl0000* m_pParent;	//0x2C	
 };
 
 class ExWaypoint : public BehaviorExtension
@@ -270,6 +271,11 @@ class ExAttackCombo : public BehaviorExtension
 	void* m_vtable;			//0x0000
 };
 
+class ExActionState : public BehaviorExtension
+{
+	void* m_vtable;			//0x0000
+};
+
 class CXmlBinary
 {
 	void* m_vTable;
@@ -287,6 +293,8 @@ class CObj
 /*
 NieR:Automata's Entity class idk if it's the right name (actual Pl0000). Just started to
 reverse this and this structure is fucking huge!
+
+Size of struct 0x178F0 (96496) bytes
 */
 class Pl0000
 {
@@ -453,7 +461,8 @@ public:
 	char _0x0620[144];						//0x00620
 	StaticArray<std::pair<TypeId, BehaviorExtension*>, 16, 8> m_BehaviourExtensions;//0x006B0 | lib::StaticArray<std::pair<enum  lib::TypeId,BehaviorExtension *>,16,8>  BehaviorExtension is an interface
 	char _0x07D0[136];						//0x007D0
-	//ExActionState							//0x00830  ExActionState
+	//2b skirt								//0x00800
+	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
 	int m_iHealth;							//0x00858
 	int m_iMaxHealth;						//0x0085C
 	char _0x0860[96];						//0x00860
@@ -519,16 +528,18 @@ public:
 	QWORD unk;					//0x0008
 	Matrix4x4 m_mat1;			//0x0010
 	float m_flZoom;				//0x0050
-	char _0x0054[84];			//0x0054
+	char _0x0054[4];			//0x0054
+	void* m_pUnknown;			//0x0060
+	char _0x0068[78];			//0x0068
 	Pl0000* m_pEntity;			//0x00A8
 	DWORD dwUnk;				//0x00B0
 	char _0x00B4[28];			//0x00B4
 	EntityHandle m_hEntity;		//0x00D0
 	DWORD alignment;			//0x00D4
 	Pl0000* m_pEntites[2];		//0x00E0
-	QWORD unknown;				//0x00F0
-	Matrix4x4 m_mat2;			//0x00F8
+	Matrix4x4 m_mat2;			//0x00F0
 };
+IS_OFFSET_CORRECT(CCamera, m_mat2, 0xF0)
 
 // Found by Dennis
 // Address = 0x14160EB40
