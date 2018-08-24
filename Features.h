@@ -1,4 +1,5 @@
 #pragma once
+#include "Vector3.h"
 #include "Log.h"
 
 class Features

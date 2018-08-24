@@ -167,7 +167,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 		//*(Vector3*)((byte*)g_pCamera + 0x3f0) = vAngles3;
 
-		g_pLocalPlayer->m_vPosition += vForward * 0.5f;
+		g_pLocalPlayer->m_vPosition += vForward * 0.5f; //link error
 	}
 
 	// wip color isn't updating
@@ -367,7 +367,6 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			ImGui::Checkbox("Ghost Model", &Vars.Gameplay.bGhostModel);
 
-
 			if (pCameraEnt)
 			{
 				ImGui::InputFloat3("Position (X,Y,Z)", (float*)&pCameraEnt->m_vPosition);
@@ -404,24 +403,34 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		}
 		ImGui::End();
 	}
-
-	Vector2 vScreen;
-	
-	if (g_pLocalPlayer && WorldToScreen(g_pLocalPlayer->m_vPosition, vScreen))
-	{
-		ImGui::Begin("esp");
-		ImGui::SetWindowPos(*(ImVec2*)&vScreen);
-		ImGui::SetWindowSize(ImVec2(100, 100));
-		ImGui::End();
-		//g_pRenderer->DrawRectOutline((int)vScreen.x, (int)vScreen.y, 100, 300, 0xffaaaaa);
-	}
-
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
-#if 0	
-	g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);// idk if we need this line since we don't draw
-#endif
+	Vector2 vScreen;
+	//g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
+
+	g_pRenderer->Begin();
+	
+	if (g_pLocalPlayer && WorldToScreen(g_pLocalPlayer->m_vPosition, vScreen))
+	{
+		g_pRenderer->DrawRectCorners((int)vScreen.x - 50, (int)vScreen.y - 200, 100, 200, 5, Color::Blue());
+	/*
+		failed forward vec line :S
+		Vector3 vAngle = g_pLocalPlayer->m_matModelToWorld.GetAxis(3) * M_RADPI;
+		Vector3 vForward, vStart, vEnd;
+		Vector2 vStart2D, vEnd2D;
+
+		Math::AngleVectors(vAngle, &vForward);
+		vStart = Vector3(g_pLocalPlayer->m_vPosition.x, g_pLocalPlayer->m_vPosition.y + 1, g_pLocalPlayer->m_vPosition.z);
+		vEnd = vStart + vForward * 1.f;
+
+		if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
+			g_pRenderer->DrawLine(vStart2D.x, vStart2D.y, vEnd2D.x, vEnd2D.y, Color::Green());
+	*/
+	}
+	g_pRenderer->Draw();
+	g_pRenderer->End();
+
 
 	return oPresent(pThis, SyncInterval, Flags); //Anti-VSync Here bud (Vars.Misc.bAntiVSync) ? 0 : SyncInterval
 }

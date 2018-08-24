@@ -10,5 +10,11 @@ typedef struct CPK_HEADER
 		DWORD Magic; 
 	};
 	DWORD dwDataOffset;
-
+	DWORD dwFileCount;
+	DWORD dwFileTableOffset;
+	DWORD dwExtensionTableOffset;
+	DWORD dwNameTableOffset;
+	DWORD dwSizeTableOffset;
+	DWORD dwUnknownOffset1C;
+	DWORD dwUnknown20;
 };

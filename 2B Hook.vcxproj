@@ -89,6 +89,7 @@
     <ClInclude Include="ImportTableHook.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="Menu.h" />
     <ClInclude Include="Renderer.h" />
@@ -97,6 +98,9 @@
     <ClInclude Include="SteamApi.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Variables.h" />
+    <ClInclude Include="Vector2.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vector4.h" />
     <ClInclude Include="VirtualTableHook.h" />
   </ItemGroup>
   <ItemGroup>
@@ -107,7 +111,10 @@
     <ClCompile Include="ImGui\imgui_draw.cpp" />
     <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
     <ClCompile Include="Log.cpp" />
+    <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Vector2.cpp" />
+    <ClCompile Include="Vector3.cpp" />
     <ClCompile Include="VirtualTableHook.cpp" />
   </ItemGroup>
   <ItemGroup>

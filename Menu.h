@@ -4,7 +4,7 @@
 
 static void DisplayEntityHandles()
 {
-	int count = g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count;
+	QWORD count = g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count;
 	char** ppszHandles = new char*[count];
 	EntityHandle* handles = new EntityHandle[count];
 
