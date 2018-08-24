@@ -7,6 +7,9 @@
 #define class struct
 #endif
 
+#define FOURCC(a, b, c, d) ( (DWORD)(((DWORD)((BYTE)a)) | (((DWORD)((BYTE)b)) << 8) | (((DWORD)((BYTE)c)) << 16) | (((DWORD)((BYTE)d)) << 24)) )
+#define EIGHTCC(a, b, c, d, e, f, g, h) ( (QWORD)(((QWORD)((BYTE)a)) | (((QWORD)((BYTE)b)) << 8) | (((QWORD)((BYTE)c)) << 16) | (((QWORD)((BYTE)d)) << 24) | (((QWORD)((BYTE)e)) << 32) | (((QWORD)((BYTE)f)) << 40) | (((QWORD)((BYTE)g)) << 48) | (((QWORD)((BYTE)h)) << 56)) )
+
 #define NOP_MEMORY_MAGIC (INT)(0x706F6E) // "nop"
 #define BYTE_PATCH_MEMORY_MAGIC (INT)(0x6863) // "bp"
 
@@ -14,9 +17,17 @@
 
 #define INRANGE(x, a, b) ((x) >= (a) && (x) <= (b))
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
-#define GetByte(x) (GetBits((x)[0]) << 4 | GetBits((x)[1]))
+#define GetByte(x) ((GetBits((x)[0]) << 4) | GetBits((x)[1]))
 
-#define MakePtr(cast, ptr, addValue) (cast)((DWORD)(ptr) + (DWORD)(addValue))
+
+#define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (DWORD)(rva)))
+#define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (DWORD)(rva)))
+
+#ifdef _WIN64
+#define MakePtr MakePtr64
+#else
+#define MakePtr MakePtr32
+#endif
 
 #define NOPMemory(dst, size) memset((VOID*)(dst), 0x90, size)
 
@@ -335,6 +346,7 @@ public:
 
 		InitializeCriticalSection(&cs);
 		EnterCriticalSection(&cs);
+
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
 		memcpy(pBytePatch->Address, pBytePatch->pOldOpcodes, pBytePatch->nBytes);
@@ -363,7 +375,7 @@ public:
 	static ISBADCODEPTR_STATUS IsBadCodePtr(const void* p)
 	{
 		MEMORY_BASIC_INFORMATION mbi;
-		ISBADCODEPTR_STATUS ret = VALID_PTR;
+		ISBADCODEPTR_STATUS status = VALID_PTR;
 
 		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
@@ -371,18 +383,18 @@ public:
 			return VIRTUAL_QUERY_FAILED;
 
 		if (mbi.State == MEM_FREE)
-			ret |= MEMORY_FREED;
+			status |= MEMORY_FREED;
 
 		if (mbi.Protect & PAGE_GUARD)
-			ret |= GUARD_PAGE;
+			status |= GUARD_PAGE;
 
 		if (mbi.Protect & PAGE_NOACCESS)
-			ret |= NO_ACCESS_PAGE;
+			status |= NO_ACCESS_PAGE;
 
 		if (mbi.Protect & PAGE_EXECUTE)
-			ret |= EXECUTE_ONLY_PAGE;
+			status |= EXECUTE_ONLY_PAGE;
 
-		return ret;
+		return status;
 	}
 private:
 };

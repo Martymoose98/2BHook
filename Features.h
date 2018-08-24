@@ -1,4 +1,5 @@
 #pragma once
+#include "Vector3.h"
 #include "Log.h"
 
 class Features
@@ -140,7 +141,7 @@ public:
 	{
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 		{
-			Entity_t* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 			pEntity->m_vPosition = vPosition;
 		}
 	}
@@ -158,7 +159,7 @@ public:
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i, rad += step)
 		{
-			Entity_t* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
 			Math::SinCos(rad, &sin, &cos);
 			Math::AngleVectors(pEntity->m_matModelToWorld.GetAxis(3), &vForward);
@@ -171,5 +172,18 @@ public:
 			pEntity->m_vPosition.x = xz.x;
 			pEntity->m_vPosition.z = xz.y;
 		}
+	}
+
+	static void MoveSun()
+	{
+		Sun* sun = (Sun*)0x14160EB40;
+		sun->m_vPosition.x += 3;
+	}
+
+	// test
+	static void ApplyA2Wig(EntityInfo* pInfo)
+	{
+		//hkCreateEntity((void*)0x1415f6b50, pInfo, 0x10000, -1, (CHeapInstance**)0x1418f6158);
+		//sub_1404F9AA0((__int64)&qword_14160DFE0, &szA2Wig);
 	}
 };

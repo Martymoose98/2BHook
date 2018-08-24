@@ -37,8 +37,9 @@ class Log
 public:
 	explicit Log(const char* szFunction, const char* fmt, ...)
 	{
-		printf("[%s]: ", szFunction);
 		va_list args;
+
+		printf("[%s]: ", szFunction);
 		va_start(args, fmt);
 		vprintf(fmt, args);
 		va_end(args);

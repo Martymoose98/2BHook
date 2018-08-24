@@ -19,6 +19,12 @@
     <Filter Include="Source Files\ImGui">
       <UniqueIdentifier>{8d66287d-4e06-40b4-a856-8ee3a48a5b85}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Math">
+      <UniqueIdentifier>{dc91db4f-5f8e-4af0-96f9-6cac255d331e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Math">
+      <UniqueIdentifier>{322a1937-0669-484f-88d0-e7c50ce575d4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory.h">
@@ -40,9 +46,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Globals.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Math.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Utils.h">
@@ -68,6 +71,24 @@
     </ClInclude>
     <ClInclude Include="ImportTableHook.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cpk.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Math.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Matrix4x4.h">
+      <Filter>Header Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector3.h">
+      <Filter>Header Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector2.h">
+      <Filter>Header Files\Math</Filter>
+    </ClInclude>
+    <ClInclude Include="Vector4.h">
+      <Filter>Header Files\Math</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -98,12 +119,27 @@
     <ClCompile Include="ImGui\imgui_impl_dx11.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="Matrix4x4.cpp">
+      <Filter>Source Files\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Vector3.cpp">
+      <Filter>Source Files\Math</Filter>
+    </ClCompile>
+    <ClCompile Include="Vector2.cpp">
+      <Filter>Source Files\Math</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="fastsqrt.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
     <MASM Include="ModelPartsHook.asm">
+      <Filter>Assembly Files</Filter>
+    </MASM>
+    <MASM Include="CreateEntityHook.asm">
+      <Filter>Assembly Files</Filter>
+    </MASM>
+    <MASM Include="sincos.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
   </ItemGroup>

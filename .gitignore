@@ -8,3 +8,9 @@ Build
 *.idb
 *.user
 *.user
+*.user
+*.vcxproj
+*.vcxproj
+*.vcxproj
+*.filters
+*.filters

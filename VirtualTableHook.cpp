@@ -37,13 +37,21 @@ bool VirtualTableHook::Initialize(QWORD*** pppqwClassBase)
 	return Initialize(*pppqwClassBase);
 }
 
+void VirtualTableHook::Relocate(QWORD** ppqwClassBase)
+{
+	Unhook();
+	m_ClassBase = ppqwClassBase;
+	m_OldVirtualTable = *ppqwClassBase;
+	*ppqwClassBase = m_NewVirtualTable;
+}
+
 void VirtualTableHook::Unhook()
 {
 	if (m_ClassBase)
 		*m_ClassBase = m_OldVirtualTable;
 }
 
-void VirtualTableHook::ReHook()
+void VirtualTableHook::Rehook()
 {
 	if (m_ClassBase)
 		*m_ClassBase = m_NewVirtualTable;

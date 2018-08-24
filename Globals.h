@@ -50,25 +50,27 @@ enum eDepthState
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(__fastcall* CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef Entity_t*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef Pl0000*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id); //returns a sItem* maybe?
-typedef bool(__fastcall* AddItemFn)(__int64 thisrcx, int item_id);
-typedef bool(__fastcall* UseItemFn)(__int64 thisrcx, int item_id);
-typedef void(__fastcall* ChangePlayerFn)(Entity_t* pEntity);
+typedef bool(__fastcall* AddItemFn)(__int64 pItemManager, int item_id);
+typedef bool(__fastcall* UseItemFn)(__int64 pItemManager, int item_id);
+typedef void(__fastcall* ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
-typedef bool(__fastcall* DestroyBuddyFn)(Entity_t* pBuddy);
-typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Entity_t* pNPC);
-typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Entity_t* pNPC);
+typedef bool(__fastcall* DestroyBuddyFn)(Pl0000* pBuddy);
+typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
+typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
+typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
+typedef __int64(__fastcall* PlaySoundFn)(Sound* pSound);
 typedef unsigned int(__fastcall* HashStringCRC32Fn)(const char* szName, __int64 length);
 typedef unsigned int(__fastcall* FNV1HashFn)(const char* szString);
-typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Entity_t** ppSourceEntity); // also second arg is another custom struct
-typedef __int64(__fastcall* PlaySoundFn)(Sound* pSound);
+typedef __int64(__fastcall* HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
 typedef void*(__fastcall* FindSceneStateFn)(CRITICAL_SECTION* pCriticalSection, unsigned int crc, const char* szName, __int64 length); // not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
 typedef bool(__fastcall* SceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef bool(__fastcall* SceneStateSystem_SetInternalFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef BOOL(__fastcall* SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
 typedef __int64(__fastcall* CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(__fastcall* QuestState_RequestStateInternalFn)(DWORD *pQuestId);
+typedef ConstructionInfo<void>*(__fastcall* GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
 
 // XInput Function Defs
 
@@ -105,6 +107,7 @@ extern GetEntityFromHandleFn GetEntityFromHandle;
 extern SetLocalPlayerFn SetLocalPlayer;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
+extern GetConstructorFn GetConstructionInfo;
 extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
 extern FNV1HashFn FNV1Hash;
@@ -119,14 +122,15 @@ extern XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 extern XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
 extern int* g_piMoney;
-extern DWORD* g_pdwExperience;
+extern int* g_piExperience;
 
 extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_pHeaps;
 
-extern Entity_t* g_pLocalPlayer;
+extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
+extern EntityInfoList* g_pEntityInfoList;
 extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
@@ -139,9 +143,8 @@ extern BYTE* g_pAntiFramerateCap_Sleep;
 extern BYTE* g_pAntiFramerateCap_Spinlock;
 extern BYTE* g_pAntiFramerateCap_Test4;
 extern IDirectInput8A* g_pDirectInput8;
-extern IDirectInputDevice8A* g_pKeyboard;
-extern IDirectInputDevice8A* g_pMouse;
-extern Mouse_t* g_pGameMouse;
+extern Keyboard_t* g_pKeyboard;
+extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
 extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
@@ -149,8 +152,6 @@ extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
 extern ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
-extern ID3D11PixelShader* g_pPixelShaderRed;
-extern ID3D11PixelShader* g_pPixelShaderGreen;
 extern ID3D11Buffer* g_pVertexBuffers;
 extern D3D11_BUFFER_DESC g_VertexBufferDesc;
 extern UINT g_VertexBuffersOffset;
@@ -164,17 +165,20 @@ extern UINT g_StartSlot;
 extern IDXGISwapChain* g_pSwapChain;
 extern IDXGISwapChain* g_pSecondarySwapChain;
 extern IDXGIFactory* g_pFactory;
-extern CGraphicDeviceDx11* g_pCGraphicDevice;
+extern CGraphicDeviceDx11* g_pGraphicDevice;
 
 extern VirtualTableHook* g_pFactoryHook;
 extern VirtualTableHook* g_pSwapChainHook;
 extern VirtualTableHook* g_pDeviceContextHook;
+extern VirtualTableHook* g_pMouseHook;
+extern VirtualTableHook* g_pKeyboardHook;
 
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
 extern ImportTableHook* g_pClipCursorHook;
 extern ImportTableHook* g_pXInputGetStateHook;
 
 extern BYTE_PATCH_MEMORY bp_save_file_io;
+extern BYTE_PATCH_MEMORY bp_CreateEntity[2];
 extern BYTE_PATCH_MEMORY bp_query_performance_counter;
 extern BYTE_PATCH_MEMORY bp_AntiVSync;
 extern BYTE_PATCH_MEMORY bp_Framecap;

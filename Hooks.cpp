@@ -1,15 +1,19 @@
 #include "Hooks.h"
 
-WNDPROC oWndProc;
-
 PresentFn oPresent;
 CreateSwapChainFn oCreateSwapChain;
 DrawIndexedFn oDrawIndexed;
 PSSetShaderResourcesFn oPSSetShaderResources;
 ClearRenderTargetViewFn oClearRenderTargetView;
 QueryPerformaceCounterFn oQueryPerformanceCounter;
+AcquireFn oKeyboardAcquire;
+GetDeviceStateFn oKeyboardGetDeviceState;
+AcquireFn oMouseAcquire;
+GetDeviceStateFn oMouseGetDeviceState;
 SetCursorPosFn oSetCursorPos;
 XInputGetStateFn oXInputGetState;
+CreateEntityFn oCreateEntity;
+WNDPROC oWndProc;
 
 HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
@@ -22,9 +26,8 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	g_pQueryPerformanceCounterHook->Rehook();
 
 	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
-	Entity_t* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
-	SceneState s;
-	//Entity_t* pBuddy = oGetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
+	//Entity_t* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 	//QWORD v[3];
 
 	ZeroMemory(&Vars.Menu.Input.emulate, sizeof(XINPUT_STATE)); // need to zero out the input state before emulating new inputs
@@ -39,11 +42,26 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	if (pCutscene)
 	{
 		char* current_cutscene = (char*)(pCutscene + 0x1F4);
-		LOG("Current Cutscene: %s\n", current_cutscene);
+		//	LOG("Current Cutscene: %s\n", current_cutscene);
 	}
 
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
+		for (size_t i = 0; i < g_pEntityInfoList->m_dwSize; ++i)
+		{
+			EntityInfo* pInfo = g_pEntityInfoList->m_pItems[i].second;
+			
+			if (pInfo)
+				LOG("Entity: %s Handle: %x Address: %llx\n",pInfo->m_szEntityType, pInfo->m_hParent, pInfo->m_pEntity);
+		}
+
+	//	CpkMount cpk = { "data105a", 0x1F };
+	//	bool bLoaded = (*(bool(*)(CpkMount*))(0x140644000))(&cpk);// = (*(void* (*)(unsigned int iCpkType, char *szPath))(0x140956D70))(0x1F, "G:\\Nier Automata\\\\data\\data105a.cpk") != NULL;
+
+	//	LOG("Loaded 105a.cpk %s\n", bLoaded ? "YES" : "NO");
+
+		//(*(void*(*)())(0x1430AC860))();
+
 		//DWORD crc = HashStringCRC32("Ba2014", 6);
 		//SceneState* p = (SceneState*)FindSceneState((PCRITICAL_SECTION)0x141ECF350, crc, "Ba2014", 6);
 		//((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &p);
@@ -52,7 +70,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 		//(*(__int64(*)(void*))(0x140AF7770))((void*)0x58940000);
 		//(*(void(*)(Entity_t*, int))(0x1401EF120))(g_pLocalPlayer, 1); //SetE3TimeTrial
-	}	
+	}
 
 
 	//if (GetAsyncKeyState(VK_F4) & 1)
@@ -91,19 +109,19 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 	if (GetAsyncKeyState(VK_F4) & 1)
 	{
-		pCameraEnt->Animate(Vars.Gameplay.iAnimation, 0);	// 0 plays, 1 stops?, 2 freezes
+		pCameraEnt->Animate(Vars.Gameplay.iAnimation, 0, 0, 0);	// 0 plays, 1 stops?, 2 freezes
 		//(*(EntityInfo *(__fastcall*)(Entity_t*))(0x140245C30))(pCameraEnt); //Buddy_UNK
 	}
 #endif
 
 	if (GetAsyncKeyState(VK_F5) & 1)
 	{
-		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0);
+		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
 	}
 
 	if (GetAsyncKeyState(VK_F11) & 1)
 	{
-		Array<EntityHandle>* pHandles = g_pEnemyManager->GetHandles3(); 
+		Array<EntityHandle>* pHandles = g_pEnemyManager->GetHandles3();
 
 		for (QWORD i = 0; i < pHandles->m_count; ++i)
 		{
@@ -149,7 +167,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 		//*(Vector3*)((byte*)g_pCamera + 0x3f0) = vAngles3;
 
-		g_pLocalPlayer->m_vPosition += vForward * 0.5f;
+		g_pLocalPlayer->m_vPosition += vForward * 0.5f; //link error
 	}
 
 	// wip color isn't updating
@@ -225,7 +243,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			{
 				if (Vars.Gameplay.bTemporaryLevel)
 				{
-					Level_t* pLevel = CalculateLevel(&g_pLocalPlayer->m_LevelsContainer, *g_pdwExperience);
+					Level_t* pLevel = CalculateLevel(&g_pLocalPlayer->m_LevelsContainer, *g_piExperience);
 					pLevel->m_iLevel = Vars.Gameplay.iLevel;
 				}
 				else
@@ -235,7 +253,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 					else if (Vars.Gameplay.iLevel < 1)
 						Vars.Gameplay.iLevel = 1;
 
-					*g_pdwExperience = (DWORD)g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
+					*g_piExperience = g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
 				}
 			}
 
@@ -246,7 +264,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				*g_piMoney = MAX_MONEY;
 
 			ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
-		
+
 			if (ImGui::Button("Play Sound"))
 			{
 				Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
@@ -293,7 +311,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			if (ImGui::Button("Play Animation"))
 			{
-				pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0);
+				pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 1, 0);
 			}
 
 			if (ImGui::Button("Change Player"))
@@ -313,7 +331,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
 			{
-				Entity_t* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+				Pl0000* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 
 				if (pBuddy)
 					DestroyBuddy(pBuddy);
@@ -349,9 +367,10 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 			ImGui::Checkbox("Ghost Model", &Vars.Gameplay.bGhostModel);
 
-			
 			if (pCameraEnt)
 			{
+				ImGui::InputFloat3("Position (X,Y,Z)", (float*)&pCameraEnt->m_vPosition);
+
 				char szModelPart[64];
 				sprintf_s(szModelPart, "ModelPart: (%s)", pCameraEnt->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
 				ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelPart, 0, pCameraEnt->m_nModelParts - 1);
@@ -365,14 +384,6 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				ImGui::InputFloat3("Model Scale (X,Y,Z)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(1));
 				ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pCameraEnt->m_matModelToWorld.GetAxis(3));
 			}
-#if 0
-			ImGui::SliderInt((Vars.Gameplay.iSwapCharacter == PROTAGONIST_NONE) ? "Swap Active Protagonist (Default)" : (Vars.Gameplay.iSwapCharacter == PROTAGONIST_2B) ? "Swap Active Protagonist (2B)" : (Vars.Gameplay.iSwapCharacter == PROTAGONIST_A2) ? "Swap Active Protagonist (A2)" :
-				(Vars.Gameplay.iSwapCharacter == PROTAGONIST_9S) ? "Swap Active Protagonist (9S)" : "Swap Active Protagonist (Unknown)", &Vars.Gameplay.iSwapCharacter, 0, 3);
-
-
-			if (ImGui::Button("Apply Protagonist"))
-				Vars.Gameplay.bSwapCharacter = true;
-#endif
 
 			ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
 			ImGui::Checkbox("SpeedMeister", &Vars.Gameplay.bSpeedMeister);
@@ -394,27 +405,36 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	}
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-	// renderer doesn't work rn fml
-	//g_pRenderer->SaveState();
-	//g_pRenderer->DrawRectOutline(100, 100, 500, 500, 0xFFFFFFFF);
-	//g_pRenderer->RestoreState();
 
-#if 0	
-	g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);// idk if we need this line since we don't draw
-#endif
+	Vector2 vScreen;
+	//g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 
-	/*D3DXVECTOR2 vScreen = { 0, 0 };
-
-	if (WorldToScreen((CONST D3DXVECTOR3*)&g_pLocalPlayer->m_vPosition, &vScreen))
+	g_pRenderer->Begin();
+	
+	if (g_pLocalPlayer && WorldToScreen(g_pLocalPlayer->m_vPosition, vScreen))
 	{
-		g_pRenderer->DrawRectOutline((int)vScreen.x, (int)vScreen.y, 100, 300, 0xffaaaaa);
-	}*/
+		g_pRenderer->DrawRectCorners((int)vScreen.x - 50, (int)vScreen.y - 200, 100, 200, 5, Color::Blue());
+	/*
+		failed forward vec line :S
+		Vector3 vAngle = g_pLocalPlayer->m_matModelToWorld.GetAxis(3) * M_RADPI;
+		Vector3 vForward, vStart, vEnd;
+		Vector2 vStart2D, vEnd2D;
+
+		Math::AngleVectors(vAngle, &vForward);
+		vStart = Vector3(g_pLocalPlayer->m_vPosition.x, g_pLocalPlayer->m_vPosition.y + 1, g_pLocalPlayer->m_vPosition.z);
+		vEnd = vStart + vForward * 1.f;
+
+		if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
+			g_pRenderer->DrawLine(vStart2D.x, vStart2D.y, vEnd2D.x, vEnd2D.y, Color::Green());
+	*/
+	}
+	g_pRenderer->Draw();
+	g_pRenderer->End();
+
 
 	return oPresent(pThis, SyncInterval, Flags); //Anti-VSync Here bud (Vars.Misc.bAntiVSync) ? 0 : SyncInterval
 }
 
-
-TODO("probs find a better way to do this (aka not alloc mem every time and put into a fucc!");
 HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
 	pDesc->BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -424,11 +444,7 @@ HRESULT __fastcall hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXG
 	if (SUCCEEDED(hr))
 	{
 		g_pSwapChain = *ppSwapChain;
-
-		delete g_pSwapChainHook;
-
-		g_pSwapChainHook = new VirtualTableHook((QWORD***)ppSwapChain);
-		oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
+		g_pSwapChainHook->Relocate((QWORD**)g_pSwapChain);
 
 		ImGui_ImplDX11_InvalidateDeviceObjects();
 	}
@@ -499,68 +515,95 @@ void __fastcall hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11Render
 	oClearRenderTargetView(pThis, pRenderTargetView, ColorRGBA);
 }
 
+HRESULT __fastcall hkKeyboardAcquire(IDirectInputDevice8A* pThis)
+{
+	g_pKeyboardHook->Unhook();
+
+	HRESULT hr = oKeyboardAcquire(pThis);
+
+	g_pKeyboardHook->Rehook();
+
+	return hr;
+}
+
+HRESULT __fastcall hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
+{
+	if (Vars.Menu.bOpened)
+		return DIERR_INPUTLOST;
+
+	g_pKeyboardHook->Unhook();
+
+	HRESULT hr = oKeyboardGetDeviceState(pThis, cbData, lpvData);
+
+	g_pKeyboardHook->Rehook();
+
+	return hr;
+}
+
+HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis)
+{
+	g_pMouseHook->Unhook();
+
+	HRESULT hr = oMouseAcquire(pThis);
+
+	g_pMouseHook->Rehook();
+
+	return hr;
+}
+
+HRESULT __fastcall hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
+{
+	if (Vars.Menu.bOpened)
+		return DIERR_INPUTLOST;
+
+	g_pMouseHook->Unhook();
+
+	HRESULT hr = oMouseGetDeviceState(pThis, cbData, lpvData);
+
+	g_pMouseHook->Rehook();
+
+	return hr;
+}
+
+void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps)
+{
+	ConstructionInfo<void>* pConstruct = GetConstructionInfo(objectId);
+	
+	void* pEntity = NULL;
+
+	if (strcmp("Em4000", pConstruct->szName) && strcmp("EmParts", pConstruct->szName))//if (strcmp("NPC", pConstruct->szName))
+		pEntity = oCreateEntity(pUnknown, pInfo, objectId, flags, ppHeaps); //0x1401A2B40
+
+	if (!pEntity)
+		LOG("Failed to create %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
+	else
+		LOG("Created %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
+
+	return pEntity;
+}
+
 void __fastcall hkSaveFileIO(CSaveDataDevice* pSavedata)
 {
 	if (!pSavedata)
 		return;
 
-	if (Vars.Gameplay.bSwapCharacter && !pSavedata->qwFlags)
-		pSavedata->qwFlags |= SAVE_FLAGS_READ;
-
 	switch (pSavedata->dwFlags)
 	{
 	case SAVE_FLAGS_READ_SLOTS:
-	{
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095DD80))(pSavedata);
+		(*(ReadSaveSlotsFn)(0x14095DD80))(pSavedata);
 		return;
-	}
 	case SAVE_FLAGS_READ:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E020))(pSavedata);
+		(*(ReadSaveDataFn)(0x14095E020))(pSavedata);
 
 		Vars.Misc.nSlot = pSavedata->nSlot;
 		Vars.Gameplay.nMaxModelVertices = 0;
 		Vars.Misc.bLoading = true;
-
-		if (Vars.Gameplay.bSwapCharacter)
-		{
-
-			//wchar_t* p = (wchar_t*)((QWORD)g_pUserManager + 0x188);
-			//*p++ = 'A';
-			//*p = '2';
-
-			//char* pszActiveProtagonist[3];
-			//pszActiveProtagonist[0] = (char*)((*(byte**)((*(byte**)0x14158CC88) + 0x100)) + 0x38); // this pointer changes based on what protagonist is active sooo fuck! Actually idk what's going on tbh
-			//pszActiveProtagonist[1] = (char*)((*(byte**)((*(byte**)0x14158CC58) + 0x350)) + 0x16C);
-			//pszActiveProtagonist[2] = (char*)((*(byte**)((*(byte**)0x14158CC58) + 0x350)) + 0x3EC);
-
-			switch (Vars.Gameplay.iSwapCharacter)
-			{
-			case PROTAGONIST_2B:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/2B", 5); //"PL/2B_Armed_NoMask"
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/2B", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/2B", 5);
-				break;
-			case PROTAGONIST_A2:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/A2", 5);
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/A2", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/A2", 5);
-				break;
-			case PROTAGONIST_9S:
-				//memcpy(pszActiveProtagonist[0], (const void*)"PL/9S", 5);
-				//memcpy(pszActiveProtagonist[1], (const void*)"PL/9S", 5);
-				//memcpy(pszActiveProtagonist[2], (const void*)"PL/9S", 5);
-				break;
-			default:
-				break;
-			}
-			Vars.Gameplay.bSwapCharacter = false;
-		}
 		return;
 	case SAVE_FLAGS_WRITE:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E330))(pSavedata);
+		(*(WriteSaveDataFn)(0x14095E330))(pSavedata);
 		return;
 	case SAVE_FLAGS_DELETE:
-		(*(void(__fastcall*)(CSaveDataDevice*))(0x14095E7B0))(pSavedata);
+		(*(DeleteSaveDataFn)(0x14095E7B0))(pSavedata);
 		return;
 	default:
 		Vars.Misc.bLoading = false;
@@ -585,7 +628,7 @@ BOOL __fastcall hkSetCursorPos(int X, int Y)
 {
 	if (Vars.Menu.bOpened)
 		return FALSE;
-	
+
 	return oSetCursorPos(X, Y);
 }
 

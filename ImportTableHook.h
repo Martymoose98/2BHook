@@ -209,7 +209,7 @@ public:
 
 								if (!strcmp(szFunctionName, szFunction))
 								{
-									WORD ordinal = (WORD)((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[hint] + pExportDirectory->Base;
+									WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[hint] + pExportDirectory->Base);
 
 									if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 									{
@@ -236,8 +236,8 @@ public:
 					}
 					else
 					{
-						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.Function))->Name;
-
+						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.AddressOfData))->Name;
+						
 						if (!strcmp(szFunctionName, szFunction))
 						{
 							this->m_pIAT = &pImportAddressTable[i];

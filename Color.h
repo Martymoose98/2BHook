@@ -1,19 +1,20 @@
 #pragma once
+#include "Math.h"
 
-#define RGBA_COLOR32(r, g, b, a) (int)((BYTE)(a) << 24 | (BYTE)(b) << 16 | (BYTE)(g) << 8 | (BYTE)(r))
-#define RGBX_COLOR32(r, g, b) (int)((BYTE)(0xFF) << 24 | (BYTE)(b) << 16 | (BYTE)(g) << 8 | (BYTE)(r))
+#define RGBA_COLOR32(r, g, b, a) (int)(((BYTE)(a) << 24) | ((BYTE)(b) << 16) | ((BYTE)(g) << 8) | (BYTE)(r))
+#define RGBX_COLOR32(r, g, b) (int)(((BYTE)(0xFF) << 24) | ((BYTE)(b) << 16) | ((BYTE)(g) << 8) | (BYTE)(r))
 
 class Color
 {
 public:
 	Color()
+		: m_color32(0)
 	{
-		*((int *)this) = 0;
 	}
 
 	Color(int color32)
+		: m_color32(color32)
 	{
-		*((int *)this) = color32;
 	}
 
 	Color(int _r, int _g, int _b)
@@ -26,95 +27,105 @@ public:
 		SetColor(_r, _g, _b, _a);
 	}
 
+	Color(const Vector4& vColor)
+	{
+		SetColor((int)(vColor[0] * 255.0f), (int)(vColor[1] * 255.0f), (int)(vColor[2] * 255.0f), (int)(vColor[3] * 255.0f));
+	}
+
+	Color(const float* rgba)
+	{
+		SetColor(rgba[0] * 255.0f, rgba[1] * 255.0f, rgba[2] * 255.0f, rgba[3] * 255.0f);
+	}
+
 	void SetColor(int _r, int _g, int _b, int _a = 255)
 	{
-		_color[0] = (unsigned char)_r;
-		_color[1] = (unsigned char)_g;
-		_color[2] = (unsigned char)_b;
-		_color[3] = (unsigned char)_a;
+		m_color[0] = (unsigned char)_r;
+		m_color[1] = (unsigned char)_g;
+		m_color[2] = (unsigned char)_b;
+		m_color[3] = (unsigned char)_a;
 	}
 
 	void GetColor(int& _r, int& _g, int& _b, int& _a) const
 	{
-		_r = _color[0];
-		_g = _color[1];
-		_b = _color[2];
-		_a = _color[3];
+		_r = m_color[0];
+		_g = m_color[1];
+		_b = m_color[2];
+		_a = m_color[3];
 	}
 
 	const unsigned char* RetColor() const
 	{
-		return _color;
+		return m_color;
 	}
 
 	void SetRawColor(int color32)
 	{
-		*((int*)this) = color32;
+		this->m_color32 = color32;
 	}
 
 	int GetRawColor() const
 	{
-		return *((int*)this);
+		return this->m_color32;
 	}
 
 	int GetD3DColor() const
 	{
-		return ((int)((((_color[3]) & 0xff) << 24) | (((_color[0]) & 0xff) << 16) | (((_color[1]) & 0xff) << 8) | ((_color[2]) & 0xff)));
+		return ((int)(((m_color[3]) << 24) | ((m_color[0]) << 16) | ((m_color[1]) << 8) | (m_color[2])));
 	}
 
 	inline int r() const
 	{
-		return _color[0];
+		return m_color[0];
 	}
 
 	inline int g() const
 	{
-		return _color[1];
+		return m_color[1];
 	}
 
 	inline int b() const
 	{
-		return _color[2];
+		return m_color[2];
 	}
 
 	inline int a() const
 	{
-		return _color[3];
+		return m_color[3];
 	}
 
 	inline float rBase() const
 	{
-		return _color[0] / 255.0f;
+		return m_color[0] / 255.0f;
 	}
 
 	inline float gBase() const
 	{
-		return _color[1] / 255.0f;
+		return m_color[1] / 255.0f;
 	}
 
 	inline float bBase() const
 	{
-		return _color[2] / 255.0f;
+		return m_color[2] / 255.0f;
 	}
 
 	inline float aBase() const
 	{
-		return _color[3] / 255.0f;
+		return m_color[3] / 255.0f;
 	}
 
 	unsigned char& operator[](int index)
 	{
-		return _color[index];
+		return m_color[index];
 	}
 
 	const unsigned char& operator[](int index) const
 	{
-		return _color[index];
+		return m_color[index];
 	}
 
 	bool operator==(const Color& rhs) const
 	{
-		return (*((int *)this) == *((int *)&rhs));
+		return (m_color32 == rhs.m_color32);
 	}
 
 	bool operator!=(const Color& rhs) const
@@ -128,39 +139,57 @@ public:
 		return *this;
 	}
 
-	float* Base()
+	operator Vector4()
+	{
+		return Vector4(BaseAlpha());
+	}
+
+	operator XMFLOAT4()
+	{
+		return XMFLOAT4(BaseAlpha());
+	}
+
+	void GetFloatColor(float* rgba) const
+	{
+		rgba[0] = m_color[0] / 255.0f;
+		rgba[1] = m_color[1] / 255.0f;
+		rgba[2] = m_color[2] / 255.0f;
+		rgba[3] = m_color[3] / 255.0f;
+	}
+
+	__forceinline float* Base() const
 	{
 		float clr[3];
 
-		clr[0] = _color[0] / 255.0f;
-		clr[1] = _color[1] / 255.0f;
-		clr[2] = _color[2] / 255.0f;
+		clr[0] = m_color[0] / 255.0f;
+		clr[1] = m_color[1] / 255.0f;
+		clr[2] = m_color[2] / 255.0f;
 
 		return &clr[0];
 	}
 
-	float* BaseAlpha()
+	__forceinline float* BaseAlpha() const
 	{
 		float clr[4];
 
-		clr[0] = _color[0] / 255.0f;
-		clr[1] = _color[1] / 255.0f;
-		clr[2] = _color[2] / 255.0f;
-		clr[3] = _color[3] / 255.0f;
+		clr[0] = m_color[0] / 255.0f;
+		clr[1] = m_color[1] / 255.0f;
+		clr[2] = m_color[2] / 255.0f;
+		clr[3] = m_color[3] / 255.0f;
 
 		return &clr[0];
 	}
 
 	float Hue() const
 	{
-		if (_color[0] == _color[1] && _color[1] == _color[2])
+		if (m_color[0] == m_color[1] && m_color[1] == m_color[2])
 		{
 			return 0.0f;
 		}
 
-		float r = _color[0] / 255.0f;
-		float g = _color[1] / 255.0f;
-		float b = _color[2] / 255.0f;
+		float r = m_color[0] / 255.0f;
+		float g = m_color[1] / 255.0f;
+		float b = m_color[2] / 255.0f;
 
 		float max = r > g ? r : g > b ? g : b,
 			min = r < g ? r : g < b ? g : b;
@@ -190,9 +219,9 @@ public:
 
 	float Saturation() const
 	{
-		float r = _color[0] / 255.0f;
-		float g = _color[1] / 255.0f;
-		float b = _color[2] / 255.0f;
+		float r = m_color[0] / 255.0f;
+		float g = m_color[1] / 255.0f;
+		float b = m_color[2] / 255.0f;
 
 		float max = r > g ? r : g > b ? g : b,
 			min = r < g ? r : g < b ? g : b;
@@ -211,9 +240,9 @@ public:
 
 	float Brightness() const
 	{
-		float r = _color[0] / 255.0f;
-		float g = _color[1] / 255.0f;
-		float b = _color[2] / 255.0f;
+		float r = m_color[0] / 255.0f;
+		float g = m_color[1] / 255.0f;
+		float b = m_color[2] / 255.0f;
 
 		float max = r > g ? r : g > b ? g : b;
 		float min = r < g ? r : g < b ? g : b;
@@ -332,7 +361,8 @@ public:
 private:
 	union
 	{
-		unsigned char _color[4];
+		unsigned char m_color[4];
+		unsigned int m_color32;
 
 		struct
 		{
