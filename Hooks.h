@@ -5,6 +5,7 @@
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_dx11.h"
 #include "Renderer.h"
+#include "Math.h"
 #include "Menu.h"
 #include "Variables.h"
 #include "Globals.h"

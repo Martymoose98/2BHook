@@ -1,10 +1,9 @@
 #pragma once
 #include <dbghelp.h>
-#include <d3dx9.h>
-#include <d3dx9math.h>
 #include <Shlobj.h>
 #include "Globals.h"
 #include "Variables.h"
+#include "Matrix4x4.h"
 
 #pragma comment(lib, "d3dx9.lib")
 
@@ -59,7 +58,7 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
 	float w = vMatrix[3][0] * vIn[0] + vMatrix[3][1] * vIn[1] + vMatrix[3][2] * vIn[2] + vMatrix[3][3];
 
-	if (w < 0.01f)
+	if (w < 0.001f)
 	{
 		return false;
 	}
@@ -84,7 +83,7 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 
 static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
 {
-	return (handle & 0x00FFFF00) >> 8;
+	return (unsigned short)((handle & 0x00FFFF00) >> 8);
 }
 
 static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, const unsigned short index)
@@ -194,6 +193,8 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 {
 	PROCESS_HEAP_ENTRY Entry;
+
+	UNREFERENCED_PARAMETER(Entry);
 
 	//HeapWalk(p)
 

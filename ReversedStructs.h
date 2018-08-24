@@ -246,6 +246,14 @@ struct ExExpInfo
 	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
 };
 
+class ExCollsion : public BehaviorExtension
+{
+	void* m_vtbl;
+	void* m_unk;
+	EntityHandle m_hEntity;
+	BOOL m_bLowGravity; //wtf ?__?
+};
+
 class ExLockOn : public BehaviorExtension
 {
 	void* m_vtable;			//0x0000
@@ -279,6 +287,17 @@ class ExActionState : public BehaviorExtension
 class CXmlBinary
 {
 	void* m_vTable;
+};
+
+/*
+Size of struct 0x580 () bytes
+*/
+class CModel
+{
+	void* m_pVtbl;							//0x0000
+	Matrix4x4 m_matRotation;				//0x0010
+	Vector3Aligned m_vPosition;				//0x0050
+	Matrix4x4 m_matModelToWorld;			//0x0060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
 };
 
 /*
@@ -413,7 +432,7 @@ public:
 	void* m_pVtable;					//0x00000	 
 #endif // ENTITY_REAL_VTABLE
 	//char _0x0008[8];						//0x00008  CMODEL STARTS AT 0x0000
-	Matrix4x4 m_matUnk;						//0x00010
+	Matrix4x4 m_matRotation;				//0x00010
 	Vector3Aligned m_vPosition;				//0x00050
 	Matrix4x4 m_matModelToWorld;			//0x00060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
 	char _0x005C[160];						//0x000A0
@@ -477,6 +496,7 @@ public:
 	char _0x14C4[44];						//0x014C4
 	void* m_pCObjHitVtable;					//0x014F0 | start cObjHit
 	char _0x014EC[2936];					//0x014F8
+	//ExCollision* m_oob;						//0x01790
 	float fl0x02070;						//0x02070
 	char _0x02074[4];						//0x02074
 	ExExpInfo m_LevelsContainer;			//0x02078
@@ -664,7 +684,7 @@ direct3d functions. It might have more to it that I haven't explored so, this is
 the basic layout of the stucture. Strangley enough, it has device pointers and factory
 pointers but not a swapchain pointer nor an adapter pointer. Perhaps, I just have not
 disovered them. In addition I haven't found a global pointer that directly points to
-this structure. This is a virtual class after further investigation. Correctly
+this structure. This is a virtual class after further investigation. Correctly 
 renamed the class to it's proper name. It seems there might be a nested struct too.
 
  Size of struct 0x110 (272) bytes
