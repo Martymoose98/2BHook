@@ -46,8 +46,6 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <IncludePath>$(IncludePath);$(DXSDK_DIR)Include</IncludePath>
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
-    <IntDir>Build\$(Platform)\$(Configuration)\</IntDir>
-    <OutDir>Build\$(Platform)\$(Configuration)\</OutDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
@@ -84,12 +82,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Color.h" />
+    <ClInclude Include="cpk.h" />
     <ClInclude Include="Features.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Hooks.h" />
     <ClInclude Include="ImportTableHook.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="Menu.h" />
     <ClInclude Include="Renderer.h" />
@@ -98,6 +98,9 @@
     <ClInclude Include="SteamApi.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Variables.h" />
+    <ClInclude Include="Vector2.h" />
+    <ClInclude Include="Vector3.h" />
+    <ClInclude Include="Vector4.h" />
     <ClInclude Include="VirtualTableHook.h" />
   </ItemGroup>
   <ItemGroup>
@@ -108,16 +111,21 @@
     <ClCompile Include="ImGui\imgui_draw.cpp" />
     <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
     <ClCompile Include="Log.cpp" />
+    <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Renderer.cpp" />
+    <ClCompile Include="Vector2.cpp" />
+    <ClCompile Include="Vector3.cpp" />
     <ClCompile Include="VirtualTableHook.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <MASM Include="CreateEntityHook.asm" />
     <MASM Include="fastsqrt.asm">
       <FileType>Document</FileType>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </MASM>
     <MASM Include="ModelPartsHook.asm" />
+    <MASM Include="sincos.asm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

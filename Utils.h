@@ -1,28 +1,27 @@
 #pragma once
 #include <dbghelp.h>
-#include <d3dx9.h>
-#include <d3dx9math.h>
 #include <Shlobj.h>
 #include "Globals.h"
 #include "Variables.h"
+#include "Matrix4x4.h"
 
 #pragma comment(lib, "d3dx9.lib")
 
-#define DEBUG_STACK_TIMER(name) DebugStackTimer name(__FUNCTION__)
+#define STACK_TIMER(name) StackTimer name(__FUNCTION__)
 
-typedef struct DebugStackTimer
+typedef struct StackTimer
 {
-	DebugStackTimer(const char* szName)
+	StackTimer(const char* szName)
 	{
 		m_szName = szName;
 		m_start = clock();
 	}
 
-	~DebugStackTimer()
+	~StackTimer()
 	{
 		m_end = clock();
 		m_duration = (double)(m_end - m_start) / CLOCKS_PER_SEC;
-		
+
 		printf("%s took %fs\n", m_szName, m_duration);
 	}
 
@@ -50,39 +49,51 @@ static void Ungod()
 		g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 }
 
-static bool WorldToScreen(CONST D3DXVECTOR3* pvIn, D3DXVECTOR2* pvOut)
+static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
-	D3DXVECTOR4 vTransformed;
+	Matrix4x4& vMatrix = *(Matrix4x4*)0x1419C73C0;
+	vMatrix.Transpose();
 
-	D3DXVec3Transform(&vTransformed, pvIn, (CONST D3DXMATRIX*)(0x141986920));
+	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
+	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
+	float w = vMatrix[3][0] * vIn[0] + vMatrix[3][1] * vIn[1] + vMatrix[3][2] * vIn[2] + vMatrix[3][3];
 
-	if (vTransformed.w < 0.01f)
+	if (w < 0.001f)
 	{
 		return false;
 	}
 
-	FLOAT invw = 1.0f / vTransformed.w;
-	
-	pvOut->x *= invw;
-	pvOut->y *= invw;
+	FLOAT invw = 1.0f / w;
 
-	int width = g_pCGraphicDevice->iScreenWidth;
-	int height = g_pCGraphicDevice->iScreenHeight;
+	vOut *= invw;
+
+	int width = g_pGraphicDevice->iScreenWidth;
+	int height = g_pGraphicDevice->iScreenHeight;
 
 	float x = (float)(width / 2);
 	float y = (float)(height / 2);
 
-	x += 0.5f * pvOut->x * (float)width + 0.5f;
-	y -= 0.5f * pvOut->y * (float)height + 0.5f;
+	x += 0.5f * vOut.x * (float)width + 0.5f;
+	y -= 0.5f * vOut.y * (float)height + 0.5f;
 
-	pvOut->x = x;
-	pvOut->y = y;
+	vOut.x = x;
+	vOut.y = y;
 	return true;
+}
+
+static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
+{
+	return (unsigned short)((handle & 0x00FFFF00) >> 8);
+}
+
+static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, const unsigned short index)
+{
+	return (index | (pList->m_dwShift << 16)) << 8;
 }
 
 /*
 Warning: this method is not synchronized with the game threads, therefore anomalies
-may occur when copying files whilst being modified by another thread. Thread 
+may occur when copying files whilst being modified by another thread. Thread
 safety will be added in the future. This method fails if the "My Documents" folder's
 path has a greater length than MAX_PATH (260).
 */
@@ -141,7 +152,7 @@ static BOOL WriteMiniDump(EXCEPTION_POINTERS* pException)
 	MINIDUMP_EXCEPTION_INFORMATION ExceptionInfo = { GetCurrentThreadId(), pException, FALSE };
 
 	BOOL status = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MINIDUMP_TYPE(MiniDumpWithUnloadedModules | MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithFullMemoryInfo), pException ? &ExceptionInfo : NULL, NULL, NULL);
-	
+
 	CloseHandle(hFile);
 
 	return status;
@@ -182,6 +193,8 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 {
 	PROCESS_HEAP_ENTRY Entry;
+
+	UNREFERENCED_PARAMETER(Entry);
 
 	//HeapWalk(p)
 

@@ -15,8 +15,10 @@ public:
 	bool Initialize(QWORD** ppqwClassBase);
 	bool Initialize(QWORD*** pppqwClassBase);
 
+	void Relocate(QWORD** ppqwClassBase);
+
 	void Unhook();
-	void ReHook();
+	void Rehook();
 
 	QWORD GetFunctionCount() const;
 	QWORD GetFunctionAddress(UINT uIndex) const;
