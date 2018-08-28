@@ -145,7 +145,7 @@ Version 0.08:
 
 There are mutiple ways to contact me:
 
-# NieR:Automata Modding
+NieR:Automata Modding
 https://discord.gg/v8Yyrrg
 
 Martino#1552 - on discord (probably the best way)
