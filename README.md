@@ -1,13 +1,13 @@
 # 2B Hook
 A Mod Menu For NieR:Automata
 
-#What it does:
+# What it does:
 
 2B Hook is a mod menu, which means it has multiple features inside one mod. Here are some of the features:
 
 Godmode
 
-No Fall
+No Fall Damage
 
 No Enemy Damage
 
@@ -86,7 +86,7 @@ Add a config for custom hotkeys
 
 Add teleport (to waypoint, poi, or objective and forward)
 
-Add an overlay renderer
+Add an overlay renderer [In Progress]
 
 # Change Log:
 
@@ -146,6 +146,7 @@ Version 0.08:
 There are mutiple ways to contact me:
 
 NieR:Automata Modding
+
 https://discord.gg/v8Yyrrg
 
 Martino#1552 - on discord (probably the best way)
