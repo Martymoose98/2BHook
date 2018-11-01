@@ -36,12 +36,6 @@
 class Log
 {
 public:
-
-	Log()
-	{
-
-	}
-
 	explicit Log(const char* szFunction, const char* fmt, ...)
 	{
 		va_list args;
