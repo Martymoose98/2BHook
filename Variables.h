@@ -1,32 +1,50 @@
 #pragma once
 
+class Pl0000;
+
 typedef struct Variables_t
 {
+	Variables_t() {}
+
+	struct Visuals_t
+	{	
+		bool bTraceLine;
+		float flTraceLength;
+		bool bEspBox;
+		bool bSkeleton;
+		bool bDebugLocalPlayerSkeleton;
+	} Visuals;
+
 	struct Gameplay_t
 	{
-		bool bGodmode = false;
-		bool bNoEnemyDamage = false;
-		bool bNoWorldDamage = false;
+		bool bGodmode;
+		bool bNoEnemyDamage;
+		bool bNoWorldDamage;
 		int iLevel;
-		bool bTemporaryLevel = false;
+		bool bTemporaryLevel;
 		int iSpawnItemId;
+		char szItemName[64];
 		bool bInstantEquip;
 		bool bRainbowModel;
+		bool bRainbowHair;
 		float flModelTintHue;
 		int iSelectedModelPart;
 		int iAnimation;
 		int iSelectedAnimation;
 		int iSelectedEntityHandle;
 		bool bGhostModel;
-		int nMaxModelVertices = 0;
-		bool bFreezePlayer = false;
-		bool bNoTutorialDialogs = false;
-		bool bSpeedMeister = false;
-		float flSpeedMultiplier = 1.0f;
+		int nBones;
+		bool bFreezePlayer;
+		bool bNoTutorialDialogs;
+		bool bSpeedMeister;
+		float flSpeedMultiplier;
+		std::vector<char[32]> SpawnBlacklist;
 	} Gameplay;
 
 	struct Misc_t
 	{
+		char szCpkName[32];
+		bool bCpkLoaded;
 		char szSoundName[128];
 		bool bWireframe;
 		bool bAntiVSync;
@@ -44,8 +62,27 @@ typedef struct Variables_t
 		{
 			XINPUT_STATE state;
 			XINPUT_STATE emulate;
+			LPDIDATAFORMAT pKeyboardFormat;	// c_dfDIKeyboard
+			LPDIDATAFORMAT pMouseFormat;	// c_dfDIMouse2
+			BOOLEAN KeyboardState[256];
+			BOOLEAN OldKeyboardState[256];
+			DIMOUSESTATE2 MouseState;
+			DIMOUSESTATE2 OldMouseState;
 		} Input;
 	} Menu;
+
+	struct Keybinds_t
+	{
+		Keybinds_t() {}
+		
+		KeybindFunctional<void, void()> ChangePlayer;
+		KeybindFunctional<void, void()> Airstuck;
+		KeybindFunctional<void, void()> DuplicateBuddy;
+		//KeybindFunctional<void(*)(Pl0000*, int, int, int, int)> PlayAnimation;
+		KeybindFunctional<void, void()> TeleportForward;
+		KeybindDynamicToggleable ModelGravity;
+		KeybindDynamicIncrement<float> ModelYControl;
+	} Keybinds;
 
 	struct Animation
 	{

@@ -2,6 +2,7 @@
 #include <Windows.h>
 #include <stdio.h>
 
+//#define VERBOSE		// helps with debugging for retards
 #define TODO_CLICKABLE
 
 #ifndef _MAKE_STRING
@@ -14,27 +15,33 @@
 
 #ifndef TODO
 #ifndef TODO_CLICKABLE
-#define TODO(x) __pragma(message(":TODO: " MAKE_STRING(x) " -> " __FILE__ "@" MAKE_STRING(__LINE__))) 
+#define TODO(x) __pragma(message("TODO: " MAKE_STRING(x) " -> " __FILE__ "@" MAKE_STRING(__LINE__))) 
 #else
 #define TODO(x) __pragma(message(__FILE__ "(" MAKE_STRING(__LINE__) "):" " TODO: " MAKE_STRING(x))) 
-#endif // !TODD_CLICKABLE
+#endif // !TODO_CLICKABLE
 #endif // !TODO
 
-#ifdef _DEBUG
+#if defined(_DEBUG) || defined(VERBOSE)
 #define LOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
 #else 
 #define LOG(fmt, ...)
 #endif
 
-#ifdef _DEBUG
-#define EXPLOG(fmt, ...) LOG
+#ifdef VERBOSE
+#define VLOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
 #else
-#define EXPLOG(fmt, ...) MessageBoxA(NULL, fmt, fmt, MB_OK | MB_ICONERROR | MB_SETFOREGROUND)
+#define VLOG(fmt, ...)
 #endif
 
 class Log
 {
 public:
+
+	Log()
+	{
+
+	}
+
 	explicit Log(const char* szFunction, const char* fmt, ...)
 	{
 		va_list args;
@@ -47,7 +54,9 @@ public:
 
 	static void AttachConsole(const wchar_t* szConsolename)
 	{
-		AllocConsole();
+		if (!AllocConsole())
+			return;
+
 		SetConsoleTitleW(szConsolename);
 		freopen_s(&pStdout, "CON", "w", stdout);
 	}

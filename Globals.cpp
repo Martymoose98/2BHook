@@ -3,12 +3,14 @@
 CalculateLevelFn CalculateLevel;
 GetEntityFromHandleFn GetEntityFromHandle;
 SetLocalPlayerFn SetLocalPlayer;
+ResetCameraFn ResetCamera;
 ChangePlayerFn ChangePlayer;
 DestroyBuddyFn DestroyBuddy;
 GetConstructorFn GetConstructionInfo;
 FindSceneStateFn FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
 FNV1HashFn FNV1Hash;
+CpkMountFn CpkMount;
 
 XInputGetStateExFn XInputGetStateEx;
 XInputWaitForGuideButtonFn InputWaitForGuideButton;
@@ -23,6 +25,9 @@ int* g_piExperience;
 HWND g_hWnd;
 HINSTANCE g_hInstance;
 HANDLE* g_pHeaps;
+LPSTR g_szDataDirectoryPath;
+std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
+
 
 Pl0000* g_pLocalPlayer;
 EntityHandle* g_pLocalPlayerHandle;
@@ -45,6 +50,8 @@ CGraphics* g_pGraphics;
 ID3D11Device* g_pDevice;
 ID3D11DeviceContext* g_pDeviceContext;
 ID3D11RenderTargetView* g_pRenderTargetView;
+ID3D11PixelShader* g_pRed;
+ID3D11PixelShader* g_pGreen;
 ID3D11RasterizerState* g_pRenderWireframeState;
 ID3D11RasterizerState* g_pRenderSolidState;
 ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
@@ -72,14 +79,16 @@ VirtualTableHook* g_pMouseHook;
 ImportTableHook* g_pQueryPerformanceCounterHook;
 ImportTableHook* g_pClipCursorHook;
 ImportTableHook* g_pXInputGetStateHook;
+ImportTableHook* g_pSetUnhandledExceptionFilterHook;
 
 BYTE_PATCH_MEMORY bp_save_file_io;
+BYTE_PATCH_MEMORY bp_UpdateModelParts;
 BYTE_PATCH_MEMORY bp_CreateEntity[2];
 BYTE_PATCH_MEMORY bp_query_performance_counter;
 BYTE_PATCH_MEMORY bp_AntiVSync;
 BYTE_PATCH_MEMORY bp_Framecap;
 BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
-BYTE_PATCH_MEMORY bp_HairColor;
+NOP_MEMORY nop_HairColor;
 NOP_MEMORY nop_Health[2];
 NOP_MEMORY nop_neon_scenery;
 NOP_MEMORY nop_Framecap[2];

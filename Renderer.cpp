@@ -253,8 +253,8 @@ void Renderer::DrawLine(int x0, int y0, int x1, int y1, const Color& color)
 
 	Vertex v[]
 	{
-		{ XMFLOAT4(x0, y0, 0.0f, 1.0f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x1, y1, 0.0f, 1.0f), XMFLOAT4(rgba) }
+		{ XMFLOAT4((float)x0, (float)y0, 0.0f, 1.0f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)x1, (float)y1, 0.0f, 1.0f), XMFLOAT4(rgba) }
 	};
 
 	m_RenderList.AddVertices(v, D3D11_PRIMITIVE_TOPOLOGY_LINELIST);
@@ -269,12 +269,12 @@ void Renderer::DrawFilledRect(int x, int y, int width, int height, const Color& 
 
 	Vertex v[]
 	{
-		{ XMFLOAT4(x,			y,			0.f,	1.f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x + width,	y,			0.f,	1.f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x,			y + height, 0.f,	1.f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x + width,	y,			0.f,	1.f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x + width,	y + height,	0.f,	1.f), XMFLOAT4(rgba) },
-		{ XMFLOAT4(x,			y + height,	0.f,	1.f), XMFLOAT4(rgba) }
+		{ XMFLOAT4((float)x,			(float)y,				0.f,	1.f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)(x + width),	(float)y,				0.f,	1.f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)x,			(float)(y + height),	0.f,	1.f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)(x + width),	(float)y,				0.f,	1.f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)(x + width),	(float)(y + height),	0.f,	1.f), XMFLOAT4(rgba) },
+		{ XMFLOAT4((float)x,			(float)(y + height),	0.f,	1.f), XMFLOAT4(rgba) }
 	};
 
 	m_RenderList.AddVertices(v, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -330,6 +330,14 @@ void Renderer::DrawRectOutline(int x, int y, int w, int h, D3DCOLOR color)
 	//this->m_pDeviceContext->Draw(4, 0);
 }
 
+void Renderer::DrawRectBordered(int x, int y, int width, int height, int thickness, const Color& color)
+{
+	DrawFilledRect(x, y, width, thickness, color);
+	DrawFilledRect(x, y, thickness, height, color);
+	DrawFilledRect(x + width, y, thickness, height, color);
+	DrawFilledRect(x, y + height, width + thickness, thickness, color);
+}
+
 void Renderer::DrawRectCorners(int x, int y, int w, int h, int thickness, const Color& color)
 {
 	int v_leg = h / 4;
@@ -347,7 +355,18 @@ void Renderer::DrawRectCorners(int x, int y, int w, int h, int thickness, const 
 	DrawFilledRect(x, y + h, h_leg, thickness, color); // h
 	DrawFilledRect(x, (y + h) - v_leg, thickness, v_leg, color); //v
 
-	//btm far
+	//btm far	
 	DrawFilledRect((x + w) - (h_leg - thickness), y + h, h_leg, thickness, color); //h
 	DrawFilledRect(x + w, (y + h) - v_leg, thickness, v_leg, color); //v
+}
+
+
+void Renderer::DrawHealthBar(int x, int y, int height, int health, int max_health)
+{
+	int R = 255 - (int)(health * (255.f / max_health));
+	int G = (int)(health * (255.f / max_health));
+	health = (height - ((height * health) / max_health));
+
+	DrawFilledRect(x - 4, y + health, 2, height - health + 1, Color(R, G, 0));
+	DrawRectBordered(x - 5, y - 1, 3, height + 2, 1, Color::Black());
 }

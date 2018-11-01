@@ -164,11 +164,11 @@ static inline float  ImFloorStd(float x)                                        
 static inline float  ImCeil(float x)                                            { return ceilf(x); }
 #endif
 // - ImMin/ImMax/ImClamp/ImLerp/ImSwap are used by widgets which support for variety of types: signed/unsigned int/long long float/double, using templates here but we could also redefine them 6 times
-template<typename T> static inline T ImMin(T lhs, T rhs)                        { return lhs < rhs ? lhs : rhs; }
-template<typename T> static inline T ImMax(T lhs, T rhs)                        { return lhs >= rhs ? lhs : rhs; }
-template<typename T> static inline T ImClamp(T v, T mn, T mx)                   { return (v < mn) ? mn : (v > mx) ? mx : v; }
-template<typename T> static inline T ImLerp(T a, T b, float t)                  { return (T)(a + (b - a) * t); }
-template<typename T> static inline void ImSwap(T& a, T& b)                      { T tmp = a; a = b; b = tmp; }
+template<typename Func> static inline Func ImMin(Func lhs, Func rhs)                        { return lhs < rhs ? lhs : rhs; }
+template<typename Func> static inline Func ImMax(Func lhs, Func rhs)                        { return lhs >= rhs ? lhs : rhs; }
+template<typename Func> static inline Func ImClamp(Func v, Func mn, Func mx)                   { return (v < mn) ? mn : (v > mx) ? mx : v; }
+template<typename Func> static inline Func ImLerp(Func a, Func b, float t)                  { return (Func)(a + (b - a) * t); }
+template<typename Func> static inline void ImSwap(Func& a, Func& b)                      { Func tmp = a; a = b; b = tmp; }
 // - Misc maths helpers
 static inline ImVec2 ImMin(const ImVec2& lhs, const ImVec2& rhs)                { return ImVec2(lhs.x < rhs.x ? lhs.x : rhs.x, lhs.y < rhs.y ? lhs.y : rhs.y); }
 static inline ImVec2 ImMax(const ImVec2& lhs, const ImVec2& rhs)                { return ImVec2(lhs.x >= rhs.x ? lhs.x : rhs.x, lhs.y >= rhs.y ? lhs.y : rhs.y); }

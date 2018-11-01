@@ -17,4 +17,11 @@ typedef struct CPK_HEADER
 	DWORD dwSizeTableOffset;
 	DWORD dwUnknownOffset1C;
 	DWORD dwUnknown20;
+} CPK_HEADER;
+
+class CpkAnalyzer
+{
+	char _pad[32];
+	void* m_pBuffer;
+
 };
