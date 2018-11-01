@@ -3,7 +3,7 @@
 #include "Vector2.h"
 #include "Matrix4x4.h"
 
-extern "C" float __forceinline __fastcall fastsqrtf(float n);
+float __forceinline __fastcall ssesqrt(float n);
 
 class Matrix4x4;
 
@@ -188,7 +188,7 @@ inline Vector3 Vector3::operator/(float v) const
 
 inline float Vector3::Length() const
 {
-	return fastsqrtf(x * x + y * y + z * z);
+	return ssesqrt(x * x + y * y + z * z);
 }
 
 inline float Vector3::LengthSqr() const
@@ -198,12 +198,12 @@ inline float Vector3::LengthSqr() const
 
 inline float Vector3::LengthXY() const
 {
-	return fastsqrtf(x * x + y * y);
+	return ssesqrt(x * x + y * y);
 }
 
 inline float Vector3::LengthXZ() const
 {
-	return fastsqrtf(x * x + z * z);
+	return ssesqrt(x * x + z * z);
 }
 
 inline float Vector3::DistTo(const Vector3& v) const

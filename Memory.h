@@ -7,26 +7,42 @@
 #define class struct
 #endif
 
-#define FOURCC(a, b, c, d) ( (DWORD)(((DWORD)((BYTE)a)) | (((DWORD)((BYTE)b)) << 8) | (((DWORD)((BYTE)c)) << 16) | (((DWORD)((BYTE)d)) << 24)) )
-#define EIGHTCC(a, b, c, d, e, f, g, h) ( (QWORD)(((QWORD)((BYTE)a)) | (((QWORD)((BYTE)b)) << 8) | (((QWORD)((BYTE)c)) << 16) | (((QWORD)((BYTE)d)) << 24) | (((QWORD)((BYTE)e)) << 32) | (((QWORD)((BYTE)f)) << 40) | (((QWORD)((BYTE)g)) << 48) | (((QWORD)((BYTE)h)) << 56)) )
-
-#define NOP_MEMORY_MAGIC (INT)(0x706F6E) // "nop"
-#define BYTE_PATCH_MEMORY_MAGIC (INT)(0x6863) // "bp"
-
 #define RandomInt(_min, _max) (rand() % ((_max) - (_min)) + (_min))
 
 #define INRANGE(x, a, b) ((x) >= (a) && (x) <= (b))
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
 #define GetByte(x) ((GetBits((x)[0]) << 4) | GetBits((x)[1]))
 
-
 #define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (DWORD)(rva)))
 #define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (DWORD)(rva)))
 
+#define FOURCC(a, b, c, d) ( (DWORD)(((DWORD)((BYTE)a)) | (((DWORD)((BYTE)b)) << 8) | (((DWORD)((BYTE)c)) << 16) | (((DWORD)((BYTE)d)) << 24)) )
+#define EIGHTCC(a, b, c, d, e, f, g, h) ( (QWORD)(((QWORD)((BYTE)a)) | (((QWORD)((BYTE)b)) << 8) | (((QWORD)((BYTE)c)) << 16) | (((QWORD)((BYTE)d)) << 24) | (((QWORD)((BYTE)e)) << 32) | (((QWORD)((BYTE)f)) << 40) | (((QWORD)((BYTE)g)) << 48) | (((QWORD)((BYTE)h)) << 56)) )
+
+#define NOP_MEMORY_MAGIC (INT)(0x706F6E) // "nop"
+#define BYTE_PATCH_MEMORY_MAGIC (INT)(0x6863) // "bp"
+
+#define MINIMUM_HOOK_LENGTH32 5
+#define MINIMUM_HOOK_LENGTH64 14
+
+
 #ifdef _WIN64
 #define MakePtr MakePtr64
+#define HookFunc HookFunc64
+#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH64
 #else
 #define MakePtr MakePtr32
+#define HookFunc HookFunc32
+#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH32
+#endif
+
+
+#ifndef _WIN64
+#define HookFunc HookFunc32
+#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH32
+#else
+#define HookFunc HookFunc64
+#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH64
 #endif
 
 #define NOPMemory(dst, size) memset((VOID*)(dst), 0x90, size)
@@ -56,6 +72,14 @@ typedef struct _BYTE_PATCH_MEMORY
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
 } BYTE_PATCH_MEMORY, *PBYTE_PATCH_MEMORY;
+
+typedef struct _HOOK_FUNC
+{
+	void* m_pSrcFunc;
+	BYTE* m_pOldInstructions;
+	SIZE_T m_length;
+	bool m_hooked;
+} HOOK_FUNC, *PHOOK_FUNC;
 
 enum _ISBADCODEPTR_STATUS : DWORD
 {
@@ -368,8 +392,88 @@ public:
 			RestoreMemoryBytePatch((PBYTE_PATCH_MEMORY)pMem);
 			return;
 		default:
+			__debugbreak();
 			return;
 		}
+	}
+
+	// maybe we should have different shellcodes that use other registers
+	BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pStruct)
+	{
+		if (length < MINIMUM_HOOK_LENGTH64)
+			return false;
+
+		if (pStruct->m_hooked)
+			return false;
+
+		DWORD oldProtect;
+
+		if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &oldProtect))
+			return false;
+
+		pStruct->m_hooked = TRUE;
+		pStruct->m_pOldInstructions = (BYTE*)malloc(length);
+		pStruct->m_pSrcFunc = pSrcFunc;
+		memcpy(pStruct->m_pOldInstructions, pSrcFunc, length);
+		pStruct->m_length = length;
+
+		NOPMemory((LPBYTE)pSrcFunc + MINIMUM_HOOK_LENGTH64, length - MINIMUM_HOOK_LENGTH64);
+
+		/*
+		push rax
+		movabs rax, address
+		xchg rax, [rsp]
+		ret
+
+		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x87, 0x04, 0x24, 0xC3 }
+
+		or
+
+		push rax
+		movabs rax, addy
+		jmp rax
+		pop rax
+
+		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0, 0x58 };
+
+		or active vvvv
+
+		rsp -= 16
+
+		push rax
+		movabs rax, addy
+		call rax
+		pop rax
+
+		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x58 }
+		*/
+		static BYTE detour[] = { 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x58 };
+		memcpy((BYTE*)pSrcFunc, detour, sizeof(detour));
+		*(QWORD*)((BYTE*)pSrcFunc + 3) = (QWORD)pDstFunc;
+
+		if (!VirtualProtect(pSrcFunc, length, oldProtect, NULL))
+			return false;
+
+		return true;
+	}
+
+	BOOL UnhookFunc(HOOK_FUNC* pStruct)
+	{
+		if (!pStruct->m_hooked)
+			return false;
+
+		DWORD oldProtect;
+
+		if (!VirtualProtect(pStruct->m_pSrcFunc, pStruct->m_length, PAGE_EXECUTE_READWRITE, &oldProtect))
+			return false;
+
+		memcpy(pStruct->m_pSrcFunc, pStruct->m_pOldInstructions, pStruct->m_length);
+		pStruct->m_hooked = false;
+
+		if (!VirtualProtect(pStruct->m_pSrcFunc, pStruct->m_length, oldProtect, NULL))
+			return false;
+
+		return true;
 	}
 
 	static ISBADCODEPTR_STATUS IsBadCodePtr(const void* p)

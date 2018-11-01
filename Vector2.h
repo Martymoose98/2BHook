@@ -18,7 +18,7 @@ public:
 
 	inline Vector2& operator=(const Vector2& v);
 	inline Vector2& operator=(const float* v);
-	
+
 	inline float& operator[](int i);
 	inline float operator[](int i) const;
 

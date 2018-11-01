@@ -2,7 +2,6 @@
 #include <VersionHelpers.h>
 #include <d3d11.h>
 #include <D3Dcompiler.h>
-#define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <stdio.h>
 
@@ -12,7 +11,6 @@
 #include "Hooks.h"
 #include "VirtualTableHook.h"
 #include "ImportTableHook.h"
-#include "Variables.h"
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "xinput.lib")
@@ -22,13 +20,11 @@
 
 CMemory* g_pMemory = new CMemory;
 
-Variables Vars;
-
 CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE XorRdxRdx[] = { 0x48, 0x31, 0xD2 };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
-BYTE RsiJumpHook[] = { 0x48, 0xBE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD6, 0x90 };
-BYTE RdiJumpHook[] = { 0x90, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7 }; //0x57,
+BYTE RdiJumpHook[] = { 0x90, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7 };
+BYTE RdiJumpHook2[] = { 0x90, 0x57, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7, 0x5F };
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 BYTE opcodes_query_performance_counter[] = { 0x90, 0x90, 0xE9, 0x00, 0x00, 0x00, 0x00 };
 
@@ -65,6 +61,10 @@ void InitHooks()
 	g_pXInputGetStateHook = new ImportTableHook("xinput1_3.dll", "XInputGetState", (LPCVOID)hkXInputGetState);
 	oXInputGetState = (XInputGetStateFn)g_pXInputGetStateHook->GetOriginalFunction();
 
+	g_pSetUnhandledExceptionFilterHook = new ImportTableHook("kernel32.dll", "SetUnhandledExceptionFilter", (LPCVOID)hkSetUnhandledExceptionFilter);
+	oSetUnhandledExceptionFilter = (SetUnhandledExceptionFilterFn)g_pSetUnhandledExceptionFilterHook->GetOriginalFunction();
+
+
 	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
 	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((QWORD)hkCreateSwapChain, 10);
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
@@ -85,12 +85,24 @@ void InitHooks()
 
 	g_pMemory->PatchBytes(&bp_save_file_io);
 
+	oUpdateModelParts = (UpdateModelPartsFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 8B EC 44 89 64 24 ?", 1);
+
+	*(QWORD*)&RdiJumpHook2[4] = (QWORD)hkUpdateModelPartsThunk;
+
+	bp_UpdateModelParts.Address = oUpdateModelParts;
+	bp_UpdateModelParts.nBytes = 15;
+	bp_UpdateModelParts.pNewOpcodes = RdiJumpHook2;
+	bp_UpdateModelParts.pOldOpcodes = NULL;
+	bp_UpdateModelParts.Patched = FALSE;
+
+	//g_pMemory->PatchBytes(&bp_UpdateModelParts);
+
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
 	QWORD qwContainingFunc = g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
 
 	*(QWORD*)&RdiJumpHook[3] = (QWORD)hkCreateEntityThunk;
 
-	bp_CreateEntity[0].Address = (VOID*)(qwContainingFunc + 0x676);
+	bp_CreateEntity[0].Address = (VOID*)(qwContainingFunc + 0x676); 
 	bp_CreateEntity[0].nBytes = 13;
 	bp_CreateEntity[0].pNewOpcodes = RdiJumpHook;
 	bp_CreateEntity[0].pOldOpcodes = NULL; 
@@ -105,16 +117,22 @@ void InitHooks()
 	bp_CreateEntity[1].Patched = FALSE;
 
 	g_pMemory->PatchBytes(&bp_CreateEntity[1]); 
+	
+	/*HOOK_FUNC hf = { 0 };
+	g_pMemory->HookFunc64((VOID*)(qwContainingFunc + 0x129), hkCreateEntityThunk, 25, &hf);*/
 
-	*(QWORD*)&RsiJumpHook[2] = (QWORD)hkModelParts;
+	HOOK_FUNC hf = { 0 };
+	//caller
+	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf);
+	//callee
+	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &hf);
 
-	bp_HairColor.Address = (VOID*)g_pMemory->FindPattern(NULL, "45 8B FC 0F 29 44 08 ?");
-	bp_HairColor.nBytes = 12;
-	bp_HairColor.pNewOpcodes = RsiJumpHook;
-	bp_HairColor.pOldOpcodes = NULL;
-	bp_HairColor.Patched = FALSE;
+	nop_HairColor.Address = (VOID*)g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE");
+	nop_HairColor.nBytes = 12;
+	nop_HairColor.pOldOpcodes = NULL;
+	nop_HairColor.Patched = FALSE;
 
-	//g_pMemory->PatchBytes(&bp_HairColor); //horrible implmentation
+	g_pMemory->NopMemory(&nop_HairColor);
 }
 
 void CreateRenderTarget()
@@ -241,6 +259,9 @@ HRESULT InitD3D11()
 	// create a whole new rasterizer state
 	g_pDevice->CreateRasterizerState(&RenderSolidDesc, &g_pRenderSolidState);
 
+	GeneratePixelShader(g_pDevice, &g_pRed, 1.0f, 0.0f, 0.0f);
+	GeneratePixelShader(g_pDevice, &g_pGreen, 0.0f, 1.0f, 0.0f);
+
 	return S_OK;
 }
 
@@ -266,12 +287,10 @@ void ExposeHiddenXInputFunctions()
 
 void Setup()
 {
-#if _DEBUG
+#if defined(_DEBUG) || defined(VERBOSE)
 	STACK_TIMER(timer);
 	Log::AttachConsole(L"2B Hook Debug Console");
 #endif
-
-	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
 
 	//while ((g_pLocalPlayer = *(Entity_t**)g_pMemory->FindPatternPtr64(NULL, "4C 89 25 ? ? ? ? 4C 89 25 ? ? ? ? E8 ? ? ? ?", 3)) == NULL) // g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
 	//{
@@ -291,20 +310,26 @@ void Setup()
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
 	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC ? 8B 11 85 D2 74"); // there is like 50 identical functions kek
 	SetLocalPlayer = (SetLocalPlayerFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B ? ? ? ? ?", 1);
+	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
 	ChangePlayer = (ChangePlayerFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
 	FindSceneState = (FindSceneStateFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 83 CE 01", 1);
 	DestroyBuddy = (DestroyBuddyFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
 	HashStringCRC32 = (HashStringCRC32Fn)g_pMemory->FindPattern(NULL, "40 57 83 C8 FF");
 	GetConstructionInfo = (GetConstructorFn)g_pMemory->FindPattern(NULL, "33 D2 44 8B C9");
+	CpkMount = (CpkMountFn)g_pMemory->FindPattern(NULL, "48 83 EC 28 44 8B C9");
+	g_szDataDirectoryPath = (LPSTR)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 48 8D 3D ? ? ? ? 48 8B CF", 8);
 	g_piMoney = (int*)g_pMemory->FindPatternPtr64(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
 	g_piExperience = (int*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
+	VLOG("Found Direct Input 8\n");
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);	
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = *g_pGraphics->m_Display.m_ppSwapChain;
+
+	VLOG("Found the swapchain\n");
 
 	if (IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
@@ -316,14 +341,17 @@ void Setup()
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr64(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
 
+	VLOG("Found the window handle\n");
+
 	ExposeHiddenXInputFunctions();
 
 	QueryProcessHeaps(&g_pHeaps, NULL);
 
 	InitD3D11();
 
-	g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
-		
+	//g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
+	
+	
 	//no ini file
 	ImGui::GetIO().IniFilename = NULL;
 
@@ -336,6 +364,12 @@ void Setup()
 	}
 
 	InitHooks();
+
+	// add VEH?
+	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
+	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
+
+	VLOG("Set exception handler\n");
 
 	nop_Health[NOP_DAMAGE_ENEMY].Address = g_pDecreaseHealth[NOP_DAMAGE_ENEMY];
 	nop_Health[NOP_DAMAGE_ENEMY].nBytes = 6;
@@ -380,8 +414,11 @@ void Setup()
 
 void Unhook()
 {
-	if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage|| Vars.Gameplay.bNoWorldDamage)
-		Ungod();
+	Vars.Gameplay.bGodmode = false;
+	Vars.Gameplay.bNoEnemyDamage = false;
+	Vars.Gameplay.bNoWorldDamage = false;
+
+	Features::ApplyHealthMods();
 
 	g_pMemory->RestoreMemory(&bp_AntiVSync);
 	g_pMemory->RestoreMemory(&bp_NoTutorialDialogs);
@@ -392,8 +429,11 @@ void Unhook()
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 	g_pMemory->RestoreMemory(&bp_save_file_io);
+#if NO_IAT_HOOKS
 	g_pMemory->RestoreMemory(&bp_query_performance_counter);
+#endif
 
+	delete g_pSetUnhandledExceptionFilterHook;
 	delete g_pQueryPerformanceCounterHook;
 	delete g_pClipCursorHook;
 	delete g_pFactoryHook;
@@ -407,7 +447,7 @@ void Unhook()
 
 	SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
 
-#if _DEBUG
+#if defined(_DEBUG) || defined(VERBOSE)
 	Log::DetachConsole();
 #endif
 

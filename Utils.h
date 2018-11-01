@@ -1,9 +1,10 @@
 #pragma once
 #include <dbghelp.h>
+#include <d3dcompiler.h>
 #include <Shlobj.h>
 #include "Globals.h"
-#include "Variables.h"
 #include "Matrix4x4.h"
+#include "Log.h"
 
 #pragma comment(lib, "d3dx9.lib")
 
@@ -31,34 +32,16 @@ private:
 	const char* m_szName;
 } DebugStackTimer;
 
-static void God()
-{
-	if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
-		g_pMemory->NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
-
-	if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoWorldDamage)
-		g_pMemory->NopMemory(&nop_Health[NOP_DAMAGE_WORLD]);
-}
-
-static void Ungod()
-{
-	if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoEnemyDamage)
-		g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
-
-	if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoWorldDamage)
-		g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
-}
-
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
-	Matrix4x4& vMatrix = *(Matrix4x4*)0x1419C73C0;
+	Matrix4x4 vMatrix = *(Matrix4x4*)0x1419C73C0;
 	vMatrix.Transpose();
 
 	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
 	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
 	float w = vMatrix[3][0] * vIn[0] + vMatrix[3][1] * vIn[1] + vMatrix[3][2] * vIn[2] + vMatrix[3][3];
 
-	if (w < 0.001f)
+	if (w < 0.01f)
 	{
 		return false;
 	}
@@ -89,6 +72,100 @@ static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
 static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, const unsigned short index)
 {
 	return (index | (pList->m_dwShift << 16)) << 8;
+}
+
+// Reversed from binary
+static BOOL ObjectIdToObjectName(char*szObjectName, size_t size, int objectId)
+{
+	static char HexChars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
+	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
+										{ 0x70000, "it" }, { 0x90000, "sc" }, { 0xA0000, "um" }, { 0xC0000, "bg" }, { 0xE0000, "bh" }, { 0xF0000, "ba" } };
+
+	unsigned int i = 0;
+
+	do
+	{
+		if (Converts[i].m_ObjectIdBase == (objectId & 0xFFFF0000)) // high word of the int
+		{
+			szObjectName[0] = Converts[i].m_szPrefix[0];
+			szObjectName[1] = Converts[i].m_szPrefix[1];
+			szObjectName[2] = HexChars[((signed __int64)objectId >> 12) & 0xF];
+			szObjectName[3] = HexChars[((signed __int64)objectId >> 8) & 0xF];
+			szObjectName[4] = HexChars[((signed __int64)objectId >> 4) & 0xF];
+			szObjectName[5] = HexChars[objectId & 0xF];
+			szObjectName[6] = 0; //null terminator
+			return TRUE;
+		}
+		++i;
+	} while (i < ARRAYSIZE(Converts));
+
+	memset(szObjectName, 0, size);
+
+	if (objectId == -1)
+	{
+		strcpy_s(szObjectName, size, "eObjInvalid");
+		return FALSE;
+	}
+	else
+	{
+		strcpy_s(szObjectName, size, (objectId != 0x700000) ? "Unknow" : "Null");
+		return FALSE;
+	}
+}
+
+static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
+{
+	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
+										{ 0x70000, "it" }, { 0x90000, "sc" }, { 0xA0000, "um" }, { 0xC0000, "bg" }, { 0xE0000, "bh" }, { 0xF0000, "ba" } };
+
+	size_t i = 0;
+
+	if (!szObjectName)
+		return FALSE;
+
+	for (; i < ARRAYSIZE(Converts); ++i)
+		if (!strncmp(Converts[i].m_szPrefix, szObjectName, 2))
+			break;
+
+	*pObjectId = Converts[i].m_ObjectIdBase | ((szObjectName[2] - 0x30) << 12) | ((szObjectName[3] - 0x30) << 8) | ((szObjectName[4] - 0x30) << 4) | (szObjectName[5] - 0x30);
+
+	return TRUE;
+}
+
+static HRESULT GeneratePixelShader(ID3D11Device* pDevice, ID3D11PixelShader** ppPixelShader, float r, float g, float b)
+{
+	char szCast[] = "struct VS_OUT"
+		"{"
+		" float4 Position : SV_Position;"
+		" float4 Color : COLOR0;"
+		"};"
+		"float4 main( VS_OUT input ) : SV_Target"
+		"{"
+		" float4 fake;"
+		" fake.a = 1.0f;"
+		" fake.r = %f;"
+		" fake.g = %f;"
+		" fake.b = %f;"
+		" return fake;"
+		"}";
+
+	ID3D10Blob* pBlob;
+	ID3DBlob* pErrorMsgBlob;
+	char szPixelShader[1000];
+
+	sprintf_s(szPixelShader, szCast, r, g, b);
+
+	HRESULT hr = D3DCompile(szPixelShader, sizeof(szPixelShader), "shader", NULL, NULL, "main", "ps_4_0", NULL, NULL, &pBlob, &pErrorMsgBlob);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pDevice->CreatePixelShader(pBlob->GetBufferPointer(), pBlob->GetBufferSize(), NULL, ppPixelShader);
+
+	if (FAILED(hr))
+		return hr;
+
+	return S_OK;
 }
 
 /*
@@ -201,10 +278,18 @@ static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 	return ERROR_SUCCESS;
 }
 
-static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
+static LONG UnhandledExceptionHandlerChild(EXCEPTION_POINTERS* pException)
 {
 	if (!WriteMiniDump(pException))
 		LOG("Failed to write dump file!\n");
+
+	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
+{
+	for (auto& handler : g_pExceptionHandlers)
+		handler(pException);
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

@@ -27,6 +27,16 @@ public:
 		SetColor(_r, _g, _b, _a);
 	}
 
+	Color(float r, float g, float b)
+	{
+		SetColor((int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f), 255);
+	}
+
+	Color(float r, float g, float b, float a)
+	{
+		SetColor((int)(r * 255.0f), (int)(g * 255.0f), (int)(b * 255.0f), (int)(a * 255.0f));
+	}
+
 	Color(const Vector4& vColor)
 	{
 		SetColor((int)(vColor[0] * 255.0f), (int)(vColor[1] * 255.0f), (int)(vColor[2] * 255.0f), (int)(vColor[3] * 255.0f));
@@ -34,7 +44,7 @@ public:
 
 	Color(const float* rgba)
 	{
-		SetColor(rgba[0] * 255.0f, rgba[1] * 255.0f, rgba[2] * 255.0f, rgba[3] * 255.0f);
+		SetColor((int)(rgba[0] * 255.0f), (int)(rgba[1] * 255.0f), (int)(rgba[2] * 255.0f), (int)(rgba[3] * 255.0f));
 	}
 
 	void SetColor(int _r, int _g, int _b, int _a = 255)
@@ -51,6 +61,11 @@ public:
 		_g = m_color[1];
 		_b = m_color[2];
 		_a = m_color[3];
+	}
+
+	void Reverse()
+	{
+		_rotl(m_color32, 24);
 	}
 
 	const unsigned char* RetColor() const

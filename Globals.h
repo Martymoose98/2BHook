@@ -3,6 +3,9 @@
 #include <d3d11.h>
 #include <dinput.h>
 #include <xinput.h>
+
+#include <vector> //should be temp
+
 #include "ReversedStructs.h"
 #include "VirtualTableHook.h"
 #include "ImportTableHook.h"
@@ -37,6 +40,11 @@
 
 #define XINPUT_GAMEPAD_GUIDE 0x400
 
+#define CREATE_ENTITY(pc) ((MakeEntityFn)(0x1404F9AA0))((void*)0x14160DFE0, pc)
+
+#define KEYDOWN(name, key) (name[key] & 0x80)
+#define KEYPRESSED(c, o, key) (KEYDOWN(c, key) && !KEYDOWN(o, key))
+
 // This is for d3d11
 enum eDepthState
 {
@@ -47,15 +55,20 @@ enum eDepthState
 	_DEPTH_COUNT
 };
 
+struct CpkEntry;
+
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(__fastcall* CalculateLevelFn)(ExExpInfo* pInfo, int experience);
 typedef Pl0000*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
-typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id); //returns a sItem* maybe?
+typedef BOOL(__fastcall* ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
+typedef int(__fastcall*  GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
+typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
 typedef bool(__fastcall* AddItemFn)(__int64 pItemManager, int item_id);
 typedef bool(__fastcall* UseItemFn)(__int64 pItemManager, int item_id);
 typedef void(__fastcall* ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
+typedef void(__fastcall* ResetCameraFn)(CCamera* pCamera);
 typedef bool(__fastcall* DestroyBuddyFn)(Pl0000* pBuddy);
 typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
 typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
@@ -71,6 +84,11 @@ typedef BOOL(__fastcall* SceneStateUnkFn)(void* unused, void* pSceneState);	//Sc
 typedef __int64(__fastcall* CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(__fastcall* QuestState_RequestStateInternalFn)(DWORD *pQuestId);
 typedef ConstructionInfo<void>*(__fastcall* GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
+typedef EntityInfo*(__fastcall* MakeEntityFn)(void*, Create_t* pCreate);
+typedef void* (__fastcall* AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
+
+typedef CpkEntry*(__fastcall* CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
+typedef BOOL(__fastcall* CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
 // XInput Function Defs
 
@@ -105,12 +123,14 @@ typedef DWORD(__stdcall* XInputGetCapabilitiesExFn)(DWORD a1, DWORD dwUserIndex,
 extern CalculateLevelFn CalculateLevel;
 extern GetEntityFromHandleFn GetEntityFromHandle;
 extern SetLocalPlayerFn SetLocalPlayer;
+extern ResetCameraFn ResetCamera;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
 extern GetConstructorFn GetConstructionInfo;
 extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
 extern FNV1HashFn FNV1Hash;
+extern CpkMountFn CpkMount;
 
 // XInput Functions
 
@@ -127,6 +147,8 @@ extern int* g_piExperience;
 extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_pHeaps;
+extern LPSTR g_szDataDirectoryPath;
+extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 
 extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
@@ -135,7 +157,7 @@ extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
-extern "C" CCamera* g_pCamera;		//for asm hook
+extern CCamera* g_pCamera;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern BYTE* g_pDecreaseHealth[2];
 extern BYTE* g_pAntiVSync;
@@ -148,6 +170,8 @@ extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
 extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
+extern ID3D11PixelShader* g_pRed;
+extern ID3D11PixelShader* g_pGreen;
 extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
@@ -176,14 +200,16 @@ extern VirtualTableHook* g_pKeyboardHook;
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
 extern ImportTableHook* g_pClipCursorHook;
 extern ImportTableHook* g_pXInputGetStateHook;
+extern ImportTableHook* g_pSetUnhandledExceptionFilterHook;
 
 extern BYTE_PATCH_MEMORY bp_save_file_io;
+extern BYTE_PATCH_MEMORY bp_UpdateModelParts;
 extern BYTE_PATCH_MEMORY bp_CreateEntity[2];
 extern BYTE_PATCH_MEMORY bp_query_performance_counter;
 extern BYTE_PATCH_MEMORY bp_AntiVSync;
 extern BYTE_PATCH_MEMORY bp_Framecap;
 extern BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
-extern BYTE_PATCH_MEMORY bp_HairColor;
+extern NOP_MEMORY nop_HairColor;
 extern NOP_MEMORY nop_Health[2];
 extern NOP_MEMORY nop_neon_scenery;
 extern NOP_MEMORY nop_Framecap[2];

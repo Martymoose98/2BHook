@@ -155,7 +155,7 @@ public:
 	ImportTableHook(const char* szModule, const char* szFunction, LPCVOID pHookFunction)
 		: m_pNewFunction(pHookFunction)
 	{
-		Hook(szModule, szFunction);			
+		Hook(szModule, szFunction);
 	}
 
 	~ImportTableHook()
@@ -170,7 +170,7 @@ public:
 		PIMAGE_DATA_DIRECTORY pImportDirectory = &((PIMAGE_NT_HEADERS)((ULONG_PTR)pDosHeader + pDosHeader->e_lfanew))->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 		PIMAGE_IMPORT_DESCRIPTOR pImportDescriptors = (PIMAGE_IMPORT_DESCRIPTOR)((ULONG_PTR)pDosHeader + pImportDirectory->VirtualAddress);
 		DWORD dwImportDescriptorCount = pImportDirectory->Size / sizeof(IMAGE_IMPORT_DESCRIPTOR);	
-		BOOL bResolveOrdinal = (WORD)szFunction <= MAXWORD;
+		BOOL bResolveOrdinal = (ULONG_PTR)szFunction > MAXWORD;
 		HMODULE hModule = NULL;
 		PIMAGE_DOS_HEADER pModuleDosHeader = NULL;
 		PIMAGE_DATA_DIRECTORY pExportDataDirectory = NULL;
@@ -180,6 +180,10 @@ public:
 		if (bResolveOrdinal)
 		{
 			hModule = GetModuleHandleA(szModule);
+
+			if (!hModule)
+				return NULL;
+
 			pModuleDosHeader = (PIMAGE_DOS_HEADER)hModule;
 			pExportDataDirectory = &((PIMAGE_NT_HEADERS)((ULONG_PTR)pModuleDosHeader + pModuleDosHeader->e_lfanew))->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 			pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)hModule + pExportDataDirectory->VirtualAddress);
@@ -224,7 +228,7 @@ public:
 						}
 						else
 						{
-							if ((WORD)szFunction == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
+							if (IMAGE_ORDINAL((ULONG_PTR)szFunction) == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 							{
 								this->m_pIAT = &pImportAddressTable[i];
 								VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);

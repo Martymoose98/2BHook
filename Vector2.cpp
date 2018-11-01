@@ -1,6 +1,6 @@
 #include "Vector2.h"
 
-extern "C" float __forceinline __fastcall fastsqrtf(float n);
+float __forceinline __fastcall ssesqrt(float n);
 
 Vector2::Vector2()
 	: x(0.0f), y(0.0f)
@@ -34,7 +34,7 @@ Vector2::Vector2(const float* xy)
 
 inline float Vector2::Length() const
 {
-	return fastsqrtf(x * x + y * y);
+	return ssesqrt(x * x + y * y);
 }
 
 inline float Vector2::LengthSqr() const

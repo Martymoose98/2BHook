@@ -3,6 +3,7 @@
 #include <d3d11.h>
 #include <DirectXMath.h>
 #include <D3Dcompiler.h>
+#include <d3dx11.h>
 #include "Globals.h"
 #include "Log.h"
 #include "Color.h"
@@ -129,13 +130,13 @@ public:
 	void AddVertex(const Vertex* pVertices, UINT uVerticeCount, D3D11_PRIMITIVE_TOPOLOGY topology)
 	{
 		assert(topology != D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP
-			&& "addVertex >Use addVertices to draw line/triangle strips!");
+			&& "AddVertex >Use AddVertices to draw line/triangle strips!");
 		assert(topology != D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP_ADJ
-			&& "addVertex >Use addVertices to draw line/triangle strips!");
+			&& "AddVertex >Use AddVertices to draw line/triangle strips!");
 		assert(topology != D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP
-			&& "addVertex >Use addVertices to draw line/triangle strips!");
+			&& "AddVertex >Use AddVertices to draw line/triangle strips!");
 		assert(topology != D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP_ADJ
-			&& "addVertex >Use addVertices to draw line/triangle strips!");
+			&& "AddVertex >Use AddVertices to draw line/triangle strips!");
 
 		if (!pVertices)
 			return;
@@ -220,8 +221,6 @@ public:
 	HRESULT Begin(void);
 	HRESULT End(void);
 
-	void OnCreateSwapchain(void);
-
 	HRESULT SaveState(void);
 	HRESULT RestoreState(void);
 
@@ -238,12 +237,19 @@ public:
 
 	void DrawPixel(int x, int y, const Color& color);
 	void DrawPixel(const RenderList& list, int x, int y, D3DCOLOR color);
+	
 	void DrawLine(int x0, int y0, int x1, int y1, const Color& color);
 	void DrawLine(const RenderList& list, int x0, int y0, int x1, int y1, D3DCOLOR color);
+	
+	void DrawText(int x, int y, const Color& color, const char* szText, ...);
+
 	void DrawFilledRect(int x, int y, int width, int height, const Color& color);
 	void DrawFilledRect(const RenderList& list, const Vector4& rect, const Color& color);
 	void DrawRectOutline(int x, int y, int w, int h, D3DCOLOR color);
+	void DrawRectBordered(int x, int y, int width, int height, int thickness, const Color& color);
 	void DrawRectCorners(int x, int y, int w, int h, int thickness, const Color& color);
+
+	void DrawHealthBar(int x, int y, int height, int health, int max_health);
 
 private:
 	__forceinline void BuildVertex(XMFLOAT4 xyzrhw, D3DCOLOR color, Vertex* vertices, int index)

@@ -98,6 +98,14 @@ enum
 	ROLL // fall over
 };
 
+enum eTransformMatrix
+{
+	RIGHT, // wha, maybe this is the left vec ?__?
+	UP,
+	FORWARD,
+	POSITION
+};
+
 class Math
 {
 public:
@@ -118,8 +126,8 @@ public:
 
 		float sp, sy, cp, cy;
 
-		SinCos(DEGTORAD(angles[PITCH]), &sp, &cp);
-		SinCos(DEGTORAD(angles[YAW]), &sy, &cy);
+		SinCos(angles[PITCH], &sp, &cp);
+		SinCos(angles[YAW], &sy, &cy);
 
 		if (forward)
 		{
@@ -134,9 +142,9 @@ public:
 
 		float sr, sp, sy, cr, cp, cy;
 
-		SinCos(DEGTORAD(angles[PITCH]), &sp, &cp);
-		SinCos(DEGTORAD(angles[YAW]), &sy, &cy);
-		SinCos(DEGTORAD(angles[ROLL]), &sr, &cr);
+		SinCos(angles[PITCH], &sp, &cp);
+		SinCos(angles[YAW], &sy, &cy);
+		SinCos(angles[ROLL], &sr, &cr);
 
 		if (forward)
 		{
@@ -179,50 +187,74 @@ public:
 
 	static float VecLength(Vector3& vec)
 	{
-		return (float)fastsqrtf(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
+		return ssesqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
 	}
 
 	static float VecDist(Vector3& fVec1, Vector3& fVec2)
 	{
-		return (float)fastsqrtf(pow(fVec1.x - fVec2.x, 2) + pow(fVec1.y - fVec2.y, 2) + pow(fVec1.z - fVec2.z, 2));
+		return ssesqrt(pow(fVec1.x - fVec2.x, 2) + pow(fVec1.y - fVec2.y, 2) + pow(fVec1.z - fVec2.z, 2));
 	}
 
-	static float GetFov(Vector3& angle, Vector3& src, Vector3& dst)
-	{
-		Vector3 ang, aim;
-		ang = CalcAngle(src, dst);
-		MakeVector(angle, aim);
-		MakeVector(ang, ang);
+	//static float GetFov(Vector3& angle, Vector3& src, Vector3& dst)
+	//{
+	//	Vector3 ang, aim;
+	//	ang = CalcAngle(src, dst);
+	//	AngleVectors(angle, &aim);
+	//	AngleVectors(ang, &ang);
 
-		float mag = aim.LengthSqr();
-		float u_dot_v = Dot(aim, ang);
+	//	float mag = aim.LengthSqr();
+	//	float u_dot_v = Dot(aim, ang);
+
+	//	return RADTODEG(acos(u_dot_v / mag));
+	//}
+
+	static float GetFov(Vector3& vForward, Vector3& src, Vector3& dst)
+	{
+		Vector3 ang;
+		ang = CalcAngle(src, dst);
+		AngleVectors(ang, &ang);
+
+		float mag = vForward.LengthSqr();
+		float u_dot_v = Dot(vForward, ang);
 
 		return RADTODEG(acos(u_dot_v / mag));
 	}
 
+	//change return type to reference param maybe depends 
 	static Vector3 CalcAngle(Vector3& PlayerPos, Vector3& EnemyPos)
 	{
 		Vector3 AimAngles;
-		Vector3 delta = PlayerPos - EnemyPos;
-		float hyp = (float)sqrtf((delta.x * delta.x) + (delta.y * delta.y)); //SUPER SECRET IMPROVEMENT CODE NAME DONUT STEEL
-		AimAngles.x = atanf(delta.z / hyp) * M_RADPI;
-		AimAngles.y = atanf(delta.y / delta.x) * M_RADPI;
+		Vector3 dir = PlayerPos - EnemyPos;
+		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y));
+		AimAngles.x = atanf(dir.z / hyp); //* M_RADPI;
+		AimAngles.y = atanf(dir.y / dir.x); //* M_RADPI;
 		AimAngles.z = 0.0f;
 
-		if (delta.x >= 0.0)
-			AimAngles.y += 180.0f;
+		if (dir.x >= 0.0f)
+			AimAngles.y += M_PI_F;
 
 		return AimAngles;
 	}
 
 	static void VectorAngles(const Vector3& dir, Vector3 &angles)
 	{
-		float hyp = (float)fastsqrtf((dir.x * dir.x) + (dir.y * dir.y)); //SUPER SECRET IMPROVEMENT CODE NAME DONUT STEEL
+		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y)); //SUPER SECRET IMPROVEMENT CODE NAME DONUT STEEL
 		angles.x = atanf(dir.z / hyp) * M_RADPI;
 		angles.y = atanf(dir.y / dir.x) * M_RADPI;
 		angles.z = 0.0f;
+
 		if (dir.x >= 0.0f)
 			angles.y += 180.0f;
+	}
+
+	static void VectorTAngle(const Vector3& PlayerPos, const Vector3& EnemyPos, const Matrix4x4& vTransform, Vector3& vAngles)
+	{
+		Vector3 dir = PlayerPos - EnemyPos;
+		dir.Normalize();
+
+		vAngles.x = dir.Dot(vTransform[UP]);
+		vAngles.y = dir.Dot(vTransform[RIGHT]);
+		vAngles.z = 0.0f;
 	}
 
 	static void ClampAngle(Vector3& angles)
@@ -242,6 +274,7 @@ public:
 	static void VectorNormalize(Vector3& v)
 	{
 		float l = VecLength(v);
+
 		if (l != 0.0f)
 		{
 			v /= l;
@@ -293,13 +326,13 @@ public:
 	{
 		float in1t[3];
 
-		in1t[0] = in1.x - in2.m[0][3];
-		in1t[1] = in1.y - in2.m[1][3];
-		in1t[2] = in1.z - in2.m[2][3];
+		in1t[0] = in1.x - in2[0][3];
+		in1t[1] = in1.y - in2[1][3];
+		in1t[2] = in1.z - in2[2][3];
 
-		out.x = in1t[0] * in2.m[0][0] + in1t[1] * in2.m[1][0] + in1t[2] * in2.m[2][0];
-		out.y = in1t[0] * in2.m[0][1] + in1t[1] * in2.m[1][1] + in1t[2] * in2.m[2][1];
-		out.z = in1t[0] * in2.m[0][2] + in1t[1] * in2.m[1][2] + in1t[2] * in2.m[2][2];
+		out.x = in1t[0] * in2[0][0] + in1t[1] * in2[1][0] + in1t[2] * in2[2][0];
+		out.y = in1t[0] * in2[0][1] + in1t[1] * in2[1][1] + in1t[2] * in2[2][1];
+		out.z = in1t[0] * in2[0][2] + in1t[1] * in2[1][2] + in1t[2] * in2[2][2];
 	}
 
 	static void VectorIRotate(Vector3& in1, const Matrix3x4& in2, Vector3& out)
@@ -307,5 +340,12 @@ public:
 		out.x = in1.x * in2.m[0][0] + in1.y * in2.m[1][0] + in1.z * in2.m[2][0];
 		out.y = in1.x * in2.m[0][1] + in1.y * in2.m[1][1] + in1.z * in2.m[2][1];
 		out.z = in1.x * in2.m[0][2] + in1.y * in2.m[1][2] + in1.z * in2.m[2][2];
+	}
+
+	static void VectorRotate(Vector3& in1, const Matrix4x4& in2, Vector3& out)
+	{
+		out.x = in1.Dot(in2[UP]);
+		out.y = in1.Dot(in2[RIGHT]);
+		out.z = in1.Dot(in2[FORWARD]);
 	}
 };
