@@ -152,8 +152,9 @@ typedef struct _PEB
 class ImportTableHook
 {
 public:
-	ImportTableHook(const char* szModule, const char* szFunction, LPCVOID pHookFunction)
-		: m_pNewFunction(pHookFunction)
+
+	ImportTableHook(const char* szModule, const char* szFunction, LPCVOID lpFunction)
+		: m_pNewFunction(lpFunction)
 	{
 		Hook(szModule, szFunction);
 	}

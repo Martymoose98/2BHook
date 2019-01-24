@@ -99,6 +99,9 @@
     <ClInclude Include="ConfigGetters.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ExportTableHook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">

@@ -1,6 +1,6 @@
 #pragma once
 #include <d3d11.h>
-#include <d3dx9math.h>
+#include <d3d11.h>
 #include "StaticAssert.h"
 #include "SteamApi.h"
 #include "Math.h"
@@ -58,16 +58,16 @@ class Pl0000;
 /*
 Nier Automata's lib::Array<T>
 */
-template<typename Func>
+template<typename T>
 class Array
 {
 public:
-	virtual Array<Func>* Clear(BYTE flags);
+	virtual Array<T>* Clear(BYTE flags);
 	virtual QWORD GetSize();
-	virtual bool GetItem(OUT Func* pItem);
-	virtual Func* Find(IN Func* pSearchItem, OUT Func* pFound);
+	virtual bool GetItem(OUT T* pItem);
+	virtual T* Find(IN T* pSearchItem, OUT T* pFound);
 
-	Func* m_pItems;	//0x0008 
+	T* m_pItems;	//0x0008 
 	QWORD m_count;	//0x0010
 	QWORD m_size;	//0x0018
 };
@@ -75,21 +75,21 @@ public:
 /*
 Nier Automata's lib::StaticArray<T, size, element_size>
 */
-template<typename Func, size_t size, size_t element_size = sizeof(Func)>
-class StaticArray : public Array<Func>
+template<typename T, size_t size, size_t element_size = sizeof(T)>
+class StaticArray : public Array<T>
 {
 public:
-	Func m_items[size];	//0x0020
+	T m_items[size];	//0x0020
 };
 
 /*
 Nier Automata's lib::AllocatedArray<T>
 */
-template<typename Func>
+template<typename T>
 class AllocatedArray
 {
 public:
-	Func* m_pItems;	//0x0008 
+	T* m_pItems;	//0x0008 
 	QWORD m_count;	//0x0010
 	QWORD m_size;	//0x0018
 };
@@ -134,7 +134,7 @@ struct Sound
 {
 	const char* m_szName;
 	DWORD m_dwFNV1Hash;
-	DWORD m_Flags;		 //probably a bitflag - (values I've seen, 0x05000000, 0x00000000, 0x800000 [mute probably])
+	DWORD m_Flags;		 //probably a bitflag - (values I've seen, 0x05000000, 0x7000000, 0x00000000, 0x800000 [mute probably])
 };
 
 struct ItemHashEntry
@@ -170,7 +170,7 @@ struct EntityInfo
 	unsigned int m_ObjectId;					//0x0028
 	BYTE m_Flags;								//0x002C  | An Entity cannot have this flag or'd with 3 game crashes (possibly a destroyed flag)
 	char alignment[3];							//0x002D
-	EntityHandle m_hParent;						//0x0030
+	EntityHandle m_hEntity;						//0x0030
 	char _0x0038[4];							//0x0034
 	char* m_pszData[2];							//0x0038
 	Pl0000* m_pEntity;							//0x0048
@@ -287,7 +287,7 @@ public:
 	void* m_vtbl;
 	StaticArray<std::pair<TypeId, BehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;
 	EntityHandle m_hOwner;
-	BOOL m_bGravity;
+	BOOL m_bEnabled;
 	BOOL m_bUnknown;
 	char pad[4];
 	Vector3Aligned m_vecs[2];
@@ -341,6 +341,21 @@ class CEnt // idk if this exists
 	short m_wUnk0x00B8;				//0x000B8 | set to -1 on construction
 	char  m_pad0x000BA[6];			//0x000BA
 	Matrix4x4 m_identies[2];		//0x000C0 | end ? CEnt ?
+};
+
+struct DATHeader
+{
+	union {
+		char Signature[4];	//0x00
+		DWORD dwMagic;		//0x00
+	};
+	DWORD dwFileCount;		//0x04
+	DWORD dwFileTableOffset;//0x08
+	DWORD dwExtensionOffset;//0x0C
+	DWORD dwNameTableOffset;//0x10
+	DWORD dwSizeTableOffset;
+	DWORD dwUnknownOffset;
+	DWORD dwNull;
 };
 
 typedef struct WMBHdr
@@ -418,6 +433,9 @@ IS_SIZE_CORRECT(Bone, 0xB0)
 class CModelData
 {
 	WMBHdr* m_pHdr;
+	void* m_pUnk;
+	Bone* m_pBones;
+	DWORD m_nBones;
 };
 
 struct ModelInfo
@@ -445,10 +463,10 @@ public:
 	virtual void function3() {};
 
 	float flUnk;				//0x0008
-	DWORD _0x0010;				//0x0010
-	unsigned int m_ObjectId;	//0x0014
-	char _0x0018[12];			//0x0018
-	Pl0000* m_pParent;			//0x002C	
+	DWORD _0x0010;				//0x000C
+	unsigned int m_ObjectId;	//0x0010
+	char _0x0018[12];			//0x0014
+	Pl0000* m_pParent;			//0x0020	
 };
 
 /*
@@ -661,6 +679,7 @@ public:
 	virtual void SetLevel(int iLevel) PURE;
 	virtual void function105() PURE;
 	virtual void function106() PURE;
+
 #else
 	void* m_pVtable;						//0x00000	 
 #endif // ENTITY_REAL_VTABLE
@@ -709,14 +728,17 @@ public:
 	char  m_pad0x000BA[6];					//0x000BA
 	Matrix4x4 m_identies[2];				//0x000C0 | end ? CEnt ?
 	CModelExtendWork m_pModelExtendWork;	//0x00140
-	char _0x0170[556];						//0x00170
+	char _0x0168[336];						//0x00168
 											//0x00180	lib::StaticArray<Pl0000Mouse::MouseKeyMap,3,4>
 											//0x001B8	lib::StaticArray<MouseInput,3,4>
+
+	BYTE m_bWetness;						//0x002B8
+	char _0x02B9[220];						//0x002B9
 											//0x00310	lib::StaticArray<Pl0000KeyBoard::KeyMap,22,4>
 											//0x003E0	lib::StaticArray<KeyInput,22,4>
 	MappedModel* m_pMappedModel;			//0x00398
 	ModelPart* m_pModelParts;				//0x003A0 
-	DWORD m_nModelParts;					//0x003A8
+	int m_nModelParts;						//0x003A8
 	char _0x03AC[4];						//0x003AC
 	void* m_pBufferShadowsidk;				//0x003B0 | model shaders
 	int m_iShadowLevel;						//0x003B8 | 0 = no shadow
@@ -773,7 +795,9 @@ public:
 	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
 	int m_iHealth;							//0x00858
 	int m_iMaxHealth;						//0x0085C
-	char _0x0860[124];						//0x00860
+	char _0x0860[36];						//0x00860
+	BYTE m_flags;							//0x00884
+	char _0x0885[91];						//0x00885
 	void* m_waypointVtbl;					//0x008E0
 	char _0x08E8[168];						//0x008E8
 	int m_iAnimationId2;					//0x00990
@@ -784,6 +808,9 @@ public:
 	//ExNpc m_npc;							//0x00A98
 	//BOOL m_bTalkDisable;					//0x00BCC
 	//EntityHandle m_hUnk;					//0x00C50
+
+	//CRITICAL_SECTION m_CriticalSection;		//0x00C60
+	
 	//EntityHandle m_hUnk;					//0x00C80
 	//EntityHandle m_hUnk;					//0x00DA0
 
@@ -792,18 +819,22 @@ public:
 	char _0x14C4[44];						//0x014C4
 	void* m_pCObjHitVtable;					//0x014F0 | start cObjHit
 	char _0x014F8[664];						//0x014F8
-	ExCollision m_obb;						//0x01790
+	ExCollision m_VerticalCollision;		//0x01790
 	char _0x17D0[240];						//0x017D0
-	ExCollision m_0x18C0;					//0x018C0
+	ExCollision m_HorizontalCollision;		//0x018C0
 	char _0x01900[400];						//0x01900
 	float m_flSprintSpeed;					//0x01A90
 	char _0x01A94[1500];					//0x01A94
 	float fl0x02070;						//0x02070
 	char _0x02074[4];						//0x02074
 	ExExpInfo m_LevelsContainer;			//0x02078
+
+//	EntityHandle m_hCaughtFish;				//0x03ED8 | on the pod
+
 	char _0x02B70[56056];					//0x02B70
-	int m_iHealth2;							//0x10668
+	int m_iHealth2;							//0x10668									
 	char _0x1066C[420];						//0x1066C
+											//0x10680
 	EntityHandle m_hPod;					//0x10810
 	EntityHandle m_hUnk;					//0x10814
 	char _0x10818[9896];					//0x10818
@@ -828,7 +859,9 @@ public:
 	BOOL m_bNotRenderFeather;				//0x16CE4
 	BOOL b0x16CE8;							//0x16CE8
 	EntityHandle m_hUnknown2;				//0x16CEC
-	char _0x16CF0[924];						//0x16CF0
+	char _0x16CF0[868];						//0x16CF0
+	EntityHandle m_hWig;					//0x17054
+	char _0x17058[52];						//0x17058
 	DWORD m_dwAccessory;					//0x1708C
 	int unk0x17090;							//0x17090
 	int m_iBodyType;						//0x17094
@@ -844,6 +877,7 @@ typedef Pl0000 Entity2B;
 IS_SIZE_CORRECT(Pl0000, 0x178F0)
 IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50)
 IS_OFFSET_CORRECT(Pl0000, m_pModelExtendWork, 0x140)
+IS_OFFSET_CORRECT(Pl0000, m_bWetness, 0x2B8)
 IS_OFFSET_CORRECT(Pl0000, m_pMappedModel, 0x398)
 IS_OFFSET_CORRECT(Pl0000, m_pModelExtend, 0x518)
 IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540)
@@ -854,6 +888,8 @@ IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0)
 IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858)
 IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0)
 IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078)
+IS_OFFSET_CORRECT(Pl0000, m_VerticalCollision, 0x1790)
+IS_OFFSET_CORRECT(Pl0000, m_HorizontalCollision, 0x18C0)
 IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0)
 IS_OFFSET_CORRECT(Pl0000, m_hUnknown, 0x15B54)
 IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1646C)
@@ -861,6 +897,10 @@ IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CEC)
 IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1708C)
 IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1746C)
 
+/*
+
+141605310
+*/
 class CCamera
 {
 public:
@@ -871,21 +911,27 @@ public:
 	char _0x0054[12];			//0x0054 | alignment (16)
 	void* m_pUnknown;			//0x0060
 	char _0x0068[64];			//0x0068
-	Pl0000* m_pLocalPlayer;		//0x00A8
+	Pl0000* m_pLocalPlayer;		//0x00A8 | probs wrong
 	DWORD dwUnk;				//0x00B0
 	char _0x00B4[28];			//0x00B4
 	EntityHandle m_hEntity;		//0x00D0
 	DWORD alignment;			//0x00D4
-	Pl0000* m_pEntity;			//0x00E0
-	Pl0000* m_pEntity2;			//0x00E8
-	Matrix4x4 m_mat2;			//0x00F0 | just seems to be two vecs
-	char _0x0130[704];			//0x0130
+	Pl0000* m_pEntity;			//0x00D8
+	Pl0000* m_pEntity2;			//0x00E0
+	QWORD align;				//0x00E8
+	Vector3Aligned m_vPosition; //0x00F0
+	Vector3Aligned m_vTargetPos;//0x0100
+	Vector3Aligned m_vUnk2;		//0x0110
+	Vector3Aligned m_vUnk3;		//0x0120
+	char _0x0130[576];			//0x0130
+	Pl0000* m_pCamEntity;		//0x0370
+	char _0x0378[120];			//0x0378
 	Vector3 m_viewangles;		//0x03F0 | radians (p, ?, ?)
 };
 IS_OFFSET_CORRECT(CCamera, m_matTransform, 0x10)
 IS_OFFSET_CORRECT(CCamera, m_pLocalPlayer, 0xA8)
 IS_OFFSET_CORRECT(CCamera, m_hEntity, 0xD0)
-IS_OFFSET_CORRECT(CCamera, m_mat2, 0xF0)
+IS_OFFSET_CORRECT(CCamera, m_vPosition, 0xF0)
 IS_OFFSET_CORRECT(CCamera, m_viewangles, 0x3F0)
 
 // Found by Dennis
@@ -1061,7 +1107,7 @@ public:
 	CVertexLayout* m_pVertexLayout;			//0x0058 | Hw::cVertexLayoutImpl
 	CConstantBuffer* m_pConstantBuffer;		//0x0060 | Hw::cConstantBufferImpl
 	char _0x0048[8];						//0x0068
-	ID3D11Device* pD3D11Device2;			//0x0070 | same pointer as first
+	ID3D11Device* pD3D11Device2;			//0x0070 | same pointer as first | struct
 	IDXGIFactory* pFactory2;				//0x0078 | same pointer as first
 	char _0x0080[96];						//0x0080 | pointers in here
 	BOOL isWindowed;						//0x00E0
@@ -1073,15 +1119,42 @@ public:
 };
 IS_SIZE_CORRECT(CGraphicDeviceDx11, 272)
 
+
+
 /*Size of struct 0x580 (1408) bytes*/
 class CGraphicContextDx11
 {
 public:
-	void* m_pVtbl;							//0x0000
+	struct Clear_t
+	{
+		DWORD m_dwColor; //argb format
+		FLOAT m_flDepth;
+		BYTE m_Stencil;
+		UINT m_uFlags;
+	};
+
+	virtual void function0() PURE;
+	virtual unsigned int GetUINT0x4(__int64 a2) PURE; // func = return *(uint*)(a2+4);
+	virtual BOOL sub_144FCC1D0(__int64 a2, __int64 a3) PURE;
+	virtual BOOL function3() PURE; 
+	virtual BOOL MapResourceReadOnly(__int64 pResource) PURE;
+	virtual BOOL MapResource3(__int64 pResource) PURE;
+	virtual BOOL UnmapResource3(__int64 pResource) PURE;
+	virtual BOOL MapResource2(__int64 pResource) PURE;
+	virtual BOOL UnmapResource2(__int64 pResource) PURE;
+	virtual BOOL MapResource(__int64 pResource) PURE;
+	virtual BOOL UnmapResource(__int64 pResource) PURE;
+	virtual BOOL Clear(Clear_t* pClearArgs) PURE;
+	virtual BOOL function12() PURE;
+	virtual BOOL SetScissorRect(int x, int y, int width, int height) PURE;
+	virtual BOOL SetViewport(int x, int y, int width, int height, float min_depth, float max_depth) PURE;
+	virtual BOOL function15() PURE;
+
+	//void* m_pVtbl;							//0x0000
 	ID3D11DeviceContext* m_pContext;		//0x0008
-	Vector4 m_vUnk;							//0x0010
+	Vector4 m_vClearColor;					//0x0010
 	CRenderTarget* m_pRenderTarget;			//0x0020
-	char _0x0030[32];						//0x0028
+	void* ptrs[4];							//0x0028
 	CDepthSurface* m_pDepthSurface;			//0x0048
 	CVertexBuffer* m_pVertexBuffer;			//0x0050
 	ID3D11VertexShader* m_pVertexShader;	//0x0058
@@ -1219,40 +1292,184 @@ struct CpkMountInfo
 	int m_iLoadOrder;
 };
 
-struct CpkEntry
+struct CpkLoader
 {
-	BOOL m_bInUse;		//0x0000
-	DWORD dw2;			//0x0004
-	void* m_pBuffer;	//0x0008
-	DWORD dw4;			//0x0010
-	DWORD dw5;			//0x0014
-	int m_iLoadOrder;	//0x0018
-	DWORD dw7;			//0x001C
+	DWORD dwCpkCount;											//0x00
+	char alignment[4];											//0x04
+	void(*LoadCpks)(unsigned int index, const char* szCpkName); //0x08
+	void(*UnloadCpks)(unsigned int index);						//0x10
+	QWORD qw0x18;												//0x18
+	DWORD dwMaxCpkCount;										
+	QWORD qwMaxCpkCount;
 };
 
-template<typename Func>
+struct CpkLoad_t
+{
+	signed int status;
+	BYTE gap4[4];
+	QWORD ptr8;
+	void *gap10;
+	BYTE gap18[8];
+	PBYTE pBuffer;
+	DWORD hBinder;
+	BYTE gap28[28];
+	QWORD szVersion;
+	void *gap50;
+	BYTE gap58[368];
+	DWORD dword1C8;
+	BYTE gap1CC[4];
+	QWORD qword1D0;
+	QWORD qword1D8;
+	QWORD qword1E0;
+	const char* szCpkPath;
+	DWORD dword1F0;
+	DWORD dword1F4;
+	void *ptr1F8;
+	DWORD dword200[2];
+	void *fnptr208;
+	void *fnptr210;	
+	CpkLoad_t *pNext;
+	void *fnptr220;
+	void *fnptr228;
+	void *fnptr230;
+	void *fnptr238;
+	DWORD dword240;
+	DWORD dword244;
+	DWORD dword248;
+	DWORD dword24C;
+	DWORD dword250;
+	DWORD dword254;
+	DWORD dword258;
+	DWORD dword25C;
+	DWORD dword260;
+	DWORD dword264;
+	DWORD dword268;
+	DWORD dword26C;
+	DWORD dword270;
+	DWORD dword274;
+	DWORD dword278;
+	DWORD dword27C;
+	DWORD dword280;
+	DWORD dword284;
+	DWORD dword288;
+	DWORD dword28C;
+	DWORD dword290;
+	DWORD dword294;
+	DWORD dword298;
+	DWORD dword29C;
+	DWORD dword2A0;
+	DWORD dword2A4;
+	DWORD dword2A8;
+	DWORD dword2AC;
+	const char *sz2B0;
+	QWORD dword2B8;
+	DWORD dword2C0;
+	QWORD dword2C4;
+};
+
+struct CpkBinderHandle
+{
+	void *ptr0;
+	BYTE gap0[16];
+	QWORD fnptr18;
+	BYTE gap20[8];
+	DWORD dword28;
+	DWORD dword2C;
+	DWORD dword30;
+	QWORD szCpkName;
+	BYTE gap40[24];
+	QWORD qword58;
+	CpkLoad_t* pCpkLoad;
+};
+
+struct CpkEntry
+{
+	BOOL m_bInUse;			//0x0000
+	DWORD dw2;				//0x0004
+	void* m_pBinderHandle;	//0x0008
+	DWORD dw4;				//0x0010
+	DWORD dw5;				//0x0014
+	int m_iLoadOrder;		//0x0018
+	DWORD dw7;				//0x001C
+};
+
+template<typename T>
 struct ConstructionInfo
 {
-	DWORD modeltype;
-	char alignment[4];
-	Func* (*Construtor)(CHeapInstance**);
-	QWORD id;
-	const char* szName;
-	void* pUnk;
+	int m_iObjectId;					//0x0000
+	char alignment[4];					//0x0004
+	T* (*Constructor)(CHeapInstance**); //0x0008 | not a CHeapInstance**, some parent struct
+	QWORD id;							//0x0010
+	const char* szName;					//0x0018
+	void* pUnk;							//0x0020
+};
+
+template<typename T>
+struct UIConstructorInfo
+{
+	DWORD id;							//0x0000
+	char bs[12];						//0x0004
+	T* (*Constructor)(CHeapInstance**); //0x0010 | not a CHeapInstance**, some parent struct
+};
+
+struct CSceneEntitySystem
+{
+	char pad0[32];
+	CRITICAL_SECTION m_CriticalSection;
+	BOOL m_bCriticalSectionInitalized;
+	DWORD dw0x54;
+	DWORD dw0x58;
+	DWORD dw0x5C;
+	QWORD dw0x60;
+	QWORD dw0x68;
+	QWORD dw0x70;
+	QWORD dw0x78;
+	QWORD sptr0x80;
+	QWORD qw0x88;
+	QWORD dw0x90;
+	QWORD dw0x98;
+};
+
+//max size 0xC0
+struct set_info_t
+{
+	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initalized to an indenity 4x4 matrix
+	Matrix4x4 m_mat;
+	Vector3Aligned m_vPosition;
+	Vector3Aligned m_vRotation;
+	Vector3Aligned m_vScale;
+	DWORD m_dw0x70;
+	DWORD m_dw0x74;
+	INT m_i0x078;
+	INT m_i0x07C;
+	INT m_i0x080;
+	INT m_i0x084;
+	INT m_i0x088;
+	INT m_i0x08C;
 };
 
 struct Create_t
 {
 	const char* m_szName;			//0x0000
 	unsigned int m_ObjectIds[2];	//0x0008
-	Vector4* m_p0x0010;				//0x0010
-	void* m_p0x0018;				//0x0018
+	set_info_t* m_pSetInfo;			//0x0010
+	DWORD m_dw0x18;					//0x0018
+	DWORD m_dw0x1C;					//0x001C
 	BOOL m_b0x0020;					//0x0020
 	char alignment24[4];			//0x0024
-	QWORD m_qwUnk;					//0x0028
-	Vector4 m_vec2;					//0x0030
-	Vector4 m_vec[2];				//0x0038
-	void* m_p0x0058;				//0x0058
+	void* m_pWMBBuffer;				//0x0028
+	void* m_unk;					//0x0040
+	void* m_pDatBuffers;			//0x0048
+	Vector3Aligned m_vec;			//0x0050
+	QWORD m_0x60;					//0x0060
+};
+
+struct Create2_t
+{
+	CSceneEntitySystem* m_pSceneEntitySystem;
+	void* ptr8;
+	Create_t* m_pCreate;
+	BOOL m_b0x18;
 };
 
 class HandlerBase;
@@ -1290,15 +1507,15 @@ Size of is 0x48 (72) bytes
 class CGameContentDevice
 {
 public:
-	void* m_pVtbl;															//0x0000
-	HandlerBase* m_pHandler;												//0x0008
-	QWORD unk0x010;															//0x0010 
-	DWORD unk0x18;															//0x0018
-	void(__fastcall* LoadCpks)(unsigned int index, const char* szCpkName);	//0x0020
-	void(__fastcall* UnloadCpks)(unsigned int index);						//0x0028
-	CHeapInstance** m_ppHeap;												//0x0030 | probably a parent pointer
-	CGameContentDeviceSteam* m_pSteamContent;								//0x0038
-	DWORD unk0x40;															//0x0040
+	void* m_pVtbl;													//0x0000
+	HandlerBase* m_pHandler;										//0x0008
+	QWORD unk0x010;													//0x0010 
+	DWORD unk0x18;													//0x0018
+	void(* LoadCpks)(unsigned int index, const char* szCpkName);	//0x0020
+	void(* UnloadCpks)(unsigned int index);							//0x0028
+	CHeapInstance** m_ppHeap;										//0x0030 | probably a parent pointer
+	CGameContentDeviceSteam* m_pSteamContent;						//0x0038
+	DWORD unk0x40;													//0x0040
 };
 IS_SIZE_CORRECT(CGameContentDevice, 72)
 
@@ -1365,7 +1582,7 @@ public:
 	virtual int GetVar0x38();
 
 	//void* m_pVtable;		//0x00
-	char pad[32];			//0x08
+	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_overlay; //0x08 id - 331
 	BOOL m_bInitalized;		//0x28
 	char pad2[4];			//0x2C
 	ISteamUser019* m_pUser;	//0x30
@@ -1398,6 +1615,60 @@ public:
 	char unknown[16];		//0x08
 };
 IS_SIZE_CORRECT(CGameBootProcess, 24)
+
+struct Task;
+
+struct TaskInfo
+{
+	Task* m_pParent;
+	void(*m_pCallback)();
+	QWORD qword10;
+	DWORD dword18;
+	DWORD dword1C;
+	const char* m_szTaskName;
+	DWORD dword28;
+	BYTE gap2C[28];
+	TaskInfo* m_pPrevious;
+	TaskInfo* m_pNext;
+};
+
+
+/*
+Size of struct is 0x60 (96) bytes
+*/
+struct Task
+{
+	DWORD dwTaskCount;
+	BYTE pad[4];
+	TaskInfo* m_pHead;
+	TaskInfo* m_pInfo2;
+	TaskInfo* m_pInfo;
+	QWORD qword20;
+	DWORD gap28;
+	Task* m_pNext;
+	HANDLE hSemaphore;
+	HANDLE hSemaphore2;
+};
+
+struct WetObjManagerDelay
+{
+	float m_flMaxDelay;
+	float m_flDelay;
+};
+
+/*
+Address = 0x1417BFD48
+*/
+struct WetObjManager
+{
+	CRITICAL_SECTION m_CriticalSection;
+	BOOL m_bCriticalSectionInitalized;
+	char pad[4];
+	EntityHandle m_localhandles[2];
+	WetObjManagerDelay m_WetDelays[2];
+	EntityHandle m_EntityHandles[256];
+	EntityHandle m_SoundHandles[32];
+};
 
 class YorhaManager
 {
@@ -1457,11 +1728,11 @@ public:
 	virtual Array<EntityHandle>* GetHandles2();
 	virtual Pl0000* GetEntity();  // from the 0x14bc handle
 	virtual Pl0000* GetEntity2(); // from the 0x14bc handle
-	virtual void* GetAddressOfField858(); //probably another Array<EntityHandle>
-	virtual void SetField14B8(float a1);
 	virtual Array<EntityHandle>* GetHandles3();
-	virtual Pl0000* function17(Vector3Aligned* pvPosition, int a2);
+	virtual void SetField14B8(float a1);
 	virtual Array<EntityHandle>* GetHandles4();
+	virtual Pl0000* function17(Vector3Aligned* pvPosition, int a2);
+	virtual Array<EntityHandle>* GetHandles5();
 	virtual Pl0000* function19(Vector3Aligned* pvPosition, int a2);
 	virtual Pl0000* function20(Vector3Aligned* pvPosition, int a2);
 	virtual bool function21(Pl0000* pEntity);

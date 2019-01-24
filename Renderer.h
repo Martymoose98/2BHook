@@ -1,12 +1,15 @@
 #pragma once
 #include <vector>
 #include <d3d11.h>
+#include <d3dx9math.h>
 #include <DirectXMath.h>
 #include <D3Dcompiler.h>
 #include <d3dx11.h>
 #include "Globals.h"
 #include "Log.h"
 #include "Color.h"
+
+#pragma comment(lib, "d3dx9.lib")
 
 using DirectX::XMFLOAT4;
 using DirectX::XMMATRIX;
