@@ -31,6 +31,10 @@
 #define MODELTYPE_2B_NORMAL 0x21020
 #define MODELTYPE_2B_SUIT	0xA2140
 
+#define OBJECTID_2B 0x10000
+#define OBJECTID_A2 0x10100
+#define OBJECTID_9S 0x10200
+
 #define NOP_DAMAGE_ENEMY 0
 #define NOP_DAMAGE_WORLD 1
 
@@ -59,40 +63,46 @@ struct CpkEntry;
 
 typedef ULONGLONG QWORD;
 
-typedef Level_t*(__fastcall* CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef Pl0000*(__fastcall* GetEntityFromHandleFn)(EntityHandle* pHandle);
-typedef BOOL(__fastcall* ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
-typedef int(__fastcall*  GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
-typedef const char*(__fastcall* GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
-typedef bool(__fastcall* AddItemFn)(__int64 pItemManager, int item_id);
-typedef bool(__fastcall* UseItemFn)(__int64 pItemManager, int item_id);
-typedef void(__fastcall* ChangePlayerFn)(Pl0000* pEntity);
-typedef __int64(__fastcall* SetLocalPlayerFn)(EntityHandle* pHandle);
-typedef void(__fastcall* ResetCameraFn)(CCamera* pCamera);
-typedef bool(__fastcall* DestroyBuddyFn)(Pl0000* pBuddy);
-typedef __int64(__fastcall* NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
-typedef __int64(__fastcall* NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
-typedef __int64(__fastcall* EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
-typedef __int64(__fastcall* PlaySoundFn)(Sound* pSound);
-typedef unsigned int(__fastcall* HashStringCRC32Fn)(const char* szName, __int64 length);
-typedef unsigned int(__fastcall* FNV1HashFn)(const char* szString);
-typedef __int64(__fastcall* HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
-typedef void*(__fastcall* FindSceneStateFn)(CRITICAL_SECTION* pCriticalSection, unsigned int crc, const char* szName, __int64 length); // not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
-typedef bool(__fastcall* SceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
-typedef bool(__fastcall* SceneStateSystem_SetInternalFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
-typedef BOOL(__fastcall* SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
-typedef __int64(__fastcall* CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
-typedef bool(__fastcall* QuestState_RequestStateInternalFn)(DWORD *pQuestId);
-typedef ConstructionInfo<void>*(__fastcall* GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
-typedef EntityInfo*(__fastcall* MakeEntityFn)(void*, Create_t* pCreate);
-typedef void* (__fastcall* AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
+typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
+typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
+typedef int(*GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
+typedef const char*(*GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
+typedef bool(*AddItemFn)(__int64 pItemManager, int item_id);
+typedef bool(*UseItemFn)(__int64 pItemManager, int item_id);
+typedef void(*ChangePlayerFn)(Pl0000* pEntity);
+typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
+typedef void(*WetObjectManager_AddLocalEntityFn)(__int64, EntityInfo* pInfo);
+typedef void(*WetObjectManager_SetWetFn)(__int64 pThis, byte wet_level, int index);
+typedef void(*WetObjectManager_SetDryFn)(__int64 pThis, EntityInfo *pInfo);
+typedef void(*ResetCameraFn)(CCamera* pCamera);
+typedef bool(*DestroyBuddyFn)(Pl0000* pBuddy);
+typedef __int64(*NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
+typedef __int64(*NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
+typedef __int64(*EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
+typedef __int64(*PlaySoundFn)(Sound* pSound);
+typedef unsigned int(*HashStringCRC32Fn)(const char* szName, __int64 length);
+typedef unsigned int(*FNV1HashFn)(const char* szString);
+typedef __int64(*HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
+typedef void*(*FindSceneStateFn)(CRITICAL_SECTION* pCriticalSection, unsigned int crc, const char* szName, __int64 length); // not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
+typedef bool(*SceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
+typedef bool(*SceneStateSystem_SetInternalFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
+typedef BOOL(*SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
+typedef void(*SetSceneEntityFn)(const char*, EntityInfo*);
+typedef __int64(*CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
+typedef bool(*QuestState_RequestStateInternalFn)(DWORD *pQuestId);
+typedef ConstructionInfo<void>*(*GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
+typedef EntityInfo*(*MakeEntityFn)(void*, Create_t* pCreate);
+typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
-typedef CpkEntry*(__fastcall* CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
-typedef BOOL(__fastcall* CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
+typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
+typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
+
+typedef void(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*, int win32err, const char* szFilepath);
 
 // XInput Function Defs
 
-typedef struct _XINPUT_BASE_BUS_INFORMATION 
+typedef struct _XINPUT_BASE_BUS_INFORMATION
 {
 	WORD w0x0000;		//0x0000
 	WORD a2;			//0x0002
@@ -126,6 +136,10 @@ extern SetLocalPlayerFn SetLocalPlayer;
 extern ResetCameraFn ResetCamera;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
+extern WetObjectManager_SetWetFn WetObjectManager_SetWet;
+extern WetObjectManager_SetDryFn WetObjectManager_SetDry;
+extern WetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
+extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
 extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
@@ -157,6 +171,7 @@ extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
+extern WetObjManager* g_pWetObjectManager;
 extern CCamera* g_pCamera;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern BYTE* g_pDecreaseHealth[2];
@@ -185,7 +200,10 @@ extern D3D11_BUFFER_DESC g_IndexBufferDesc;
 extern DXGI_FORMAT g_IndexFormat;
 extern UINT g_IndexOffset;
 extern UINT g_StartSlot;
-
+extern ID3D11Buffer* g_pPixelShaderBuffer;
+extern D3D11_BUFFER_DESC g_PixelShaderBufferDesc;
+extern UINT g_PixelShaderStartSlot;
+extern D3D11_SHADER_RESOURCE_VIEW_DESC g_ShaderResViewDesc;
 extern IDXGISwapChain* g_pSwapChain;
 extern IDXGISwapChain* g_pSecondarySwapChain;
 extern IDXGIFactory* g_pFactory;

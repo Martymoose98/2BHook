@@ -10,7 +10,7 @@ static bool* GetModelGravity()
 	if (!pCameraEnt)
 		return NULL;
 
-	return (bool*)&pCameraEnt->m_obb.m_bGravity;
+	return (bool*)&pCameraEnt->m_VerticalCollision.m_bEnabled;
 }
 
 static float* GetOBBY()
@@ -23,5 +23,8 @@ static float* GetOBBY()
 	if (!pCameraEnt)
 		return NULL;
 
-	return &pCameraEnt->m_obb.m_vecs[0].y;
+	return &pCameraEnt->m_VerticalCollision.m_vecs[0].y;
 }
+
+static void b(int a)
+{}

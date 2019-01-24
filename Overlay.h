@@ -83,12 +83,12 @@ struct OverlayDrawList : public ImDrawList
 			return;
 
 		va_start(args, szText);
-		
+
 		int n = _vscprintf(szText, args);
 
 		if (n > sizeof(szBuffer))
 			return;
-		
+
 		vsprintf_s(szBuffer, szText, args);
 		va_end(args);
 
@@ -148,68 +148,71 @@ public:
 		Vector3 vStart, vEnd, vBottom, vTop;
 		int iTarget = -1;
 		float best = FLT_MAX;
-		 
-		if (g_pLocalPlayer)
+
+		if (g_pCamera)
 		{
-			vBottom = g_pLocalPlayer->m_vPosition;
-			vTop = Vector3(g_pLocalPlayer->m_vPosition.x, g_pLocalPlayer->m_vPosition.y + 1.6f, g_pLocalPlayer->m_vPosition.z);
+			Pl0000* pCameraEntity = GetEntityFromHandle(&g_pCamera->m_hEntity);
 
-			if (Vars.Visuals.bEspBox && WorldToScreen(vBottom, vBottom2D) && WorldToScreen(vTop, vTop2D))
+			if (pCameraEntity)
 			{
-				int h = (int)(vBottom2D.y - vTop2D.y);
-				int w = h / 2;
+				vBottom = pCameraEntity->m_vPosition;
+				vTop = Vector3(pCameraEntity->m_vPosition.x, pCameraEntity->m_vPosition.y + 1.6f, pCameraEntity->m_vPosition.z);
 
-				pList->AddRectCorners((int)vBottom2D.x - (w / 2), (int)(vBottom2D.y - h), w, h, 5, ImColor(23, 128, 150));
-				pList->AddText(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), "2B");
-				pList->AddHealthBar((int)vBottom2D.x + 10 + (w / 2), (int)(vBottom2D.y - h), h, g_pLocalPlayer->m_iHealth, g_pLocalPlayer->m_iMaxHealth);
-			}
-
-			if (Vars.Visuals.bTraceLine)
-			{
-				vStart = g_pLocalPlayer->m_pBones[11].m_vPosition;
-				vEnd = vStart + (g_pLocalPlayer->m_matTransform.GetAxis(FORWARD) * Vars.Visuals.flTraceLength);
-
-				if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
+				if (Vars.Visuals.bEspBox && WorldToScreen(vBottom, vBottom2D) && WorldToScreen(vTop, vTop2D))
 				{
-					pList->AddLine(*(ImVec2*)&vStart2D, *(ImVec2*)&vEnd2D, ImColor(120, 255, 0));
+					int h = (int)(vBottom2D.y - vTop2D.y);
+					int w = h / 2;
+
+					pList->AddRectCorners((int)vBottom2D.x - (w / 2), (int)(vBottom2D.y - h), w, h, 5, ImColor(23, 128, 150));
+					pList->AddText(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), (pCameraEntity->m_ObjectId == 0x10000) ? "2B" : (pCameraEntity->m_ObjectId == 0x10100) ? "A2" : (pCameraEntity->m_ObjectId == 0x10200) ? "9S" : "Unknown");
+					pList->AddHealthBar((int)vBottom2D.x + 10 + (w / 2), (int)(vBottom2D.y - h), h, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
 				}
-			}
 
-			if (Vars.Visuals.bDebugLocalPlayerSkeleton)
-			{
-				for (int i = 0; i < g_pLocalPlayer->m_nBones; ++i)
+				if (Vars.Visuals.bTraceLine)
 				{
-					if (WorldToScreen(g_pLocalPlayer->m_pBones[i].m_vPosition, vTop2D))
-						pList->AddTextArgs(ImVec2(vTop2D.x, vTop2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "%i", i);
+					vStart = pCameraEntity->m_pBones[11].m_vPosition;
+					vEnd = vStart + (pCameraEntity->m_matTransform.GetAxis(FORWARD) * Vars.Visuals.flTraceLength);
+
+					if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
+					{
+						pList->AddLine(*(ImVec2*)&vStart2D, *(ImVec2*)&vEnd2D, ImColor(120, 255, 0));
+					}
 				}
-			}
 
-			if (Vars.Visuals.bSkeleton)
-			{
-				for (int i = 0; i < g_pCamera->m_pEntity->m_nBones; ++i)
+				if (Vars.Visuals.bDebugLocalPlayerSkeleton)
 				{
-					Bone* pCur = &g_pCamera->m_pEntity->m_pBones[i];
+					for (int i = 0; i < pCameraEntity->m_nBones; ++i)
+					{
+						if (WorldToScreen(pCameraEntity->m_pBones[i].m_vPosition, vTop2D))
+							pList->AddTextArgs(ImVec2(vTop2D.x, vTop2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "%i", i);
+					}
+				}
 
-					if (pCur->m_pParent)
-						pList->AddBone(pCur->m_vPosition, pCur->m_pParent->m_vPosition, ImColor(200, 0, 0));
+				if (Vars.Visuals.bSkeleton)
+				{
+					for (int i = 0; i < pCameraEntity->m_nBones; ++i)
+					{
+						Bone* pCur = &pCameraEntity->m_pBones[i];
+
+						if (pCur->m_pParent)
+							pList->AddBone(pCur->m_vPosition, pCur->m_pParent->m_vPosition, ImColor(200, 0, 0));
+					}
 				}
 			}
 		}
 
-		for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+		if (Vars.Visuals.bEnemyInfo)
 		{
-			Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
-
-			if (pCur && g_pCamera->m_pEntity && WorldToScreen(pCur->m_vPosition, vBottom2D))
+			for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 			{
-				pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "Enemy: %s HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth,
-					pCur->m_iMaxHealth, g_pCamera->m_pEntity->m_vPosition.DistTo(pCur->m_vPosition));
+				Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
-				Pl0000* pPod = GetEntityFromHandle(&g_pCamera->m_pLocalPlayer->m_hPod);
-
-				if (pPod)
+				if (pCur && g_pCamera->m_pEntity && WorldToScreen(pCur->m_vPosition, vBottom2D))
 				{
-					float fov = Math::GetFov(g_pCamera->m_viewangles, pPod->m_vPosition, pCur->m_vPosition);
+					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "Enemy: %s HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth,
+						pCur->m_iMaxHealth, g_pCamera->m_pEntity->m_vPosition.DistTo(pCur->m_vPosition));
+
+					float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
 
 					if (fov < best)
 					{
@@ -220,6 +223,24 @@ public:
 			}
 		}
 
+		if (Vars.Visuals.bNPCInfo)
+		{
+			for (int i = 0; i < g_pNPCManager->m_handles.m_count; ++i)
+			{
+				Pl0000* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
+
+				if (pCur && WorldToScreen(pCur->m_vPosition, vBottom2D))
+				{
+					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth, pCur->m_iMaxHealth);
+				}
+			}
+		}
+		
+#ifdef _DEBUG
+		if (g_pCamera)
+			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H, "ang (%f,%f,%f)", RADTODEG(g_pCamera->m_viewangles.x), RADTODEG(g_pCamera->m_viewangles.y), RADTODEG(g_pCamera->m_viewangles.z));
+#endif
+
 		if (iTarget != -1)
 		{
 			Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
@@ -229,27 +250,12 @@ public:
 
 			if (pTarget && GetAsyncKeyState(VK_XBUTTON1) & 0x8000)
 			{
-				Pl0000* pPod = GetEntityFromHandle(&g_pLocalPlayer->m_hPod);
+				g_pCamera->m_viewangles.x = Math::LookAt(g_pCamera->m_vPosition, pTarget->m_vPosition).x;
+			//	Vector3 vAng = Math::CalcAngle(g_pCamera->m_matTransform.GetAxis(0), pTarget->m_vPosition);
+				//Math::VectorTAngle(pPod->m_vPosition, pTarget->m_vPosition, pPod->m_matTransform, vTAng);
 
-				if (pPod)
-				{
-					Vector3 vTAng;
-					Vector3 vAng = Math::CalcAngle(pPod->m_vPosition, pTarget->m_vPosition);
-					//Math::VectorTAngle(pPod->m_vPosition, pTarget->m_vPosition, pPod->m_matTransform, vTAng);
-
-					g_pCamera->m_viewangles = vAng;
-					//pPod->m_matTransform.GetAxis(2) = vTAng;
-				}
-			}
-		}
-
-		for (int i = 0; i < g_pNPCManager->m_handles.m_count; ++i)
-		{
-			Pl0000* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
-
-			if (pCur && WorldToScreen(pCur->m_vPosition, vBottom2D))
-			{
-				pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth, pCur->m_iMaxHealth);
+				//g_pCamera->m_viewangles = vAng;
+				//pPod->m_matTransform.GetAxis(2) = vTAng;
 			}
 		}
 	}

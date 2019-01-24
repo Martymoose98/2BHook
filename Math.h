@@ -43,6 +43,16 @@ float __forceinline __fastcall ssesqrt(float n)
 	return _mm_cvtss_f32(_mm_sqrt_ss(_mm_set_ss(n)));
 }
 
+double __forceinline loga(double a, double x)
+{
+	return log(x) / log(a);
+}
+
+float __forceinline logaf(float a, float x)
+{
+	return logf(x) / logf(a);
+}
+
 class Matrix3x4
 {
 public:
@@ -220,6 +230,19 @@ public:
 		return RADTODEG(acos(u_dot_v / mag));
 	}
 
+	static Vector3 LookAt(Vector3 vPlayerPos, const Vector3& vEnemyPos)
+	{
+		Vector3 ang;
+		Vector3 relativePos = vEnemyPos - vPlayerPos;
+		float yaw = atan2f(relativePos.y, relativePos.x);
+		float pitch = -(acosf(relativePos.z  / vPlayerPos.DistTo(vEnemyPos)) - (M_PI_F / 4));
+
+		ang.x = pitch;
+		ang.y = yaw;
+
+		return ang;
+	}
+
 	//change return type to reference param maybe depends 
 	static Vector3 CalcAngle(Vector3& PlayerPos, Vector3& EnemyPos)
 	{
@@ -227,7 +250,7 @@ public:
 		Vector3 dir = PlayerPos - EnemyPos;
 		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y));
 		AimAngles.x = atanf(dir.z / hyp); //* M_RADPI;
-		AimAngles.y = atanf(dir.y / dir.x); //* M_RADPI;
+		AimAngles.y = atanf(dir.y / dir.x);//* M_RADPI;
 		AimAngles.z = 0.0f;
 
 		if (dir.x >= 0.0f)

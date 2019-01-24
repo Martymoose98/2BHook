@@ -6,8 +6,6 @@
 #include "Matrix4x4.h"
 #include "Log.h"
 
-#pragma comment(lib, "d3dx9.lib")
-
 #define STACK_TIMER(name) StackTimer name(__FUNCTION__)
 
 typedef struct StackTimer
@@ -75,7 +73,7 @@ static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, con
 }
 
 // Reversed from binary
-static BOOL ObjectIdToObjectName(char*szObjectName, size_t size, int objectId)
+static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId)
 {
 	static char HexChars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
@@ -132,6 +130,110 @@ static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
 	return TRUE;
 }
 
+static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileName)
+{
+	const char *szName; // r12
+	LPBYTE *pHeaders; // r15
+	unsigned int v4; // esi
+	DATHeader* pHdr; // r8
+	DWORD dwOffset; // r9
+	DWORD dwFileCount; // ebp
+	DWORD dwNextNameOffset; // r14
+	const char *szCurrentFileName; // rdi
+	unsigned int i; // ebx
+	DWORD result; // eax
+
+	szName = szFileName;
+	pHeaders = (LPBYTE*)ppBuffer;
+	v4 = 0;
+
+	while (true)
+	{
+		pHdr = (DATHeader*)*pHeaders;
+
+		if (*pHeaders)
+		{
+			dwOffset = pHdr->dwNameTableOffset;
+			if (dwOffset)
+			{
+				dwFileCount = pHdr->dwFileCount;
+				dwNextNameOffset = *(DWORD*)((LPBYTE)pHdr + dwOffset);
+				szCurrentFileName = (const char*)(pHdr + dwOffset + 4);
+				i = 0;
+				if (dwFileCount)
+				{
+					while (_stricmp(szName, szCurrentFileName))
+					{
+						++i;
+						szCurrentFileName += dwNextNameOffset;
+						if (i >= dwFileCount)
+							goto next_file;
+					}
+					result = i + (v4 << 28);
+					if (result != -1)
+						return result;
+				}
+			}
+		}
+	next_file:
+		++v4;
+		++pHeaders;
+		if (v4 >= 2)
+			return 0xFFFFFFFF; //-1
+	}
+}
+
+static void  DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD* pdwFileCount)
+{
+	if (!pBuffer)
+		return;
+
+	if (!pppszFiles)
+		return;
+
+	if (!pdwFileCount)
+		return;
+
+	DATHeader* pHdr = (DATHeader*)pBuffer;
+
+	*pdwFileCount = pHdr->dwFileCount;
+	DWORD dwNextNameOffset = *(DWORD*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset);
+
+	*pppszFiles = (const char**)malloc(sizeof(const char*) * pHdr->dwFileCount);
+
+	for (DWORD i = 0; i < pHdr->dwFileCount; ++i)
+		(*pppszFiles)[i] = (const char*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset + 4 + i * dwNextNameOffset);
+}
+
+static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
+{
+	if (!ppFile)
+		return;
+
+	DWORD flags = DataFile_QueryFileIndex((DATHeader**)&pBuffer, szName);
+
+	if (flags == -1)
+	{
+		*ppFile = NULL;
+	}
+	else
+	{
+		DWORD dwFileIndex = flags & 0xFFFFFFF; // pretty sure this and flags >> 28 and equivalent
+		DATHeader* pHdr = (DATHeader*)((&pBuffer)[flags >> 28]); // get the highest 4 bytes (32 - 28) and use as the index
+
+		if (pHdr->dwFileCount > dwFileIndex)
+		{
+			PDWORD pFileTable = (PDWORD)((LPBYTE)pHdr + pHdr->dwFileTableOffset);
+			DWORD rva = pFileTable[dwFileIndex];
+			*ppFile = rva ? (void*)((LPBYTE)pHdr + rva) : NULL;
+		}
+		else
+		{
+			*ppFile = NULL;
+		}
+	}
+}
+
 static HRESULT GeneratePixelShader(ID3D11Device* pDevice, ID3D11PixelShader** ppPixelShader, float r, float g, float b)
 {
 	char szCast[] = "struct VS_OUT"
@@ -174,6 +276,7 @@ may occur when copying files whilst being modified by another thread. Thread
 safety will be added in the future. This method fails if the "My Documents" folder's
 path has a greater length than MAX_PATH (260).
 */
+TODO("Make this use SYSTEMTIME struct and GetSystemTime or GetLocalTime")
 static BOOL BackupSave(int nSlot)
 {
 	WCHAR szPath[MAX_PATH];
@@ -218,7 +321,7 @@ static BOOL WriteMiniDump(EXCEPTION_POINTERS* pException)
 	DWORD nCharsWritten = GetModuleFileNameW(NULL, szDumpFile, MAX_PATH);
 
 	GetSystemTime(&time);
-
+	
 	wsprintfW(&szDumpFile[nCharsWritten - 4], L"_%4d%02d%02d_%02d%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
 
 	HANDLE hFile = CreateFileW(szDumpFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -246,6 +349,9 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 		return ERROR_NO_MORE_ITEMS;
 
 	*pphHeaps = (HANDLE*)malloc(dwNumberOfHeaps * sizeof(HANDLE));
+
+	if (*pphHeaps)
+		return ERROR_NOT_ENOUGH_MEMORY;
 
 	DWORD dwHeapsLength = dwNumberOfHeaps;
 
@@ -292,4 +398,67 @@ static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
 		handler(pException);
 
 	return EXCEPTION_CONTINUE_SEARCH;
+}
+
+/*
+Rebuilt from the debug build
+*/
+static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3)
+{
+	int v11[3];
+
+	const char* szFmt = szFormat;
+	QWORD v4 = *(QWORD *)(a3 | ((unsigned __int64)a2 << 32));
+	QWORD v5 = *(QWORD *)((a3 | ((unsigned __int64)a2 << 32)) + 8);
+	SIZE_T length = strlen(szFormat);
+	SIZE_T j = 0;
+	DWORD i = 0;
+
+	if (length)
+	{
+		do
+		{
+			if (szFmt[j] == '%')
+			{
+				if (szFmt[j + 1] == 's')
+					v11[i] = 1;
+
+				++i;
+				
+				if (i == 3)
+					break;
+			}
+			++j;
+		} while (j < length);
+
+		if (i > 2)
+			return (char *)szFmt;
+	}
+
+	if (v11[0])
+	{
+		if (v11[0] != 1 || v11[1])
+		{
+			snprintf((char*)0x14270F500, 512, szFmt, v4, v5);
+		}
+		else
+		{
+			snprintf((char*)0x14270F500, 512, szFmt, v4, (unsigned int)v5);
+		}
+	}
+	else if (v11[1])
+	{
+		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, v5);
+	}
+	else
+	{
+		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, (unsigned int)v5);
+	}
+
+	return (char*)0x14270F500;
+}
+
+static void CRILogCallback(const char* szFormat, unsigned int a2, unsigned int a3, void* a4)
+{
+	printf("%s\n", CRIGetBuffer(szFormat, a2, a3));
 }

@@ -1670,11 +1670,11 @@ protected:
 	friend class CCallbackMgr;
 };
 
-template< class Func, class P, bool bGameServer >
+template< class T, class P, bool bGameServer >
 class CCallback : private CCallbackBase
 {
 public:
-	typedef void (Func::*func_t)(P*);
+	typedef void (T::*func_t)(P*);
 
 	// If you can't support constructing a callback with the correct parameters
 	// then uncomment the empty constructor below and manually call ::Register() for your object
@@ -1684,7 +1684,7 @@ public:
 
 	// constructor for initializing this object in owner's constructor
 
-	CCallback(Func *pObj, func_t func) : m_pObj(pObj), m_Func(func)
+	CCallback(T *pObj, func_t func) : m_pObj(pObj), m_Func(func)
 	{
 		if (pObj && func)
 			Register(pObj, func);
@@ -1698,7 +1698,7 @@ public:
 
 	// manual registration of the callback
 
-	void Register(Func *pObj, func_t func)
+	void Register(T *pObj, func_t func)
 	{
 		if (!pObj || !func)
 			return;
@@ -1744,7 +1744,7 @@ private:
 		return sizeof(P);
 	}
 
-	Func *m_pObj;
+	T *m_pObj;
 	func_t m_Func;
 };
 

@@ -157,7 +157,7 @@ class KeybindDynamicToggleable : public IKeybind
 {
 public:
 	typedef bool*(*GetterFn)();
-	
+
 	KeybindDynamicToggleable() : IKeybind(), m_pGetter(NULL)
 	{}
 
@@ -166,7 +166,7 @@ public:
 	{
 	}
 
-	virtual void OnPressed() 
+	virtual void OnPressed()
 	{
 		if (m_pGetter)
 		{
@@ -213,7 +213,7 @@ public:
 	}
 
 	virtual void OnPressed()
-	{ 
+	{
 		if (m_pGetter)
 		{
 			T* pIncremental = m_pGetter();
@@ -309,14 +309,13 @@ public:
 	KeybindDynamicDecremental<T> m_dec;
 };
 
-
-template<typename Ret, typename Func, typename... Args>
+template<typename Ret, typename... Args>
 class KeybindFunctional : public IKeybind
 {
 public:
 	KeybindFunctional() : IKeybind(), m_callback() {}
 
-	KeybindFunctional(const char* szName, int keycode, Mode mode, Func callback, Args... callback_params)
+	KeybindFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(Args...), Args... callback_params)
 		: IKeybind(szName, keycode, mode), m_callback(std::bind(callback, callback_params...))
 	{
 	}
@@ -331,12 +330,62 @@ private:
 	std::function<Ret()> m_callback;
 };
 
+template<typename Ret, class Base, typename... Args>
+class KeybindVirtualFunctional : public IKeybind
+{
+public:
+	KeybindVirtualFunctional() : IKeybind(), m_callback() {}
+
+	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, size_t index, const Base* pThis, Args... callback_params)
+		: KeybindVirtualFunctional(szName, keycode, mode, GetVirtual(pThis, index), pThis, callback_params...)
+	{
+	}
+	
+	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(const Base*, Args...), const Base* pThis, Args... callback_params)
+		: IKeybind(szName, keycode, mode), m_callback(std::bind(callback, pThis, callback_params...))
+	{
+	}
+
+	virtual void OnPressed()
+	{
+		if (m_callback)
+			m_callback();
+	}
+
+	static Ret(*GetVirtual(const Base* pThis, size_t index))(const Base*, Args...)
+	{
+		assert(index > GetVTableFunctionCount(pThis));
+
+		return (*((Ret(***)(const Base*, Args...))(pThis)))[index];
+	}
+
+	static inline size_t GetVTableFunctionCount(const Base* pThis)
+	{
+		size_t count = 0;
+
+		if (pThis)
+		{
+			const void** pVftable = *(const void***)pThis;
+
+			if (pVftable)
+				for (; pVftable[count]; ++count)
+					if (CMemory::IsBadCodePtr(pVftable[count]))
+						break;
+		}
+
+		return count;
+	}
+
+private:
+	std::function<Ret()> m_callback;
+};
+
 class IConfigItem
 {
 public:
 
 	virtual void Read(const char* szFilename) = 0;
-	virtual void Write(const char* szFilename) = 0;
+	virtual void Write(const char* szFilename) = 0;	
 
 	const char* m_szCategory;
 	const char* m_szName;
@@ -480,12 +529,12 @@ public:
 	virtual void Write(const char* szFilename)
 	{
 		char szKeybindKeycode[32];
-		
+
 		sprintf_s(szKeybindKeycode, "%i", m_key.GetKeycode());
 
 		WritePrivateProfileString(m_szCategory, m_szName, szKeybindKeycode, szFilename);
 	}
-	
+
 private:
 	IKeybind& m_key;
 };
@@ -493,28 +542,26 @@ private:
 class CConfig
 {
 public:
-	CConfig(LPTSTR szFilename);
+	CConfig();
 	~CConfig();
 
 	bool CreateConfig(LPTSTR szFilename);
 	void ResetConfig();
-	void Load();
-	void Save();
+	void Load(LPTSTR szFilename);
+	void Save(LPTSTR szFilename);
 
-	std::vector<IKeybind*>& GetKeybinds()
-	{
-		return m_keybinds;
-	}
+	std::vector<IKeybind*>& GetKeybinds() {	return m_keybinds; }
+	LPCTSTR GetConfigPath() const { return m_szFilename; }
 
 private:
 	void InitializeConfig();
+
 	void PurgeConfig();
 	void LoadDefault();
 	bool SetFilename(LPTSTR szFilename);
 	BOOL FileExists(LPTSTR szFilename);
 	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath);
 
-	HANDLE m_hFile;
 	TCHAR m_szFilename[MAX_PATH];
 	std::vector<IConfigItem*> m_items;
 	std::vector<IKeybind*> m_keybinds;

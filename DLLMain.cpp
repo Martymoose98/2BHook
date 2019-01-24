@@ -200,7 +200,6 @@ void CreateStencilDescription()
 	StencilDesc.BackFace.StencilPassOp = D3D11_STENCIL_OP_ZERO;
 	StencilDesc.BackFace.StencilFunc = D3D11_COMPARISON_NEVER;
 	g_pDevice->CreateDepthStencilState(&StencilDesc, &g_pDepthStencilStates[READ_NO_WRITE]);
-
 }
 
 HRESULT InitD3D11()
@@ -290,9 +289,11 @@ void Setup()
 #if defined(_DEBUG) || defined(VERBOSE)
 	STACK_TIMER(timer);
 	Log::AttachConsole(L"2B Hook Debug Console");
+	*((void**)0x141415350) = CRILogCallback;
 #endif
 
-	//while ((g_pLocalPlayer = *(Entity_t**)g_pMemory->FindPatternPtr64(NULL, "4C 89 25 ? ? ? ? 4C 89 25 ? ? ? ? E8 ? ? ? ?", 3)) == NULL) // g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
+	// g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
+	//while ((g_pLocalPlayer = *(Entity_t**)g_pMemory->FindPatternPtr64(NULL, "4C 89 25 ? ? ? ? 4C 89 25 ? ? ? ? E8 ? ? ? ?", 3)) == NULL) 
 	//{
 	//	LOG("Please load a save first!\n");
 	//	Sleep(300);
@@ -303,6 +304,7 @@ void Setup()
 	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr64(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
 	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr64(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
 	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr64(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
+	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
 	g_pCamera = (CCamera*)g_pMemory->FindPatternPtr64(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
@@ -313,6 +315,10 @@ void Setup()
 	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
 	ChangePlayer = (ChangePlayerFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
 	FindSceneState = (FindSceneStateFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 83 CE 01", 1);
+	SetSceneEntity = (SetSceneEntityFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
+	WetObjectManager_SetWet = (WetObjectManager_SetWetFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
+	WetObjectManager_SetDry = (WetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
+	WetObjectManager_AddLocalEntity = (WetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1);
 	DestroyBuddy = (DestroyBuddyFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
 	HashStringCRC32 = (HashStringCRC32Fn)g_pMemory->FindPattern(NULL, "40 57 83 C8 FF");
@@ -322,14 +328,11 @@ void Setup()
 	g_piMoney = (int*)g_pMemory->FindPatternPtr64(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
 	g_piExperience = (int*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
-	VLOG("Found Direct Input 8\n");
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);	
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = *g_pGraphics->m_Display.m_ppSwapChain;
-
-	VLOG("Found the swapchain\n");
 
 	if (IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
@@ -341,17 +344,15 @@ void Setup()
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr64(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
 
-	VLOG("Found the window handle\n");
-
 	ExposeHiddenXInputFunctions();
 
 	QueryProcessHeaps(&g_pHeaps, NULL);
 
 	InitD3D11();
 
+	g_pConfig->CreateConfig(NULL);
 	//g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
-	
-	
+
 	//no ini file
 	ImGui::GetIO().IniFilename = NULL;
 

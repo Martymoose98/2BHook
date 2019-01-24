@@ -112,6 +112,39 @@ public:
 		}
 	}
 
+	static void ApplyHorizontalCollision(Pl0000* pEntity)
+	{
+		if (!pEntity)
+			return;
+
+		pEntity->m_HorizontalCollision.m_hOwner = pEntity->m_pInfo->m_hEntity;
+	}
+
+	static void RemoveHorizontalCollision(Pl0000* pEntity)
+	{
+		if (!pEntity)
+			return;
+
+		pEntity->m_HorizontalCollision.m_hOwner = 0;
+	}
+
+	static int WetEntity(Pl0000* pEntity, byte wetness)
+	{
+		int i = 0;
+
+		if (!pEntity)
+			return -1;
+
+		WetObjectManager_AddLocalEntity(0, pEntity->m_pInfo);
+
+		for (; i < ARRAYSIZE(g_pWetObjectManager->m_localhandles); ++i)
+			if (g_pWetObjectManager->m_localhandles[i] == pEntity->m_pInfo->m_hEntity)
+				break;
+
+		WetObjectManager_SetWet(0, wetness, i);
+		return i;
+	}
+
 	static void SetPlayer(EntityHandle hEntity)
 	{
 		Pl0000* pEntity = GetEntityFromHandle(&hEntity);
@@ -119,7 +152,7 @@ public:
 		if (!pEntity)
 			return;
 
-		SetLocalPlayer(&pEntity->m_pInfo->m_hParent);
+		SetLocalPlayer(&pEntity->m_pInfo->m_hEntity);
 
 		*(PDWORD)0x1419AED20 = 0x80000000;
 
@@ -128,7 +161,7 @@ public:
 
 	static void ChangePlayerEx(Pl0000* pCameraEnt)
 	{
-		if (pCameraEnt)
+		if (pCameraEnt && g_pLocalPlayer)
 		{
 			pCameraEnt->m_nBones = Vars.Gameplay.nBones;
 			Vars.Gameplay.nBones = 0;
@@ -154,10 +187,26 @@ public:
 			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer);
 	}
 
+	static void TeleportForwardEx(Pl0000* pEntity, float flSpeed)
+	{
+		if (pEntity)
+			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(FORWARD) * flSpeed;
+	}
+
 	static void TeleportForward()
 	{
-		if (g_pLocalPlayer)
-			g_pLocalPlayer->m_vPosition += g_pLocalPlayer->m_matTransform.GetAxis(FORWARD) * 0.5f;
+		TeleportForwardEx(GetEntityFromHandle(&g_pCamera->m_hEntity), 0.5f);
+	}
+
+	static void PlayAnimationEx(Pl0000* pEntity)
+	{
+		if (pEntity)
+			pEntity->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
+	}
+
+	static void PlayAnimation()
+	{
+		PlayAnimationEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
 	}
 
 	static void AddPod(int pod)
@@ -216,7 +265,7 @@ public:
 		}
 	}
 
-	static void TeleportAllEnemiesToEncirclePoint(const Vector3& vPosition, float flRadius)
+	static void TeleportAllEnemiesToEncirclePoint(const Vector3& vPosition, const Vector3& vRotation, float flRadius)
 	{
 		if (!g_pEnemyManager->m_handles.m_count)
 			return;
@@ -233,7 +282,7 @@ public:
 
 			Math::SinCos(rad, &sin, &cos);
 
-			vEndpoint = vPosition + (pEntity->m_matTransform.GetAxis(FORWARD) * flRadius);
+			vEndpoint = vPosition + (vRotation * flRadius);
 
 			xz.x += cos * (vEndpoint.x - vPosition.x) - sin * (vEndpoint.z - vPosition.z); // + vPosition.x;
 			xz.y += sin * (vEndpoint.x - vPosition.x) + cos * (vEndpoint.z - vPosition.z); // + vPosition.z;
@@ -275,7 +324,7 @@ public:
 		//sun->m_vPosition.x += 3;
 	}
 
-	static void CreateEntity(const char* szName, int objectId)
+	static EntityInfo* CreateEntity(const char* szName, int objectId, OPTIONAL set_info_t* pSetInfo)
 	{
 		Create_t c;
 
@@ -284,8 +333,10 @@ public:
 		c.m_szName = szName;
 		c.m_ObjectIds[0] = objectId;
 		c.m_ObjectIds[1] = objectId;
+		c.m_b0x0020 = TRUE;
+		c.m_pSetInfo = pSetInfo;
 
-		CREATE_ENTITY(&c);
+		return CREATE_ENTITY(&c);
 	}
 
 	// test
@@ -301,7 +352,11 @@ public:
 
 		sprintf_s(szFullpath, "%s%s.cpk", g_szDataDirectoryPath, szCpkName);
 
-		return CpkMount(0, szFullpath);
+		CpkEntry* pEntry = (CpkEntry*)0x141991D90;
+
+		while (pEntry->m_bInUse && pEntry < (CpkEntry*)0x141992590) ++pEntry;
+
+		return CpkMount((--pEntry)->m_iLoadOrder + 1, szFullpath);
 	}
 
 	// if this doesn't work might have to create critical section, enter, copy the array contents and zero out the array, then leave

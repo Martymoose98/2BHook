@@ -11,6 +11,8 @@ typedef struct Variables_t
 		bool bTraceLine;
 		float flTraceLength;
 		bool bEspBox;
+		bool bEnemyInfo;
+		bool bNPCInfo;
 		bool bSkeleton;
 		bool bDebugLocalPlayerSkeleton;
 	} Visuals;
@@ -20,8 +22,10 @@ typedef struct Variables_t
 		bool bGodmode;
 		bool bNoEnemyDamage;
 		bool bNoWorldDamage;
+		bool bNoCollision;
 		int iLevel;
 		bool bTemporaryLevel;
+		int iSpawnObjectId;
 		int iSpawnItemId;
 		char szItemName[64];
 		bool bInstantEquip;
@@ -29,7 +33,13 @@ typedef struct Variables_t
 		bool bRainbowHair;
 		float flModelTintHue;
 		int iSelectedModelPart;
+		bool bRainbowPod;
+		bool bHidePod;
+		float flPodTintHue;
+		int iSelectedPodModelPart;
 		int iAnimation;
+		Vector3Aligned vSpawnEntityScale;
+		int iSelectedEntityType;
 		int iSelectedAnimation;
 		int iSelectedEntityHandle;
 		bool bGhostModel;
@@ -69,17 +79,22 @@ typedef struct Variables_t
 			DIMOUSESTATE2 MouseState;
 			DIMOUSESTATE2 OldMouseState;
 		} Input;
+
+		struct Config_t
+		{
+			char szName[MAX_PATH];
+		} Config;
 	} Menu;
 
 	struct Keybinds_t
 	{
 		Keybinds_t() {}
 		
-		KeybindFunctional<void, void()> ChangePlayer;
-		KeybindFunctional<void, void()> Airstuck;
-		KeybindFunctional<void, void()> DuplicateBuddy;
-		//KeybindFunctional<void(*)(Pl0000*, int, int, int, int)> PlayAnimation;
-		KeybindFunctional<void, void()> TeleportForward;
+		KeybindFunctional<void> ChangePlayer;
+		KeybindFunctional<void> Airstuck;
+		KeybindFunctional<void> DuplicateBuddy;
+		KeybindFunctional<void> PlayAnimation;
+		KeybindFunctional<void> TeleportForward;
 		KeybindDynamicToggleable ModelGravity;
 		KeybindDynamicIncrement<float> ModelYControl;
 	} Keybinds;
@@ -150,6 +165,35 @@ typedef struct Variables_t
 		{ 55, "Self Destruct Start" },
 		{ 56, "Self Destruct" },
 		{ 57, "Self Destruct Effect" },
+	};
+
+	struct Spawn
+	{
+		const char* m_szName;
+		const char* m_szClass;
+		int m_ObjectId;
+	};
+
+	constexpr static Spawn SpawnEntities[] =
+	{
+		{ "2B", "partner", 0x10000 },
+		{ "A2", "partner", 0x10100 },
+		{ "9S", "partner", 0x10200 },
+		{ "Moose", "regenerate_animal", 0x2A010 },
+		{ "White Moose", "regenerate_animal", 0x2A011 },
+		{ "Boar", "regenerate_animal", 0x2A000 },
+		{ "White Boar", "regenerate_animal", 0x2A001 }
+	};
+
+	constexpr static const char* EntityTypeList[] =
+	{
+		"2B",
+		"A2",
+		"9S",
+		"Moose",
+		"White Moose",
+		"Boar",
+		"White Boar"
 	};
 
 	constexpr static const char* AnimationListBoxList[58] =

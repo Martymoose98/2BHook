@@ -40,6 +40,12 @@ static void DisplayEntityHandles()
 
 	ImGui::ListBox("NPC, Yorha & Enemy Handles", &Vars.Gameplay.iSelectedEntityHandle, ppszHandles, count);
 
+	ImGui::Checkbox("Display Enemy Info", &Vars.Visuals.bEnemyInfo);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
+
 	if (ImGui::Button("Set NPC Follow"))
 	{
 		Pl0000* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
@@ -65,15 +71,6 @@ static void DisplayEntityHandles()
 		Features::SetPlayer(handles[Vars.Gameplay.iSelectedEntityHandle]);
 	}
 
-	//if (ImGui::Button("Set Player"))
-	//{
-	//	__int64 ret = oSetLocalPlayer(&handles[Vars.Gameplay.iSelectedYorhaHandle]);
-	//
-	//	(*(__int64(*)(void*))(0x1401EDA40))(pNPC); //setplayer
-	//}
-
-	//ImGui::SameLine();
-
 	for (int i = 0; i < count; ++i)
 		delete[] ppszHandles[i];
 
@@ -81,16 +78,57 @@ static void DisplayEntityHandles()
 	delete[] handles;
 }
 
+static void ApplyPodMods(Pl0000* pOwner)
+{
+	if (!pOwner)
+		return;
+
+	Pl0000* pPod = GetEntityFromHandle(&pOwner->m_hPod);
+
+	if (!pPod)
+		return;
+
+	ImGui::Checkbox("Rainbow Pod", &Vars.Gameplay.bRainbowPod);
+	ImGui::SameLine();
+	ImGui::Checkbox("Hide Pod", &Vars.Gameplay.bHidePod);
+
+	pPod->m_pModelInfo->m_vTint.w = Vars.Gameplay.bHidePod ? 0.f : 1.f;
+
+	char szModelPart[64];
+	sprintf_s(szModelPart, "Pod ModelPart: (%s)", pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_szModelPart);
+	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodModelPart, 0, pPod->m_nModelParts - 1);
+
+	sprintf_s(szModelPart, "Pod ModelPart Color: (%s)", pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_szModelPart);
+
+	if (ImGui::Checkbox("Enabled", (bool*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bShow))
+		pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bUpdate = TRUE;
+
+	ImGui::ColorPicker4(szModelPart, (float*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_vColor);
+	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
+	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
+}
+
 static void ApplyModelMods(Pl0000* pEntity)
 {
 	if (!pEntity)
 		return;
 
+	if (ImGui::Button("Wet Entity"))
+		Features::WetEntity(pEntity, 127);
+
+	ImGui::SameLine();
+
 	ImGui::Checkbox("Ghost Model", &Vars.Gameplay.bGhostModel);
 
 	ImGui::SameLine();
 
-	ImGui::Checkbox("Model Gravity", (bool*)&pEntity->m_obb.m_bGravity);
+	ImGui::Checkbox("Model Collision", &Vars.Gameplay.bNoCollision);
+
+	Vars.Gameplay.bNoCollision ? Features::RemoveHorizontalCollision(pEntity) : Features::ApplyHorizontalCollision(pEntity);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Model Gravity", (bool*)&pEntity->m_VerticalCollision.m_bEnabled);
 
 	ImGui::SameLine();
 
@@ -113,6 +151,9 @@ static void ApplyModelMods(Pl0000* pEntity)
 	ImGui::Checkbox("Rainbow Hair", &Vars.Gameplay.bRainbowHair);
 
 	ImGui::InputFloat3("Position (X,Y,Z)", (float*)&pEntity->m_vPosition);
+
+	if (Vars.Gameplay.iSelectedModelPart > pEntity->m_nModelParts)
+		Vars.Gameplay.iSelectedModelPart = pEntity->m_nModelParts;
 
 	char szModelPart[64];
 	sprintf_s(szModelPart, "ModelPart: (%s)", pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
@@ -144,4 +185,6 @@ static void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::InputFloat3("Model Scale (X,Y,Z)", (float*)&pEntity->m_matModelToWorld.GetAxis(1));
 	ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pEntity->m_matModelToWorld.GetAxis(3));
+
+	ApplyPodMods(pEntity);
 }
