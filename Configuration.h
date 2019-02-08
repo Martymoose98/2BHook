@@ -76,6 +76,7 @@
 #define CATEGORY_GAMEPLAY "Gameplay"
 #define CATEGORY_KEYBINDS "Keybinds"
 #define CATEGORY_MISC "Misc"
+#define CATEGORY_MENU "Menu"
 
 #define CONFIG_DEFAULT TEXT("default")
 #define CONFIG_DEFAULT_INI TEXT("default.ini")
@@ -507,6 +508,36 @@ public:
 	float& m_value;
 };
 
+class ConfigItemString : public IConfigItem
+{
+public:
+	ConfigItemString(const char* szCategory, const char* szName, std::string& value)
+		: m_value(value)
+	{
+		m_szCategory = szCategory;
+		m_szName = szName;
+	}
+
+	virtual void Read(const char* szFilename)
+	{
+		LPTSTR szRawValue = (LPTSTR)LocalAlloc(LPTR, m_value.size());
+
+		if (szRawValue)
+		{
+			GetPrivateProfileString(m_szCategory, m_szName, "(null)", szRawValue, (DWORD)m_value.size(), szFilename);
+			m_value.assign(szRawValue);
+			LocalFree(szRawValue);
+		}
+	}
+
+	virtual void Write(const char* szFilename)
+	{
+		WritePrivateProfileString(m_szCategory, m_szName, m_value.c_str(), szFilename);
+	}
+
+	std::string& m_value;
+};
+
 class ConfigItemKeybind : public IConfigItem
 {
 public:
@@ -537,6 +568,84 @@ public:
 
 private:
 	IKeybind& m_key;
+};
+
+
+template<typename T>
+class ConfigItemVector : public IConfigItem
+{
+public:
+	enum Type
+	{
+		VOID_PTR,
+		BOOL,
+		INT,
+		UINT,
+		INT64,
+		UINT64,
+		CSTRING,
+		WCSTRING,
+		STRING,
+		WSTRING,
+	};
+
+	ConfigItemVector(const char* szCategory, const char* szName, Type type, std::vector<T>& vec)
+		: m_vec(vec), m_type(type)
+	{
+		m_szCategory = szCategory;
+		m_szName = szName;
+	}
+
+	virtual void Read(const char* szFilename)
+	{
+		char szKeybindKeycode[32];
+
+		GetPrivateProfileString(m_szCategory, m_szName, "0", szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
+
+		m_key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
+	}
+
+	virtual void Write(const char* szFilename)
+	{
+
+		switch (m_type)
+		{
+		case STRING:
+			WriteString(szFilename);
+			break;
+		}
+	}
+
+	void WriteString(const char* szFilename)
+	{
+		char szItem[32];
+		size_t i = 0;
+
+		for (auto& it : m_vec)
+		{
+			sprintf_s(szItem, "%s[%i]", m_szName, i++);
+
+			WritePrivateProfileString(m_szCategory, szItem, it, szFilename);
+		}
+	}
+
+	void WriteInt(const char* szFilename)
+	{
+		char szItem[32];
+		char szBuffer[32];
+		size_t i = 0;
+
+		for (auto& it : m_vec)
+		{
+			sprintf_s(szItem, "%s[%i]", m_szName, i++);
+
+			WritePrivateProfileString(m_szCategory, szItem, szBuffer, szFilename);
+		}
+	}
+
+private:
+	std::vector<T>& m_vec;
+	Type m_type;
 };
 
 class CConfig

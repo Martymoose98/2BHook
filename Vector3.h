@@ -259,7 +259,7 @@ public:
 		this->x = x;
 		this->y = y;
 		this->z = z;
-		w = 1.0f;
+		this->w = 1.0f;
 	}
 
 	Vector3Aligned(float x, float y, float z, float w)
@@ -276,6 +276,11 @@ public:
 		y = v.y;
 		z = v.z;
 		w = 1.0f;
+	}
+
+	Vector3Aligned(const Vector3Aligned& v)
+	{
+		*this = v;
 	}
 
 private:

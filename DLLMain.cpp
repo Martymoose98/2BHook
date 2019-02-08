@@ -208,15 +208,15 @@ HRESULT InitD3D11()
 	
 	if (FAILED(result))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x", result);
+		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", result);
 		return result;
 	}
 
-	g_pSwapChain->GetParent(IID_IDXGIFactory, (void**)&g_pFactory);
+	result = g_pSwapChain->GetParent(IID_IDXGIFactory, (void**)&g_pFactory);
 
 	if (FAILED(result))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x", result);
+		LOG("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", result);
 		return result;
 	}
 
@@ -227,13 +227,13 @@ HRESULT InitD3D11()
 
 	if (!ImGui_ImplDX11_Init(g_hWnd, g_pDevice, g_pDeviceContext))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!");
+		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
 		return S_FALSE;
 	}
 
 	if (!ImGui_ImplDX11_CreateDeviceObjects())
 	{
-		LOG("2B Hook Failed Initalization!\nCould not create device objects!");
+		LOG("2B Hook Failed Initalization!\nCould not create device objects!\n");
 		return S_FALSE;
 	}
 
@@ -289,15 +289,11 @@ void Setup()
 #if defined(_DEBUG) || defined(VERBOSE)
 	STACK_TIMER(timer);
 	Log::AttachConsole(L"2B Hook Debug Console");
-	*((void**)0x141415350) = CRILogCallback;
+	*((void**)0x141415350) = CRILogCallbackV2;//CRILogCallback;
 #endif
+	srand((unsigned int)time(NULL));
 
 	// g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
-	//while ((g_pLocalPlayer = *(Entity_t**)g_pMemory->FindPatternPtr64(NULL, "4C 89 25 ? ? ? ? 4C 89 25 ? ? ? ? E8 ? ? ? ?", 3)) == NULL) 
-	//{
-	//	LOG("Please load a save first!\n");
-	//	Sleep(300);
-	//}
 	g_pEntityInfoList = (EntityInfoList*)g_pMemory->FindPatternPtr64(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
@@ -305,8 +301,9 @@ void Setup()
 	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr64(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
 	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr64(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
 	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
-	g_pCamera = (CCamera*)g_pMemory->FindPatternPtr64(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
+	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr64(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
+	g_pMemoryDevice = (CMemoryDevice*)g_pMemory->FindPatternPtr64(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8 ? ? ? ?", 6);
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
@@ -343,7 +340,7 @@ void Setup()
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr64(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
-
+	
 	ExposeHiddenXInputFunctions();
 
 	QueryProcessHeaps(&g_pHeaps, NULL);
@@ -369,8 +366,6 @@ void Setup()
 	// add VEH?
 	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
 	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
-
-	VLOG("Set exception handler\n");
 
 	nop_Health[NOP_DAMAGE_ENEMY].Address = g_pDecreaseHealth[NOP_DAMAGE_ENEMY];
 	nop_Health[NOP_DAMAGE_ENEMY].nBytes = 6;

@@ -25,6 +25,9 @@ typedef struct Variables_t
 		bool bNoCollision;
 		int iLevel;
 		bool bTemporaryLevel;
+		bool bBalanceEnemyLevels;
+		bool bExclusivelyPositiveTolerance;
+		int iEnemyLevelTolerance;
 		int iSpawnObjectId;
 		int iSpawnItemId;
 		char szItemName[64];
@@ -48,7 +51,9 @@ typedef struct Variables_t
 		bool bNoTutorialDialogs;
 		bool bSpeedMeister;
 		float flSpeedMultiplier;
-		std::vector<char[32]> SpawnBlacklist;
+		int iSelectedBlacklistItem;
+		char szBlacklistName[32];
+		std::vector<std::string> SpawnBlacklist;
 	} Gameplay;
 
 	struct Misc_t
@@ -67,6 +72,7 @@ typedef struct Variables_t
 	struct Menu_t
 	{
 		bool bOpened;
+		bool bIgnoreInputWhenOpened;
 
 		struct Input_t
 		{
@@ -182,7 +188,21 @@ typedef struct Variables_t
 		{ "Moose", "regenerate_animal", 0x2A010 },
 		{ "White Moose", "regenerate_animal", 0x2A011 },
 		{ "Boar", "regenerate_animal", 0x2A000 },
-		{ "White Boar", "regenerate_animal", 0x2A001 }
+		{ "White Boar", "regenerate_animal", 0x2A001 },
+		{ "Grun", "Em4000Core", 0x31700 },
+		{ "Eve", "em5000", 0x42000 },
+		{ "Missle", "missile", 0x35000 },
+		{ "Flight Suit", "flightUnit", 0x10010 },
+		{ "Director", "et0009", 0x40009 },
+		{ "Corpse1", "Corpse", 0x21080 },
+		{ "Corpse2", "Corpse", 0x21081 },
+		{ "Enemy Drop", "EmBase", 0x70001 }
+		//{ "Director2", "Et0024", 0x40012 }, CRASHES
+		//{ "BG", "Bg4440", 0xC4440}, CRASHES
+		//{ "Enemy1", "Em2101", 0x22101 }, CRASHES
+		//{ "Enemy2", "Em2101", 0xA21C1 }, CRASHES
+		//{ "Kago", "kago", 0xF0431 }, CRASHES
+		//{ "Baketsu", "baketsu", 0xF0113 } CRASHES
 	};
 
 	constexpr static const char* EntityTypeList[] =
@@ -193,7 +213,20 @@ typedef struct Variables_t
 		"Moose",
 		"White Moose",
 		"Boar",
-		"White Boar"
+		"White Boar",
+		"Grun",
+		"Eve",
+		"Missle",
+		"Flight Suit (Dummy)",
+		"Director",
+		"Corpse1 (Invisible)",
+		"Corpse2 (Invisible)",
+		"Enemy Drop"
+		//"BG", CRASHES
+		//"Enemy1",CRASHES
+		//"Enemy2", CRASHES
+		//"Kago", CRASHES
+		//"Baketsu" CRASHES
 	};
 
 	constexpr static const char* AnimationListBoxList[58] =

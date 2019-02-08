@@ -403,13 +403,13 @@ static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
 /*
 Rebuilt from the debug build
 */
-static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3)
+static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsigned int arg_ptr_low)
 {
-	int v11[3];
+	BOOL IsStringVar[3];
 
 	const char* szFmt = szFormat;
-	QWORD v4 = *(QWORD *)(a3 | ((unsigned __int64)a2 << 32));
-	QWORD v5 = *(QWORD *)((a3 | ((unsigned __int64)a2 << 32)) + 8);
+	QWORD v4 = *(QWORD *)(arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32));	// 1st arg
+	QWORD v5 = *(QWORD *)((arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32)) + 8); //2nd arg
 	SIZE_T length = strlen(szFormat);
 	SIZE_T j = 0;
 	DWORD i = 0;
@@ -421,7 +421,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3
 			if (szFmt[j] == '%')
 			{
 				if (szFmt[j + 1] == 's')
-					v11[i] = 1;
+					IsStringVar[i] = TRUE;
 
 				++i;
 				
@@ -431,13 +431,14 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3
 			++j;
 		} while (j < length);
 
+		// there is no format params just return the format string
 		if (i > 2)
 			return (char *)szFmt;
 	}
 
-	if (v11[0])
+	if (IsStringVar[0])
 	{
-		if (v11[0] != 1 || v11[1])
+		if (IsStringVar[0] != TRUE || IsStringVar[1])
 		{
 			snprintf((char*)0x14270F500, 512, szFmt, v4, v5);
 		}
@@ -446,7 +447,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3
 			snprintf((char*)0x14270F500, 512, szFmt, v4, (unsigned int)v5);
 		}
 	}
-	else if (v11[1])
+	else if (IsStringVar[1])
 	{
 		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, v5);
 	}
@@ -458,7 +459,33 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int a2, unsigned int a3
 	return (char*)0x14270F500;
 }
 
-static void CRILogCallback(const char* szFormat, unsigned int a2, unsigned int a3, void* a4)
+static void CRILogCallback(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
-	printf("%s\n", CRIGetBuffer(szFormat, a2, a3));
+	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
+	void* caller_return_address = *(void**)stack_ptr;
+	printf("[%llx]: %s\n", (QWORD)caller_return_address, CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
+}
+
+static void CRILogCallbackV2(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+{
+	QWORD stack[100];
+	SYMBOL_INFO_PACKAGE symbol;
+
+	HANDLE hProc = GetCurrentProcess();
+
+	SymInitialize(hProc, NULL, TRUE);
+	
+	WORD nFrames = CaptureStackBackTrace(0, ARRAYSIZE(stack), (PVOID*)stack, NULL);
+	symbol.si.MaxNameLen = MAX_SYM_NAME;
+	symbol.si.SizeOfStruct = sizeof(SYMBOL_INFO);
+
+	for (WORD i = 0; i < nFrames; i++)
+	{
+		if (!SymFromAddr(hProc, stack[i], 0, &symbol.si))
+			printf("%i: RSP: %llx\n", nFrames - i - 1, stack[i]);
+		else
+			printf("%i: %s - %llx\n", nFrames - i - 1, symbol.si.Name, symbol.si.Address);
+	}
+
+	printf("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }

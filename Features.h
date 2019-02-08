@@ -137,8 +137,8 @@ public:
 
 		WetObjectManager_AddLocalEntity(0, pEntity->m_pInfo);
 
-		for (; i < ARRAYSIZE(g_pWetObjectManager->m_localhandles); ++i)
-			if (g_pWetObjectManager->m_localhandles[i] == pEntity->m_pInfo->m_hEntity)
+		for (; i < ARRAYSIZE(g_pWetObjectManager->m_Localhandles); ++i)
+			if (g_pWetObjectManager->m_Localhandles[i] == pEntity->m_pInfo->m_hEntity)
 				break;
 
 		WetObjectManager_SetWet(0, wetness, i);
@@ -207,6 +207,40 @@ public:
 	static void PlayAnimation()
 	{
 		PlayAnimationEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+	}
+
+	static void BuffEnemies()
+	{
+		Pl0000* pLocal = GetEntityFromHandle(g_pLocalPlayerHandle);
+
+		if (!pLocal)
+			return;
+
+		int iMinLevel = max(0, (Vars.Gameplay.bExclusivelyPositiveTolerance) ? pLocal->m_iLevel - 1 : pLocal->m_iLevel - Vars.Gameplay.iEnemyLevelTolerance - 1);
+		int iMaxLevel = min(MAX_LEVELS, pLocal->m_iLevel + Vars.Gameplay.iEnemyLevelTolerance - 1);
+
+		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+			BalanceEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);					
+	}
+
+
+	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
+	{
+		if (!pEnemy)
+			return;
+
+		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+
+		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+		{
+			int* pHealth = MakePtr(int*, pEnemy, 0x858);
+			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
+			ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
+			Level_t* pProperLevel = &pInfo->m_levels[RandomInt(iMinLevel, iMaxLevel)];
+			*pLevel = pProperLevel->m_iLevel;
+			*pHealth = pProperLevel->m_iHealth;
+			*pMaxHealth = pProperLevel->m_iHealth;
+		}
 	}
 
 	static void AddPod(int pod)
@@ -336,7 +370,7 @@ public:
 		c.m_b0x0020 = TRUE;
 		c.m_pSetInfo = pSetInfo;
 
-		return CREATE_ENTITY(&c);
+		return ((SceneEntitySystem_CreateEntityFn)(0x1404F9AA0))((CSceneEntitySystem*)0x14160DFE0, &c);
 	}
 
 	// test
@@ -385,7 +419,8 @@ public:
 	{
 		BYTE current_byte;
 		PBYTE pData, lpDataEnd, lpDataStart;
-		UINT  dwDataEndOffset, dwDataStartOffset, length, dwWordByteLength, Index;
+		UINT  dwDataEndOffset, dwDataStartOffset, length, dwWordByteLength;
+		INT64 index;
 
 		if (!pChecker || !pChecker->m_pBuffer)
 			return;
@@ -414,11 +449,11 @@ public:
 				if (dwWordByteLength)
 				{
 					pData = lpDataStart;
-					Index = lpDataEnd - lpDataStart;
+					index = lpDataEnd - lpDataStart;
 					length = dwWordByteLength;
 					do
 					{
-						current_byte = (pData++)[Index];
+						current_byte = (pData++)[index];
 						*(pData - 1) = current_byte - 19;
 					} while (--length);
 				}

@@ -186,7 +186,16 @@ struct EntityInfo
 IS_OFFSET_CORRECT(EntityInfo, m_pParent, 0x60)
 IS_OFFSET_CORRECT(EntityInfo, m_hUnk, 0xB8)
 
-class EntityInfoList //std::map<EntityHandle, EntityInfo*>* ??
+struct EntityInfoListEntry
+{
+	EntityHandle m_hEntity;
+	EntityInfo* m_pInfo;
+};
+
+/*
+Address = 14160DF88
+*/
+class EntityInfoList
 {
 public:
 	DWORD m_dwItems;								//0x0000
@@ -195,6 +204,7 @@ public:
 	DWORD m_dwShift;								//0x000C
 	std::pair<EntityHandle, EntityInfo*>* m_pItems; //0x0010
 	CRITICAL_SECTION m_CriticalSection;				//0x0018
+	BOOL m_bCriticalSectionInitalized;				//0x0040
 };
 
 /*
@@ -205,7 +215,8 @@ struct ModelPart
 {
 	Vector4 m_vColor;			//0x0000
 	Vector4 m_vColorReadOnly;	//0x0010
-	Vector4 m_vUnknown20;		//0x0020
+	const char* m_pszUnk;		//0x0020
+	QWORD m_qwUnknown28;		//0x0028
 	Vector4 m_vUnknown30;		//0x0030
 	const char* m_szModelPart;	//0x0040
 	void* m_pUnknown;			//0x0048 | important pointer 
@@ -296,6 +307,7 @@ public:
 class ExLockOn : public BehaviorExtension
 {
 	void* m_vtable;			//0x0000
+	void* m_pEntity;		//0x0008 
 };
 
 class ExCatch : public BehaviorExtension
@@ -839,8 +851,9 @@ public:
 	EntityHandle m_hUnk;					//0x10814
 	char _0x10818[9896];					//0x10818
 	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
-	char _0x130E0[10868];					//0x130E0
-	EntityHandle m_hUnknown;				//0x15B54 | one of these unknown handles are probably your tamed animal lel
+	char _0x130E0[10864];					//0x130E0
+	BOOL m_bFlightSuit;						//0x15B50
+	EntityHandle m_hFlightSuit;				//0x15B54
 	char _0x15B58[880];						//0x15B58
 	StaticArray<EntityHandle, 64> m_Handles;//0x15EC8
 	char _0x15FE8[1156];					//0x15FE8
@@ -891,48 +904,59 @@ IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078)
 IS_OFFSET_CORRECT(Pl0000, m_VerticalCollision, 0x1790)
 IS_OFFSET_CORRECT(Pl0000, m_HorizontalCollision, 0x18C0)
 IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0)
-IS_OFFSET_CORRECT(Pl0000, m_hUnknown, 0x15B54)
+IS_OFFSET_CORRECT(Pl0000, m_hFlightSuit, 0x15B54)
 IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1646C)
 IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CEC)
 IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1708C)
 IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1746C)
 
+class CCameraInstance;
+
 /*
 
 141605310
 */
-class CCamera
+class CCameraGame
 {
 public:
-	void* m_vtable;				//0x0000
-	QWORD unk;					//0x0008 | align 16 padding tbh
-	Matrix4x4 m_matTransform;	//0x0010
-	float m_flZoom;				//0x0050
-	char _0x0054[12];			//0x0054 | alignment (16)
-	void* m_pUnknown;			//0x0060
-	char _0x0068[64];			//0x0068
-	Pl0000* m_pLocalPlayer;		//0x00A8 | probs wrong
-	DWORD dwUnk;				//0x00B0
-	char _0x00B4[28];			//0x00B4
-	EntityHandle m_hEntity;		//0x00D0
-	DWORD alignment;			//0x00D4
-	Pl0000* m_pEntity;			//0x00D8
-	Pl0000* m_pEntity2;			//0x00E0
-	QWORD align;				//0x00E8
-	Vector3Aligned m_vPosition; //0x00F0
-	Vector3Aligned m_vTargetPos;//0x0100
-	Vector3Aligned m_vUnk2;		//0x0110
-	Vector3Aligned m_vUnk3;		//0x0120
-	char _0x0130[576];			//0x0130
-	Pl0000* m_pCamEntity;		//0x0370
-	char _0x0378[120];			//0x0378
-	Vector3 m_viewangles;		//0x03F0 | radians (p, ?, ?)
+	void* m_vtable;					//0x0000
+	char align8[8];					//0x0008 | align 16 padding tbh
+	Matrix4x4 m_matTransform;		//0x0010
+	float m_flZoom;					//0x0050
+	char align54[12];				//0x0054 | alignment (16)
+	CCameraInstance* m_pInstance;	//0x0060
+	char align68[8];				//0x0068
+	Vector3Aligned m_v0x70;			//0x0070
+	Vector3Aligned m_v0x80;			//0x0080
+	Vector3Aligned m_v0x90;			//0x0090
+	float m_fl0xA0;					//0x00A0
+	float m_fl0xA4;					//0x00A4
+	Pl0000* m_pLocalPlayer;			//0x00A8 | probs wrong
+	DWORD dwUnk;					//0x00B0
+	char _0x00B4[28];				//0x00B4
+	EntityHandle m_hEntity;			//0x00D0
+	DWORD alignment;				//0x00D4
+	Pl0000* m_pEntity;				//0x00D8
+	Pl0000* m_pEntity2;				//0x00E0
+	QWORD align;					//0x00E8
+	Vector3Aligned m_vPosition;		//0x00F0
+	Vector3Aligned m_vTargetPos;	//0x0100
+	Vector3Aligned m_vUnk2;			//0x0110
+	Vector3Aligned m_vUnk3;			//0x0120
+	char _0x0130[208];				//0x0130
+	Matrix4x4 m_matWorldToScreen;	//0x0200
+	void* m_pUnk;					//0x0240
+	char _0x0240[296];				//0x0248
+	Pl0000* m_pCamEntity;			//0x0370
+	char _0x0378[120];				//0x0378
+	Vector3 m_viewangles;			//0x03F0 | radians (p, ?, ?)
 };
-IS_OFFSET_CORRECT(CCamera, m_matTransform, 0x10)
-IS_OFFSET_CORRECT(CCamera, m_pLocalPlayer, 0xA8)
-IS_OFFSET_CORRECT(CCamera, m_hEntity, 0xD0)
-IS_OFFSET_CORRECT(CCamera, m_vPosition, 0xF0)
-IS_OFFSET_CORRECT(CCamera, m_viewangles, 0x3F0)
+IS_OFFSET_CORRECT(CCameraGame, m_matTransform, 0x10)
+IS_OFFSET_CORRECT(CCameraGame, m_pLocalPlayer, 0xA8)
+IS_OFFSET_CORRECT(CCameraGame, m_hEntity, 0xD0)
+IS_OFFSET_CORRECT(CCameraGame, m_vPosition, 0xF0)
+IS_OFFSET_CORRECT(CCameraGame, m_matWorldToScreen, 0x200)
+IS_OFFSET_CORRECT(CCameraGame, m_viewangles, 0x3F0)
 
 // Found by Dennis
 // Address = 0x14160EB40
@@ -1056,6 +1080,54 @@ enum eControllerButtons
 	LEFT_THUMB = 0x1000,
 	RIGHT_SHOULDER = 0x2000,
 	RIGHT_THUMB = 0x8000
+};
+	
+struct CGamePadDevice
+{
+	void *m_vtbl;
+	DWORD m_dwUnk8;
+	DWORD m_dwUnkC;
+	DWORD m_dw10;
+	DWORD m_dw14;
+	DWORD m_dw18;
+	DWORD m_dwUserIndexs[4];
+};
+
+struct controller_input_state2
+{
+	DWORD dwunk;				//0x0000
+	BOOL bUpdated;				//0x0004
+	float m_flThumbLX;			//0x0008
+	float m_flThumbLY;			//0x000C`
+	float m_flThumbRX;			//0x0010
+	float m_flThumbRY;			//0x0014
+	float m_flLeftTrigger;		//0x0018
+	float m_flRightTrigger;		//0x001C
+	DWORD m_dwButtons;			//0x0020 | eConrollerButtons
+};
+
+/*
+Size of struct is 0x80 (128) bytes
+*/
+struct controller_input
+{
+	controller_input_state2 state;
+	BYTE gap20[24];
+	char char38[64];
+	BOOL m_bVibrate;
+};
+
+/*
+Size of struct is 0x18 (24) bytes
+*/
+struct controller_vibration
+{
+	BOOL m_bVibrate;			//0x00
+	float m_flLeftVibration;	//0x04
+	float m_flRightVibration;	//0x08
+	DWORD dw0x0C;				//0x0C
+	DWORD dw0x10;				//0x10
+	BOOL m_bOldVibrate;			//0x14
 };
 
 // apperantly 128 bytes according to stack memset, but asm says 32 bytes
@@ -1192,16 +1264,43 @@ class CGraphics
 {
 public:
 	void* unk;							//0x0000
-	char unk0x08[8];					//0x0008
+	DWORD dw0x04;						//0x0004
+	char unk0x08[4];					//0x0008
 	void* m_pSamplerState;				//0x0010
-	char unk0x18[8];					//0x0018
+	DWORD dw0x18;						//0x0018
+	char unk0x1C[4];					//0x001C
 	CGraphicContextDx11* m_pContext;	//0x0020
 	CDisplay m_Display;					//0x0028
-	char _0x98[8];						//0x0098
+	void* m_pUnk98;						//0x0098
 	CRITICAL_SECTION m_CriticalSection;	//0x00A0
+	BOOL m_bCriticalSectionInitalized;	//0x00C8
+	char padCC[36];						//0x00CC
 };
 IS_OFFSET_CORRECT(CGraphics, m_Display, 0x28)
 IS_OFFSET_CORRECT(CGraphics, m_CriticalSection, 0xA0)
+IS_SIZE_CORRECT(CGraphics, 240)
+
+struct ReadWriteLock
+{
+  CRITICAL_SECTION m_CriticalSection;
+  BOOL m_bCriticalSectionInitalized;
+};
+
+class COsMainWindow
+{
+public:
+	void* m_vtbl;
+	HWND m_hWindow;
+	union 
+	{
+		struct { POINT m_WindowPosition; INT m_iWidth; INT m_iHeight; };
+		RECT m_windowRect;
+	};
+	BYTE gap20[4];
+	BOOL m_bUpdateRect;
+	BYTE gap28[8];
+	BOOL m_bMouse[3];
+};
 
 struct CSaveSlot
 {
@@ -1218,7 +1317,7 @@ struct CSaveDataDevice
 	DWORD dwUnk0x08;				//0x0008
 	char _0x000C[4];				//0x000C
 	CSaveSlot* pSaveSlots;			//0x0010
-	DWORD nMaxSlot;					//0x0018
+	int nMaxSlot;					//0x0018
 	DWORD dwError;					//0x001C
 	QWORD qw0x0020;					//0x0020
 	int i0x0028;					//0x0028
@@ -1270,20 +1369,6 @@ class CUserInfo
 	BOOL m_bInit;		//0x14
 	int index;			//0x18
 	char _0x1C[4];		//0x1C	
-};
-
-struct HeapAlloc_t
-{
-	LPVOID Pointer;
-	BOOL Succeeded;
-};
-
-class CHeapInstance
-{
-	void* m_pVtbl;							//0x0000
-	CRITICAL_SECTION m_CriticalSection;		//0x0008
-	HeapAlloc_t* m_pAllocation;				//0x0028
-	//const char* m_szId;					//0x0028 | doesn't line up  
 };
 
 struct CpkMountInfo
@@ -1393,6 +1478,8 @@ struct CpkEntry
 	DWORD dw7;				//0x001C
 };
 
+struct CHeapInstance;
+
 template<typename T>
 struct ConstructionInfo
 {
@@ -1453,8 +1540,8 @@ struct Create_t
 	const char* m_szName;			//0x0000
 	unsigned int m_ObjectIds[2];	//0x0008
 	set_info_t* m_pSetInfo;			//0x0010
-	DWORD m_dw0x18;					//0x0018
-	DWORD m_dw0x1C;					//0x001C
+	DWORD m_dw0x18;					//0x0018 | this is the same as set_info_t::m_dw0x70
+	DWORD m_dwFlags;				//0x001C
 	BOOL m_b0x0020;					//0x0020
 	char alignment24[4];			//0x0024
 	void* m_pWMBBuffer;				//0x0028
@@ -1469,14 +1556,76 @@ struct Create2_t
 	CSceneEntitySystem* m_pSceneEntitySystem;
 	void* ptr8;
 	Create_t* m_pCreate;
-	BOOL m_b0x18;
+	BOOL m_bSetInfo;
+};
+
+struct HeapAlloc_t
+{
+	LPVOID Pointer;
+	BOOL Succeeded;
+};
+
+/*
+Size of struct is 0x98 (152) bytes
+*/
+struct CHeapInstance
+{
+	virtual void fn0();
+	virtual void fn1();
+	virtual void fn2();
+	virtual void fn3();
+	virtual void* Alloc(__int64 nBytes, unsigned __int64 align, int flags);
+
+
+	CRITICAL_SECTION m_CriticalSection;		//0x0008
+	BOOL m_bCriticalSectionInitalized;		//0x0038
+	char align2C[4];						//0x003C
+	HeapAlloc_t* m_pAllocation;				//0x0040
+	BYTE gap48[4];							//0x0048
+	BOOL m_b0x4C;							//0x004C
+	BYTE gap50[44];							//0x0050
+	QWORD m_qwMemoryAlignment;				//0x0078
+	DWORD dword84;							//0x0080
+	DWORD dword88;							//0x0084
+	DWORD m_dwReferenceCount;				//0x0088
+	DWORD dword8c;							//0x008c
+	DWORD dword90;							//0x0090
+	DWORD dword94;							//0x0094
+};
+IS_SIZE_CORRECT(CHeapInstance, 0x98)
+
+struct HeapAllocInfo
+{
+	BYTE gap0[16];
+	CHeapInstance *m_pHeap;
+	HeapAllocInfo* m_pNext;
+	BYTE gap2[32];
+	QWORD m_nSize;
+	__int64 *m_pStruct;
+};
+
+struct CMemoryDevice
+{
+	virtual __int64 dtor();
+	virtual BOOL CreateHeap(void** ppMem, SIZE_T nByteSize);
+	virtual BOOL FreeHeap(VOID** ppMem);
+	virtual __int64 FindHeap(int index);
+
+	CRITICAL_SECTION m_CriticalSection; //0x00
+	BOOL m_bCriticalSectionInitalized;	//0x28
+	CHeapInstance m_inst;
+	void *m_pMemory;
+	void *m_punks[2];
+	BOOL m_bHeapAllocated;
+	char align[4];
+	HANDLE m_hHeap;
 };
 
 class HandlerBase;
 
 /*
 
-Size of is 0xC (12) bytes
+Size of struct is 0xC (12) bytes
 */
 class CallbackInstalled
 {
@@ -1509,7 +1658,8 @@ class CGameContentDevice
 public:
 	void* m_pVtbl;													//0x0000
 	HandlerBase* m_pHandler;										//0x0008
-	QWORD unk0x010;													//0x0010 
+	DWORD m_nCpkCount;												//0x0010 
+	DWORD unk0x014;													//0x0014 
 	DWORD unk0x18;													//0x0018
 	void(* LoadCpks)(unsigned int index, const char* szCpkName);	//0x0020
 	void(* UnloadCpks)(unsigned int index);							//0x0028
@@ -1554,7 +1704,7 @@ class CAchievementDevice
 	QWORD qw0x18;
 	QWORD qw0x20;
 	CRITICAL_SECTION m_CriticalSection;
-	DWORD bCriticalSectionValid;
+	BOOL m_bCriticalSectionValid;
 	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
 	DWORD dw0x60;
 };
@@ -1612,7 +1762,10 @@ class CGameBootProcess
 {
 public:
 	void* m_pVtbl;			//0x00
-	char unknown[16];		//0x08
+	BOOL m_bInitialized;	//0x08
+	DWORD dwordC;			//0x0C
+	DWORD dword10;
+	DWORD dword14;
 };
 IS_SIZE_CORRECT(CGameBootProcess, 24)
 
@@ -1664,7 +1817,7 @@ struct WetObjManager
 	CRITICAL_SECTION m_CriticalSection;
 	BOOL m_bCriticalSectionInitalized;
 	char pad[4];
-	EntityHandle m_localhandles[2];
+	EntityHandle m_Localhandles[2];
 	WetObjManagerDelay m_WetDelays[2];
 	EntityHandle m_EntityHandles[256];
 	EntityHandle m_SoundHandles[32];

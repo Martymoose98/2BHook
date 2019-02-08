@@ -53,14 +53,17 @@ public:
 
 		SetConsoleTitleW(szConsolename);
 		freopen_s(&pStdout, "CON", "w", stdout);
+		freopen_s(&pStderr, "CON", "w", stderr);
 	}
 
 	static inline void DetachConsole(void)
 	{
 		fclose(pStdout);
+		fclose(pStderr);
 		FreeConsole();
 	}
 
 private:
 	static FILE* pStdout;
+	static FILE* pStderr;
 };

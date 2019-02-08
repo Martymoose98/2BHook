@@ -3,7 +3,7 @@
 
 static void DisplayEntityHandles()
 {
-	QWORD count = g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count;
+	int count = (int)(g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count);
 	char** ppszHandles = new char*[count];
 	EntityHandle* handles = new EntityHandle[count];
 
@@ -78,6 +78,16 @@ static void DisplayEntityHandles()
 	delete[] handles;
 }
 
+static bool BlacklistItemCallback(void* data, int idx, const char** out_text)
+{
+	std::string* pItems = (std::string*)data;
+
+	if (out_text)
+		*out_text = pItems[idx].c_str();
+
+	return true;
+}
+
 static void ApplyPodMods(Pl0000* pOwner)
 {
 	if (!pOwner)
@@ -103,7 +113,12 @@ static void ApplyPodMods(Pl0000* pOwner)
 	if (ImGui::Checkbox("Enabled", (bool*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bShow))
 		pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bUpdate = TRUE;
 
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
+	
 	ImGui::ColorPicker4(szModelPart, (float*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_vColor);
+	
+	ImGui::PopItemWidth();
+
 	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
 	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
 }
@@ -164,6 +179,8 @@ static void ApplyModelMods(Pl0000* pEntity)
 	if (ImGui::Checkbox("Enabled", (bool*)&pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow))
 		pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
 
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
+
 	if (!strcmp(pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart, "Hair"))
 	{
 		if (!Vars.Gameplay.bRainbowHair)
@@ -180,8 +197,12 @@ static void ApplyModelMods(Pl0000* pEntity)
 		pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
 	}
 
+	ImGui::SameLine();
+
 	if (!Vars.Gameplay.bRainbowModel)
 		ImGui::ColorPicker4("Model Tint Color", (float*)&pEntity->m_pModelInfo->m_vTint);
+
+	ImGui::PopItemWidth();
 
 	ImGui::InputFloat3("Model Scale (X,Y,Z)", (float*)&pEntity->m_matModelToWorld.GetAxis(1));
 	ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pEntity->m_matModelToWorld.GetAxis(3));

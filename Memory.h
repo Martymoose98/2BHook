@@ -7,7 +7,7 @@
 #define class struct
 #endif
 
-#define RandomInt(_min, _max) (rand() % ((_max) - (_min)) + (_min))
+#define RandomInt(_min, _max) (rand() % ((_max) - (_min) + 1) + (_min))
 
 #define INRANGE(x, a, b) ((x) >= (a) && (x) <= (b))
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
@@ -139,9 +139,9 @@ public:
 		return (DWORD)(dest - rip - (uOffset + sizeof(DWORD)));
 	}
 
-	inline QWORD ReadPtr64(QWORD rip, SIZE_T uOffset)
+	static inline QWORD ReadPtr64(QWORD rip, SIZE_T uOffset)
 	{
-		return rip + uOffset + sizeof(DWORD) + *(LONG*)(rip + uOffset);
+		return rip + uOffset + sizeof(LONG) + *(LONG*)(rip + uOffset);
 	}
 
 	/*
@@ -156,7 +156,7 @@ public:
 	QWORD FindPatternPtr64(const char* szModulename, const char* szPattern, UINT uOffset)
 	{
 		QWORD rip = FindPattern(szModulename, szPattern);
-		SIZE_T OpcodeSize = uOffset + sizeof(DWORD);
+		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
 		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
 	}
 
@@ -174,7 +174,7 @@ public:
 		while (*(szPattern + uOffset * 3) != '?' && *(WORD*)(szPattern + uOffset * 3) != '??')
 			++uOffset;
 
-		SIZE_T OpcodeSize = uOffset + sizeof(DWORD);
+		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
 		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
 	}
 
@@ -193,7 +193,7 @@ public:
 		while (*(szPattern + uOpcodeStartOffset + uOffset * 3) != '?' && *(WORD*)(szPattern + uOpcodeStartOffset + uOffset * 3) != '??')
 			++uOffset;
 
-		SIZE_T OpcodeSize = uOffset + sizeof(DWORD);
+		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
 		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
 	}
 
