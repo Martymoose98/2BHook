@@ -13,7 +13,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{A9CC58DE-9D10-4056-B51A-B3FEED76E897}</ProjectGuid>
-    <RootNamespace>My2BHook</RootNamespace>
+    <RootNamespace>2BHook</RootNamespace>
     <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />

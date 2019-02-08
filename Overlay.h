@@ -12,7 +12,9 @@ enum eFontRenderFlags
 	FRF_LEFT = 0,
 	FRF_RIGHT = 1,
 	FRF_CENTER_V = 2,
-	FRF_CENTER_H = 4
+	FRF_CENTER_H = 4,
+
+	FRF_OUTLINE = 16
 };
 typedef unsigned int FontRenderFlags;
 
@@ -58,7 +60,7 @@ struct OverlayDrawList : public ImDrawList
 		int pxhealth = (height - ((height * health) / max_health));
 		ImColor col = ImColor(R, G, 0);
 
-		AddTextArgs(ImVec2((float)(x + 2), (float)(y + pxhealth)), col, FRF_LEFT, "%i/%i HP", health, max_health);
+		AddTextArgs(ImVec2((float)(x + 2), (float)(y + pxhealth)), col, FRF_LEFT | FRF_OUTLINE, "%i/%i HP", health, max_health);
 		AddRectFilled(ImVec2((float)(x - 4), (float)(y + pxhealth)), ImVec2((float)(x - 2), (float)(y + pxhealth + height - pxhealth + 1)), col);
 		AddRectBordered(x - 5, y - 1, 3, height + 2, 1, ImColor(0, 0, 0));
 	}
@@ -102,6 +104,19 @@ struct OverlayDrawList : public ImDrawList
 		if (flags & FRF_CENTER_V)
 			pos.y -= size.y / 2;
 
+		if (flags & FRF_OUTLINE)
+		{
+			ImVec2 out[4] = {
+				{ pos.x + 1, pos.y },
+				{ pos.x - 1, pos.y },
+				{ pos.x, pos.y + 1 },
+				{ pos.x, pos.y - 1} 
+			};
+
+			for (auto& curPos : out)
+				AddText(curPos, 0xFF000000, szBuffer);
+		}
+
 		AddText(pos, col, szBuffer);
 	}
 
@@ -129,6 +144,19 @@ struct OverlayDrawList : public ImDrawList
 
 		if (flags & FRF_CENTER_V)
 			pos.y -= size.y / 2;
+
+		if (flags & FRF_OUTLINE)
+		{
+			ImVec2 out[4] = {
+				{ pos.x + 1, pos.y },
+				{ pos.x - 1, pos.y },
+				{ pos.x, pos.y + 1 },
+				{ pos.x, pos.y - 1}
+			};
+
+			for (auto& curPos : out)
+				AddText(curPos, 0xFF000000, szBuffer);
+		}
 
 		AddText(pos, col, szBuffer);
 	}
@@ -164,7 +192,7 @@ public:
 					int w = h / 2;
 
 					pList->AddRectCorners((int)vBottom2D.x - (w / 2), (int)(vBottom2D.y - h), w, h, 5, ImColor(23, 128, 150));
-					pList->AddText(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), (pCameraEntity->m_ObjectId == 0x10000) ? "2B" : (pCameraEntity->m_ObjectId == 0x10100) ? "A2" : (pCameraEntity->m_ObjectId == 0x10200) ? "9S" : "Unknown");
+					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, (pCameraEntity->m_ObjectId == 0x10000) ? "2B" : (pCameraEntity->m_ObjectId == 0x10100) ? "A2" : (pCameraEntity->m_ObjectId == 0x10200) ? "9S" : "Unknown");
 					pList->AddHealthBar((int)vBottom2D.x + 10 + (w / 2), (int)(vBottom2D.y - h), h, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
 				}
 
@@ -184,7 +212,7 @@ public:
 					for (int i = 0; i < pCameraEntity->m_nBones; ++i)
 					{
 						if (WorldToScreen(pCameraEntity->m_pBones[i].m_vPosition, vTop2D))
-							pList->AddTextArgs(ImVec2(vTop2D.x, vTop2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "%i", i);
+							pList->AddTextArgs(ImVec2(vTop2D.x, vTop2D.y), ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%i", i);
 					}
 				}
 
@@ -209,7 +237,7 @@ public:
 
 				if (pCur && g_pCamera->m_pEntity && WorldToScreen(pCur->m_vPosition, vBottom2D))
 				{
-					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "Enemy: %s HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth,
+					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, *MakePtr(int*, pCur, 0x28030), pCur->m_iHealth,
 						pCur->m_iMaxHealth, g_pCamera->m_pEntity->m_vPosition.DistTo(pCur->m_vPosition));
 
 					float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
@@ -231,7 +259,7 @@ public:
 
 				if (pCur && WorldToScreen(pCur->m_vPosition, vBottom2D))
 				{
-					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth, pCur->m_iMaxHealth);
+					pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth, pCur->m_iMaxHealth);
 				}
 			}
 		}

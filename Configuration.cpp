@@ -128,6 +128,9 @@ void CConfig::InitializeConfig()
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_temporary_level", Vars.Gameplay.bTemporaryLevel));
 	//m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "fl_model_tint_hue", Vars.Gameplay.flModelTintHue)); not impl (rainbow model)
 	m_items.emplace_back(new ConfigItemInt(CATEGORY_GAMEPLAY, "i_level", Vars.Gameplay.iLevel));
+	m_items.emplace_back(new ConfigItemInt(CATEGORY_GAMEPLAY, "i_enemy_level_tolerance", Vars.Gameplay.iEnemyLevelTolerance));
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "b_balance_enemy_levels", Vars.Gameplay.bBalanceEnemyLevels));
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "b_enemy_level_tolerance_exclusively_positive", Vars.Gameplay.bExclusivelyPositiveTolerance));
 #pragma endregion
 
 #pragma region keybinds
@@ -155,15 +158,18 @@ void CConfig::InitializeConfig()
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_anti_framecap", Vars.Misc.bAntiFramerateCap));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_anti_vsync", Vars.Misc.bAntiVSync));
 #pragma endregion
+
+#pragma region menu
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", Vars.Menu.bIgnoreInputWhenOpened));
+#pragma endregion
 }
 
 void CConfig::LoadDefault()
 {
-	Vars.Menu.bOpened = false;
-
 	ZeroMemory(&Vars.Visuals, sizeof(Variables_t::Visuals_t));
 	ZeroMemory(&Vars.Misc, sizeof(Variables_t::Misc_t));
 	ZeroMemory(&Vars.Gameplay, UFIELD_OFFSET(Variables_t::Gameplay_t, SpawnBlacklist));
+	ZeroMemory(&Vars.Menu, UFIELD_OFFSET(Variables_t::Menu_t, bIgnoreInputWhenOpened));
 
 	InitializeConfig();
 }

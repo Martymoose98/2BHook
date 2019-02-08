@@ -163,7 +163,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		//(*(__int64(*)(void*))0x144807360)((void*)0x1419861E0); //CreateYesNoDialog
 	}
 
-	if (pCameraEnt && (GetAsyncKeyState(VK_F7) & 1))
+	if (pCameraEnt && (GetAsyncKeyState(VK_F7) & 0x8000))
 	{
 		//(*(void(*)(Pl0000*))(0x14391AA80))(pCameraEnt);
 		//(*(void(*)(Pl0000*))(0x1401ADB90))(pCameraEnt); //createA2wig
@@ -265,6 +265,9 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 		}
 	}
 
+	if (Vars.Gameplay.bBalanceEnemyLevels)
+		Features::BuffEnemies();
+
 	if (!Vars.Gameplay.nBones)
 	{
 		if (pCameraEnt && !Vars.Misc.bLoading)
@@ -303,7 +306,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 	{
 		ImGui::Begin("2B Hook! ~ 2B Owns Me and All :^)", &Vars.Menu.bOpened);
 		{
-			ImGui::SetWindowSize(ImVec2(850, 600));
+			ImGui::SetWindowSize(ImVec2(860, 600));
 			ImGui::Text("Average %.3f ms / frame(%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::Separator();
 			ImGui::Checkbox("Godmode", &Vars.Gameplay.bGodmode);
@@ -311,11 +314,18 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			ImGui::Checkbox("No Fall Damage", &Vars.Gameplay.bNoWorldDamage);
 			ImGui::SameLine();
 			ImGui::Checkbox("No Enemy Damage", &Vars.Gameplay.bNoEnemyDamage);
+
+			
+	
+			ImGui::Columns(2);
+			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+			//ImGui::SetColumnWidth(0, ImGui::GetWindowWidth() * 0.33f);
+
 			ImGui::InputInt("Experience:", g_piExperience, 1, 5);
 			ImGui::InputInt("Level:", &Vars.Gameplay.iLevel, 1, 5);
-			ImGui::SameLine();
 			ImGui::Checkbox("Temporary Level", &Vars.Gameplay.bTemporaryLevel);
-		
+			ImGui::SameLine();
+
 			if (ImGui::Button("Apply Level"))
 			{
 				if (Vars.Gameplay.bTemporaryLevel)
@@ -334,11 +344,24 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				}
 			}
 
+			ImGui::PopItemWidth();
+			ImGui::NextColumn();
+			ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+
+			ImGui::InputInt("Enemy Level Tolerance (+/-):", &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
+			ImGui::Checkbox("Balance Enemy Levels", &Vars.Gameplay.bBalanceEnemyLevels);
+			ImGui::SameLine();
+			ImGui::Checkbox("Exclusively Positive", &Vars.Gameplay.bExclusivelyPositiveTolerance);
+
 			ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
 			ImGui::SameLine();
 
 			if (ImGui::Button("Max Money"))
 				*g_piMoney = MAX_MONEY;
+
+	
+			ImGui::PopItemWidth();
+			ImGui::Columns();
 
 			ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
 
@@ -392,7 +415,7 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			{
 				set_info_t set_info;
 
-				set_info.m_mat = Matrix4x4(*(__m128*)0x140E94250, *(__m128*)0x140E94150, *(__m128*)0x140E941D0, *(__m128*)0x140E94110); // just an identity matrix
+				set_info.m_mat = Matrix4x4();
 				set_info.m_vPosition = pCameraEnt->m_vPosition + (pCameraEnt->m_matTransform.GetAxis(FORWARD) * 2.f);
 				set_info.m_vRotation = pCameraEnt->m_matModelToWorld.GetAxis(3); //  Vector3Aligned(0, 1, 0);
 				set_info.m_vScale = Vars.Gameplay.vSpawnEntityScale;
@@ -407,13 +430,32 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 
 				EntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSpawnObjectId].m_szClass, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId, &set_info);
 
-				if (pInfo && (pInfo->m_ObjectId & 0xF0F00))
+				if (pInfo)
 				{
-					pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-					(pInfo->m_ObjectId == OBJECTID_2B) ? SetSceneEntity("buddy_2B", pInfo) :
-						(pInfo->m_ObjectId == OBJECTID_A2) ? SetSceneEntity("buddy_A2", pInfo) :
-						(pInfo->m_ObjectId == OBJECTID_9S) ? SetSceneEntity("buddy_9S", pInfo) : (void)0;
-					SetSceneEntity("buddy", pInfo);
+					switch (pInfo->m_ObjectId)			
+					{
+					case OBJECTID_2B:
+						pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+						SetSceneEntity("buddy_2B", pInfo);
+						SetSceneEntity("buddy", pInfo);
+						break;
+					case OBJECTID_A2:
+						pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+						SetSceneEntity("buddy_A2", pInfo);
+						SetSceneEntity("buddy", pInfo);
+						break;
+					case OBJECTID_9S:
+						pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+						SetSceneEntity("buddy_9S", pInfo);
+						SetSceneEntity("buddy", pInfo);
+						break;
+					case 0x10010:
+						//pCameraEnt->m_bFlightSuit = TRUE;
+						pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
+						//*MakePtr(EntityHandle*, pInfo->m_pParent, 0xC50) = pCameraEnt->m_pInfo->m_hEntity;
+						*MakePtr(DWORD*, pInfo->m_pParent, 0xC7C) = -1;
+						break;
+					}	
 				}
 			}
 
@@ -423,6 +465,10 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			{
 				pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 1, 0);
 			}
+
+			DisplayEntityHandles();
+
+			ImGui::SameLine();
 
 			if (ImGui::Button("Change Player"))
 			{
@@ -434,8 +480,6 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 					pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
 				}
 			}
-
-			DisplayEntityHandles();
 
 			ImGui::SameLine();
 
@@ -473,6 +517,21 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 				Features::ChangeBuddy(PROTAGONIST_9S);
 			}
 
+			ImGui::ListBox("Spawn Blacklist", &Vars.Gameplay.iSelectedBlacklistItem, BlacklistItemCallback, Vars.Gameplay.SpawnBlacklist.data(), (int)Vars.Gameplay.SpawnBlacklist.size());
+			ImGui::InputText("Blacklist Item", Vars.Gameplay.szBlacklistName, 32);
+			
+			if (ImGui::Button("Add Item"))
+			{
+				Vars.Gameplay.SpawnBlacklist.emplace_back(Vars.Gameplay.szBlacklistName);
+			}
+
+			ImGui::SameLine();
+
+			if (ImGui::Button("Delete Item"))
+			{
+				Vars.Gameplay.SpawnBlacklist.erase(std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), Vars.Gameplay.SpawnBlacklist.data()[Vars.Gameplay.iSelectedBlacklistItem]));
+			}
+
 			ApplyModelMods(pCameraEnt);
 
 			ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_viewangles);
@@ -487,7 +546,8 @@ HRESULT __fastcall hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 			ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
 			ImGui::SameLine();
 			ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
-
+			ImGui::SameLine();
+			ImGui::Checkbox("Ignore Input", &Vars.Menu.bIgnoreInputWhenOpened);
 			ImGui::InputText("Mount Custom Cpk", Vars.Misc.szCpkName, _ARRAYSIZE(Vars.Misc.szCpkName));
 
 			if (ImGui::Button("Mount"))
@@ -646,7 +706,7 @@ HRESULT __fastcall hkKeyboardAcquire(IDirectInputDevice8A* pThis)
 
 HRESULT __fastcall hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
 {
-	if (Vars.Menu.bOpened)
+	if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
 		return DIERR_INPUTLOST;
 
 	g_pKeyboardHook->Unhook();
@@ -688,7 +748,7 @@ HRESULT __fastcall hkMouseAcquire(IDirectInputDevice8A* pThis)
 
 HRESULT __fastcall hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
 {
-	if (Vars.Menu.bOpened)
+	if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
 		return DIERR_INPUTLOST;
 
 	g_pMouseHook->Unhook();
@@ -713,7 +773,7 @@ void* __fastcall hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int 
 
 	void* pEntity = NULL;
 
-	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->szName) != Vars.Gameplay.SpawnBlacklist.cend()) //strcmp("Em4000", pConstruct->szName) && strcmp("BehaviorFunnel", pConstruct->szName)
+	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->szName) == Vars.Gameplay.SpawnBlacklist.cend()) //strcmp("Em4000", pConstruct->szName) && strcmp("BehaviorFunnel", pConstruct->szName)
 		pEntity = oCreateEntity(pUnknown, pInfo, objectId, flags, ppHeaps); //0x1401A2B40
 
 	if (!pEntity)
@@ -833,11 +893,10 @@ void __fastcall hkSaveFileIO(CSaveDataDevice* pSavedata)
 		(*(ReadSaveSlotsFn)(0x14095DD80))(pSavedata);
 		return;
 	case SAVE_FLAGS_READ:
+		Vars.Misc.bLoading = true;
 		(*(ReadSaveDataFn)(0x14095E020))(pSavedata);
-
 		Vars.Misc.nSlot = pSavedata->nSlot;
 		Vars.Gameplay.nBones = 0; // read gets run when you're editing some setting
-		Vars.Misc.bLoading = true;
 		return;
 	case SAVE_FLAGS_WRITE:
 		(*(WriteSaveDataFn)(0x14095E330))(pSavedata);
@@ -845,10 +904,8 @@ void __fastcall hkSaveFileIO(CSaveDataDevice* pSavedata)
 	case SAVE_FLAGS_DELETE:
 		(*(DeleteSaveDataFn)(0x14095E7B0))(pSavedata);
 		return;
-	default:
-		Vars.Misc.bLoading = false;
-		return;
 	}
+	Vars.Misc.bLoading = false;
 }
 
 BOOL __fastcall hkQueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)

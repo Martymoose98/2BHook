@@ -23,7 +23,9 @@ class ExportTableHook
 			if (!pExportDirectory[index].Characteristics)
 				return NULL;
 
-			if ()
+			if (1)
+			{
+			}
 		}
 	}
 

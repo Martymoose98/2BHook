@@ -14,7 +14,7 @@
 #define MAX_EXPERIENCE 9999999
 #define MAX_MONEY 9999999
 
-#define PROTAGONIST_NONE NULL
+#define PROTAGONIST_NONE -1
 #define PROTAGONIST_2B 0
 #define PROTAGONIST_A2 1
 #define PROTAGONIST_9S 2
@@ -75,7 +75,7 @@ typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef void(*WetObjectManager_AddLocalEntityFn)(__int64, EntityInfo* pInfo);
 typedef void(*WetObjectManager_SetWetFn)(__int64 pThis, byte wet_level, int index);
 typedef void(*WetObjectManager_SetDryFn)(__int64 pThis, EntityInfo *pInfo);
-typedef void(*ResetCameraFn)(CCamera* pCamera);
+typedef void(*ResetCameraFn)(CCameraGame* pCamera);
 typedef bool(*DestroyBuddyFn)(Pl0000* pBuddy);
 typedef __int64(*NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
 typedef __int64(*NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
@@ -92,7 +92,7 @@ typedef void(*SetSceneEntityFn)(const char*, EntityInfo*);
 typedef __int64(*CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(*QuestState_RequestStateInternalFn)(DWORD *pQuestId);
 typedef ConstructionInfo<void>*(*GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
-typedef EntityInfo*(*MakeEntityFn)(void*, Create_t* pCreate);
+typedef EntityInfo*(*SceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
 typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
@@ -172,8 +172,9 @@ extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
 extern WetObjManager* g_pWetObjectManager;
-extern CCamera* g_pCamera;
+extern CCameraGame* g_pCamera;
 extern CSceneStateSystem* g_pSceneStateSystem;
+extern CMemoryDevice* g_pMemoryDevice;
 extern BYTE* g_pDecreaseHealth[2];
 extern BYTE* g_pAntiVSync;
 extern BYTE* g_pAntiFramerateCap_Sleep;
