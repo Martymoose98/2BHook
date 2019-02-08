@@ -88,6 +88,13 @@
     <ClInclude Include="Features.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Hooks.h" />
+    <ClInclude Include="ImGui\imconfig.h" />
+    <ClInclude Include="ImGui\imgui.h" />
+    <ClInclude Include="ImGui\imgui_impl_dx11.h" />
+    <ClInclude Include="ImGui\imgui_internal.h" />
+    <ClInclude Include="ImGui\imstb_rectpack.h" />
+    <ClInclude Include="ImGui\imstb_textedit.h" />
+    <ClInclude Include="ImGui\imstb_truetype.h" />
     <ClInclude Include="ImportTableHook.h" />
     <ClInclude Include="Log.h" />
     <ClInclude Include="Math.h" />
@@ -112,8 +119,10 @@
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="ImGui\imgui.cpp" />
+    <ClCompile Include="ImGui\imgui_demo.cpp" />
     <ClCompile Include="ImGui\imgui_draw.cpp" />
     <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="ImGui\imgui_widgets.cpp" />
     <ClCompile Include="Log.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="Overlay.cpp" />
@@ -126,6 +135,14 @@
     <MASM Include="CreateEntityHook.asm" />
     <MASM Include="LoadWordBlacklistHook.asm" />
     <MASM Include="UpdateModelPartsHook.asm" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ImGui\.editorconfig" />
+    <None Include="ImGui\.git" />
+    <None Include="ImGui\.travis.yml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ImGui\LICENSE.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
