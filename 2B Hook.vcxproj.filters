@@ -16,14 +16,14 @@
     <Filter Include="Assembly Files">
       <UniqueIdentifier>{fe73b19c-e86a-4d8f-a0ef-a4432c878917}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\ImGui">
-      <UniqueIdentifier>{8d66287d-4e06-40b4-a856-8ee3a48a5b85}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\Math">
       <UniqueIdentifier>{dc91db4f-5f8e-4af0-96f9-6cac255d331e}</UniqueIdentifier>
     </Filter>
     <Filter Include="Source Files\Math">
       <UniqueIdentifier>{322a1937-0669-484f-88d0-e7c50ce575d4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\ImGui">
+      <UniqueIdentifier>{122f911a-5b7e-4332-ac8f-1342e457d8c8}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -102,6 +102,27 @@
     <ClInclude Include="ExportTableHook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ImGui\imconfig.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imgui.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imgui_internal.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imstb_rectpack.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imstb_textedit.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imstb_truetype.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGui\imgui_impl_dx11.h">
+      <Filter>Source Files\ImGui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">
@@ -122,15 +143,6 @@
     <ClCompile Include="Renderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ImGui\imgui.cpp">
-      <Filter>Source Files\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGui\imgui_draw.cpp">
-      <Filter>Source Files\ImGui</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGui\imgui_impl_dx11.cpp">
-      <Filter>Source Files\ImGui</Filter>
-    </ClCompile>
     <ClCompile Include="Matrix4x4.cpp">
       <Filter>Source Files\Math</Filter>
     </ClCompile>
@@ -146,6 +158,21 @@
     <ClCompile Include="Configuration.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="ImGui\imgui.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\imgui_demo.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\imgui_draw.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\imgui_widgets.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGui\imgui_impl_dx11.cpp">
+      <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <MASM Include="UpdateModelPartsHook.asm">
@@ -157,5 +184,21 @@
     <MASM Include="CreateEntityHook.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ImGui\.editorconfig">
+      <Filter>Source Files\ImGui</Filter>
+    </None>
+    <None Include="ImGui\.git">
+      <Filter>Source Files\ImGui</Filter>
+    </None>
+    <None Include="ImGui\.travis.yml">
+      <Filter>Source Files\ImGui</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="ImGui\LICENSE.txt">
+      <Filter>Source Files\ImGui</Filter>
+    </Text>
   </ItemGroup>
 </Project>
