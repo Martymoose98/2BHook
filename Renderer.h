@@ -1,7 +1,6 @@
 #pragma once
 #include <vector>
 #include <d3d11.h>
-#include <d3dx9math.h>
 #include <DirectXMath.h>
 #include <D3Dcompiler.h>
 #include <d3dx11.h>
@@ -65,17 +64,11 @@ float4 PS(VS_OUTPUT input) : SV_TARGET
 //" return fake;"
 //"}";
 
-
 typedef struct Vertex
 {
 	XMFLOAT4 xyzrhw;
 	XMFLOAT4 color;
 	//	D3DCOLOR color;
-
-	enum
-	{
-		FVF = D3DFVF_XYZRHW | D3DFVF_DIFFUSE
-	};
 } Vertex;
 
 typedef struct RenderBatch
