@@ -67,12 +67,12 @@ struct OverlayDrawList : public ImDrawList
 
 	void AddBone(Vector3Aligned vStart, Vector3Aligned vEnd, const ImColor& color)
 	{
-		ImVec2 vBoneStart, vBoneEnd;
+		Vector2 vBoneStart, vBoneEnd;
 
-		if ((!WorldToScreen(vStart, (Vector2&)vBoneStart)) || (!WorldToScreen(vEnd, (Vector2&)vBoneEnd)))
+		if ((!WorldToScreen(vStart, vBoneStart)) || (!WorldToScreen(vEnd, vBoneEnd)))
 			return;
 
-		AddLine(vBoneStart, vBoneEnd, color);
+		AddLine((ImVec2&)vBoneStart, (ImVec2&)vBoneEnd, color);
 	}
 
 	void AddTextArgs(ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
@@ -263,11 +263,18 @@ public:
 				}
 			}
 		}
+
+		Pl0000* pEmil = GetEntityFromHandle(g_pEmilHandle);
 		
+		if (pEmil && WorldToScreen(pEmil->m_vPosition, vBottom2D))
+		{
+			pList->AddTextArgs(ImVec2(vBottom2D.x, vBottom2D.y), ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Emil: %s HP: %i/%i", pEmil->m_pInfo->m_szEntityType, pEmil->m_iHealth, pEmil->m_iMaxHealth);
+		}
+
 #ifdef _DEBUG
 		if (g_pCamera)
 			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H, "ang (%f,%f,%f)", RADTODEG(g_pCamera->m_viewangles.x), RADTODEG(g_pCamera->m_viewangles.y), RADTODEG(g_pCamera->m_viewangles.z));
-#endif
+
 
 		if (iTarget != -1)
 		{
@@ -286,6 +293,7 @@ public:
 				//pPod->m_matTransform.GetAxis(2) = vTAng;
 			}
 		}
+#endif
 	}
 };
 extern Overlay* g_pOverlay;

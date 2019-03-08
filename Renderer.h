@@ -6,8 +6,8 @@
 #include <D3Dcompiler.h>
 #include <d3dx11.h>
 #include "Globals.h"
-#include "Log.h"
 #include "Color.h"
+#include "Log.h"
 
 #pragma comment(lib, "d3dx9.lib")
 

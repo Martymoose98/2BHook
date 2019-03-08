@@ -76,6 +76,11 @@ public:
 		return Vector4(_x, _y, _z, _w);
 	}
 
+	inline float Dot(const Vector4& v)
+	{
+		return x * v.x + y * v.y + z * v.z + w * v.w;
+	}
+
 	inline Vector4 Conjugate() const
 	{
 		return Vector4(-x, -y, -z, w);

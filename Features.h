@@ -128,6 +128,7 @@ public:
 		pEntity->m_HorizontalCollision.m_hOwner = 0;
 	}
 
+	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(0, pEntity->m_pInfo); after the wet time has elapsed")
 	static int WetEntity(Pl0000* pEntity, byte wetness)
 	{
 		int i = 0;
@@ -142,6 +143,7 @@ public:
 				break;
 
 		WetObjectManager_SetWet(0, wetness, i);
+
 		return i;
 	}
 
@@ -170,7 +172,7 @@ public:
 		}
 	}
 
-	static void SwapPlayer()
+	static void SwapPlayer(void)
 	{
 		ChangePlayerEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
 	}
@@ -185,6 +187,15 @@ public:
 	{
 		if (g_pLocalPlayer)
 			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer);
+	}
+
+	static void TeleportEntityToOther(EntityHandle hTeleporter, EntityHandle hTeleportee)
+	{
+		Pl0000* pTeleporter = GetEntityFromHandle(&hTeleporter);
+		Pl0000* pTeleportee = GetEntityFromHandle(&hTeleportee);
+
+		if (pTeleportee && pTeleporter)
+			pTeleportee->m_vPosition = pTeleporter->m_vPosition + pTeleporter->m_matTransform.GetAxis(FORWARD) * 4.f;
 	}
 
 	static void TeleportForwardEx(Pl0000* pEntity, float flSpeed)

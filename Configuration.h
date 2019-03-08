@@ -570,83 +570,195 @@ private:
 	IKeybind& m_key;
 };
 
+//template<typename T>
+//class ConfigItemVector : public IConfigItem
+//{
+//public:
+//	enum Type
+//	{
+//		VOID_PTR,
+//		BOOL,
+//		INT,
+//		UINT,
+//		INT64,
+//		UINT64,
+//		CSTRING,
+//		WCSTRING,
+//		STRING,
+//		WSTRING,
+//	};
+//
+//	ConfigItemVector(const char* szCategory, const char* szName, Type type, std::vector<T>& vec)
+//		: m_vec(vec), m_type(type)
+//	{
+//		m_szCategory = szCategory;
+//		m_szName = szName;
+//	}
+//
+//	virtual void Read(const char* szFilename)
+//	{
+//		switch (m_type)
+//		{
+//		case STRING:
+//			WriteString(szFilename);
+//			break;
+//		}
+//	}
+//
+//	virtual void Write(const char* szFilename)
+//	{
+//		switch (m_type)
+//		{
+//		case STRING:
+//			WriteString(szFilename);
+//			break;
+//		}
+//	}
+//
+//	void WriteString(const char* szFilename)
+//	{
+//		char szItem[32];
+//		size_t i = 0;
+//
+//		for (auto& it : m_vec)
+//		{
+//			sprintf_s(szItem, "%s[%i]", m_szName, i++);
+//
+//			WritePrivateProfileString(m_szCategory, szItem, it, szFilename);
+//		}
+//	}
+//
+//	void WriteInt(const char* szFilename)
+//	{
+//		char szItem[32];
+//		char szBuffer[32];
+//		size_t i = 0;
+//
+//		for (auto& it : m_vec)
+//		{
+//			sprintf_s(szItem, "%s[%i]", m_szName, i++);
+//			sprintf_s(szBuffer, "%i", i);
+//
+//			WritePrivateProfileString(m_szCategory, szItem, szBuffer, szFilename);
+//		}
+//
+//		void WriteUInt(const char* szFilename)
+//		{
+//			char szItem[32];
+//			char szBuffer[32];
+//			size_t i = 0;
+//
+//			for (auto& it : m_vec)
+//			{
+//				sprintf_s(szItem, "%s[%u]", m_szName, i++);
+//				sprintf_s(szBuffer, "%u", i);
+//
+//				WritePrivateProfileString(m_szCategory, szItem, szBuffer, szFilename);
+//			}
+//		}
+//	}
+//
+//private:
+//	std::vector<T>& m_vec;
+//	Type m_type;
+//};
+#if 0
+#include <sstream>
+
+template<class X, class Y, class Op>
+struct op_valid_impl
+{
+	template<class U, class L, class R>
+	static auto test(int) -> decltype(std::declval<U>()(std::declval<L>(), std::declval<R>()),
+		void(), std::true_type());
+
+	template<class U, class L, class R>
+	static auto test(...)->std::false_type;
+
+	using type = decltype(test<Op, X, Y>(0));
+
+};
+template<class X, class Y, class Op> using op_valid = typename op_valid_impl<X, Y, Op>::type;
+
+struct left_shift {
+	template <class L, class R>
+	constexpr auto operator()(L&& l, R&& r) const
+		noexcept(noexcept(std::forward<L>(l) << std::forward<R>(r)))
+		-> decltype(std::forward<L>(l) << std::forward<R>(r))
+	{
+		return std::forward<L>(l) << std::forward<R>(r);
+	}
+};
+
+struct right_shift {
+	template <class L, class R>
+	constexpr auto operator()(L&& l, R&& r) const
+		noexcept(noexcept(std::forward<L>(l) >> std::forward<R>(r)))
+		-> decltype(std::forward<L>(l) >> std::forward<R>(r))
+	{
+		return std::forward<L>(l) >> std::forward<R>(r);
+	}
+};
+
+template<class X, class Y> using has_left_shift = op_valid<X, Y, left_shift>;
+template<class X, class Y> using has_right_shift = op_valid<X, Y, right_shift>;
 
 template<typename T>
 class ConfigItemVector : public IConfigItem
 {
 public:
-	enum Type
+	ConfigItemVector(const char* szCategory, const char* szName, std::vector<T>& vec)
+		: m_vec(vec)
 	{
-		VOID_PTR,
-		BOOL,
-		INT,
-		UINT,
-		INT64,
-		UINT64,
-		CSTRING,
-		WCSTRING,
-		STRING,
-		WSTRING,
-	};
+		assert((has_right_shift<std::stringstream, T>()()));
+		assert((has_left_shift<std::stringstream, T>()()));
 
-	ConfigItemVector(const char* szCategory, const char* szName, Type type, std::vector<T>& vec)
-		: m_vec(vec), m_type(type)
-	{
 		m_szCategory = szCategory;
 		m_szName = szName;
 	}
 
 	virtual void Read(const char* szFilename)
 	{
-		char szKeybindKeycode[32];
+		char szBuffer[32];
+		std::stringstream ss_name, ss_val;
+		T type;
+	
+		for (size_t i = 0; ; ++i)
+		{
+			ss_name << m_szName << "[" << i << "]";
+			GetPrivateProfileString(m_szCategory, ss_name.str().c_str(), "(null)", szBuffer, sizeof(szBuffer), szFilename);
 
-		GetPrivateProfileString(m_szCategory, m_szName, "0", szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
+			if (!strcmp(szBuffer, "(null)"))
+				break;
 
-		m_key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
+			ss_val << szBuffer;
+			ss_val >> type;
+			m_vec.emplace_back(type);
+			ss_name.str(std::string());
+			ss_val.str(std::string());
+			ss_val.clear();
+		}
 	}
 
 	virtual void Write(const char* szFilename)
 	{
-
-		switch (m_type)
-		{
-		case STRING:
-			WriteString(szFilename);
-			break;
-		}
-	}
-
-	void WriteString(const char* szFilename)
-	{
-		char szItem[32];
+		std::stringstream ss_name, ss_val;
 		size_t i = 0;
 
 		for (auto& it : m_vec)
 		{
-			sprintf_s(szItem, "%s[%i]", m_szName, i++);
-
-			WritePrivateProfileString(m_szCategory, szItem, it, szFilename);
-		}
-	}
-
-	void WriteInt(const char* szFilename)
-	{
-		char szItem[32];
-		char szBuffer[32];
-		size_t i = 0;
-
-		for (auto& it : m_vec)
-		{
-			sprintf_s(szItem, "%s[%i]", m_szName, i++);
-
-			WritePrivateProfileString(m_szCategory, szItem, szBuffer, szFilename);
+			ss_name << m_szName << "[" << i++ << "]";
+			ss_val << it;
+			WritePrivateProfileString(m_szCategory, ss_name.str().c_str(), ss_val.str().c_str(), szFilename);
+			ss_name.str(std::string());
+			ss_val.str(std::string());
 		}
 	}
 
 private:
 	std::vector<T>& m_vec;
-	Type m_type;
 };
+#endif
 
 class CConfig
 {

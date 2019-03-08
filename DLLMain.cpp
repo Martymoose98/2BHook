@@ -7,7 +7,6 @@
 
 #include "Memory.h"
 #include "cpk.h"
-#include "Log.h"
 #include "Hooks.h"
 #include "VirtualTableHook.h"
 #include "ImportTableHook.h"
@@ -26,7 +25,6 @@ CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 BYTE RdiJumpHook[] = { 0x90, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7 };
 BYTE RdiJumpHook2[] = { 0x90, 0x57, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7, 0x5F };
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
-BYTE opcodes_query_performance_counter[] = { 0x90, 0x90, 0xE9, 0x00, 0x00, 0x00, 0x00 };
 
 void InitHooks()
 {
@@ -36,24 +34,8 @@ void InitHooks()
 	g_pKeyboardHook = new VirtualTableHook((QWORD**)g_pKeyboard->pKeyboard);
 	g_pMouseHook = new VirtualTableHook((QWORD**)g_pMouse->pMouse);
 	
-
-#if NO_IAT_HOOKS
-	QueryPerformaceCounterFn QueryPerformanceCounterStub = (QueryPerformaceCounterFn)GetProcAddress(GetModuleHandle("kernel32.dll"), "QueryPerformanceCounter");
-	oQueryPerformanceCounter = *(QueryPerformaceCounterFn*)g_pMemory->ReadPtr64((QWORD)QueryPerformanceCounterStub, 3);
-
-	*(DWORD*)&opcodes_query_performance_counter[3] = g_pMemory->CalculateJump((QWORD)QueryPerformanceCounterStub, (QWORD)hkQueryPerformanceCounter, 3);
-
-	bp_query_performance_counter.Address = QueryPerformanceCounterStub;
-	bp_query_performance_counter.nBytes = 7;
-	bp_query_performance_counter.pNewOpcodes = opcodes_query_performance_counter;
-	bp_query_performance_counter.pOldOpcodes = NULL;
-	bp_query_performance_counter.Patched = FALSE;
-
-	g_pMemory->PatchBytes(&bp_query_performance_counter);
-#else
 	g_pQueryPerformanceCounterHook = new ImportTableHook("kernel32.dll", "QueryPerformanceCounter", (LPCVOID)hkQueryPerformanceCounter);
 	oQueryPerformanceCounter = (QueryPerformaceCounterFn)g_pQueryPerformanceCounterHook->GetOriginalFunction();
-#endif
 
 	g_pClipCursorHook = new ImportTableHook("user32.dll", "SetCursorPos", (LPCVOID)hkSetCursorPos);
 	oSetCursorPos = (SetCursorPosFn)g_pClipCursorHook->GetOriginalFunction();
@@ -69,6 +51,7 @@ void InitHooks()
 	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((QWORD)hkCreateSwapChain, 10);
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
 	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((QWORD)hkDrawIndexed, 12);
+	oDraw = (DrawFn)g_pDeviceContextHook->HookFunction((QWORD)hkDraw, 13);
 	oClearRenderTargetView = (ClearRenderTargetViewFn)g_pDeviceContextHook->HookFunction((QWORD)hkClearRenderTargetView, 50);
 	oKeyboardAcquire = (AcquireFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardAcquire, 7);
 	oKeyboardGetDeviceState = (GetDeviceStateFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardGetDeviceState, 9);
@@ -264,7 +247,7 @@ HRESULT InitD3D11()
 	return S_OK;
 }
 
-void ExposeHiddenXInputFunctions()
+void ExposeHiddenXInputFunctions(void)
 {
 	HMODULE hXInput910 = GetModuleHandleA("xinput9_1_0.dll");
 	HMODULE hXInput13 = GetModuleHandleA("xinput1_3.dll");
@@ -284,18 +267,47 @@ void ExposeHiddenXInputFunctions()
 	}
 }
 
-void Setup()
+
+void LogOffsets(void)
+{
+	LOG_OFFSET("CEntityList", g_pEntityInfoList);
+	LOG_OFFSET("LocalPlayerHandle", g_pLocalPlayerHandle);
+	LOG_OFFSET("EmilHandle", g_pEmilHandle);
+	LOG_OFFSET("CYorhaManager", g_pYorhaManager);
+	LOG_OFFSET("CNPCManager", g_pNPCManager);
+	LOG_OFFSET("CEnemyManager", g_pEnemyManager);
+	LOG_OFFSET("CUserManager", g_pUserManager);
+	LOG_OFFSET("CWetObjectManager", g_pWetObjectManager);
+	LOG_OFFSET("CGameCamera", g_pCamera);
+	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
+	LOG_OFFSET("CalculateLevel", CalculateLevel);
+	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
+	LOG_OFFSET("DataDirectory", g_szDataDirectoryPath);
+	LOG_OFFSET("Money", g_piMoney);
+	LOG_OFFSET("Experience", g_piExperience);
+	LOG_OFFSET("IDirectInput8A", g_pDirectInput8);
+	LOG_OFFSET("CKeyboard", g_pKeyboard);
+	LOG_OFFSET("CMouse", g_pMouse);
+	LOG_OFFSET("CGraphics", g_pGraphics);
+	LOG_OFFSET("ViewMatrix", g_pViewMatrix);
+
+	g_pConsole->Log(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
+}
+
+void Setup(void)
 {
 #if defined(_DEBUG) || defined(VERBOSE)
 	STACK_TIMER(timer);
 	Log::AttachConsole(L"2B Hook Debug Console");
-	*((void**)0x141415350) = CRILogCallbackV2;//CRILogCallback;
+	// 48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ? + 3
+	*((void**)0x141415350) = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
 #endif
 	srand((unsigned int)time(NULL));
 
 	// g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
 	g_pEntityInfoList = (EntityInfoList*)g_pMemory->FindPatternPtr64(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
+	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
 	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
 	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr64(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
 	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr64(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
@@ -327,7 +339,8 @@ void Setup()
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
-	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);	
+	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);
+	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr64(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = *g_pGraphics->m_Display.m_ppSwapChain;
 
@@ -341,6 +354,8 @@ void Setup()
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr64(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
 	
+	LogOffsets();
+
 	ExposeHiddenXInputFunctions();
 
 	QueryProcessHeaps(&g_pHeaps, NULL);
@@ -395,15 +410,12 @@ void Setup()
 	bp_Framecap.pOldOpcodes = NULL;
 	bp_Framecap.Patched = FALSE;
 
-	bp_AntiVSync.Address = g_pAntiVSync;
-	bp_AntiVSync.nBytes = 3;
-	bp_AntiVSync.pNewOpcodes = (BYTE*)XorRdxRdx;
-	bp_AntiVSync.Patched = FALSE;
-
 	bp_NoTutorialDialogs.Address = (VOID*)g_pMemory->FindPattern(NULL, "77 07 8B CA");
 	bp_NoTutorialDialogs.nBytes = 1;
 	bp_NoTutorialDialogs.pNewOpcodes = (BYTE*)LocalJmp;
 	bp_NoTutorialDialogs.Patched = FALSE;
+
+	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initalization Complete! GLHF");
 
 	LOG("2B Hook Initalization Complete!\n");
 }
@@ -416,18 +428,13 @@ void Unhook()
 
 	Features::ApplyHealthMods();
 
-	g_pMemory->RestoreMemory(&bp_AntiVSync);
 	g_pMemory->RestoreMemory(&bp_NoTutorialDialogs);
 	g_pMemory->RestoreMemory(&bp_Framecap);
-	g_pMemory->RestoreMemory(&bp_AntiVSync);
 	g_pMemory->RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
 	g_pMemory->RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 	g_pMemory->RestoreMemory(&bp_save_file_io);
-#if NO_IAT_HOOKS
-	g_pMemory->RestoreMemory(&bp_query_performance_counter);
-#endif
 
 	delete g_pSetUnhandledExceptionFilterHook;
 	delete g_pQueryPerformanceCounterHook;

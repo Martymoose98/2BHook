@@ -45,7 +45,9 @@ typedef struct Variables_t
 		int iSelectedEntityType;
 		int iSelectedAnimation;
 		int iSelectedEntityHandle;
+		int iSelectedEntityLevel;
 		bool bGhostModel;
+		bool bGhostModelOld;
 		int nBones;
 		bool bFreezePlayer;
 		bool bNoTutorialDialogs;
@@ -65,6 +67,7 @@ typedef struct Variables_t
 		bool bAntiVSync;
 		bool bAntiFramerateCap;
 		bool bBackupSave;
+		bool bConsoleShowGameErrors;
 		bool bLoading;
 		int nSlot;
 	} Misc;
@@ -185,6 +188,7 @@ typedef struct Variables_t
 		{ "2B", "partner", 0x10000 },
 		{ "A2", "partner", 0x10100 },
 		{ "9S", "partner", 0x10200 },
+		{ "Emil", "\0", 0x11010 },
 		{ "Moose", "regenerate_animal", 0x2A010 },
 		{ "White Moose", "regenerate_animal", 0x2A011 },
 		{ "Boar", "regenerate_animal", 0x2A000 },
@@ -196,7 +200,8 @@ typedef struct Variables_t
 		{ "Director", "et0009", 0x40009 },
 		{ "Corpse1", "Corpse", 0x21080 },
 		{ "Corpse2", "Corpse", 0x21081 },
-		{ "Enemy Drop", "EmBase", 0x70001 }
+		{ "Enemy Drop", "EmBase", 0x70001 },
+		{ "Enemy Drop 2", "EmBase", 0x20030 } //0xA2180 c, 0x21060 c, 0x20030,  0x40006, 0xF2014, 0x20030, 0x30610, 0x30240, 0x30450, 0x30050, 0x30260, 0x30261, 0x30240, 0x30070, 0x30071, 0x30080, 0x30610, 0x30450, 0x30240, 0x30050, 0x31000, 0x40006, 0x40002,  0x31000
 		//{ "Director2", "Et0024", 0x40012 }, CRASHES
 		//{ "BG", "Bg4440", 0xC4440}, CRASHES
 		//{ "Enemy1", "Em2101", 0x22101 }, CRASHES
@@ -210,6 +215,7 @@ typedef struct Variables_t
 		"2B",
 		"A2",
 		"9S",
+		"Emil",
 		"Moose",
 		"White Moose",
 		"Boar",
@@ -221,7 +227,8 @@ typedef struct Variables_t
 		"Director",
 		"Corpse1 (Invisible)",
 		"Corpse2 (Invisible)",
-		"Enemy Drop"
+		"Enemy Drop",
+		"Enemy Drop 2"
 		//"BG", CRASHES
 		//"Enemy1",CRASHES
 		//"Enemy2", CRASHES
