@@ -22,21 +22,16 @@
 #endif // !TODO
 
 #if defined(_DEBUG) || defined(VERBOSE)
-#define LOG_OFFSETS
-#ifndef LOG
 #define LOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
 #else 
-#define LOG(fmt, ...)
-#endif
+#define LOG(fmt, ...) ((void)0)
 #endif
 
 #ifdef LOG_OFFSETS
-#ifndef LOG_OFFSET
 #define LOG_OFFSET(name, offset) Log::LogOffset(name, offset)
 #else
 #define LOG_OFFSET(name, offset)
-#endif // LOG_OFFSET
-#endif // LOG_OFFSETS
+#endif
 
 #ifdef VERBOSE
 #define VLOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
