@@ -12,7 +12,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 	m_pVertexBuffer = pVertexBuffer;
 	m_pDeviceContext->IAGetInputLayout(&this->m_pInputLayout);
 
-	return D3D_OK;
+	return S_OK;
 }
 
 HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext) // this needs more shit
@@ -79,8 +79,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 	if (FAILED(hr = m_pDevice->CreateBuffer(&Desc, NULL, &m_pViewMatrix)))
 		return hr;
 
-	D3DXMatrixOrthoOffCenterLH((D3DXMATRIX*)&m_ViewMatrix, 0.0f, (FLOAT)g_pGraphicDevice->iScreenWidth, (FLOAT)g_pGraphicDevice->iScreenHeight, 0.0f, -100.0f, 100.0f);
-	//XMMatrixOrthographicOffCenterLH(0.0f, g_pGraphicDevice->iScreenWidth, g_pGraphicDevice->iScreenHeight, 0.0f, -100.0f, 100.0f);
+	m_ViewMatrix = DirectX::XMMatrixOrthographicOffCenterLH(0.0f, g_pGraphicDevice->iScreenWidth, g_pGraphicDevice->iScreenHeight, 0.0f, -100.0f, 100.0f);
 
 	if (FAILED(hr = m_pDeviceContext->Map(m_pViewMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &Mapped)))
 		return hr;
@@ -89,7 +88,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 
 	m_pDeviceContext->Unmap(m_pViewMatrix, 0);
 
-	return D3D_OK;
+	return S_OK;
 }
 
 template<size_t N>
@@ -99,7 +98,7 @@ HRESULT Renderer::GeneratePixelShader(ID3D11PixelShader** pShader, ID3DBlob** pp
 	HRESULT hr;
 
 	if (!m_pDevice)
-		return D3DERR_DEVICELOST;
+		return E_FAIL;
 
 	if (FAILED(hr = D3DCompile(szShader, N, NULL, NULL, NULL, "PS", "ps_4_0", 0, 0, ppBlob, &pD3DErrorMsgBlob)))
 		return hr;
@@ -116,7 +115,7 @@ HRESULT Renderer::GeneratePixelShader(ID3D11PixelShader** pShader, ID3DBlob** pp
 	HRESULT hr;
 
 	if (!m_pDevice)
-		return D3DERR_DEVICELOST;
+		return E_FAIL;
 
 	if (FAILED(hr = D3DCompile(szShader, cchSource, NULL, NULL, NULL, "PS", "ps_4_0", 0, 0, ppBlob, &pD3DErrorMsgBlob)))
 		return hr;
@@ -134,7 +133,7 @@ HRESULT Renderer::GenerateVertexShader(ID3D11VertexShader** pShader, ID3DBlob** 
 	HRESULT hr;
 
 	if (!m_pDevice)
-		return D3DERR_DEVICELOST;
+		return E_FAIL;
 
 	if (FAILED(hr = D3DCompile(szShader, N, NULL, NULL, NULL, "VS", "vs_4_0", 0, 0, ppBlob, &pD3DErrorMsgBlob)))
 		return hr;
@@ -151,7 +150,7 @@ HRESULT Renderer::GenerateVertexShader(ID3D11VertexShader** pShader, ID3DBlob** 
 	HRESULT hr;
 
 	if (!m_pDevice)
-		return D3DERR_DEVICELOST;
+		return E_FAIL;
 
 	if (FAILED(hr = D3DCompile(szShader, cchSource, NULL, NULL, NULL, "VS", "vs_4_0", 0, 0, ppBlob, &pD3DErrorMsgBlob)))
 		return hr;
