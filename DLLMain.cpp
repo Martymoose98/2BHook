@@ -46,7 +46,6 @@ void InitHooks()
 	g_pSetUnhandledExceptionFilterHook = new ImportTableHook("kernel32.dll", "SetUnhandledExceptionFilter", (LPCVOID)hkSetUnhandledExceptionFilter);
 	oSetUnhandledExceptionFilter = (SetUnhandledExceptionFilterFn)g_pSetUnhandledExceptionFilterHook->GetOriginalFunction();
 
-
 	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
 	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((QWORD)hkCreateSwapChain, 10);
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
@@ -60,11 +59,7 @@ void InitHooks()
 
 	*(QWORD*)&opcodes_save_file_io[2] = (QWORD)hkSaveFileIO;
 
-	bp_save_file_io.Address = (void*)g_pMemory->FindPattern(NULL, "8B 51 30 FF CA");
-	bp_save_file_io.nBytes = 24;
-	bp_save_file_io.pNewOpcodes = opcodes_save_file_io;
-	bp_save_file_io.pOldOpcodes = NULL;
-	bp_save_file_io.Patched = FALSE;
+	InitalizeBytePatchMemory(&bp_save_file_io, g_pMemory->FindPattern(NULL, "8B 51 30 FF CA"), opcodes_save_file_io, 24);
 
 	g_pMemory->PatchBytes(&bp_save_file_io);
 
@@ -72,11 +67,7 @@ void InitHooks()
 
 	*(QWORD*)&RdiJumpHook2[4] = (QWORD)hkUpdateModelPartsThunk;
 
-	bp_UpdateModelParts.Address = oUpdateModelParts;
-	bp_UpdateModelParts.nBytes = 15;
-	bp_UpdateModelParts.pNewOpcodes = RdiJumpHook2;
-	bp_UpdateModelParts.pOldOpcodes = NULL;
-	bp_UpdateModelParts.Patched = FALSE;
+	//InitalizeBytePatchMemory(&bp_UpdateModelParts, oUpdateModelParts, RdiJumpHook2, 15);
 
 	//g_pMemory->PatchBytes(&bp_UpdateModelParts);
 
@@ -85,19 +76,11 @@ void InitHooks()
 
 	*(QWORD*)&RdiJumpHook[3] = (QWORD)hkCreateEntityThunk;
 
-	bp_CreateEntity[0].Address = (VOID*)(qwContainingFunc + 0x676); 
-	bp_CreateEntity[0].nBytes = 13;
-	bp_CreateEntity[0].pNewOpcodes = RdiJumpHook;
-	bp_CreateEntity[0].pOldOpcodes = NULL; 
-	bp_CreateEntity[0].Patched = FALSE;
+	//InitalizeBytePatchMemory(&bp_CreateEntity[0], qwContainingFunc + 0x676, RdiJumpHook, 13);
 
 	// g_pMemory->PatchBytes(&bp_CreateEntity[0]); //doesn't seem to do much
 
-	bp_CreateEntity[1].Address = (VOID*)(qwContainingFunc + 0x135);
-	bp_CreateEntity[1].nBytes = 13;
-	bp_CreateEntity[1].pNewOpcodes = RdiJumpHook;
-	bp_CreateEntity[1].pOldOpcodes = NULL;
-	bp_CreateEntity[1].Patched = FALSE;
+	InitalizeBytePatchMemory(&bp_CreateEntity[1], qwContainingFunc + 0x135, RdiJumpHook, 13);
 
 	g_pMemory->PatchBytes(&bp_CreateEntity[1]); 
 	
@@ -105,15 +88,11 @@ void InitHooks()
 	g_pMemory->HookFunc64((VOID*)(qwContainingFunc + 0x129), hkCreateEntityThunk, 25, &hf);*/
 
 	HOOK_FUNC hf = { 0 };
-	//caller
-	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf);
-	//callee
-	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &hf);
+	
+	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
+	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &hf);//callee
 
-	nop_HairColor.Address = (VOID*)g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE");
-	nop_HairColor.nBytes = 12;
-	nop_HairColor.pOldOpcodes = NULL;
-	nop_HairColor.Patched = FALSE;
+	InitalizeNopMemory(&nop_HairColor, g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE"), 12)
 
 	g_pMemory->NopMemory(&nop_HairColor);
 }
@@ -299,12 +278,11 @@ void Setup(void)
 #if defined(_DEBUG) || defined(VERBOSE)
 	STACK_TIMER(timer);
 	Log::AttachConsole(L"2B Hook Debug Console");
-	// 48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ? + 3
-	*((void**)0x141415350) = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
 #endif
 	srand((unsigned int)time(NULL));
 
-	// g_pMemory->FindPatternPtr64(NULL, "0F 28 4C 24 ? 48 89 05 ? ? ? ?", 8); //old incosistent sig // sometimes localplayer is null (maybe because I injected in the menu?)
+	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr64(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
+	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
 	g_pEntityInfoList = (EntityInfoList*)g_pMemory->FindPatternPtr64(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
@@ -382,38 +360,15 @@ void Setup(void)
 	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
 	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
 
-	nop_Health[NOP_DAMAGE_ENEMY].Address = g_pDecreaseHealth[NOP_DAMAGE_ENEMY];
-	nop_Health[NOP_DAMAGE_ENEMY].nBytes = 6;
-	nop_Health[NOP_DAMAGE_ENEMY].Patched = FALSE;
+	//InitalizeNopMemory(nop_neon_scenery, g_pMemory->FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);
+	InitalizeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
+	InitalizeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
+	InitalizeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
+	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
+	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
-	nop_Health[NOP_DAMAGE_WORLD].Address = g_pDecreaseHealth[NOP_DAMAGE_WORLD];
-	nop_Health[NOP_DAMAGE_WORLD].nBytes = 6;
-	nop_Health[NOP_DAMAGE_WORLD].Patched = FALSE;
-
-	nop_Framecap[NOP_FRAMECAP_SLEEP].Address = g_pAntiFramerateCap_Sleep;
-	nop_Framecap[NOP_FRAMECAP_SLEEP].nBytes = 6;
-	nop_Framecap[NOP_FRAMECAP_SLEEP].Patched = FALSE;
-
-	nop_Framecap[NOP_FRAMECAP_SPINLOCK].Address = g_pAntiFramerateCap_Spinlock;
-	nop_Framecap[NOP_FRAMECAP_SPINLOCK].nBytes = 2;
-	nop_Framecap[NOP_FRAMECAP_SPINLOCK].Patched = FALSE;
-
-	/*nop_neon_scenery.Address = (VOID*)(g_pMemory->FindPattern(NULL, "45 8B FC 0F 29 44 08 ?") + 3);
-	nop_neon_scenery.nBytes = 5;
-	nop_neon_scenery.Patched = FALSE;*/
-
-	//g_pMemory->NopMemory(&nop_neon_scenery);
-
-	bp_Framecap.Address = g_pAntiFramerateCap_Test4;
-	bp_Framecap.nBytes = 7;
-	bp_Framecap.pNewOpcodes = (BYTE*)JmpFramecap;
-	bp_Framecap.pOldOpcodes = NULL;
-	bp_Framecap.Patched = FALSE;
-
-	bp_NoTutorialDialogs.Address = (VOID*)g_pMemory->FindPattern(NULL, "77 07 8B CA");
-	bp_NoTutorialDialogs.nBytes = 1;
-	bp_NoTutorialDialogs.pNewOpcodes = (BYTE*)LocalJmp;
-	bp_NoTutorialDialogs.Patched = FALSE;
+	InitalizeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7)
+	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, g_pMemory->FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1)
 
 	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initalization Complete! GLHF");
 

@@ -114,7 +114,7 @@ typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
-typedef void(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*, int win32err, const char* szFilepath);
+typedef void(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*);
 
 // XInput Function Defs
 
@@ -161,6 +161,7 @@ extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
 extern FNV1HashFn FNV1Hash;
 extern CpkMountFn CpkMount;
+extern CRILogCallbackFn CRILogCallback;
 
 // XInput Functions
 

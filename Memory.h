@@ -50,11 +50,11 @@ typedef struct _NOP_MEMORY
 } NOP_MEMORY, *PNOP_MEMORY;
 
 #define InitalizeNopMemoryDefault(pNop) memset((PBYTE)(pNop) + FIELD_OFFSET(NOP_MEMORY, Patched), 0, sizeof(NOP_MEMORY) - sizeof(INT));
-#define InitalizeNopMemory(pNop, address, pOldOpcodes, nBytes) (pNop)->Magic = NOP_MEMORY_MAGIC;\
-															   (pNop)->Patched = FALSE;\
-															   (pNop)->Address = address;\
-															   (pNop)->pOldOpcodes = pOldOpcodes;\
-															   (pNop)->nBytes = nBytes;
+#define InitalizeNopMemory(pNop, address, cb) (pNop)->Magic = NOP_MEMORY_MAGIC;\
+												  (pNop)->Patched = FALSE;\
+												  (pNop)->Address = (VOID*)(address);\
+												  (pNop)->pOldOpcodes = NULL;\
+												  (pNop)->nBytes = (cb);
 
 /*
 	If your going to call ZeroMemory(aka. memset(dst, 0, length);) you need to restore the Magic field to BYTE_PATCH_MEMORY_MAGIC,
@@ -72,12 +72,12 @@ typedef struct _BYTE_PATCH_MEMORY
 } BYTE_PATCH_MEMORY, *PBYTE_PATCH_MEMORY;
 
 #define InitalizeBytePatchMemoryDefault(pBytePatch) memset((PBYTE)(pBytePatch) + FIELD_OFFSET(BYTE_PATCH_MEMORY, Patched), 0, sizeof(BYTE_PATCH_MEMORY) - sizeof(INT));
-#define InitalizeBytePatchMemory(pBytePatch, address, pNewOpcodes, pOldOpcodes, nBytes) (pBytePatch)->Magic = BYTE_PATCH_MEMORY_MAGIC;\
-																						(pBytePatch)->Patched = FALSE;\
-																						(pBytePatch)->Address = address;\
-																						(pBytePatch)->pNewOpcodes = pNewOpcodes;\
-																						(pBytePatch)->pOldOpcodes = pOldOpcodes;\
-																						(pBytePatch)->nBytes = nBytes;
+#define InitalizeBytePatchMemory(pBytePatch, address, pOpcodes, cb) (pBytePatch)->Magic = BYTE_PATCH_MEMORY_MAGIC;\
+																		   (pBytePatch)->Patched = FALSE;\
+																		   (pBytePatch)->Address = (VOID*)(address);\
+																		   (pBytePatch)->pNewOpcodes = (PBYTE)(pOpcodes);\
+																		   (pBytePatch)->pOldOpcodes = NULL;\
+																		   (pBytePatch)->nBytes = (cb);
 
 typedef struct _HOOK_FUNC
 {
