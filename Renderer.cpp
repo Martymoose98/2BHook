@@ -79,7 +79,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 	if (FAILED(hr = m_pDevice->CreateBuffer(&Desc, NULL, &m_pViewMatrix)))
 		return hr;
 
-	m_ViewMatrix = DirectX::XMMatrixOrthographicOffCenterLH(0.0f, g_pGraphicDevice->iScreenWidth, g_pGraphicDevice->iScreenHeight, 0.0f, -100.0f, 100.0f);
+	m_ViewMatrix = DirectX::XMMatrixOrthographicOffCenterLH(0.0f, (float)g_pGraphicDevice->iScreenWidth, (float)g_pGraphicDevice->iScreenHeight, 0.0f, -100.0f, 100.0f);
 
 	if (FAILED(hr = m_pDeviceContext->Map(m_pViewMatrix, 0, D3D11_MAP_WRITE_DISCARD, 0, &Mapped)))
 		return hr;
