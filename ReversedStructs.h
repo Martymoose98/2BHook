@@ -1,6 +1,5 @@
 #pragma once
 #include <d3d11.h>
-#include <d3d11.h>
 #include "StaticAssert.h"
 #include "SteamApi.h"
 #include "Math.h"
@@ -184,7 +183,7 @@ struct EntityInfo
 	char _0x0038[4];							//0x0034
 	char* m_pszData[2];							//0x0038
 	Pl0000* m_pEntity;							//0x0048
-	DatafileDesc* m_pDatDesc;					//0x0050  | struct pointer
+	DatafileDesc* m_pDatDesc;					//0x0050
 	DWORD* m_pUnk;								//0x0058  | dword array 2 members (0x1415F6B50)
 	Pl0000* m_pParent;							//0x0060
 	BOOL bSetInfo;								//0x0068
@@ -1783,7 +1782,7 @@ Size of is 0x38 (56) bytes
 class CGameContentDeviceSteam
 {
 	virtual void* function0();
-	virtual void UnloadContent(CGameContentDevice* pCGameContentDevice);
+	virtual void UnloadContent(CGameContentDevice* pGameContentDevice);
 	virtual void LoadContent(CGameContentDevice* pGameContentDevice);
 public:
 	//void* m_pVtbl;															//0x0000
@@ -2117,6 +2116,7 @@ class CUserInfo
 /* Size of struct 0x108 (264) bytes	*/
 class CUserManager
 {
+	~CUserManager() = delete;
 public:
 	virtual CUserManager* Clear(BYTE bFlags);
 

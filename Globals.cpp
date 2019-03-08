@@ -15,6 +15,7 @@ FindSceneStateFn FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
 FNV1HashFn FNV1Hash;
 CpkMountFn CpkMount;
+CRILogCallbackFn CRILogCallback;
 
 XInputGetStateExFn XInputGetStateEx;
 XInputWaitForGuideButtonFn InputWaitForGuideButton;

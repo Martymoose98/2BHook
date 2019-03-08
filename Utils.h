@@ -458,7 +458,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 	return (char*)0x14270F500;
 }
 
-static void CRILogCallback(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+static void CRILogCallbackWin32Console(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
 	QWORD caller_return_address = *(QWORD*)stack_ptr;
@@ -471,7 +471,7 @@ static void CRILogCallbackConsole(const char* szFormat, unsigned int callback_ar
 		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
 
-static void CRILogCallbackV2(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+static void CRILogCallbackVerbose(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack[100];
 	SYMBOL_INFO_PACKAGE symbol;
