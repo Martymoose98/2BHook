@@ -36,15 +36,6 @@
 #define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH32
 #endif
 
-
-#ifndef _WIN64
-#define HookFunc HookFunc32
-#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH32
-#else
-#define HookFunc HookFunc64
-#define MINIMUM_HOOK_LENGTH MINIMUM_HOOK_LENGTH64
-#endif
-
 #define NOPMemory(dst, size) memset((VOID*)(dst), 0x90, size)
 
 typedef ULONGLONG QWORD;
@@ -57,6 +48,13 @@ typedef struct _NOP_MEMORY
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
 } NOP_MEMORY, *PNOP_MEMORY;
+
+#define InitalizeNopMemoryDefault(pNop) memset((PBYTE)(pNop) + FIELD_OFFSET(NOP_MEMORY, Patched), 0, sizeof(NOP_MEMORY) - sizeof(INT));
+#define InitalizeNopMemory(pNop, address, pOldOpcodes, nBytes) (pNop)->Magic = NOP_MEMORY_MAGIC;\
+															   (pNop)->Patched = FALSE;\
+															   (pNop)->Address = address;\
+															   (pNop)->pOldOpcodes = pOldOpcodes;\
+															   (pNop)->nBytes = nBytes;
 
 /*
 	If your going to call ZeroMemory(aka. memset(dst, 0, length);) you need to restore the Magic field to BYTE_PATCH_MEMORY_MAGIC,
@@ -73,6 +71,14 @@ typedef struct _BYTE_PATCH_MEMORY
 	SIZE_T nBytes;
 } BYTE_PATCH_MEMORY, *PBYTE_PATCH_MEMORY;
 
+#define InitalizeBytePatchMemoryDefault(pBytePatch) memset((PBYTE)(pBytePatch) + FIELD_OFFSET(BYTE_PATCH_MEMORY, Patched), 0, sizeof(BYTE_PATCH_MEMORY) - sizeof(INT));
+#define InitalizeBytePatchMemory(pBytePatch, address, pNewOpcodes, pOldOpcodes, nBytes) (pBytePatch)->Magic = BYTE_PATCH_MEMORY_MAGIC;\
+																						(pBytePatch)->Patched = FALSE;\
+																						(pBytePatch)->Address = address;\
+																						(pBytePatch)->pNewOpcodes = pNewOpcodes;\
+																						(pBytePatch)->pOldOpcodes = pOldOpcodes;\
+																						(pBytePatch)->nBytes = nBytes;
+
 typedef struct _HOOK_FUNC
 {
 	void* m_pSrcFunc;
@@ -81,7 +87,7 @@ typedef struct _HOOK_FUNC
 	bool m_hooked;
 } HOOK_FUNC, *PHOOK_FUNC;
 
-enum _ISBADCODEPTR_STATUS : DWORD
+enum _ISBADPTR_STATUS
 {
 	VALID_PTR = 0x0,
 	VIRTUAL_QUERY_FAILED = 0x1,
@@ -89,8 +95,11 @@ enum _ISBADCODEPTR_STATUS : DWORD
 	GUARD_PAGE = 0x4,
 	NO_ACCESS_PAGE = 0x8,
 	EXECUTE_ONLY_PAGE = 0x10,
+	READ_ONLY_PAGE = 0x20,
+	READ_WRITE_PAGE = 0x40,
+	WRITE_COPY_PAGE = 0x80
 };
-typedef DWORD ISBADCODEPTR_STATUS;
+typedef DWORD ISBADPTR_STATUS;
 
 class CMemory
 {
@@ -476,10 +485,10 @@ public:
 		return true;
 	}
 
-	static ISBADCODEPTR_STATUS IsBadCodePtr(const void* p)
+	static ISBADPTR_STATUS IsBadReadPtr(const void* p)
 	{
 		MEMORY_BASIC_INFORMATION mbi;
-		ISBADCODEPTR_STATUS status = VALID_PTR;
+		ISBADPTR_STATUS status = VALID_PTR;
 
 		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
@@ -496,10 +505,42 @@ public:
 			status |= NO_ACCESS_PAGE;
 
 		if (mbi.Protect & PAGE_EXECUTE)
-			status |= EXECUTE_ONLY_PAGE;
+			status |= READ_ONLY_PAGE;
 
 		return status;
 	}
+
+	static ISBADPTR_STATUS IsBadCodePtr(const void* p)
+	{
+		MEMORY_BASIC_INFORMATION mbi;
+		ISBADPTR_STATUS status = VALID_PTR;
+
+		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+
+		if (!nBytes || nBytes == ERROR_INVALID_PARAMETER)
+			return VIRTUAL_QUERY_FAILED;
+
+		if (mbi.State == MEM_FREE)
+			status |= MEMORY_FREED;
+
+		if (mbi.Protect & PAGE_GUARD)
+			status |= GUARD_PAGE;
+
+		if (mbi.Protect & PAGE_NOACCESS)
+			status |= NO_ACCESS_PAGE;
+
+		if (mbi.Protect & PAGE_READONLY)
+			status |= READ_ONLY_PAGE;
+
+		if (mbi.Protect & PAGE_READWRITE)
+			status |= READ_WRITE_PAGE;
+
+		if (mbi.Protect & PAGE_WRITECOPY)
+			status |= WRITE_COPY_PAGE;
+
+		return status;
+	}
+
 private:
 };
 extern CMemory* g_pMemory;

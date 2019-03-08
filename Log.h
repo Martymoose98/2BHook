@@ -17,15 +17,26 @@
 #ifndef TODO_CLICKABLE
 #define TODO(x) __pragma(message("TODO: " MAKE_STRING(x) " -> " __FILE__ "@" MAKE_STRING(__LINE__))) 
 #else
-#define TODO(x) __pragma(message(__FILE__ "(" MAKE_STRING(__LINE__) "):" " TODO: " MAKE_STRING(x))) 
+#define TODO(x) __pragma(message(__FILE__ "(" MAKE_STRING(__LINE__) "): TODO: " MAKE_STRING(x))) 
 #endif // !TODO_CLICKABLE
 #endif // !TODO
 
 #if defined(_DEBUG) || defined(VERBOSE)
+#define LOG_OFFSETS
+#ifndef LOG
 #define LOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
 #else 
 #define LOG(fmt, ...)
 #endif
+#endif
+
+#ifdef LOG_OFFSETS
+#ifndef LOG_OFFSET
+#define LOG_OFFSET(name, offset) Log::LogOffset(name, offset)
+#else
+#define LOG_OFFSET(name, offset)
+#endif // LOG_OFFSET
+#endif // LOG_OFFSETS
 
 #ifdef VERBOSE
 #define VLOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
@@ -63,7 +74,11 @@ public:
 		FreeConsole();
 	}
 
+	static void LogOffset(const char* szName, void* p);
+
+
 private:
 	static FILE* pStdout;
 	static FILE* pStderr;
 };
+#include "Console.h"

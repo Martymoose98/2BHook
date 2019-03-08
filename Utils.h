@@ -32,17 +32,16 @@ private:
 
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
-	Matrix4x4 vMatrix = *(Matrix4x4*)0x1419C73C0;
+	VMatrix vMatrix = *g_pViewMatrix;//*(VMatrix*)0x1419C73C0;
 	vMatrix.Transpose();
 
-	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
-	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
 	float w = vMatrix[3][0] * vIn[0] + vMatrix[3][1] * vIn[1] + vMatrix[3][2] * vIn[2] + vMatrix[3][3];
 
 	if (w < 0.01f)
-	{
 		return false;
-	}
+
+	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
+	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
 
 	FLOAT invw = 1.0f / w;
 
@@ -122,7 +121,7 @@ static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
 		return FALSE;
 
 	for (; i < ARRAYSIZE(Converts); ++i)
-		if (!strncmp(Converts[i].m_szPrefix, szObjectName, 2))
+		if (Converts[i].m_szPrefix[0] == szObjectName[0] && Converts[i].m_szPrefix[1] == szObjectName[1])
 			break;
 
 	*pObjectId = Converts[i].m_ObjectIdBase | ((szObjectName[2] - 0x30) << 12) | ((szObjectName[3] - 0x30) << 8) | ((szObjectName[4] - 0x30) << 4) | (szObjectName[5] - 0x30);
@@ -183,7 +182,7 @@ static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileNam
 	}
 }
 
-static void  DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD* pdwFileCount)
+static void DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD* pdwFileCount)
 {
 	if (!pBuffer)
 		return;
@@ -462,8 +461,14 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 static void CRILogCallback(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
-	void* caller_return_address = *(void**)stack_ptr;
-	printf("[%llx]: %s\n", (QWORD)caller_return_address, CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
+	QWORD caller_return_address = *(QWORD*)stack_ptr;
+	printf("[%llx]: %s\n", caller_return_address, CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
+}
+
+static void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+{
+	if (Vars.Misc.bConsoleShowGameErrors)
+		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
 
 static void CRILogCallbackV2(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)

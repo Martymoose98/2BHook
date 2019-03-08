@@ -14,7 +14,7 @@
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{A9CC58DE-9D10-4056-B51A-B3FEED76E897}</ProjectGuid>
     <RootNamespace>2BHook</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -83,6 +83,7 @@
     <ClInclude Include="Color.h" />
     <ClInclude Include="ConfigGetters.h" />
     <ClInclude Include="Configuration.h" />
+    <ClInclude Include="Console.h" />
     <ClInclude Include="cpk.h" />
     <ClInclude Include="ExportTableHook.h" />
     <ClInclude Include="Features.h" />

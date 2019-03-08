@@ -56,6 +56,22 @@ enum eDepthState
 	DISABLED,
 	READ_NO_WRITE,
 	NO_READ_NO_WRITE,
+	ENABLED1,
+	ENABLED2,
+	ENABLED3,
+	ENABLED4,
+	ENABLED5,
+	ENABLED6,
+	ENABLED7,
+	ENABLED8,
+	READ_NO_WRITE1,
+	READ_NO_WRITE2,
+	READ_NO_WRITE3,
+	READ_NO_WRITE4,
+	READ_NO_WRITE5,
+	READ_NO_WRITE6,
+	READ_NO_WRITE7,
+	READ_NO_WRITE8,
 	_DEPTH_COUNT
 };
 
@@ -166,6 +182,7 @@ extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 
 extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
+extern EntityHandle* g_pEmilHandle;
 extern EntityInfoList* g_pEntityInfoList;
 extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
@@ -173,6 +190,7 @@ extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
 extern WetObjManager* g_pWetObjectManager;
 extern CCameraGame* g_pCamera;
+extern VMatrix* g_pViewMatrix;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern CMemoryDevice* g_pMemoryDevice;
 extern BYTE* g_pDecreaseHealth[2];
@@ -192,10 +210,10 @@ extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
 extern ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
-extern ID3D11Buffer* g_pVertexBuffers;
-extern D3D11_BUFFER_DESC g_VertexBufferDesc;
-extern UINT g_VertexBuffersOffset;
-extern UINT g_Stride;
+extern ID3D11Buffer* g_pVertexBuffers[8];
+extern D3D11_BUFFER_DESC g_VertexBufferDesc[8];
+extern UINT g_VertexBuffersOffset[8];
+extern UINT g_Stride[8];
 extern ID3D11Buffer* g_pIndexBuffer;
 extern D3D11_BUFFER_DESC g_IndexBufferDesc;
 extern DXGI_FORMAT g_IndexFormat;
@@ -225,7 +243,6 @@ extern BYTE_PATCH_MEMORY bp_save_file_io;
 extern BYTE_PATCH_MEMORY bp_UpdateModelParts;
 extern BYTE_PATCH_MEMORY bp_CreateEntity[2];
 extern BYTE_PATCH_MEMORY bp_query_performance_counter;
-extern BYTE_PATCH_MEMORY bp_AntiVSync;
 extern BYTE_PATCH_MEMORY bp_Framecap;
 extern BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
 extern NOP_MEMORY nop_HairColor;
