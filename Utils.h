@@ -71,8 +71,8 @@ static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, con
 	return (index | (pList->m_dwShift << 16)) << 8;
 }
 
-// Reversed from binary
-static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId)
+// Reversed from binary with added functionality
+static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, ObjectIdConvert** ppConvert)
 {
 	static char HexChars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
@@ -91,6 +91,10 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId)
 			szObjectName[4] = HexChars[((signed __int64)objectId >> 4) & 0xF];
 			szObjectName[5] = HexChars[objectId & 0xF];
 			szObjectName[6] = 0; //null terminator
+			
+			if (*ppConvert)
+				*ppConvert = &Converts[i];
+
 			return TRUE;
 		}
 		++i;
@@ -99,15 +103,15 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId)
 	memset(szObjectName, 0, size);
 
 	if (objectId == -1)
-	{
 		strcpy_s(szObjectName, size, "eObjInvalid");
-		return FALSE;
-	}
 	else
-	{
 		strcpy_s(szObjectName, size, (objectId != 0x700000) ? "Unknow" : "Null");
-		return FALSE;
-	}
+
+
+	if (*ppConvert)
+		*ppConvert = NULL;
+
+	return FALSE;
 }
 
 static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
@@ -231,6 +235,43 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 			*ppFile = NULL;
 		}
 	}
+}
+
+static HRESULT MyPreloadModel(int objectId)
+{
+	char szObjectName[16];
+	char szFilename[64];
+	ObjectIdConvert* pConvert;
+	ObjReadSystem::Work* pWork;
+	ObjReadSystem::Work::Desc* pDesc;
+	HeapThing lmao;
+
+	if (ObjectIdToObjectName(szObjectName, ARRAYSIZE(szObjectName), objectId, &pConvert))
+	{
+		QueryHeap(&lmao, objectId, 1);
+		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dtt");
+		pWork = GetWork(objectId);
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.m_pHeap, lmao.m_bFlag, pWork);
+
+		if (pDesc)
+		{
+			_InterlockedCompareExchange((volatile LONG*)&pDesc->m_0x20, 1, 0);
+			_InterlockedIncrement((volatile LONG*)&pDesc->m_0x20);
+			pWork->m_objectid = pDesc->m_objectId;
+		}
+
+		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dat");
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.m_pHeap, lmao.m_bFlag, pWork);
+
+		if (pDesc)
+		{
+			_InterlockedCompareExchange((volatile LONG*)&pDesc->m_0x20, 1, 0);
+			_InterlockedIncrement((volatile LONG*)&pDesc->m_0x20);
+			pWork->m_objectid = pDesc->m_objectId;
+		}
+		return S_OK;
+	}
+	return E_FAIL;
 }
 
 static HRESULT GeneratePixelShader(ID3D11Device* pDevice, ID3D11PixelShader** ppPixelShader, float r, float g, float b)
@@ -458,7 +499,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 	return (char*)0x14270F500;
 }
 
-static void CRILogCallbackWin32Console(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+static void CRILogCallbackWinConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
 	QWORD caller_return_address = *(QWORD*)stack_ptr;

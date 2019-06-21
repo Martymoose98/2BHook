@@ -23,8 +23,5 @@ static float* GetOBBY()
 	if (!pCameraEnt)
 		return NULL;
 
-	return &pCameraEnt->m_VerticalCollision.m_vecs[0].y;
+	return &pCameraEnt->m_VerticalCollision.m_vPosition.y;
 }
-
-static void b(int a)
-{}

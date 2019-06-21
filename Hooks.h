@@ -17,7 +17,6 @@ typedef HRESULT(* PresentFn)(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flag
 typedef HRESULT(* CreateSwapChainFn)(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain);
 typedef void(* DrawIndexedFn)(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation);
 typedef void(* DrawFn)(ID3D11DeviceContext* pThis, UINT VertexCount, UINT StartVertexLocation);
-typedef void(* CreateQueryFn)(ID3D11Device* pDevice, const D3D11_QUERY_DESC *pQueryDesc, ID3D11Query **ppQuery);
 typedef void(* ClearRenderTargetViewFn)(ID3D11DeviceContext* pThis, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4]);
 typedef void(* PSSetShaderResourcesFn)(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView *const *ppShaderResourceViews);
 typedef HRESULT(* AcquireFn)(IDirectInputDevice8A* pThis);
@@ -36,6 +35,8 @@ typedef void(* DeleteSaveDataFn)(CSaveDataDevice* pSave);
 typedef void(* UpdateModelPartsFn)(Pl0000* pEntity);
 typedef void*(* CreateEntityFn)(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 typedef BOOL(* LoadWordBlacklistFn)(BannedWordChecker* pThis, __int64 thisrdx, QWORD *a3, const char* szBlacklistName);
+
+typedef bool(* MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -56,6 +57,7 @@ extern XInputGetStateFn oXInputGetState;
 extern UpdateModelPartsFn oUpdateModelParts;
 extern CreateEntityFn oCreateEntity;
 extern LoadWordBlacklistFn oLoadWordBlacklist;
+extern MRubyLoadScriptFn oMRubyLoadScript;
 extern WNDPROC oWndProc;
 
 
@@ -76,6 +78,7 @@ extern "C" void hkUpdateModelPartsThunk(Pl0000* pEntity);
 extern "C" void hkUpdateModelParts(Pl0000* pEntity); //proabably not a pl0000 must be a parent
 extern "C" void* hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 extern "C" void* hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
+bool hkMRubyLoadScriptFn(MrubyImpl* pThis, MrubyScript* pScript);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter);

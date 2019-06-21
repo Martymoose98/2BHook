@@ -3,7 +3,6 @@
 #include <d3d11.h>
 #include <DirectXMath.h>
 #include <D3Dcompiler.h>
-#include <d3dx11.h>
 #include "Globals.h"
 #include "Color.h"
 #include "Log.h"

@@ -128,6 +128,12 @@ public:
 		pEntity->m_HorizontalCollision.m_hOwner = 0;
 	}
 
+	static void UnlockAllAchievements(void)
+	{
+		for (unsigned int id = 0; id < g_pUserManager->m_pAchivementDevice->m_uMaxAchievement; ++id)
+			UnlockAchievement(0, 0, id);
+	}
+
 	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(0, pEntity->m_pInfo); after the wet time has elapsed")
 	static int WetEntity(Pl0000* pEntity, byte wetness)
 	{
@@ -204,7 +210,7 @@ public:
 			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(FORWARD) * flSpeed;
 	}
 
-	static void TeleportForward()
+	static void TeleportForward(void)
 	{
 		TeleportForwardEx(GetEntityFromHandle(&g_pCamera->m_hEntity), 0.5f);
 	}
@@ -215,12 +221,26 @@ public:
 			pEntity->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
 	}
 
-	static void PlayAnimation()
+	static void PlayAnimation(void)
 	{
 		PlayAnimationEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
 	}
 
-	static void BuffEnemies()
+	static void BuffEnemies(void)
+	{
+		if (Vars.Gameplay.bLevelBuffMode)
+			BuffEnemiesAbsolute();
+		else
+			BuffEnemiesTolerance();
+	}
+
+	static void BuffEnemiesAbsolute(void)
+	{
+		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+			SetEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), Vars.Gameplay.iEnemyLevel);
+	}
+
+	static void BuffEnemiesTolerance(void)
 	{
 		Pl0000* pLocal = GetEntityFromHandle(g_pLocalPlayerHandle);
 
@@ -231,9 +251,8 @@ public:
 		int iMaxLevel = min(MAX_LEVELS, pLocal->m_iLevel + Vars.Gameplay.iEnemyLevelTolerance - 1);
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
-			BalanceEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);					
+			BalanceEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
 	}
-
 
 	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
 	{
@@ -248,6 +267,25 @@ public:
 			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
 			ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
 			Level_t* pProperLevel = &pInfo->m_levels[RandomInt(iMinLevel, iMaxLevel)];
+			*pLevel = pProperLevel->m_iLevel;
+			*pHealth = pProperLevel->m_iHealth;
+			*pMaxHealth = pProperLevel->m_iHealth;
+		}
+	}
+
+	static void SetEnemyLevel(void* pEnemy, int iLevel)
+	{
+		if (!pEnemy)
+			return;
+
+		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+
+		if ((*pLevel) != iLevel && iLevel > 0 && iLevel < MAX_LEVELS)
+		{
+			int* pHealth = MakePtr(int*, pEnemy, 0x858);
+			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
+			ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
+			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
 			*pLevel = pProperLevel->m_iLevel;
 			*pHealth = pProperLevel->m_iHealth;
 			*pMaxHealth = pProperLevel->m_iHealth;
@@ -282,7 +320,7 @@ public:
 		}
 	}
 
-	static void AddItem(int id)
+	static void AddItem(int id, int quantity)
 	{
 		typedef __int64(__fastcall* HandleSpecialItemsFn)(__int64 thisrcx, int item_id);
 		//const char* pItem = ((GetItemByIdFn)(0x1405E0FD0))(0, id); //emil head
@@ -293,7 +331,7 @@ public:
 		//g_pLocalPlayer->m_dwAccessory = ((HandleSpecialItemsFn)(0x1405E1170))(0, id);
 		//(*(void(*)(void* a1, signed int a2))(0x1401AE440))(g_pLocalPlayer, g_pLocalPlayer->m_dwAccessory);
 
-		((AddItemFn)(0x1405DC410))(0, id);
+		((AddItemFn)(0x1405DC410))(0, id, quantity);
 
 		if (Vars.Gameplay.bInstantEquip)
 		{
@@ -310,30 +348,28 @@ public:
 		}
 	}
 
-	static void TeleportAllEnemiesToEncirclePoint(const Vector3& vPosition, const Vector3& vRotation, float flRadius)
+	static void TeleportAllEnemiesToEncirclePoint(const Vector3& vPosition, float flRadius)
 	{
 		if (!g_pEnemyManager->m_handles.m_count)
 			return;
 
+		Vector3 vEndpoint, vDirection;
+		float sin, cos;
 		float step = (2.0f * M_PI_F) / g_pEnemyManager->m_handles.m_count;
 		float rad = 0.0f;
-		Vector2 xz(vPosition.x, vPosition.z);
-		Vector3 vEndpoint;
-		float sin, cos;
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i, rad += step)
 		{
 			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
+			vDirection = (vPosition - pEntity->m_vPosition).Normalize();
+
 			Math::SinCos(rad, &sin, &cos);
 
-			vEndpoint = vPosition + (vRotation * flRadius);
+			vEndpoint = vPosition + (vDirection * flRadius);
 
-			xz.x += cos * (vEndpoint.x - vPosition.x) - sin * (vEndpoint.z - vPosition.z); // + vPosition.x;
-			xz.y += sin * (vEndpoint.x - vPosition.x) + cos * (vEndpoint.z - vPosition.z); // + vPosition.z;
-
-			pEntity->m_vPosition.x = xz.x;
-			pEntity->m_vPosition.z = xz.y;
+			pEntity->m_vPosition.x = (cos * (vEndpoint.x - vPosition.x) - sin * (vEndpoint.z - vPosition.z)) + vPosition.x;
+			pEntity->m_vPosition.z = (sin * (vEndpoint.x - vPosition.x) + cos * (vEndpoint.z - vPosition.z)) + vPosition.z;
 		}
 	}
 

@@ -4,6 +4,7 @@
 void DisplayEntityHandles(void);
 void ApplyModelMods(Pl0000* pEntity);
 bool BlacklistItemCallback(void* data, int idx, const char** out_text);
+bool ConfigCallback(void* data, int idx, const char** out_text);
 
 static void GameplayTab(Pl0000* pCameraEnt)
 {
@@ -43,10 +44,11 @@ static void GameplayTab(Pl0000* pCameraEnt)
 	ImGui::NextColumn();
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
 
-	ImGui::InputInt("Enemy Level Tolerance (+/-):", &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
+	ImGui::InputInt((Vars.Gameplay.bLevelBuffMode) ? "Enemy Level (1-99):" : "Enemy Level Tolerance (+/-):", (Vars.Gameplay.bLevelBuffMode) ? &Vars.Gameplay.iEnemyLevel : &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
 	ImGui::Checkbox("Balance Enemy Levels", &Vars.Gameplay.bBalanceEnemyLevels);
 	ImGui::SameLine();
 	ImGui::Checkbox("Exclusively Positive", &Vars.Gameplay.bExclusivelyPositiveTolerance);
+	ImGui::Checkbox("Absolute Level", &Vars.Gameplay.bLevelBuffMode);
 
 	ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
 	ImGui::SameLine();
@@ -62,12 +64,12 @@ static void GameplayTab(Pl0000* pCameraEnt)
 	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
 	int id = ((GetItemIdByNameFn)(0x1405DE6E0))(0, Vars.Gameplay.szItemName);
 	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
-
+	ImGui::InputInt("Quantity", &Vars.Gameplay.iSpawnItemQuantity);
 	ImGui::Checkbox("Instant Equip", &Vars.Gameplay.bInstantEquip);
 	ImGui::SameLine();
 
 	if (ImGui::Button("Spawn Item"))
-		Features::AddItem(Vars.Gameplay.iSpawnItemId);
+		Features::AddItem(Vars.Gameplay.iSpawnItemId, Vars.Gameplay.iSpawnItemQuantity);
 
 	ImGui::SameLine();
 
@@ -103,6 +105,14 @@ static void GameplayTab(Pl0000* pCameraEnt)
 		set_info.m_dw0x70 = 0;
 		set_info.m_dw0x74 = 0;
 		set_info.m_i0x078 = 0;
+
+		//ObjReadSystem::Work* pWork = GetWork(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId);
+
+		//if (pWork)
+		//{
+		//	BOOL s = PreloadModel(pWork);	
+		//	RequestEnd(0, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId);
+		//}
 
 		EntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId, &set_info);
 
@@ -233,6 +243,10 @@ static void VisualsTab(Pl0000* pCameraEnt)
 
 	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
 
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Display Collision Object Info", &Vars.Visuals.bCollisionObjectInfo);
+
 	ImGui::Separator();
 
 	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
@@ -284,6 +298,9 @@ static void MiscTab()
 	ImGui::SameLine();
 	ImGui::Text((Vars.Misc.bCpkLoaded) ? "%s successfully mounted!" : "%s failed to mount!", Vars.Misc.szCpkName);
 
+	if (ImGui::Button("Unlock All Achivements"))
+		Features::UnlockAllAchievements();
+
 	ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
 	ImGui::SameLine();
 	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
@@ -301,20 +318,34 @@ static void MiscTab()
 
 }
 
+TODO("v0.18 add customization for keybinds")
 static void ConfigTab()
 {
-	ImGui::Checkbox("Ignore Input", &Vars.Menu.bIgnoreInputWhenOpened);
+	LPCTSTR szConfig;
 
+	ImGui::Checkbox("Ignore Input", &Vars.Menu.bIgnoreInputWhenOpened);
+	ImGui::ListBox("Configs", &Vars.Menu.Config.iSelectedConfig, ConfigCallback, Vars.Menu.Config.pHead, FindDataListCount(Vars.Menu.Config.pHead));
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
 	ImGui::InputText("Config Name", Vars.Menu.Config.szName, _ARRAYSIZE(Vars.Menu.Config.szName));
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
+
+	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Vars.Menu.Config.pHead, Vars.Menu.Config.iSelectedConfig);
+	szConfig = Vars.Menu.Config.szName[0] ? Vars.Menu.Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
+
+	if (ImGui::Button("Refresh"))
+	{
+		FindDataListFree(Vars.Menu.Config.pHead);
+		g_pConfig->EnumerateConfigs(NULL, &Vars.Menu.Config.pHead);
+	}
 
 	if (ImGui::Button("Load"))
-		g_pConfig->Load(Vars.Menu.Config.szName);
-
+		g_pConfig->Load(szConfig);
 
 	ImGui::SameLine();
 
 	if (ImGui::Button("Save"))
-		g_pConfig->Save(Vars.Menu.Config.szName);
+		g_pConfig->Save(szConfig);
 }
 
 static void DisplayEntityHandles()
@@ -399,16 +430,6 @@ static void DisplayEntityHandles()
 	delete[] handles;
 }
 
-static bool BlacklistItemCallback(void* data, int idx, const char** out_text)
-{
-	std::string* pItems = (std::string*)data;
-
-	if (out_text)
-		*out_text = pItems[idx].c_str();
-
-	return true;
-}
-
 static void ApplyPodMods(Pl0000* pOwner)
 {
 	if (!pOwner)
@@ -466,6 +487,8 @@ static void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::SameLine();
 
+	ImGui::Checkbox("Draw 2D Esp Box", &Vars.Visuals.b2DEspBox);
+
 	ImGui::Checkbox("Draw Skeleton", &Vars.Visuals.bSkeleton);
 
 	ImGui::SameLine();
@@ -518,4 +541,32 @@ static void ApplyModelMods(Pl0000* pEntity)
 	ImGui::PopItemWidth();
 
 	ApplyPodMods(pEntity);
+}
+
+static bool BlacklistItemCallback(void* data, int idx, const char** out_text)
+{
+	if (out_text)
+		*out_text = ((std::string*)data)[idx].c_str();
+
+	return true;
+}
+
+/*
+this might be needed
+	for (int i = 0; i < idx; pEntry = pEntry->m_pNext)
+		if (!pEntry->m_pNext)
+			return false;
+*/
+static bool ConfigCallback(void* data, int idx, const char** out_text)
+{
+	PWIN32_FIND_DATA_LIST pEntry = FindDataListNav((PCWIN32_FIND_DATA_LIST)data, idx);
+
+	if (pEntry)
+	{
+		if (out_text)
+			*out_text = pEntry->m_Data.cFileName;
+
+		return true;
+	}
+	else return false;
 }

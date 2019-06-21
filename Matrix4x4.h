@@ -1,11 +1,10 @@
 #pragma once
 #include <ostream>
 #include <immintrin.h>
-#include "Vector3.h"
 
 class Vector3;
 
-/*
+   /*
 	*
 	* 	rotation z axis matrix:
 	* 	----    		     ----
@@ -44,7 +43,7 @@ public:
 			float _20, _21, _22, _23;
 			float _30, _31, _32, _33;
 		};
-
+		
 		float m[4][4];
 		float mm[16];
 
@@ -62,6 +61,10 @@ public:
 		float _20, float _21, float _22, float _23,
 		float _30, float _31, float _32, float _33);
 
+	void InitAxisAngle(const Vector3& vAxis, float theta);
+	void InitTransform(const Vector3& vAngles, const Vector3& vPosition);
+	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition);
+
 	inline Matrix4x4& operator*(const Matrix4x4& matrix);
 
 	inline float* operator[](int i);
@@ -70,12 +73,17 @@ public:
 	inline float& operator()(int row, int col);
 	inline float operator()(int row, int col) const;
 
+	inline float ThetaOfAxisAngle() const;
+
 	inline void Transpose();
-	inline Vector3& Transform(const Vector3& v);
+	inline void Rotate(const Vector3& v, float theta, Vector3& vRotate);
+	inline void Transform(const Vector3& v, Vector3& vTransform) const;
 	inline Vector3& GetAxis(int i);
 	inline friend std::ostream& operator<<(std::ostream& os, const Matrix4x4& m);
 };
 typedef Matrix4x4 VMatrix;
+
+#include "Vector3.h"
 
 inline Matrix4x4& Matrix4x4::operator*(const Matrix4x4& matrix)
 {
@@ -136,7 +144,25 @@ inline void Matrix4x4::Transpose()
 	m3 = _mm_shuffle_ps(_Tmp2, _Tmp3, 0xDD);
 }
 
+inline void Matrix4x4::Rotate(const Vector3& v, float theta, Vector3& vRotate)
+{
+	/*float sin, cos;
+	Math::SinCos(theta, &sin, &cos);
+	vRotate = v * cos + (sin * (e x v)) + (1.f - cos) * (e dot v) * e;*/
+	vRotate.x = m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z;
+	vRotate.y = m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z;
+	vRotate.z = m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z;
+}
+
+inline void Matrix4x4::Transform(const Vector3& v, Vector3& vTransform) const
+{
+	vTransform.x = m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z + m[3][0];
+	vTransform.y = m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z + m[3][1];
+	vTransform.z = m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z + m[3][2];
+}
+
 inline Vector3& Matrix4x4::GetAxis(int i)
 {
 	return *(Vector3*)((*this)[i]);
 }
+#include "Math.h"

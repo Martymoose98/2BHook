@@ -90,4 +90,9 @@ public:
 	{
 		return Vector3(x, y, z);
 	}
+
+	inline operator __m128() const
+	{
+		return *(__m128*)this;
+	}
 };

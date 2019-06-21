@@ -5,12 +5,12 @@ VirtualTableHook::VirtualTableHook()
 	ZeroMemory(this, sizeof(VirtualTableHook));
 }
 
-VirtualTableHook::VirtualTableHook(QWORD** ppqwClassBase)
+VirtualTableHook::VirtualTableHook(ULONG_PTR** ppqwClassBase)
 {
 	Initialize(ppqwClassBase);
 }
 
-VirtualTableHook::VirtualTableHook(QWORD*** pppqwClassBase)
+VirtualTableHook::VirtualTableHook(ULONG_PTR*** pppqwClassBase)
 {
 	Initialize(*pppqwClassBase);
 }
@@ -21,23 +21,23 @@ VirtualTableHook::~VirtualTableHook()
 	free(m_NewVirtualTable);
 }
 
-bool VirtualTableHook::Initialize(QWORD** ppqwClassBase)
+bool VirtualTableHook::Initialize(ULONG_PTR** ppqwClassBase)
 {
 	m_ClassBase = ppqwClassBase;
 	m_OldVirtualTable = *ppqwClassBase;
 	m_VirtualTableSize = GetVirtualTableCount(*ppqwClassBase);
-	m_NewVirtualTable = (QWORD*)malloc(m_VirtualTableSize * sizeof(QWORD));
-	memcpy(m_NewVirtualTable, m_OldVirtualTable, m_VirtualTableSize * sizeof(QWORD));
+	m_NewVirtualTable = (ULONG_PTR*)malloc(m_VirtualTableSize * sizeof(ULONG_PTR));
+	memcpy(m_NewVirtualTable, m_OldVirtualTable, m_VirtualTableSize * sizeof(ULONG_PTR));
 	*ppqwClassBase = m_NewVirtualTable;
 	return true;
 }
 
-bool VirtualTableHook::Initialize(QWORD*** pppqwClassBase)
+bool VirtualTableHook::Initialize(ULONG_PTR*** pppqwClassBase)
 {
 	return Initialize(*pppqwClassBase);
 }
 
-void VirtualTableHook::Relocate(QWORD** ppqwClassBase)
+void VirtualTableHook::Relocate(ULONG_PTR** ppqwClassBase)
 {
 	Unhook();
 	m_ClassBase = ppqwClassBase;
@@ -57,12 +57,12 @@ void VirtualTableHook::Rehook()
 		*m_ClassBase = m_NewVirtualTable;
 }
 
-QWORD VirtualTableHook::GetFunctionCount() const
+ULONG_PTR VirtualTableHook::GetFunctionCount() const
 {
 	return m_VirtualTableSize;
 }
 
-QWORD VirtualTableHook::GetFunctionAddress(UINT uIndex) const
+ULONG_PTR VirtualTableHook::GetFunctionAddress(UINT uIndex) const
 {
 	if (uIndex >= 0 && uIndex <= m_VirtualTableSize && m_OldVirtualTable)
 		return m_OldVirtualTable[uIndex];
@@ -70,7 +70,7 @@ QWORD VirtualTableHook::GetFunctionAddress(UINT uIndex) const
 	return NULL;
 }
 
-QWORD VirtualTableHook::HookFunction(QWORD qwNewFunction, UINT uIndex)
+ULONG_PTR VirtualTableHook::HookFunction(ULONG_PTR qwNewFunction, UINT uIndex)
 {
 	if (m_NewVirtualTable && m_OldVirtualTable && uIndex >= 0 && uIndex <= m_VirtualTableSize)
 	{
@@ -81,7 +81,7 @@ QWORD VirtualTableHook::HookFunction(QWORD qwNewFunction, UINT uIndex)
 	return NULL;
 }
 
-QWORD VirtualTableHook::GetVirtualTableCount(QWORD* pqwVirtualTable) const
+ULONG_PTR VirtualTableHook::GetVirtualTableCount(ULONG_PTR* pqwVirtualTable) const
 {
 	QWORD qwIndex = 0;
 
@@ -92,7 +92,7 @@ QWORD VirtualTableHook::GetVirtualTableCount(QWORD* pqwVirtualTable) const
 	return qwIndex;
 }
 
-QWORD* VirtualTableHook::GetOldVirtualTable() const
+ULONG_PTR* VirtualTableHook::GetOldVirtualTable() const
 {
 	return m_OldVirtualTable;
 }

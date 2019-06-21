@@ -11,8 +11,10 @@ typedef struct Variables_t
 		bool bTraceLine;
 		float flTraceLength;
 		bool bEspBox;
+		bool b2DEspBox;
 		bool bEnemyInfo;
 		bool bNPCInfo;
+		bool bCollisionObjectInfo;
 		bool bSkeleton;
 		bool bDebugLocalPlayerSkeleton;
 	} Visuals;
@@ -27,9 +29,12 @@ typedef struct Variables_t
 		bool bTemporaryLevel;
 		bool bBalanceEnemyLevels;
 		bool bExclusivelyPositiveTolerance;
+		bool bLevelBuffMode;
+		int iEnemyLevel;
 		int iEnemyLevelTolerance;
 		int iSpawnObjectId;
 		int iSpawnItemId;
+		int iSpawnItemQuantity;
 		char szItemName[64];
 		bool bInstantEquip;
 		bool bRainbowModel;
@@ -91,7 +96,9 @@ typedef struct Variables_t
 
 		struct Config_t
 		{
-			char szName[MAX_PATH];
+			PWIN32_FIND_DATA_LIST pHead;
+			INT iSelectedConfig;
+			TCHAR szName[MAX_PATH];
 		} Config;
 	} Menu;
 
@@ -99,6 +106,7 @@ typedef struct Variables_t
 	{
 		Keybinds_t() {}
 		
+		KeybindToggleable OpenMenu;
 		KeybindFunctional<void> ChangePlayer;
 		KeybindFunctional<void> Airstuck;
 		KeybindFunctional<void> DuplicateBuddy;

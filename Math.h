@@ -178,21 +178,14 @@ public:
 		}
 	}
 
-	static float DotProduct(Vector3 &v1, float* v2)
+	static float Dot(const Vector3& v1, const float* v2)
 	{
-		return v1.x*v2[0] + v1.y*v2[1] + v1.z*v2[2];
+		return v1.x * v2[0] + v1.y * v2[1] + v1.z * v2[2];
 	}
 
-	static float Dot(const Vector3 &v1, Vector3 &v2)
+	static float Dot(const Vector3& v1, const Vector3& v2)
 	{
 		return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
-	}
-
-	static void VectorTransform(Vector3 &in1, Matrix3x4& in2, Vector3 &out)
-	{
-		out.x = DotProduct(in1, in2.m[0]) + in2.m[0][3];
-		out.y = DotProduct(in1, in2.m[1]) + in2.m[1][3];
-		out.z = DotProduct(in1, in2.m[2]) + in2.m[2][3];
 	}
 
 	static float VecLength(Vector3& vec)
@@ -205,32 +198,17 @@ public:
 		return ssesqrt(pow(fVec1.x - fVec2.x, 2) + pow(fVec1.y - fVec2.y, 2) + pow(fVec1.z - fVec2.z, 2));
 	}
 
-	//static float GetFov(Vector3& angle, Vector3& src, Vector3& dst)
-	//{
-	//	Vector3 ang, aim;
-	//	ang = CalcAngle(src, dst);
-	//	AngleVectors(angle, &aim);
-	//	AngleVectors(ang, &ang);
-
-	//	float mag = aim.LengthSqr();
-	//	float u_dot_v = Dot(aim, ang);
-
-	//	return RADTODEG(acos(u_dot_v / mag));
-	//}
-
-	static float GetFov(Vector3& vForward, Vector3& src, Vector3& dst)
+	/*
+	 theta = acos(v dot u / |v| * |u|)
+	*/
+	static float GetFov(const Vector3& vForward, const Vector3& src, const Vector3& dst)
 	{
-		Vector3 ang;
-		ang = CalcAngle(src, dst);
+		Vector3 ang = CalcAngle(src, dst);
 		AngleVectors(ang, &ang);
-
-		float mag = vForward.LengthSqr();
-		float u_dot_v = Dot(vForward, ang);
-
-		return RADTODEG(acos(u_dot_v / mag));
+		return RADTODEG(acos(vForward.Dot(ang) / (vForward.LengthSqr() * ang.Length())));
 	}
 
-	static Vector3 LookAt(Vector3 vPlayerPos, const Vector3& vEnemyPos)
+	static Vector3 LookAt(const Vector3& vPlayerPos, const Vector3& vEnemyPos)
 	{
 		Vector3 ang;
 		Vector3 relativePos = vEnemyPos - vPlayerPos;
@@ -244,40 +222,22 @@ public:
 	}
 
 	//change return type to reference param maybe depends 
-	static Vector3 CalcAngle(Vector3& PlayerPos, Vector3& EnemyPos)
+	static Vector3 CalcAngle(const Vector3& PlayerPos, const Vector3& EnemyPos)
 	{
 		Vector3 AimAngles;
-		Vector3 dir = PlayerPos - EnemyPos;
-		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y));
-		AimAngles.x = atanf(dir.z / hyp); //* M_RADPI;
-		AimAngles.y = atanf(dir.y / dir.x);//* M_RADPI;
-		AimAngles.z = 0.0f;
-
-		if (dir.x >= 0.0f)
-			AimAngles.y += M_PI_F;
-
+		VectorAngles(PlayerPos - EnemyPos, AimAngles);
 		return AimAngles;
 	}
 
-	static void VectorAngles(const Vector3& dir, Vector3 &angles)
+	static inline void VectorAngles(const Vector3& dir, Vector3& angles)
 	{
-		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y)); //SUPER SECRET IMPROVEMENT CODE NAME DONUT STEEL
-		angles.x = atanf(dir.z / hyp) * M_RADPI;
-		angles.y = atanf(dir.y / dir.x) * M_RADPI;
+		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y));
+		angles.x = atanf(dir.z / hyp);
+		angles.y = atanf(dir.y / dir.x);
 		angles.z = 0.0f;
 
 		if (dir.x >= 0.0f)
-			angles.y += 180.0f;
-	}
-
-	static void VectorTAngle(const Vector3& PlayerPos, const Vector3& EnemyPos, const Matrix4x4& vTransform, Vector3& vAngles)
-	{
-		Vector3 dir = PlayerPos - EnemyPos;
-		dir.Normalize();
-
-		vAngles.x = dir.Dot(vTransform[UP]);
-		vAngles.y = dir.Dot(vTransform[RIGHT]);
-		vAngles.z = 0.0f;
+			angles.y += M_PI_F;
 	}
 
 	static void ClampAngle(Vector3& angles)
@@ -317,35 +277,15 @@ public:
 
 	static void MakeVector(const Vector3& angle, Vector3& vector)
 	{
-		float pitch = float(angle[0] * M_PI / 180);
-		float yaw = float(angle[1] * M_PI / 180);
-		float tmp = float(cos(pitch));
-		vector[0] = float(-tmp * -cos(yaw));
-		vector[1] = float(sin(yaw)*tmp);
-		vector[2] = float(-sin(pitch));
+		float pitch = DEGTORAD(angle[PITCH]);
+		float yaw = DEGTORAD(angle[YAW]);
+		float cp = cos(pitch);
+		vector[0] = cp * cos(yaw);
+		vector[1] = cp * sin(yaw);
+		vector[2] = -sin(pitch);
 	}
 
-	static Vector3 AngleToDirection(Vector3& angle)
-	{
-		// Convert angle to radians 
-		angle.x = DEGTORAD(angle.x);
-		angle.y = DEGTORAD(angle.y);
-
-		float sinYaw = (float)sin(angle.y);
-		float cosYaw = (float)cos(angle.y);
-
-		float sinPitch = (float)sin(angle.x);
-		float cosPitch = (float)cos(angle.x);
-
-		Vector3 direction;
-		direction.x = cosPitch * cosYaw;
-		direction.y = cosPitch * sinYaw;
-		direction.z = -sinPitch;
-
-		return direction;
-	}
-
-	static void VectorITransform(Vector3& in1, const Matrix3x4& in2, Vector3& out)
+	static void VectorITransform(const Vector3& in1, const Matrix3x4& in2, Vector3& out)
 	{
 		float in1t[3];
 
@@ -358,17 +298,24 @@ public:
 		out.z = in1t[0] * in2[0][2] + in1t[1] * in2[1][2] + in1t[2] * in2[2][2];
 	}
 
-	static void VectorIRotate(Vector3& in1, const Matrix3x4& in2, Vector3& out)
+	static void VectorIRotate(const Vector3& in1, const Matrix3x4& in2, Vector3& out)
 	{
 		out.x = in1.x * in2.m[0][0] + in1.y * in2.m[1][0] + in1.z * in2.m[2][0];
 		out.y = in1.x * in2.m[0][1] + in1.y * in2.m[1][1] + in1.z * in2.m[2][1];
 		out.z = in1.x * in2.m[0][2] + in1.y * in2.m[1][2] + in1.z * in2.m[2][2];
 	}
 
-	static void VectorRotate(Vector3& in1, const Matrix4x4& in2, Vector3& out)
+	static void VectorTransform(const Vector3& in1, const Matrix3x4& in2, Vector3& out)
 	{
-		out.x = in1.Dot(in2[UP]);
-		out.y = in1.Dot(in2[RIGHT]);
+		out.x = Dot(in1, in2.m[0]) + in2.m[0][3];
+		out.y = Dot(in1, in2.m[1]) + in2.m[1][3];
+		out.z = Dot(in1, in2.m[2]) + in2.m[2][3];
+	}
+
+	static void VectorRotate(const Vector3& in1, const Matrix4x4& in2, Vector3& out)
+	{
+		out.y = in1.Dot(in2[UP]);
+		out.x = in1.Dot(in2[RIGHT]);
 		out.z = in1.Dot(in2[FORWARD]);
 	}
 };

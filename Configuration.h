@@ -79,7 +79,9 @@
 #define CATEGORY_MENU "Menu"
 
 #define CONFIG_DEFAULT TEXT("default")
-#define CONFIG_DEFAULT_INI TEXT("default.ini")
+#define CONFIG_EXTENSION TEXT(".ini")
+#define CONFIG_SEARCH_WILDCARD _CRT_CONCATENATE(TEXT("*"), CONFIG_EXTENSION)
+#define CONFIG_DEFAULT_INI _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
 
 class IKeybind
 {
@@ -119,23 +121,6 @@ private:
 	const char* m_szName;
 	int m_keycode;
 	int m_mode;
-};
-
-struct KeybindOrdinal
-{
-	const char* m_szName;
-	IKeybind::Type m_type;
-};
-
-static KeybindOrdinal s_keyOrdinals[] =
-{
-	{ "kb_airstuck", IKeybind::Type::KEYBIND_TOGGLE },
-	{ "kb_change_player", IKeybind::Type::KEYBIND_FUNCTION },
-	{ "kb_duplicate_buddy", IKeybind::Type::KEYBIND_FUNCTION },
-	{ "kb_teleport_forward", IKeybind::Type::KEYBIND_FUNCTION },
-	{ "kb_play_animation", IKeybind::Type::KEYBIND_VIRTUAL_FUNCTION },
-	{ "kb_model_gravity", IKeybind::Type::KEYBIND_TOGGLE },
-	{ "kb_model_ycontrol", IKeybind::Type::KEYBIND_INCREMENT }
 };
 
 class KeybindToggleable : public IKeybind
@@ -331,7 +316,7 @@ private:
 	std::function<Ret()> m_callback;
 };
 
-template<typename Ret, class Base, typename... Args>
+template<typename Ret, typename Base, typename... Args>
 class KeybindVirtualFunctional : public IKeybind
 {
 public:
@@ -550,9 +535,12 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
+		char szDefaultKeybindKeycode[32];
 		char szKeybindKeycode[32];
 
-		GetPrivateProfileString(m_szCategory, m_szName, "0", szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
+		_itoa_s(m_key.GetKeycode(), szDefaultKeybindKeycode, 10);
+
+		GetPrivateProfileString(m_szCategory, m_szName, szDefaultKeybindKeycode, szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
 
 		m_key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
 	}
@@ -561,7 +549,7 @@ public:
 	{
 		char szKeybindKeycode[32];
 
-		sprintf_s(szKeybindKeycode, "%i", m_key.GetKeycode());
+		_itoa_s(m_key.GetKeycode(), szKeybindKeycode, 10);
 
 		WritePrivateProfileString(m_szCategory, m_szName, szKeybindKeycode, szFilename);
 	}
@@ -760,6 +748,34 @@ private:
 };
 #endif
 
+typedef struct _WIN32_FIND_DATA_LISTA
+{
+	struct _WIN32_FIND_DATA_LISTA* m_pNext;
+	struct _WIN32_FIND_DATA_LISTA* m_pPrevious;
+	WIN32_FIND_DATAA m_Data;
+} WIN32_FIND_DATA_LISTA, *PWIN32_FIND_DATA_LISTA;
+
+typedef struct _WIN32_FIND_DATA_LISTW
+{
+	struct _WIN32_FIND_DATA_LISTW* m_pNext;
+	struct _WIN32_FIND_DATA_LISTW* m_pPrevious;
+	WIN32_FIND_DATAW m_Data;
+} WIN32_FIND_DATA_LISTW, *PWIN32_FIND_DATA_LISTW, *PCWIN32_FIND_DATA_LISTW;
+
+#ifdef _UNICODE
+typedef WIN32_FIND_DATA_LISTW WIN32_FIND_DATA_LIST;
+typedef PWIN32_FIND_DATA_LISTW PWIN32_FIND_DATA_LIST;
+#else
+typedef WIN32_FIND_DATA_LISTA WIN32_FIND_DATA_LIST;
+typedef PWIN32_FIND_DATA_LISTA PWIN32_FIND_DATA_LIST;
+#endif
+typedef CONST PWIN32_FIND_DATA_LIST PCWIN32_FIND_DATA_LIST;
+
+VOID FindDataListFree(PCWIN32_FIND_DATA_LIST pList);
+SIZE_T FindDataListCount(PCWIN32_FIND_DATA_LIST pList);
+VOID FindDataListSort(PWIN32_FIND_DATA_LIST pList);
+PWIN32_FIND_DATA_LIST FindDataListNav(PCWIN32_FIND_DATA_LIST pList, INT iIndex);
+
 class CConfig
 {
 public:
@@ -768,8 +784,10 @@ public:
 
 	bool CreateConfig(LPTSTR szFilename);
 	void ResetConfig();
-	void Load(LPTSTR szFilename);
-	void Save(LPTSTR szFilename);
+	void Load(LPCTSTR szFilename);
+	void Save(LPCTSTR szFilename);
+
+	BOOL EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const;
 
 	std::vector<IKeybind*>& GetKeybinds() {	return m_keybinds; }
 	LPCTSTR GetConfigPath() const { return m_szFilename; }
@@ -779,9 +797,9 @@ private:
 
 	void PurgeConfig();
 	void LoadDefault();
-	bool SetFilename(LPTSTR szFilename);
+	bool SetFilename(LPCTSTR szFilename);
 	BOOL FileExists(LPTSTR szFilename);
-	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath);
+	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath) const;
 
 	TCHAR m_szFilename[MAX_PATH];
 	std::vector<IConfigItem*> m_items;
