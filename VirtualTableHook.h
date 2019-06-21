@@ -8,29 +8,29 @@ class VirtualTableHook
 {
 public:
 	VirtualTableHook();
-	VirtualTableHook(QWORD** ppqwClassBase);
-	VirtualTableHook(QWORD*** pppqwClassBase);
+	VirtualTableHook(ULONG_PTR** ppqwClassBase);
+	VirtualTableHook(ULONG_PTR*** pppqwClassBase);
 	~VirtualTableHook();
 
-	bool Initialize(QWORD** ppqwClassBase);
-	bool Initialize(QWORD*** pppqwClassBase);
+	bool Initialize(ULONG_PTR** ppqwClassBase);
+	bool Initialize(ULONG_PTR*** pppqwClassBase);
 
-	void Relocate(QWORD** ppqwClassBase);
+	void Relocate(ULONG_PTR** ppqwClassBase);
 
 	void Unhook();
 	void Rehook();
 
-	QWORD GetFunctionCount() const;
-	QWORD GetFunctionAddress(UINT uIndex) const;
+	ULONG_PTR GetFunctionCount() const;
+	ULONG_PTR GetFunctionAddress(UINT uIndex) const;
 
-	QWORD* GetOldVirtualTable()	const;
-	QWORD  HookFunction(QWORD qwNewFunc, UINT uIndex);
+	ULONG_PTR* GetOldVirtualTable()	const;
+	ULONG_PTR  HookFunction(ULONG_PTR qwNewFunc, UINT uIndex);
 
 private:
-	QWORD GetVirtualTableCount(QWORD* pqwVirtualTable) const;
+	ULONG_PTR GetVirtualTableCount(ULONG_PTR* pqwVirtualTable) const;
 
-	QWORD** m_ClassBase;
-	QWORD* m_NewVirtualTable;
-	QWORD* m_OldVirtualTable;
-	QWORD m_VirtualTableSize;
+	ULONG_PTR** m_ClassBase;
+	ULONG_PTR* m_NewVirtualTable;
+	ULONG_PTR* m_OldVirtualTable;
+	ULONG_PTR m_VirtualTableSize;
 };

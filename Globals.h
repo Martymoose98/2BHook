@@ -28,6 +28,17 @@
 #define SZPROTAGONIST_A2 "PL/A2"
 #define SZPROTAGONIST_9S "PL/9S"
 
+#define PRELOAD_TYPE_USER_INTERFACE	1
+#define PRELOAD_TYPE_SHADER_INFO	1
+#define PRELOAD_TYPE_BXM			1
+#define PRELOAD_TYPE_QUEST			2
+#define PRELOAD_TYPE_EFFECT			3
+#define PRELOAD_TYPE_MODELDATA		3
+#define PRELOAD_TYPE_NOVEL			4
+#define PRELOAD_TYPE_GAMEDATA		5
+#define PRELOAD_TYPE_FONT			5
+#define PRELOAD_TYPE_CUBEMAP		7
+
 #define MODELTYPE_2B_NORMAL 0x21020
 #define MODELTYPE_2B_SUIT	0xA2140
 
@@ -44,7 +55,7 @@
 
 #define XINPUT_GAMEPAD_GUIDE 0x400
 
-#define CREATE_ENTITY(pc) ((MakeEntityFn)(0x1404F9AA0))((void*)0x14160DFE0, pc)
+#define CREATE_ENTITY(pc) ((CSceneSceneSystem__CreateEntityFn)(0x1404F9AA0))((void*)0x14160DFE0, pc)
 
 #define KEYDOWN(name, key) (name[key] & 0x80)
 #define KEYPRESSED(c, o, key) (KEYDOWN(c, key) && !KEYDOWN(o, key))
@@ -84,10 +95,11 @@ typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
 typedef int(*GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
 typedef const char*(*GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
-typedef bool(*AddItemFn)(__int64 pItemManager, int item_id);
+typedef bool(*AddItemFn)(__int64 pItemManager, int item_id, int quantity);
 typedef bool(*UseItemFn)(__int64 pItemManager, int item_id);
 typedef void(*ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
+typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
 typedef void(*WetObjectManager_AddLocalEntityFn)(__int64, EntityInfo* pInfo);
 typedef void(*WetObjectManager_SetWetFn)(__int64 pThis, byte wet_level, int index);
 typedef void(*WetObjectManager_SetDryFn)(__int64 pThis, EntityInfo *pInfo);
@@ -111,6 +123,13 @@ typedef ConstructionInfo<void>*(*GetConstructorFn)(int objectId); //0x1401A2C20 
 typedef EntityInfo*(*SceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
+typedef void(*ExCollision_GetOBBMaxFn)(ExCollision* pThis, Vector3Aligned* pvMax);
+
+typedef HeapThing*(*QueryHeapFn)(HeapThing* pResult, int objectid, int a3); // or void i guess
+typedef ObjReadSystem::Work*(*GetWorkFn)(int objectid);
+typedef ObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, ObjReadSystem::Work* pWork);
+typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int objectId);
+typedef BOOL(*ObjReadSystem_PreloadModelFn)(ObjReadSystem::Work* pWork);
 typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
@@ -155,11 +174,18 @@ extern DestroyBuddyFn DestroyBuddy;
 extern WetObjectManager_SetWetFn WetObjectManager_SetWet;
 extern WetObjectManager_SetDryFn WetObjectManager_SetDry;
 extern WetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
+extern ExCollision_GetOBBMaxFn GetOBBMax;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
 extern FindSceneStateFn FindSceneState;
 extern HashStringCRC32Fn HashStringCRC32;
+extern UnlockAchievementFn UnlockAchievement;
 extern FNV1HashFn FNV1Hash;
+extern QueryHeapFn QueryHeap;
+extern GetWorkFn GetWork;
+extern PreloadFileFn PreloadFile;
+extern ObjReadSystem_RequestEndFn RequestEnd;
+extern ObjReadSystem_PreloadModelFn PreloadModel;
 extern CpkMountFn CpkMount;
 extern CRILogCallbackFn CRILogCallback;
 
@@ -180,6 +206,7 @@ extern HINSTANCE g_hInstance;
 extern HANDLE* g_pHeaps;
 extern LPSTR g_szDataDirectoryPath;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
+extern std::vector<MrubyImpl*> g_pRubyInstances;
 
 extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
@@ -190,9 +217,11 @@ extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
 extern WetObjManager* g_pWetObjectManager;
+extern CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
 extern CSceneStateSystem* g_pSceneStateSystem;
+extern CSceneEntitySystem* g_pSceneEntitySystem;
 extern CMemoryDevice* g_pMemoryDevice;
 extern BYTE* g_pDecreaseHealth[2];
 extern BYTE* g_pAntiVSync;
@@ -234,6 +263,7 @@ extern VirtualTableHook* g_pSwapChainHook;
 extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
+extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
 extern ImportTableHook* g_pClipCursorHook;

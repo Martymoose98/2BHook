@@ -1,7 +1,7 @@
 #pragma once
 #include <ostream>
+#include <immintrin.h>
 #include "Vector2.h"
-#include "Matrix4x4.h"
 
 float __forceinline __fastcall ssesqrt(float n);
 
@@ -17,6 +17,7 @@ public:
 	Vector3(float XYZ);
 	Vector3(float* v);
 	Vector3(const float* v);
+	Vector3(const __m128 v);
 
 	inline Vector3& operator=(const Vector3& v);
 	inline Vector3& operator=(const float* v);
@@ -59,19 +60,8 @@ public:
 
 	inline Vector3 Cross(const Vector3& v) const;
 
-	/*inline Vector3 Rotate(const Vector3& vAxis, float angle) const
-	{
-		float SinHalfAngle = sinf(DEGTORAD(angle / 2));
-		float CosHalfAngle = cosf(DEGTORAD(angle / 2));
-
-		Vector4 Rotation(vAxis.x * SinHalfAngle, vAxis.y * SinHalfAngle, vAxis.z * SinHalfAngle, CosHalfAngle);
-		Vector4 Conjugate = Rotation.Conjugate();
-		Vector4 Rotated = Rotation * (*this) * Conjugate;
-
-		return Rotated.XYZ();
-	}*/
-
-	/*inline*/ Vector3 Rotate(const Matrix4x4& mRot) const;
+	inline Vector3 Rotate(const Vector3& vAxis, float theta) const;
+	inline Vector3 Rotate(const Matrix4x4& mRot) const;
 
 	inline Vector2 XY() const;
 	inline Vector2 XZ() const;
@@ -80,6 +70,8 @@ public:
 	inline bool IsZero() const;
 	inline bool IsZeroTolerance(float tolerance = 0.01f) const;
 };
+#include "Matrix4x4.h"
+#include "Vector4.h"
 
 inline Vector3& Vector3::operator=(const Vector3& v)
 {
@@ -206,6 +198,18 @@ inline float Vector3::LengthXZ() const
 	return ssesqrt(x * x + z * z);
 }
 
+inline bool Vector3::IsZero() const
+{
+	return (x == 0.0f && y == 0.0f && z == 0.0f);
+}
+
+inline bool Vector3::IsZeroTolerance(float tolerance) const
+{
+	return (x > -tolerance && x < tolerance
+		&&	y > -tolerance && y < tolerance
+		&&	z > -tolerance && z < tolerance);
+}
+
 inline float Vector3::DistTo(const Vector3& v) const
 {
 	return (*this - v).Length();
@@ -226,6 +230,23 @@ inline Vector3 Vector3::Cross(const Vector3& v) const
 	return Vector3(y * v.z - z * v.y, z * v.x - x * v.z, x * v.y - y * v.x);
 }
 
+inline Vector3 Vector3::Rotate(const Vector3& vAxis, float angle) const
+{
+	float SinHalfAngle = sinf(angle / 2);
+	float CosHalfAngle = cosf(angle / 2);
+
+	Vector4 Rotation(vAxis.x * SinHalfAngle, vAxis.y * SinHalfAngle, vAxis.z * SinHalfAngle, CosHalfAngle);
+	Vector4 Conjugate = Rotation.Conjugate();
+	Vector4 Rotated = Rotation * (*this) * Conjugate;
+
+	return Rotated.XYZ();
+}
+
+inline Vector3 Vector3::Rotate(const Matrix4x4& mRot) const
+{
+	return Vector3(Dot(mRot[0]), Dot(mRot[1]), Dot(mRot[2]));
+}
+
 inline Vector3& Vector3::Normalize()
 {
 	float l = this->Length();
@@ -243,7 +264,7 @@ inline Vector3& Vector3::Normalize()
 	return *this;
 }
 
-class Vector3Aligned : public Vector3
+class __declspec(align(16)) Vector3Aligned : public Vector3
 {
 public:
 	Vector3Aligned()
@@ -281,6 +302,16 @@ public:
 	Vector3Aligned(const Vector3Aligned& v)
 	{
 		*this = v;
+	}
+
+	Vector3Aligned(const __m128 v)
+	{
+		*(__m128*)this = v;
+	}
+
+	inline operator __m128()
+	{
+		return *(__m128*)this;
 	}
 
 private:

@@ -13,7 +13,14 @@ WetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
 GetConstructorFn GetConstructionInfo;
 FindSceneStateFn FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
+UnlockAchievementFn UnlockAchievement;
 FNV1HashFn FNV1Hash;
+QueryHeapFn QueryHeap;
+GetWorkFn GetWork;
+PreloadFileFn PreloadFile;
+ObjReadSystem_RequestEndFn RequestEnd;
+ObjReadSystem_PreloadModelFn PreloadModel;
+ExCollision_GetOBBMaxFn GetOBBMax;
 CpkMountFn CpkMount;
 CRILogCallbackFn CRILogCallback;
 
@@ -32,7 +39,7 @@ HINSTANCE g_hInstance;
 HANDLE* g_pHeaps;
 LPSTR g_szDataDirectoryPath;
 std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
-
+std::vector<MrubyImpl*> g_pRubyInstances;
 
 Pl0000* g_pLocalPlayer;
 EntityHandle* g_pLocalPlayerHandle;
@@ -43,9 +50,11 @@ YorhaManager* g_pYorhaManager;
 NPCManager* g_pNPCManager;
 EmBaseManager* g_pEnemyManager;
 WetObjManager* g_pWetObjectManager;
+CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 CCameraGame* g_pCamera;
 VMatrix* g_pViewMatrix;
 CSceneStateSystem* g_pSceneStateSystem;
+CSceneEntitySystem* g_pSceneEntitySystem;
 CMemoryDevice* g_pMemoryDevice;
 BYTE* g_pDecreaseHealth[2];
 BYTE* g_pAntiVSync; 
@@ -88,6 +97,7 @@ VirtualTableHook* g_pSwapChainHook;
 VirtualTableHook* g_pDeviceContextHook;
 VirtualTableHook* g_pKeyboardHook;
 VirtualTableHook* g_pMouseHook;
+std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 ImportTableHook* g_pQueryPerformanceCounterHook;
 ImportTableHook* g_pClipCursorHook;

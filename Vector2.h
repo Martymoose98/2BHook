@@ -1,5 +1,6 @@
 #pragma once
 #include <ostream>
+#include "ImGui/imgui.h"
 
 class Vector2
 {
@@ -51,6 +52,8 @@ public:
 
 	inline bool IsZero() const;
 	inline bool IsZeroTolerance(float tolerance = 0.01f) const;
+
+	inline operator ImVec2&() { return *(ImVec2*)this; }
 
 	inline friend std::ostream& operator<<(std::ostream& os, const Vector2& v);
 };

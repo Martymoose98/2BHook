@@ -1,8 +1,8 @@
 #include "Matrix4x4.h"
 
 Matrix4x4::Matrix4x4()
-	: m0(_mm_set_ps(1.0f, 0.0f, 0.0f, 0.0f)), m1(_mm_set_ps(0.0f, 1.0f, 0.0f, 0.0f)),
-	m2(_mm_set_ps(0.0f, 0.0f, 1.0f, 0.0f)), m3(_mm_set_ps(0.0f, 0.0f, 0.0f, 1.0f))
+	: m0(_mm_setr_ps(1.0f, 0.0f, 0.0f, 0.0f)), m1(_mm_setr_ps(0.0f, 1.0f, 0.0f, 0.0f)),
+	m2(_mm_setr_ps(0.0f, 0.0f, 1.0f, 0.0f)), m3(_mm_setr_ps(0.0f, 0.0f, 0.0f, 1.0f))
 {
 }
 
@@ -27,9 +27,59 @@ Matrix4x4::Matrix4x4(float _00, float _01, float _02, float _03,
 {
 }
 
-inline Vector3& Matrix4x4::Transform(const Vector3& v)
+void Matrix4x4::InitAxisAngle(const Vector3& vAxis, float theta)
 {
-	return Vector3(m[0][0] * v.x + m[0][1] * v.y + m[0][2] * v.z + m[0][3], m[1][0] * v.x + m[1][1] * v.y + m[1][2] * v.z + m[1][3], m[2][0] * v.x + m[2][1] * v.y + m[2][2] * v.z + m[2][3]);
+	float sin, cos, c;
+	Math::SinCos(theta, &sin, &cos);
+	c = 1.f - cos;
+
+	m[0][0] = (vAxis.x * vAxis.x) * c + cos;
+	m[0][1] = (vAxis.x * vAxis.y) * c - vAxis.z * sin;
+	m[0][2] = (vAxis.x * vAxis.z) * c + vAxis.y * sin;
+
+	m[1][0] = (vAxis.y * vAxis.x) * c + vAxis.z * sin;
+	m[1][1] = (vAxis.y * vAxis.y) * c + cos;
+	m[1][2] = (vAxis.y * vAxis.z) * c - vAxis.x * sin;
+
+	m[2][0] = (vAxis.z * vAxis.x) * c - vAxis.y * sin;
+	m[2][1] = (vAxis.z * vAxis.y) * c + vAxis.x * sin;
+	m[2][2] = (vAxis.z * vAxis.z) * c + cos;
+}
+
+void Matrix4x4::InitTransform(const Vector3& vAngles, const Vector3& vPosition)
+{
+	Vector3 vForward, vRight, vUp;
+	Math::AngleVectors(vAngles, &vForward, &vRight, &vUp);
+	InitTransform(vForward, vRight, vUp, vPosition);
+}
+
+void Matrix4x4::InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition)
+{
+	m[RIGHT][0] = vRight.x;
+	m[RIGHT][1] = vRight.y;
+	m[RIGHT][2] = vRight.z;
+	m[RIGHT][3] = 0.0f;
+
+	m[UP][0] = vUp.x;
+	m[UP][1] = vUp.y;
+	m[UP][2] = vUp.z;
+	m[UP][3] = 0.0f;
+
+	m[FORWARD][0] = vForward.x;
+	m[FORWARD][1] = vForward.y;
+	m[FORWARD][2] = vForward.z;
+	m[FORWARD][3] = 0.0f;
+
+	m[POSITION][0] = vPosition.x;
+	m[POSITION][1] = vPosition.y;
+	m[POSITION][2] = vPosition.z;
+	m[POSITION][3] = 1.0f;
+}
+
+inline float Matrix4x4::ThetaOfAxisAngle() const
+{
+	Vector3 v(m[2][1] - m[1][2], m[0][2] - m[2][0], m[1][2] - m[0][1]);
+	return atan2f(v.Length(), (m[0][0] + m[1][1] + m[2][2]) - 1.f);
 }
 
 inline std::ostream& operator<<(std::ostream& os, const Matrix4x4& m)
