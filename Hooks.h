@@ -78,7 +78,7 @@ extern "C" void hkUpdateModelPartsThunk(Pl0000* pEntity);
 extern "C" void hkUpdateModelParts(Pl0000* pEntity); //proabably not a pl0000 must be a parent
 extern "C" void* hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 extern "C" void* hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
-bool hkMRubyLoadScriptFn(MrubyImpl* pThis, MrubyScript* pScript);
+bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter);

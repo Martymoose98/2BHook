@@ -47,6 +47,8 @@
 #define IS_OFFSET_CORRECT(s, m, offset) CASSERT(offsetof(s, m) == (offset), ReversedStructs)
 #define IS_SIZE_CORRECT(s, size) CASSERT(sizeof(s) == (size), ReversedStructs)
 
+#define ALIGN(size, align) ((size + align) & ~align)
+
 #define ENTITY_REAL_VTABLE
 
 typedef ULONGLONG QWORD;
@@ -248,32 +250,57 @@ struct ObjReadSystem
 	};
 };
 
-struct CTextureResourceManager
+enum TextureDimension
 {
-	CReadWriteLock m_Lock;
-	BYTE gap2C[52];
-	DWORD dword60;
-	DWORD dword64;
-	QWORD qword68;
-	QWORD qword70;
-	QWORD qword78;
-	QWORD qword80;
+	TEXTURE_DIMENSION_CUBEMAP = 2
 };
 
+struct CTextureD3D
+{
+	void *m_pTextureD3D;
+	ID3D11ShaderResourceView *m_pDefaultShaderResourceView;
+	QWORD qword10;
+	ID3D11ShaderResourceView *m_pShaderResourceViews[16];
+};
+
+/*
+Size of struct is 0xB0 (176)
+*/
 struct CTexture
 {
+	void* m_vtbl;					//0x00
+	int m_iWidth;					//0x08
+	int m_iHeight;					//0x0C
+	int m_Depth;					//0x10
+	BYTE gap14[4];					//0x14
+	BOOL m_bForceSRGB;				//0x18
+	UINT m_uMipMapCount;			//0x1C
+	BYTE gap20[4];					//0x20
+	DXGI_FORMAT m_Format;			//0x24
+	BYTE gap28[8];					//0x28
+	TextureDimension m_Dimension;	//0x30
+	BYTE gap34[60];					//0x34
+	CTextureD3D* m_pTexture;		//0x70
+	char gap78[56];					//0x78
+};
+IS_OFFSET_CORRECT(CTexture, m_Depth, 0x10)
+IS_OFFSET_CORRECT(CTexture, m_Dimension, 0x30)
+
+struct CTargetTexture
+{
 	void* m_vtbl;
-	int m_iWidth;
-	int m_iHeight;
-	BYTE gap0[96];
-	void* ptr70;
+	CTexture* m_pTexture;
+	BOOL m_bInitalized;
 };
 
 struct CTextureBatch
 {
-	void* punk; //0x00
-	CTexture* m_pTextures;
+	void *punk;
+	CTargetTexture m_Texture;
+	BOOL m_b20;
+	char pad24[4];
 };
+IS_SIZE_CORRECT(CTextureBatch, 40)
 
 // size of struct 96 (0x60) bytes
 struct CTextureData
@@ -293,6 +320,56 @@ struct CTextureData
 };
 IS_SIZE_CORRECT(CTextureData, 96)
 
+struct DDS_PIXELFORMAT
+{
+	uint32_t size;
+	uint32_t flags;
+	uint32_t fourCC;
+	uint32_t RGBBitCount;
+	uint32_t RBitMask;
+	uint32_t GBitMask;
+	uint32_t BBitMask;
+	uint32_t ABitMask;
+};
+
+struct DDS_HEADER
+{
+	uint32_t size;
+	uint32_t flags;
+	uint32_t height;
+	uint32_t width;
+	uint32_t pitchOrLinearSize;
+	uint32_t depth;
+	uint32_t mipMapCount;
+	uint32_t reserved1[11];
+	DDS_PIXELFORMAT ddspf;
+	uint32_t caps;
+	uint32_t caps2;
+	uint32_t caps3;
+	uint32_t caps4;
+	uint32_t reserved2;
+};
+
+struct DDS_HEADER_WITH_MAGIC
+{
+	uint32_t magic;
+	DDS_HEADER hdr;
+};
+
+struct CTextureDescription
+{
+	void* m_pTextureInfo;
+	DDS_HEADER_WITH_MAGIC *m_pDDS;
+	unsigned int m_uTextureSize;	//size of dds file
+	DWORD gap14;					// 0,2
+	DWORD dword18;					// 1-4
+	BOOL m_b1C;
+	BOOL m_b20;
+	DWORD dword24;
+	BOOL m_bUseTextureInfo;
+};
+
+
 // Struct at least 0x1A8 bytes
 struct EntityInfo
 {
@@ -305,9 +382,9 @@ struct EntityInfo
 	char _0x0038[4];							//0x0034
 	CTextureData* m_pTextureData[2];			//0x0038
 	Pl0000* m_pEntity;							//0x0048
-	DatafileDesc* m_pDatDesc;					//0x0050
-	DWORD* m_pUnk;								//0x0058  | dword array 2 members (0x1415F6B50)
-	Pl0000* m_pParent;							//0x0060
+	DatafileDesc* m_pDatDesc;					//0x0050  | m_pWMB
+	DWORD* m_pUnk;								//0x0058  | m_pWTA (debug build) dword array 2 members (0x1415F6B50)
+	Pl0000* m_pParent;							//0x0060  | m_pWTP (debug build)
 	BOOL m_bDataExists;							//0x0068
 	UINT m_uEntityId;							//0x006C
 	DWORD _0x0070;								//0x0070
@@ -531,7 +608,22 @@ class CEnt // idk if this exists
 	Matrix4x4 m_identies[2];		//0x000C0 | end ? CEnt ?
 };
 
-typedef struct WMBHdr
+typedef struct WTBHeader
+{
+	union {
+		char			id[4];			// 0x00
+		unsigned int	magic;
+	};
+	int					unknown;
+	int					numTex;
+	unsigned int		ofsTexOfs;
+	unsigned int		ofsTexSizes;
+	unsigned int		ofsTexFlags;
+	unsigned int		texIdxOffset;
+	unsigned int		texInfoOffset;
+} WTBHeader, WTBHdr, WTAHeader, WTAHdr;
+
+typedef struct WMBHeader
 {
 	union {
 		char			id[4];			// 0x00
@@ -566,7 +658,7 @@ typedef struct WMBHdr
 	int					numMeshMaterial;	//7C
 	unsigned int		ofsUnknownF;		//80
 	int					numUnknownG;		//84
-} WMBHdr;
+} WMBHeader, WMBHdr;
 
 // Size of struct 0x58 (88) bytes
 typedef struct WMBBone
@@ -603,41 +695,62 @@ typedef struct Bone
 } Bone;
 IS_SIZE_CORRECT(Bone, 0xB0)
 
-struct WMBMaterial
+struct WMBSamplerParameterGroup
 {
-	short m_sVersion[4];
-	unsigned int m_uNameOffset;
-	unsigned int m_uShaderNameOffset;
-	unsigned int m_uTechniqueOffset;
-	int unsigned18;
-	unsigned int m_uTextureOffset;
-	int m_iTextures;
-	unsigned int m_uParameterGroupsOffset;
-	int m_iParameterGroups;
-	unsigned int m_uVariablesOffset;
-	unsigned int m_nVariables;
+	int m_iIndex;						//0x00
+	unsigned int m_uParametersOffset;	//0x04 float*
+	int m_nParameters;					//0x08
 };
-IS_SIZE_CORRECT(WMBMaterial, 0x30)
+
+struct WMBVariable
+{
+	unsigned int m_uNameOffset;		//0x00
+	float m_flValue;				//0x04
+};
+
+class CConstantBuffer;
+
+struct CSamplerParam
+{
+	CConstantBuffer* m_pBuffer;
+	BOOL m_bInitalized;
+};
 
 struct CSamplerParameterGroup
 {
-	void* m_pParameters;
+	CSamplerParam* m_pParameters;
 	int m_nParameters;
 	int m_iIndex;
 };
 
+struct WMBMaterial
+{
+	short m_sVersion[4];					//0x00
+	unsigned int m_uNameOffset;				//0x08
+	unsigned int m_uShaderNameOffset;		//0x0C
+	unsigned int m_uTechniqueOffset;		//0x10
+	int m_nParamCount;						//0x14			
+	unsigned int m_uTexturesOffset;			//0x18
+	int m_nTextures;						//0x1C
+	unsigned int m_uParameterGroupsOffset;	//0x20
+	int m_nParameterGroups;					//0x24
+	unsigned int m_uVariablesOffset;		//0x28
+	int m_nVariables;						//0x2C
+};
+IS_SIZE_CORRECT(WMBMaterial, 0x30)
+
 // Size of struct is 120 (0x78) bytes
 struct CMaterial
 {
-	short m_sVersion[4];
+	void* m_pHeap;
 	const char *m_szName;
 	const char *m_szShaderName;
 	const char *m_szTechniqueName;
-	UINT m_textureIds[16];
+	UINT m_TextureIds[16];
 	CSamplerParameterGroup *m_pParameterGroups;
-	unsigned int m_nParameterGroups;
-	unsigned int m_unk;
-	void *m_pParameters;
+	int m_nParameterGroups;
+	int m_nParameters;
+	CSamplerParam* m_pParameters;
 };
 IS_SIZE_CORRECT(CMaterial, 0x78)
 
@@ -669,7 +782,7 @@ struct WMBMesh
 	unsigned int m_uMaterialsOffset;
 	int m_nMaterials;
 	unsigned int m_uBoneOffset;
-	int m_iBones;
+	int m_nBones;
 };
 IS_SIZE_CORRECT(WMBMesh, 0x2C)
 
@@ -688,7 +801,7 @@ struct CMesh
 struct WMBTexture
 {
 	unsigned int m_uNameOffset;
-	int m_iTexture;
+	int m_TextureId;
 };
 
 struct CModelDataUnk
@@ -698,6 +811,17 @@ struct CModelDataUnk
 	int m_iUnk[2];			//0x20
 };
 IS_SIZE_CORRECT(CModelDataUnk, 0x30)
+
+struct WMBBatch
+{
+	int m_iVertexGroupIndex;	//0x00
+	int m_nPrimitives;			//0x04
+	int m_nIndices;				//0x08
+	int m_nVertices;			//0x0C
+	int m_iIndexStart;			//0x10
+	int m_iVertexStart;			//0x14
+	int m_iBoneSetIndex;		//0x18
+};
 
 struct CBatch
 {
@@ -709,6 +833,7 @@ struct CBatch
 	int m_nIndices;
 	int m_nPrimitives;
 };
+IS_SIZE_CORRECT(CBatch, 28)
 
 struct WMBVertexGroup
 {
@@ -719,25 +844,140 @@ struct WMBVertexGroup
 	unsigned int m_uVertexExSize;		//0x14
 	int pad18[2];						//0x18
 	int m_nVertices;					//0x20
-	int m_iVertexExFlags;				//0x24
+	int m_uVertexExFlags;				//0x24
 	unsigned int m_uIndexBufferOffset;	//0x28
 	int m_nIndices;						//0x2C
+};
+IS_SIZE_CORRECT(WMBVertexGroup, 0x30)
+
+struct CVertexGroupEx
+{	
+	void* m_pVertexData;	//0x00
+	void* m_pVertexData2;	//0x08
+	BYTE gap10[40];			//0x10
+	void* m_pIndexData;		//0x38
+	UINT m_uVertexSize;		//0x40
+	UINT m_nIndices;		//0x44
+	UINT m_uIndiceSize;		//0x48
 };
 
 struct CVertexGroup
 {
-	struct CVertexBuffer* m_pVertexBuffer;
-	struct CVertexBuffer* m_pVertexBuffer2;
-	struct CIndexBuffer* m_pIndexBuffer;
+	struct CVertexBuffer* m_pVertexBuffer;	//0x00
+	struct CVertexBuffer* m_pVertexBuffer2;	//0x08
+	struct CIndexBuffer* m_pIndexBuffer;	//0x10
 };
+IS_SIZE_CORRECT(CVertexGroup, 24)
 
 struct CModelDrawData
 {
-	void* m_pVertexGroups;
+	CVertexGroup* m_pVertexGroups;
 	int m_nVertexGroups;
 	CBatch* m_pBatches;
 	int m_nBatches;
 	DWORD dword1C;
+};
+
+struct CMaterialInfo
+{
+	void* m_pModelAnalyzer;
+	CMaterial* m_pMaterial;
+	BOOL m_bUnknownsExist;
+	BOOL m_bUnkGreZero;
+};
+
+struct CMaterialDescription
+{
+	CMaterial *m_pMaterial;
+	BOOL m_bUnknownsExist;
+	BOOL m_bUnkGreZero;
+};
+
+struct CShaderSetting
+{
+	void *m_pVtbl;
+	BYTE gap0[12];
+	DWORD dword14;
+	DWORD dword18;
+	BYTE gap1C[28];
+	DWORD dword38;
+	BYTE gap3C[16];
+	DWORD dword4C;
+	DWORD dword50;
+	DWORD dword54;
+	DWORD dword58;
+	DWORD dword5C;
+	DWORD dword60;
+	DWORD dword64;
+	QWORD dword68;
+};
+
+/*
+Size of struct 0x90 (144) bytes
+*/
+struct CModelShaderModule
+{
+	void *m_pVtbl;
+	CShaderSetting *m_pSetting;
+	QWORD qword10;
+	CConstantBuffer *m_pConstantBuffer;
+	DWORD dword20;
+	QWORD qword28;
+	DWORD dword30;
+	QWORD qword38;
+	DWORD dword40;
+	QWORD qword48;
+	DWORD dword50;
+	DWORD dword54;
+	DWORD dword58;
+	DWORD dword5C;
+	__m128 oword60;
+	__m128 oword70;
+	float float80;
+	float m_flWetness;
+};
+IS_OFFSET_CORRECT(CModelShaderModule, m_flWetness, 0x84)
+
+struct CTextureResource
+{
+	void* m_punk;
+	CMaterial* m_pMaterial;
+	char pad10[16];
+};
+
+struct CTextureResourceManager
+{
+	CReadWriteLock m_Lock;
+	BYTE gap2C[52];
+	DWORD dword60;
+	DWORD dword64;
+	QWORD qword68;
+	QWORD qword70;
+	CTextureResource* m_pTextures;
+	QWORD qword80;
+};
+
+/*
+Size of struct 0x318 (792) bytes
+*/
+struct CModelShader
+{
+	CMaterial* m_pMaterial;
+	CModelShaderModule* m_pShader;
+	//char pad10[24];
+	//CModelShaderModule*
+	CTextureResource m_Resources[16];
+	char pad210[0x108];
+};
+
+struct CModelAnalyzer
+{
+	virtual void function0(char a2);
+	virtual void LOD_sub_143F4B620(__int64 a2);
+	virtual int FindTextureIndexByName( const char *);
+	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, __int64 pModelWorkExtend, __int64 ppHeaps);
+	virtual void function4();
+	virtual void function5();
 };
 
 // Size of struct 0x140 (320) bytes
@@ -747,35 +987,35 @@ struct CModelData
 		byte* m_pWMB;						//0x0000
 		WMBHdr* m_pHdr;						//0x0000
 	};
-	QWORD qword8;							//0x0008
+	void* m_pBoneIndexTranslateTable;		//0x0008
 	Vector3Aligned m_vMax;					//0x0010
 	Vector3Aligned m_vMin;					//0x0020
 	int *m_pUnk;							//0x0030
 	CModelDrawData* m_pDrawData;			//0x0038
-	unsigned int *m_puVertexExOffsets;		//0x0040 | unsure what this pointer is
+	int *m_piVertexExFlags;					//0x0040 
 	int m_nVertexGroups;					//0x0048
 	char pad4C[4];							//0x004C
 	Bone *m_pBones;							//0x0050
 	void *m_pBoneMaps;						//0x0058
-	unsigned int m_nBones;					//0x0060
+	int m_nBones;							//0x0060
 	char pad64[4];							//0x0064
-	void* m_pBoneIndexTranslateTable;		//0x0068
+	void* m_pBoneIndexTranslateTable2;		//0x0068
 	CModelDataUnk* m_pUnks;					//0x0070
-	unsigned int m_nUnks;					//0x0078
+	int m_nUnks;							//0x0078
 	char pad78[4];							//0x007C
 	void *m_pBoneMap;						//0x0080
 	int m_nBoneMapEntries;					//0x0088
 	char pad8C[4];							//0x008C
 	void *m_pBoneSets;						//0x0090
-	unsigned int m_nBoneSets;				//0x0098
+	int m_nBoneSets;						//0x0098
 	char pad9C[4];							//0x009C
 	void *m_pLODS;							//0x00A0
-	unsigned int m_nLODS;					//0x00A8
+	int m_nLODS;							//0x00A8
 	char padAC[12];							//0x00AC
 	CMesh *m_pMeshes;						//0x00B8
 	int m_nMeshes;							//0x00BC
 	CMaterial *m_pMaterials;				//0x00C0
-	unsigned int m_nMaterials;				//0x00C8
+	int m_nMaterials;						//0x00C8
 	char padCC[84];							//0x00CC
 	struct CModelData *m_pNext;
 	char pad9[8];
@@ -844,7 +1084,7 @@ public:
 	void* vtbl;
 #endif
 
-	Matrix4x4 m_matRotation;				//0x0010
+	Matrix4x4 m_matTransform;				//0x0010
 	Vector3Aligned m_vPosition;				//0x0050
 	Matrix4x4 m_matModelToWorld;			//0x0060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
 	void* m_pUnk0x00A0;						//0x00A0
@@ -880,20 +1120,6 @@ IS_OFFSET_CORRECT(CModel, m_pMappedModel, 0x398)
 IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540)
 IS_OFFSET_CORRECT(CModel, m_nBones, 0x568)
 IS_OFFSET_CORRECT(CModel, dwFinal, 0x580)
-
-/*
-Size of struct 0x90 (144) bytes
-*/
-class CModelShaderModule
-{
-public:
-	void* lpVtbl;			//0x0000
-	char _0x0008[8];		//0x0008
-	const char* m_szName;	//0x0010
-	char _0x0018[108];		//0x0018
-	float m_flWetness;		//0x0084
-};
-IS_OFFSET_CORRECT(CModelShaderModule, m_flWetness, 0x84)
 
 /*
 Size of struct 0x670 (1648) bytes
@@ -1089,16 +1315,17 @@ public:
 	char  m_pad0x000BA[6];					//0x000BA
 	Matrix4x4 m_matCol;						//0x000C0
 	Matrix4x4 m_identity;					//0x00100 | end ? CEnt ?
-	CModelExtendWork m_pModelExtendWork;	//0x00140
+	CModelExtendWork m_ModelExtendWork;		//0x00140
 	char _0x0168[336];						//0x00168
 	BYTE m_bWetness;						//0x002B8
 	char _0x02B9[220];						//0x002B9
+											//0x00390 | struct start
 	MappedModel* m_pMappedModel;			//0x00398
 	ModelPart* m_pModelParts;				//0x003A0 
 	int m_nModelParts;						//0x003A8
 	char _0x03AC[4];						//0x003AC
-	void* m_pBufferShadowsidk;				//0x003B0 | model shaders
-	int m_iShadowLevel;						//0x003B8 | 0 = no shadow
+	CModelShader* m_pModelShaders;			//0x003B0 | model shaders +0x20
+	int m_nModelShaders;					//0x003B8 | 0 = no shadow 
 	char _0x03BC[4];						//0x003BC
 	void* m_p0x03C0;						//0x003C0
 	BOOL m_b0x03C8;							//0x003C8
@@ -1124,7 +1351,7 @@ public:
 	DWORD dw0x0059C;						//0x0059C
 	DATHeader* m_pDataFiles[2];				//0x005A0
 	CTextureData* m_pTextureData;			//0x005B0
-	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regualar, mech suit, and static -1)
+	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regular, mech suit, and static -1)
 	unsigned int unk0x005BC;				//0x005BC
 	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
 	BYTE unk0x05C4;							//0x005C4 | disable dynamic skirt?
@@ -1190,7 +1417,6 @@ public:
 	char _0x02B70[56056];					//0x02B70
 	int m_iHealth2;							//0x10668									
 	char _0x1066C[420];						//0x1066C
-											//0x10680
 	EntityHandle m_hPod;					//0x10810
 	EntityHandle m_hUnk;					//0x10814
 	char _0x10818[9896];					//0x10818
@@ -1225,7 +1451,7 @@ public:
 	char _0x17090[980];						//0x17098
 	EntityHandle m_hUnknown3;				//0x1746C
 	char _0x17470[896];						//0x17470
-	Vector3Aligned m_vDesinationTarget;		//0x177F0
+	Vector3Aligned m_vDestinationTarget;	//0x177F0
 	BOOL m_bWalkToTarget;					//0x17800
 	BOOL m_bRunToTarget;					//0x17804
 	char _0x17808[224];						//0x17808
@@ -1233,7 +1459,7 @@ public:
 typedef Pl0000 Entity2B;
 IS_SIZE_CORRECT(Pl0000, 0x178F0)
 IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50)
-IS_OFFSET_CORRECT(Pl0000, m_pModelExtendWork, 0x140)
+IS_OFFSET_CORRECT(Pl0000, m_ModelExtendWork, 0x140)
 IS_OFFSET_CORRECT(Pl0000, m_bWetness, 0x2B8)
 IS_OFFSET_CORRECT(Pl0000, m_pMappedModel, 0x398)
 IS_OFFSET_CORRECT(Pl0000, m_pModelExtend, 0x518)
@@ -1268,7 +1494,7 @@ public:
 	Vector3Aligned m_vMax;			//0x0010
 	Vector3Aligned m_vMin;			//0x0020
 	Vector3Aligned m_v0x30[2];		//0x0030
-	float m_flZoom;					//0x0050
+	float m_flDistance;				//0x0050
 	char align54[12];				//0x0054 | alignment (16)
 	CCameraInstance* m_pInstance;	//0x0060
 	char align68[8];				//0x0068
@@ -1488,51 +1714,77 @@ struct CDepthSurface
 };
 
 // Size of struct 104 (0x68) bytes
-class CRenderTarget
+struct CRenderTarget
 {
 	void* vtbl;
 	int m_iWidth;
 	int m_iHeight;
-	char pad[88];
-
+	char pad[80];
+	CTexture* m_pTexture;
 	//const Hw::cRenderTargetImpl::`vftable'{for `Hw::cGraphicObjectBase' }
 };
 
+struct CBufferInfo
+{
+	ID3D11Buffer* m_pBuffer;
+	DXGI_FORMAT m_Format;
+	ID3D11ShaderResourceView* m_pShaderResourceView;
+	ID3D11UnorderedAccessView* m_pUnorderedAccessView;
+};
+IS_SIZE_CORRECT(CBufferInfo, 0x20)
+
 // Size of struct is 56 (0x38) bytes
-class CVertexBuffer
+struct CVertexBuffer
 {
 	void* m_pVtbl;
-	QWORD qword8;
-	QWORD qword10;
-	QWORD qword18;
-	QWORD qword20;
-	QWORD qword28;
+	QWORD qword8;						//0x08
+	BOOL m_bInitalized;					//0x10
+	UINT m_uVertexSize;					//0x14
+	INT m_nVertices;					//0x18
+	char pad1c[12];						//0x1C
+	CBufferInfo* m_pInfo;				//0x28
 	DWORD dword30;
 };
 IS_SIZE_CORRECT(CVertexBuffer, 0x38)
-
-struct CIndexBufferInternal
-{
-	ID3D11Buffer *m_pBuffer;
-	DXGI_FORMAT m_format;
-	QWORD ptr;
-	void *ptr0;
-};
-IS_SIZE_CORRECT(CIndexBufferInternal, 0x20)
 
 // Size of struct is 48 (0x30) bytes
 struct CIndexBuffer
 {
 	void* m_pVtbl;						//0x00
-	ID3D11Buffer* m_pBuffer;			//0x08
-	void* ptr1;							//0x10
-	void* ptr2;							//0x18
-	CIndexBufferInternal* m_pInternal;	//0x20
-	int m_unk;							//0x28
+	BOOL m_bInitalized;					//0x0C
+	UINT m_uIndiceSize;					//0x08	
+	INT m_nIndices;						//0x10
+	char pad14[12];						//0x14
+	CBufferInfo* m_pInfo;				//0x20
+	DWORD dword28;
 };
-IS_SIZE_CORRECT(CIndexBuffer, 0x30)
+IS_SIZE_CORRECT(CIndexBuffer, 0x30)	
 
 class CConstantBuffer;
+
+struct CDepthStencilStateInfo;
+
+struct CDepthStencilState
+{
+	void* m_pVtbl;
+	BOOL m_bDepthEnable;
+	D3D11_DEPTH_WRITE_MASK m_DepthWriteMask;
+	D3D11_COMPARISON_FUNC m_DepthFunc;
+	DWORD dword14;
+	BOOL m_bStencilEnable;
+	UINT m_uStencilRef;
+	DWORD dword20;
+	DWORD dword24;
+	DWORD dword28;
+	DWORD dword2C;
+	DWORD dword30;
+	DWORD dword34;
+	DWORD dword38;
+	DWORD dword3C;
+	BYTE gap40[8];
+	ID3D11DepthStencilState** m_ppDepthStencilState;
+};
+
 
 // CVertexLayoutImpl is 320 bytes in size
 struct CVertexLayout
@@ -1563,7 +1815,7 @@ struct RenderInfo
 
 	Topology m_Topology;
 	INT m_iBaseVertexLocation;
-	DWORD m_dwUnk;
+	UINT m_uPrimitives; //???
 	UINT m_uVertexCount;
 	UINT m_uIndexCountPerInstance;
 };
@@ -1596,7 +1848,7 @@ struct ShaderDescVS
 {
 	BYTE gap0[8];					//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 	CShaderMemorizeVS* m_pShader;	//0x18
 	BOOL m_b0x18[2];				//0x20
 	char m_szName[48];				//0x28
@@ -1606,7 +1858,7 @@ struct ShaderDescPS
 {
 	BYTE gap0[8];					//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 	CShaderMemorizePS* m_pShader;	//0x18
 	BOOL m_b0x18[2];				//0x20
 	char m_szName[48];				//0x28
@@ -1616,7 +1868,7 @@ struct ShaderDescCS
 {
 	BYTE gap0[8];					//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 	CShaderMemorizeCS* m_pShader;	//0x18
 	BOOL m_b0x18[2];				//0x20
 	char m_szName[48];				//0x28
@@ -1626,21 +1878,21 @@ struct PixelShaderInfo
 {
 	ID3D11PixelShader* m_pShader;	//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 };
 
 struct VertexShaderInfo
 {
 	ID3D11VertexShader* m_pShader;	//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 };
 
 struct ComputeShaderInfo
 {
 	ID3D11ComputeShader* m_pShader;	//0x00
 	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_shaderSize;			//0x10
+	SIZE_T m_ShaderSize;			//0x10
 };
 
 struct PixelShaderContext
@@ -1667,40 +1919,59 @@ struct COcclusionQuery
 	ID3D11Query** m_ppQuery;
 };
 
-struct ReadWriteLock
-{
-	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionInitalized;
-};
-
 struct dd
 {
 	char pad[16];
 	CRenderTarget* m_pTarget;
 };
 
-/*
-Size of struct 504 (0x1F8) bytes
-*/
-struct CGraphicShader
+
+// size of struct 0xF0 (240) bytes
+struct TextureGroup
 {
-	VertexShaderInfo* m_pVertexShader;		//0x00
-	PixelShaderInfo* m_pPixelShader;		//0x08
-	BOOL m_bSetShaders;						//0x10
-	BYTE gap14[4];							//0x14
-	BOOL m_bSetVertexBuffer;				//0x18
-	BYTE gap1C[4];							//0x1C
-	ID3D11Buffer *const m_pBuffers[8];		//0x20
-	UINT m_uOffsets[8];						//0x60
-	UINT m_uStrides[8];						//0x80
-	ID3D11InputLayout** m_ppInputLayout;	//0xA0 | probs a struct w/ the ID3D11InputLayout* at offset 0
-	CIndexBuffer* m_pIndexBuffer;			//0xA8
-	DWORD m_dw0xB0;							//0xB0
-	BOOL m_bSetInputLayout;					//0xB4
-	BOOL m_bSetIndexBuffer;					//0xB8
-	UINT m_uTopologyIndex;					//0xBC
-	CConstantBuffers m_ConstantBuffers[2];	//0xC0
+	BOOL m_bUpdateTextures;
+	ID3D11ShaderResourceView* m_pTextures[32];
 };
+
+/*
+Size of struct 264 (0x108) bytes
+*/
+struct TextureContainer
+{
+	struct TextureGroup m_Textures;
+	char padF0[24];
+};
+
+struct CSamplerState
+{
+	BOOL m_bSetSamplers;
+	ID3D11SamplerState* m_pSamplerStates[16];
+};
+
+/*
+Size of struct 504 (0x1F8) bytes //wrong
+*/
+struct CGraphicRenderContext
+{
+	VertexShaderInfo* m_pVertexShader;			//0x000
+	PixelShaderInfo* m_pPixelShader;			//0x008
+	BOOL m_bSetShaders;							//0x010
+	BYTE gap14[4];								//0x014
+	BOOL m_bSetVertexBuffer;					//0x018
+	BYTE gap1C[4];								//0x01C
+	ID3D11Buffer *const m_pVertexBuffers[8];	//0x020
+	UINT m_uOffsets[8];							//0x060
+	UINT m_uStrides[8];							//0x080
+	ID3D11InputLayout** m_ppInputLayout;		//0x0A0 | probs a struct w/ the ID3D11InputLayout* at offset 0
+	CIndexBuffer* m_pIndexBuffer;				//0x0A8
+	DWORD m_dw0xB0;								//0x0B0
+	BOOL m_bSetInputLayout;						//0x0B4
+	BOOL m_bSetIndexBuffer;						//0x0B8
+	UINT m_uTopologyIndex;						//0x0BC
+	CConstantBuffers m_ConstantBuffers[2];		//0x0C0
+	TextureContainer m_TextureContainer;		//0x1B0
+};
+IS_OFFSET_CORRECT(CGraphicRenderContext, m_TextureContainer, 0x1B0)
 
 struct CSwapchain
 {
@@ -1708,7 +1979,13 @@ struct CSwapchain
 	char pad[96];					//0x08
 	dd* m_pUnk;						//0x60
 	char pad2[48];					//0x68
-	BOOL bSyncInterval;				//0xA0
+	BOOL m_bSyncInterval;			//0xA0
+};
+
+struct CGraphicOutputDx11
+{
+	DXGI_OUTPUT_DESC m_Desc;
+	char extra[184];
 };
 
 class CGraphicContextDx11;
@@ -1732,6 +2009,8 @@ public:
 };
 IS_OFFSET_CORRECT(CDisplay, m_pSwapchain, 0x50)
 
+struct HeapInfo;
+
 // Size = 0xF0 (240) bytes
 class CGraphics
 {
@@ -1744,13 +2023,13 @@ public:
 	char unk0x1C[4];					//0x001C
 	CGraphicContextDx11* m_pContext;	//0x0020
 	CDisplay m_Display;					//0x0028
-	void* m_pUnk98;						//0x0098
-	CRITICAL_SECTION m_CriticalSection;	//0x00A0
-	BOOL m_bCriticalSectionInitalized;	//0x00C8
-	char padCC[36];						//0x00CC
+	HeapInfo* m_pHeapInfo;				//0x0098
+	CReadWriteLock m_Lock;				//0x00A0
+	char padCC[32];						//0x00CC
 };
+IS_OFFSET_CORRECT(CGraphics, m_pContext, 0x20)
 IS_OFFSET_CORRECT(CGraphics, m_Display, 0x28)
-IS_OFFSET_CORRECT(CGraphics, m_CriticalSection, 0xA0)
+IS_OFFSET_CORRECT(CGraphics, m_Lock, 0xA0)
 IS_SIZE_CORRECT(CGraphics, 240)
 
 /*
@@ -1767,27 +2046,27 @@ renamed the class to it's proper name. It seems there might be a nested struct t
 class CGraphicDeviceDx11
 {
 	virtual CGraphicDeviceDx11* function0();
-	virtual void function1();
-	virtual BOOL Create(__int64 a1, CDisplay* pDisplay, HWND hWnd, __int64 a4);
+	virtual BOOL Create(CGraphicContextDx11** ppContext, CDisplay* pDisplay, HWND hWnd, void* pInfo);
+	virtual BOOL function2();
 	virtual BOOL function3();
 	virtual BOOL function4();
 	virtual BOOL function5();
-	virtual BOOL function6();
+	virtual BOOL Render(CGraphics* pGraphics, DWORD* a2, CDisplay* pDisplay);
 	virtual BOOL function7();
-	virtual BOOL function8();
+	virtual BOOL CreateComputeContext(__int64 a1, __int64 a2);
 	virtual BOOL function9();
 	virtual BOOL function10();
-	virtual BOOL function11();
-	virtual void function12();
+	virtual void function11();
+	virtual BOOL function12();
 	virtual BOOL function13();
 	virtual BOOL function14();
-	virtual BOOL function15();
-	virtual BOOL function16();
-	virtual BOOL function17();
-	virtual BOOL function18();
-	virtual BOOL function19();
-	virtual BOOL function20();
-	virtual BOOL function21();
+	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile);
+	virtual BOOL CreateIndexBuffer(CVertexBuffer* pBuffer, __int64* a2);
+	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int* pcbVertexSizes, int index, int iElement);
+	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, unsigned int uByteWidth);
+	virtual BOOL CreateIndexBuffer(CIndexBuffer* pBuffer, __int64* a2);
+	virtual BOOL CreateImmutableIndexBuffer(CIndexBuffer* pBuffer, const void* pData, int cbIndexSize, int nIndices);
+	virtual BOOL CreateDynamicIndexBuffer(CIndexBuffer* pBuffer, int iElements, int cbElementSize);
 	virtual BOOL CreateInputLayout(__int64 a2, const void* pDescriptions, unsigned int nDescs, VertexShaderContext* pCtx);
 	virtual BOOL CreateVertexShader(VertexShaderContext* pCtx, ShaderDescVS* pDesc);
 	virtual BOOL CreatePixelShader(PixelShaderContext* pCtx, ShaderDescPS* pDesc);
@@ -1800,7 +2079,7 @@ class CGraphicDeviceDx11
 	virtual BOOL function31();
 	virtual BOOL function32();
 	virtual BOOL function33();
-	virtual BOOL CreateDepthStencilState();
+	virtual BOOL CreateDepthStencilState(CDepthStencilState* pState, CDepthStencilStateInfo* pInfo);
 	virtual BOOL CreateSamplerState();
 	virtual BOOL CreateOcclusionQuery(COcclusionQuery* pQuery);
 
@@ -1812,27 +2091,29 @@ public:
 	BOOL isFullscreen;						//0x0014
 	BOOL bUnk0x018;							//0x0018
 	BOOL bUnk0x01C;							//0x001C
-	BOOL bFullscreenState;					//0x0020
+	BOOL m_bAquiredFullscreen;				//0x0020
 	char _0x0024[4];						//0x0024
 	ID3D11Device* pDevice;					//0x0028
 	IDXGIFactory* pFactory;					//0x0030
-	HWND hWindow;							//0x0038
+	HWND m_hWindow;							//0x0038
 	CVertexBuffer* m_pVertexBuffer;			//0x0040 | Hw::cVertexBufferImpl
 	void* unk0x048[2];						//0x0048
 	CVertexLayout* m_pVertexLayout;			//0x0058 | Hw::cVertexLayoutImpl
 	CConstantBuffer* m_pConstantBuffer;		//0x0060 | Hw::cConstantBufferImpl
 	char _0x0048[8];						//0x0068
-	CGraphicObjectFactoryDx11 m_factory;	//0x0070
+	CGraphicObjectFactoryDx11 m_Factory;	//0x0070
 	char _0x0080[96];						//0x0080 | pointers in here
 
 	//void* pd3dunk;						//0x00A0 
 
-	BOOL isWindowed;						//0x00E0
+	BOOL m_bFullscreen;						//0x00E0
 	float flFrameRate;						//0x00E4
-	char _0x00E8[8];						//0x00E8
-	D3D11_QUERY_DESC QueryDescs[2];			//0x00F0
-	wchar_t* pszGraphicsAdapterName;		//0x0100 (array?) maybe DXGI_OUTPUT_DESC*
-	QWORD qwCurrentAdapterNameIndex;		//0x0108
+	int m_iAdapter;							//0x00E8
+	char _0x00E8[4];						//0x00EC
+	D3D11_QUERY_DESC m_OccusionDesc;		//0x00F0
+	D3D11_QUERY_DESC m_TimestampDesc;		//0x00F8
+	wchar_t* m_szGraphicsAdapterName;		//0x0100 (array?) maybe DXGI_OUTPUT_DESC* CGraphicOutputDx11* probs
+	QWORD m_uAdapterCount;					//0x0108 | ID3D11DeviceContext* m_pContext;
 };
 IS_SIZE_CORRECT(CGraphicDeviceDx11, 272)
 
@@ -1900,12 +2181,6 @@ public:
 		int m_iIndex; //valid range 0 - 31 (clamped)
 	};
 
-	struct TextureGroup
-	{
-		BOOL m_bUpdateTextures;
-		void* m_pTextures[32];
-	};
-
 	virtual void function0() PURE;
 	virtual unsigned int GetUINT0x4(__int64 a2) PURE; // func = return *(uint*)(a2+4);
 	virtual BOOL sub_144FCC1D0(__int64 a2, __int64 a3) PURE;
@@ -1941,7 +2216,7 @@ public:
 	virtual BOOL function32() PURE;
 	virtual BOOL function33() PURE;
 	virtual BOOL ClearUnorderedAccessViewUint(__int64 a2, const UINT a3) PURE;
-	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int index) PURE;
+	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int iShaderResourceView) PURE;
 	virtual BOOL UnsetTexture(CTexture* pTexture) PURE;
 	virtual BOOL SetSamplerState() PURE;
 	virtual BOOL SetBlendState(__int64 p) PURE;
@@ -1949,8 +2224,8 @@ public:
 	virtual BOOL SetDepthStencilState(__int64 p) PURE;
 	virtual BOOL SetBlendFactor(UINT color) PURE;
 	virtual BOOL SetTopology(Topology topology) PURE;
-	virtual BOOL BeginOcclsuionQuery(__int64 p) PURE;
-	virtual BOOL EndOcclsuionQuery(__int64 p) PURE;
+	virtual BOOL BeginOcclusionQuery(__int64 p) PURE;
+	virtual BOOL EndOcclusionQuery(__int64 p) PURE;
 	virtual BOOL DrawPrimitive(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawIndexedPrimitive(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawPrimitiveInstanced(RenderInfo* pInfo) PURE;
@@ -1973,19 +2248,16 @@ public:
 	ID3D11DepthStencilView* m_pDepthStencilView;	//0x0080
 	CDepthSurface* m_pDepthSurface2;				//0x0088
 	CVertexBuffer* m_pVertexBuffer2;				//0x0090
-	CGraphicShader m_shader;						//0x0090
-	//CShaderCache									//0x0098
-	char extra2[816];								//0x0198
-
-	//0x0248 - start TextureGroup array (unknown size)
-
-	//int m_iRenderWidth;							//0x0568
-	//int m_iRenderHeight;							//0x056C
-
-	void* m_pIface;									//0x0578
+	CGraphicRenderContext m_RenderContext;			//0x0098
+	char pad368[512];								//0x0368
+	int m_iRenderWidth;								//0x0568
+	int m_iRenderHeight;							//0x056C
+	char pad570[8];									//0x0570
+	ID3D11Device* m_pDevice;						//0x0578
 };
 IS_SIZE_CORRECT(CGraphicContextDx11, 1408)
-
+IS_OFFSET_CORRECT(CGraphicContextDx11, m_RenderContext, 0x98)
+IS_OFFSET_CORRECT(CGraphicContextDx11, m_iRenderWidth, 0x568)
 
 class COsMainWindow
 {
@@ -2224,6 +2496,8 @@ struct set_info_t
 	INT m_i0x08C;
 };
 
+#define CREATE_ENTITY_VFX 0x40000000
+
 struct Create_t
 {
 	const char* m_szName;			//0x0000
@@ -2233,13 +2507,14 @@ struct Create_t
 	DWORD m_dwFlags;				//0x001C
 	BOOL m_b0x0020;					//0x0020
 	char alignment24[4];			//0x0024
-	void* m_pWMBBuffer;				//0x0028
-	void* m_unk;					//0x0040
-	void* m_pDatBuffers;			//0x0048
-	Vector3Aligned m_vec;			//0x0050
-	QWORD m_0x60;					//0x0060
+	void* m_pWMB;					//0x0028
+	CModelData *m_pModelData;		//0x0030
+	void *m_pDatBuffers;			//0x0038
+	void* m_pWTA;					//0x0040
+	void* m_pWTP;					//0x0048
+	void* m_pBXM;					//0x0050
 };
-
+	
 struct Create2_t
 {
 	CSceneEntitySystem* m_pSceneEntitySystem;
@@ -2340,11 +2615,11 @@ class CGameContentDeviceSteam
 	virtual void UnloadContent(CGameContentDevice* pGameContentDevice);
 	virtual void LoadContent(CGameContentDevice* pGameContentDevice);
 public:
-	//void* m_pVtbl;															//0x0000
+	//void* m_pVtbl;														//0x0000
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008 | id is 1005
 	CallbackInstalled* m_pItems;											//0x0028
 	DWORD m_nItems;															//0x0030
-	BOOL m_Unloaded;														//0x0034 | not sure
+	BOOL m_bUnloaded;														//0x0034 | not sure
 };
 IS_SIZE_CORRECT(CGameContentDeviceSteam, 56)
 
@@ -2359,7 +2634,7 @@ public:
 	DWORD m_nCpkCount;												//0x0010 
 	DWORD unk0x014;													//0x0014 
 	DWORD unk0x18;													//0x0018
-	void(*LoadCpks)(unsigned int index, const char* szCpkName);	//0x0020
+	void(*LoadCpks)(unsigned int index, const char* szCpkName);		//0x0020
 	void(*UnloadCpks)(unsigned int index);							//0x0028
 	CHeapInstance** m_ppHeap;										//0x0030 | probably a parent pointer
 	CGameContentDeviceSteam* m_pSteamContent;						//0x0038
@@ -2402,8 +2677,7 @@ public:
 	DWORD dw0x14;
 	QWORD qw0x18;
 	QWORD qw0x20;
-	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionValid;
+	CReadWriteLock m_Lock;
 	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
 	UINT m_uMaxAchievement;
 };
@@ -2420,7 +2694,7 @@ class CRankingDevice
 IS_SIZE_CORRECT(CRankingDevice, 120)
 
 /*
-Size of is 0x40 (64) bytes
+Size of struct is 0x40 (64) bytes
 */
 class COsSystemDeviceSteam
 {
@@ -2428,14 +2702,14 @@ public:
 	virtual __int64 sub_144F5DAA0(char a2); //destructor???
 	virtual __int64 RunCallbacks();
 	virtual __int64 InitContext(void* p);
-	virtual int GetVar0x38();
+	virtual BOOL IsOverlayActive();
 
 	//void* m_pVtable;		//0x00
-	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_overlay; //0x08 id - 331
+	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_overlay; //0x08 id = 331
 	BOOL m_bInitalized;		//0x28
 	char pad2[4];			//0x2C
 	ISteamUser019* m_pUser;	//0x30
-	int _0x038;				//0x38
+	BOOL m_bOverlayActive;	//0x38
 	char pad3[4];			//0x3C
 };
 IS_SIZE_CORRECT(COsSystemDeviceSteam, 64)
@@ -2512,8 +2786,7 @@ Address = 0x1417BFD48
 */
 struct WetObjManager
 {
-	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionInitalized;
+	CReadWriteLock m_Lock;
 	char pad[4];
 	EntityHandle m_Localhandles[2];
 	WetObjManagerDelay m_WetDelays[2];
@@ -2614,15 +2887,14 @@ public:
 	//void* m_pvtable;							//0x0000
 	StaticArray<EntityHandle, 256> m_handles;	//0x0008
 	StaticArray<EntityHandle, 256> m_handles2;	//0x0428
-	char _0x0840[16];							//0x0840
+	char _0x0840[16];							//0x0848
 	StaticArray<EntityHandle, 256> m_handles3;	//0x0858
 	StaticArray<EntityHandle, 256> m_handles4;	//0x0C78
 	StaticArray<EntityHandle, 256> m_handles5;	//0x1098
-	char _0x14B0[4];							//0x14B0
+	EntityHandle m_hCameraEntity;				//0x14B8
 	EntityHandle m_hEntity;						//0x14BC
-	EntityHandle m_hEnt[7];						//0x14BC
-	CRITICAL_SECTION m_CriticalSection;			//0x14D8
-	BOOL m_bUnk;								//0x1500
+	EntityHandle m_hEnt[7];						//0x14C0
+	CReadWriteLock m_Lock;						//0x14DC
 };
 IS_OFFSET_CORRECT(EmBaseManager, m_handles, 0x8)
 IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428)
@@ -2630,6 +2902,7 @@ IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0x858)
 IS_OFFSET_CORRECT(EmBaseManager, m_handles4, 0xC78)
 IS_OFFSET_CORRECT(EmBaseManager, m_handles5, 0x1098)
 IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
+//IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14DC) //wtf is going on
 
 struct SteamContext
 {
@@ -2746,7 +3019,7 @@ typedef struct mrb_heap_page {
 	struct mrb_heap_page *free_next;
 	struct mrb_heap_page *free_prev;
 	mrb_bool old : 1;
-	void *objects[];
+	void *objects[ANYSIZE_ARRAY];
 } mrb_heap_page;
 
 typedef struct mrb_gc {
@@ -2981,7 +3254,7 @@ struct MrubyScript
 
 struct ScriptProxy
 {
-	INT m_dwReferenceCount;
+	INT m_iReferenceCount;
 	struct mrb_state *m_pRubyVM;
 };
 

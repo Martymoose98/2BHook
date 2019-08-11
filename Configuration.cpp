@@ -108,6 +108,8 @@ void CConfig::InitializeConfig()
 #pragma region visuals
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_traceline", Vars.Visuals.bTraceLine));
 	m_items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_traceline", Vars.Visuals.flTraceLength));
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_chams", Vars.Visuals.bChams));
+	m_items.emplace_back(new ConfigItemInt(CATEGORY_VISUALS, "i_cham_type", Vars.Visuals.iChamType));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_espbox", Vars.Visuals.bEspBox));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_2despbox", Vars.Visuals.b2DEspBox));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_enemy_info", Vars.Visuals.bEnemyInfo));
@@ -194,9 +196,7 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 	DWORD dwStatus;
 	HANDLE hFind;
 	TCHAR szSearchDirectory[MAX_PATH];
-	TCHAR szFileName[MAX_PATH];
 	BOOLEAN bHeadConstructed = FALSE;
-
 
 	if (!ppData)
 		return ERROR_INVALID_PARAMETER;
@@ -248,7 +248,7 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 			pPrev->m_pNext = pEntry;
 
 		pEntry->m_pPrevious = pPrev;
-		memcpy(&pEntry->m_Data, &Find, sizeof(WIN32_FIND_DATA_LIST));
+		memcpy(&pEntry->m_Data, &Find, sizeof(WIN32_FIND_DATA));
 		pPrev = pEntry;
 	} while (FindNextFile(hFind, &Find));
 

@@ -205,9 +205,9 @@ public:
 	{
 		Vector3 ang = CalcAngle(src, dst);
 		AngleVectors(ang, &ang);
-		return RADTODEG(acos(vForward.Dot(ang) / (vForward.LengthSqr() * ang.Length())));
+		return RADTODEG(acos(vForward.Dot(ang) / (vForward.Length() * ang.Length())));
 	}
-
+	
 	static Vector3 LookAt(const Vector3& vPlayerPos, const Vector3& vEnemyPos)
 	{
 		Vector3 ang;

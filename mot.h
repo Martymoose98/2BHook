@@ -37,7 +37,7 @@ struct MotRecord
 
 struct MotInterpolation
 {
-	float flValues[]; // MotRecord::elemNumber
+	float flValues[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolationInternal
@@ -55,7 +55,7 @@ struct MotInterpolation2Values
 struct MotInterpolation2
 {
 	MotInterpolation2Values values;
-	uint16 cp[]; // MotRecord::elemNumber
+	uint16 cp[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation2Internal
@@ -74,7 +74,7 @@ struct MotInterpolation3Values
 struct MotInterpolation3
 {
 	MotInterpolation3Values values;
-	byte cp[]; // MotRecord::elemNumber
+	byte cp[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation3Internal
@@ -95,7 +95,7 @@ struct MotInterpolation4Key
 
 struct MotInterpolation4
 {
-	MotInterpolation4Key keys[]; // MotRecord::elemNumber
+	MotInterpolation4Key keys[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation4Internal
@@ -125,7 +125,7 @@ struct MotInterpolation5Key
 struct MotInterpolation5
 {
 	MotInterpolation5Values values;
-	MotInterpolation5Key keys[]; // MotRecord::elemNumber
+	MotInterpolation5Key keys[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation5Internal
@@ -157,7 +157,7 @@ struct MotInterpolation6Key
 struct MotInterpolation6
 {
 	MotInterpolation6Values values;
-	MotInterpolation6Key keys[];  // MotRecord::elemNumber
+	MotInterpolation6Key keys[ANYSIZE_ARRAY];  // MotRecord::elemNumber
 };
 
 struct MotInterpolation6Internal
@@ -178,7 +178,7 @@ struct MotInterpolation7Key
 struct MotInterpolation7
 {
 	MotInterpolation6Values values;
-	MotInterpolation7Key keys[]; // MotRecord::elemNumber
+	MotInterpolation7Key keys[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation7Internal
@@ -209,7 +209,7 @@ struct MotInterpolation8Key
 struct MotInterpolation8
 {
 	MotInterpolation8Values values;
-	MotInterpolation8Key keys[]; // MotRecord::elemNumber
+	MotInterpolation8Key keys[ANYSIZE_ARRAY]; // MotRecord::elemNumber
 };
 
 struct MotInterpolation8Internal
@@ -467,6 +467,94 @@ static double Readpghalf(pghalf value)
 		}
 	}
 	return f;
+}
+
+static uint32_t halfbits_to_floatbits(pghalf h)
+{
+	uint16_t h_exp, h_sig;
+	uint32_t f_sgn, f_exp, f_sig;
+
+	h_exp = (h & 0x7c00u);
+	f_sgn = ((uint32_t)h & 0x8000u) << 16;
+	switch (h_exp) {
+	case 0x0000u: /* 0 or subnormal */
+		h_sig = (h & 0x03ffu);
+		/* Signed zero */
+		if (h_sig == 0) {
+			return f_sgn;
+		}
+		/* Subnormal */
+		h_sig <<= 1;
+		while ((h_sig & 0x0400u) == 0) {
+			h_sig <<= 1;
+			h_exp++;
+		}
+		f_exp = ((uint32_t)(127 - 15 - h_exp)) << 23;
+		f_sig = ((uint32_t)(h_sig & 0x03ffu)) << 13;
+		return f_sgn + f_exp + f_sig;
+	case 0x7c00u: /* inf or NaN */
+		/* All-ones exponent and a copy of the significand */
+		return f_sgn + 0x7f800000u + (((uint32_t)(h & 0x03ffu)) << 13);
+	default: /* normalized */
+		/* Just need to adjust the exponent and shift */
+		return f_sgn + (((uint32_t)(h & 0x7fffu) + 0x1c000u) << 13);
+	}
+}
+
+static float half_to_float(pghalf h)
+{
+	return halfbits_to_floatbits(h);
+}
+
+static pghalf make_half_float(float f) 
+{
+
+	union {
+		float fv;
+		uint32_t ui;
+	} ci;
+	ci.fv = f;
+
+	uint32_t x = ci.ui;
+	uint32_t sign = (unsigned short)(x >> 31);
+	uint32_t mantissa;
+	uint32_t exp;
+	uint16_t hf;
+
+	// get mantissa
+	mantissa = x & ((1 << 23) - 1);
+	// get exponent bits
+	exp = x & (0xFF << 23);
+	if (exp >= 0x47800000) {
+		// check if the original single precision float number is a NaN
+		if (mantissa && (exp == (0xFF << 23))) {
+			// we have a single precision NaN
+			mantissa = (1 << 23) - 1;
+		}
+		else {
+			// 16-bit half-float representation stores number as Inf
+			mantissa = 0;
+		}
+		hf = (((uint16_t)sign) << 15) | (uint16_t)((0x1F << 10)) |
+			(uint16_t)(mantissa >> 13);
+	}
+	// check if exponent is <= -15
+	else if (exp <= 0x38000000) {
+
+		/*// store a denorm half-float value or zero
+	exp = (0x38000000 - exp) >> 23;
+	mantissa >>= (14 + exp);
+	hf = (((uint16_t)sign) << 15) | (uint16_t)(mantissa);
+	*/
+		hf = 0; //denormals do not work for 3D, convert to zero
+	}
+	else {
+		hf = (((uint16_t)sign) << 15) |
+			(uint16_t)((exp - 0x38000000) >> 13) |
+			(uint16_t)(mantissa >> 13);
+	}
+
+	return hf;
 }
 
 static float HermiteInterpolate(float p, float deltap, float m0, float deltam0, float m1, float deltam1)

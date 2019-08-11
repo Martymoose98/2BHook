@@ -23,100 +23,77 @@ static ID3D11RasterizerState* pNorm, *pBias;
 static bool hookupdate = false;
 VirtualTableHook m_ctxhook;
 
-void(*oSetViewport)(CGraphicContextDx11* pThis, int x, int y, int width, int height, float min_depth, float max_depth);
-
-BOOL(*oSetTexture)(CGraphicContextDx11* pThis, int *idxs, CTexture* pTexture, int index);
-
-void hkSetViewport(CGraphicContextDx11* pThis, int x, int y, int width, int height, float min_depth, float max_depth)
-{
-	LOG("X=%i, Y=%i, W=%i, H=%i, MIN_DEPTH=%f, MAX_DEPTH=%f\n", x, y, width, height, min_depth, max_depth);
-
-	oSetViewport(pThis, x, y, width, height, min_depth, max_depth);
-}
-
 BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 {
-	ID3D11RenderTargetView *pRTV[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT];
-	ID3D11DepthStencilView *pDSV;
+	ID3D11RasterizerState* pRS;
+	ID3D11DepthStencilState* pDSS;
+	UINT uStencilRef;
 	CModelDrawData* pDrawData;
-	PixelShaderContext ctx;
 	BOOLEAN bChams = FALSE;
 
-	if (g_pLocalPlayer)
+	BOOL b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_RenderContext, pThis->m_pContext);
+
+
+	if (g_pCamera && g_pCamera->m_pCamEntity && Vars.Visuals.bChams)
 	{
-		pDrawData = g_pLocalPlayer->m_pModelData->m_pDrawData;
+		pDrawData = g_pCamera->m_pCamEntity->m_pModelData->m_pDrawData;
 
 		for (int i = 0; i < pDrawData->m_nBatches; ++i)
 		{
 			CBatch* pBatch = &pDrawData->m_pBatches[i];
 
 			if (pInfo->m_uVertexCount == pBatch->m_nVertices && pInfo->m_uIndexCountPerInstance == pBatch->m_nPrimitives)
+			{
 				bChams = TRUE;
+				break;
+			}
 		}
 	}
-
-	BOOL b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_shader, pThis->m_pContext);
-
+	
 	if (bChams)
-	{
-		pThis->m_pContext->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, pRTV, &pDSV);
-		pThis->m_pContext->RSSetState(pBias);
-		pThis->m_pContext->OMSetDepthStencilState(g_pDepthStencilStates[READ_NO_WRITE], 1);
-		pThis->m_pContext->PSSetShader(g_pRed, NULL, 0);
+	{	
+		pThis->m_pContext->OMGetDepthStencilState(&pDSS, &uStencilRef);
+		pDSS->Release();
+		pThis->m_pContext->RSGetState(&pRS);
+		pRS->Release();
 
-		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
-
-		pThis->m_pContext->OMSetDepthStencilState(g_pDepthStencilStates[READ_NO_WRITE1], 1);
-		pThis->m_pContext->RSSetState(pNorm);
-		pThis->m_pContext->PSSetShader(g_pGreen, NULL, 0);
-
-		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
-
-		pThis->m_pContext->RSSetState(pBias);
-		pThis->m_pContext->OMSetRenderTargets(0, NULL, pDSV);
-
-		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
-
-		pThis->m_pContext->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, pRTV, pDSV);
-		pThis->m_pContext->RSSetState(pNorm);
-
-		/*ctx.m_pInfo = (PixelShaderInfo*)&g_pRed; // ghetto asf
-		pThis->SetPixelShader(&ctx);
-
-		b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_shader, pThis->m_pContext);
-
-		pThis->m_pContext->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, pRTV, &pDSV);
-		pThis->m_pContext->RSSetState(pBias);
 		pThis->m_pContext->OMSetDepthStencilState(g_pDepthStencilStates[DISABLED], 1);
 
-		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
+		if (Vars.Visuals.iChamType)
+		{
+			pThis->m_pContext->PSSetShader(g_pRed, NULL, 0);
+		}
+		else
+		{
+			pThis->m_pContext->PSSetShaderResources(0, 1, &g_pRedSRV);
+			//pThis->m_pContext->PSSetSamplers(0, 1, &g_pSamplerState);
+		}
 
-		ctx.m_pInfo = (PixelShaderInfo*)&g_pGreen;
-		pThis->SetPixelShader(&ctx);
+		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_RenderContext, pThis->m_pContext, pInfo);
 
-		b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_shader, pThis->m_pContext);
-
-		pThis->m_pContext->RSSetState(pNorm);
-		pThis->m_pContext->OMSetDepthStencilState(g_pDepthStencilStates[READ_NO_WRITE1], 1);
-
-		if (b) b = (*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
-
+		pThis->m_pContext->OMSetDepthStencilState(g_pDepthStencilStates[READ_NO_WRITE], 1);
 		pThis->m_pContext->RSSetState(pBias);
-		pThis->m_pContext->OMGetRenderTargets(0, NULL, &pDSV);
 
-		b = (*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo);
-		
-		pThis->m_pContext->RSSetState(pNorm);
-		pThis->m_pContext->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, pRTV, pDSV);*/
+		if (Vars.Visuals.iChamType)
+		{
+			pThis->m_pContext->PSSetShader(g_pGreen, NULL, 0);
+		}
+		else
+		{
+			pThis->m_pContext->PSSetShaderResources(0, 1, &g_pGreenSRV);
+			//pThis->m_pContext->PSSetSamplers(0, 1, &g_pSamplerState);
+		}
+
+		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_RenderContext, pThis->m_pContext, pInfo);
+
+		pThis->m_pContext->RSSetState(pRS);
+		//pThis->m_pContext->RSSetState(pNorm);
+		pThis->m_pContext->OMSetDepthStencilState(pDSS, uStencilRef);
+
+		//b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_RenderContext, pThis->m_pContext);
 	}
 		
-	return (b) ? (*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_shader, pThis->m_pContext, pInfo) : b;
-}
-
-void CTX_FLUSH(CGraphicContextDx11 *a1)
-{
-	a1->m_pContext->Flush();
-	LOG("CTX FLUSHED!");
+	return (b) ? (*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_RenderContext, pThis->m_pContext, pInfo) : b;
 }
 
 HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
@@ -138,9 +115,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	{
 		hookupdate = true;
 		m_ctxhook.Initialize((QWORD**)g_pGraphics->m_pContext);
-		//oSetViewport = (void(*)(CGraphicContextDx11*, int, int, int, int, float, float))m_ctxhook.HookFunction((QWORD)hkSetViewport, 14);
 		m_ctxhook.HookFunction((QWORD)DrawIndexedPrimitive, 46);
-		m_ctxhook.HookFunction((QWORD)CTX_FLUSH, 51);
 
 		D3D11_RASTERIZER_DESC nrasterizer_desc;
 		ZeroMemory(&nrasterizer_desc, sizeof(nrasterizer_desc));
@@ -160,12 +135,12 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		D3D11_RASTERIZER_DESC rasterizer_desc;
 		ZeroMemory(&rasterizer_desc, sizeof(rasterizer_desc));
 		rasterizer_desc.FillMode = D3D11_FILL_SOLID;
-		rasterizer_desc.CullMode = D3D11_CULL_NONE; //D3D11_CULL_FRONT;
+		rasterizer_desc.CullMode = D3D11_CULL_FRONT; // D3D11_CULL_NONE;
 		rasterizer_desc.FrontCounterClockwise = false;
 		float bias = 1000.0f;
 		float bias_float = -bias;
 		bias_float /= 10000.0f;
-		rasterizer_desc.DepthBias = (*(UINT*)&bias_float / (1.f / 8388608.f));
+		rasterizer_desc.DepthBias = (INT)(*(UINT*)&bias_float / (1.f / 8388608.f));
 		rasterizer_desc.SlopeScaledDepthBias = 0.0f;
 		rasterizer_desc.DepthBiasClamp = 0.0f;
 		rasterizer_desc.DepthClipEnable = true;
@@ -206,20 +181,26 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	if (GetAsyncKeyState(VK_F2) & 1)
 		LOG("Animation ID: %d\n", --Vars.Gameplay.iAnimation);
 
-	if (GetAsyncKeyState(VK_F3) & 1)
+	if (GetAsyncKeyState(VK_F4) & 1)
 	{
-		static DWORD diagId = 0;
-		typedef void*(*DialogFactoryFn)(QWORD thisrcx, DWORD id);
-		void* rax = ((DialogFactoryFn)(0x1408127E0))(0, diagId);
-		if ((*(BOOL(*)(void*))(0x140812B80))(rax))
+		typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(uint32 texid);
+		typedef BOOL(*CreateModelShaderModuleFn)(CModelShader *pEnt_390, CMaterialInfo *pInfo, void* pModelWork);
+		static bool bInit = false;
+		static CMaterial* pReplace;
+
+		CMaterialInfo info = { 0 };
+
+		if (!bInit)
 		{
-			//*(DWORD*)((BYTE*)rax + 0x58) &= 0xBFFFFFFF;
-			*(DWORD*)((BYTE*)rax + 0x58) = 0xC0000000;
-			*(DWORD*)((BYTE*)rax + 0x88) |= 3;
-			*((void**)0x14105C968) = rax;
-			(*(DWORD*)0x14105C91C)++;
+			bInit = true;
+			pReplace = LoadMaterial("X:\\Documents\\Visual Studio 2017\\Projects\\2B Hook\\2B Hook\\Hair.dds");
 		}
-		//(*(__int64(*)(void*))0x144807360)((void*)0x1419861E0); //CreateYesNoDialog
+
+		info.m_pModelAnalyzer = (void*)0x141101C60;
+		info.m_pMaterial = pReplace;
+		info.m_bUnknownsExist = *MakePtr(int*, g_pLocalPlayer->m_pModelData, 0xE0) > 0;
+		((CreateModelShaderModuleFn)(0x140871EF0))(&g_pLocalPlayer->m_pModelShaders[10], &info, &g_pLocalPlayer->m_ModelExtendWork);
+		g_pLocalPlayer->m_pModelShaders[10].m_pMaterial = info.m_pMaterial;
 	}
 
 	if (GetAsyncKeyState(VK_F11) & 1)
@@ -253,15 +234,11 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 			if (Vars.Gameplay.flModelTintHue > 1.f)
 				Vars.Gameplay.flModelTintHue = 0.0f;
 
-			Vector4 vRain;
-			Color rainbow = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
-			rainbow.GetFloatColor((float*)&vRain);
-
 			for (INT i = 0; i < pCameraEnt->m_nModelParts; ++i)
 			{
 				if (!strcmp(pCameraEnt->m_pModelParts[i].m_szModelPart, "Hair"))
 				{
-					pCameraEnt->m_pModelParts[i].m_vColor = vRain;
+					pCameraEnt->m_pModelParts[i].m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
 					pCameraEnt->m_pModelParts[i].m_bUpdate = TRUE;
 					pCameraEnt->m_pModelParts[i].m_bShow = TRUE;
 					break;
@@ -279,16 +256,14 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 				if (Vars.Gameplay.flPodTintHue > 1.f)
 					Vars.Gameplay.flPodTintHue = 0.0f;
-
-				Vector4 vRain;
-				Color rainbow = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
-				rainbow.GetFloatColor((float*)&vRain);
+	
+				Vector4 vRain = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
 
 				for (INT i = 0; i < pPod->m_nModelParts; ++i)
 				{
 					if (!strcmp(pPod->m_pModelParts[i].m_szModelPart, "Body"))
 					{
-						pPod->m_pModelParts[i].m_vColor = vRain;
+						pPod->m_pModelParts[i].m_vColor = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
 						pPod->m_pModelParts[i].m_bUpdate = TRUE;
 						pPod->m_pModelParts[i].m_bShow = TRUE;
 						break;
@@ -404,7 +379,7 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 
 void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const * ppShaderResourceViews)
 {
-	g_StartSlot = StartSlot;
+	D3D11_SHADER_RESOURCE_VIEW_DESC Desc;
 
 	for (UINT i = 0; i < NumViews; ++i)
 	{
@@ -412,9 +387,9 @@ void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT Num
 
 		if (pShaderResourceView)
 		{
-			pShaderResourceView->GetDesc(&g_ShaderResViewDesc);
+			pShaderResourceView->GetDesc(&Desc);
 
-			if ((g_ShaderResViewDesc.ViewDimension == D3D11_SRV_DIMENSION_BUFFER) || (g_ShaderResViewDesc.ViewDimension == D3D11_SRV_DIMENSION_BUFFEREX))
+			if ((Desc.ViewDimension == D3D11_SRV_DIMENSION_BUFFER) || (Desc.ViewDimension == D3D11_SRV_DIMENSION_BUFFEREX))
 				continue;//Skip buffer resources
 		}
 	}
@@ -432,37 +407,22 @@ void hkDraw(ID3D11DeviceContext* pThis, UINT VertexCount, UINT StartVertexLocati
 */
 void hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
-	pThis->IAGetVertexBuffers(0, 8, g_pVertexBuffers, g_Stride, g_VertexBuffersOffset);
+	ID3D11Buffer* pVertexBuffers[8];
+	UINT Strides[8];
+	UINT VertexBufferOffsets[8];
+
+	pThis->IAGetVertexBuffers(0, 8, pVertexBuffers, Strides, VertexBufferOffsets);
 
 	for (int i = 0; i < 8; ++i)
 	{
-		if (g_pVertexBuffers[i])
+		if (pVertexBuffers[i])
 		{
-			g_pVertexBuffers[i]->GetDesc(&g_VertexBufferDesc[i]);
-			g_pVertexBuffers[i]->Release();
-			g_pVertexBuffers[i] = NULL;
+			pVertexBuffers[i]->Release();
+			pVertexBuffers[i] = NULL;
 		}
 	}
 
-	pThis->IAGetIndexBuffer(&g_pIndexBuffer, &g_IndexFormat, &g_IndexOffset);
-
-	if (g_pIndexBuffer)
-	{
-		g_pIndexBuffer->GetDesc(&g_IndexBufferDesc);
-		g_pIndexBuffer->Release();
-		g_pIndexBuffer = NULL;
-	}
-
-	pThis->PSGetConstantBuffers(g_PixelShaderStartSlot, 1, &g_pPixelShaderBuffer);
-
-	if (g_pPixelShaderBuffer)
-	{
-		g_pPixelShaderBuffer->GetDesc(&g_PixelShaderBufferDesc);
-		g_pPixelShaderBuffer->Release();
-		g_pPixelShaderBuffer = NULL;
-	}
-
-	if (Vars.Misc.bWireframe && g_Stride[0] == 28)
+	if (Vars.Misc.bWireframe && Strides[0] == 28)
 		g_pDeviceContext->RSSetState(g_pRenderWireframeState); // wireframe
 
 	oDrawIndexed(pThis, IndexCount, StartIndexLocation, BaseVertexLocation);
@@ -544,7 +504,7 @@ void hkUpdateModelParts(Pl0000* pEntity)
 	LOG("Update model hook!");
 }
 
-bool hkMRubyLoadScriptFn(MrubyImpl* pThis, MrubyScript* pScript)
+bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 {
 	g_pConsole->Log(ImColor(0.5f, 0.f, 0.7f), "Script%x loaded!", pScript->m_dwHash);
 	return oMRubyLoadScript(pThis, pScript);

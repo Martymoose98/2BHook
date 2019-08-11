@@ -322,20 +322,11 @@ public:
 
 	static void AddItem(int id, int quantity)
 	{
-		typedef __int64(__fastcall* HandleSpecialItemsFn)(__int64 thisrcx, int item_id);
-		//const char* pItem = ((GetItemByIdFn)(0x1405E0FD0))(0, id); //emil head
-
-		//(*(void(*)(void* a1, signed int a2))(0x1401AE440))(g_pLocalPlayer, 15); // 5
-
-
-		//g_pLocalPlayer->m_dwAccessory = ((HandleSpecialItemsFn)(0x1405E1170))(0, id);
-		//(*(void(*)(void* a1, signed int a2))(0x1401AE440))(g_pLocalPlayer, g_pLocalPlayer->m_dwAccessory);
-
 		((AddItemFn)(0x1405DC410))(0, id, quantity);
 
 		if (Vars.Gameplay.bInstantEquip)
 		{
-			((UseItemFn)(0x1405DC5A0))(0, id);
+			((UseItemFn)(0x1405DC5A0))(0, id, quantity);
 		}
 	}
 

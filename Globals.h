@@ -67,22 +67,6 @@ enum eDepthState
 	DISABLED,
 	READ_NO_WRITE,
 	NO_READ_NO_WRITE,
-	ENABLED1,
-	ENABLED2,
-	ENABLED3,
-	ENABLED4,
-	ENABLED5,
-	ENABLED6,
-	ENABLED7,
-	ENABLED8,
-	READ_NO_WRITE1,
-	READ_NO_WRITE2,
-	READ_NO_WRITE3,
-	READ_NO_WRITE4,
-	READ_NO_WRITE5,
-	READ_NO_WRITE6,
-	READ_NO_WRITE7,
-	READ_NO_WRITE8,
 	_DEPTH_COUNT
 };
 
@@ -96,7 +80,7 @@ typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objec
 typedef int(*GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
 typedef const char*(*GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
 typedef bool(*AddItemFn)(__int64 pItemManager, int item_id, int quantity);
-typedef bool(*UseItemFn)(__int64 pItemManager, int item_id);
+typedef bool(*UseItemFn)(__int64 pItemManager, int item_id, float flQuantity);
 typedef void(*ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
@@ -218,6 +202,7 @@ extern NPCManager* g_pNPCManager;
 extern EmBaseManager* g_pEnemyManager;
 extern WetObjManager* g_pWetObjectManager;
 extern CCollisionDataObjectManager* g_pCollisionDataObjectManager;
+extern CTextureResourceManager* g_pTextureResourceManager;
 extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
 extern CSceneStateSystem* g_pSceneStateSystem;
@@ -240,19 +225,11 @@ extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
 extern ID3D11DepthStencilState* g_pDepthStencilStates[_DEPTH_COUNT];
-extern ID3D11Buffer* g_pVertexBuffers[8];
-extern D3D11_BUFFER_DESC g_VertexBufferDesc[8];
-extern UINT g_VertexBuffersOffset[8];
-extern UINT g_Stride[8];
-extern ID3D11Buffer* g_pIndexBuffer;
-extern D3D11_BUFFER_DESC g_IndexBufferDesc;
-extern DXGI_FORMAT g_IndexFormat;
-extern UINT g_IndexOffset;
-extern UINT g_StartSlot;
-extern ID3D11Buffer* g_pPixelShaderBuffer;
-extern D3D11_BUFFER_DESC g_PixelShaderBufferDesc;
-extern UINT g_PixelShaderStartSlot;
-extern D3D11_SHADER_RESOURCE_VIEW_DESC g_ShaderResViewDesc;
+extern ID3D11SamplerState* g_pSamplerState;
+extern ID3D11Texture2D* g_pTexRed;
+extern ID3D11Texture2D* g_pTexGreen;
+extern ID3D11ShaderResourceView* g_pRedSRV;
+extern ID3D11ShaderResourceView* g_pGreenSRV;
 extern IDXGISwapChain* g_pSwapChain;
 extern IDXGISwapChain* g_pSecondarySwapChain;
 extern IDXGIFactory* g_pFactory;
