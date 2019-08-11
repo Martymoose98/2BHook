@@ -389,7 +389,7 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		GetPrivateProfileString(m_szCategory, m_szName, "false", szBuffer, sizeof(szBuffer), szFilename);
 		m_value = !_stricmp(szBuffer, "true");
@@ -397,7 +397,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		strcpy_s(szBuffer, (m_value) ? "true" : "false");
 		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
@@ -418,7 +418,7 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		GetPrivateProfileString(m_szCategory, m_szName, "0", szBuffer, sizeof(szBuffer), szFilename);
 		m_value = strtol(szBuffer, NULL, 0);
@@ -426,7 +426,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		sprintf_s(szBuffer, "%i", m_value);
 		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
@@ -447,7 +447,7 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		GetPrivateProfileString(m_szCategory, m_szName, "0", szBuffer, sizeof(szBuffer), szFilename);
 		m_value = strtoul(szBuffer, NULL, 0);
@@ -455,7 +455,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		sprintf_s(szBuffer, "%u", m_value);
 		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
@@ -476,7 +476,7 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		GetPrivateProfileString(m_szCategory, m_szName, "0.0f", szBuffer, sizeof(szBuffer), szFilename);
 		m_value = (float)atof(szBuffer);
@@ -484,7 +484,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szBuffer[32];
+		char szBuffer[33];
 
 		sprintf_s(szBuffer, "%f", m_value);
 		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
@@ -535,8 +535,8 @@ public:
 
 	virtual void Read(const char* szFilename)
 	{
-		char szDefaultKeybindKeycode[32];
-		char szKeybindKeycode[32];
+		char szDefaultKeybindKeycode[33];
+		char szKeybindKeycode[33];
 
 		_itoa_s(m_key.GetKeycode(), szDefaultKeybindKeycode, 10);
 
@@ -547,7 +547,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szKeybindKeycode[32];
+		char szKeybindKeycode[33];
 
 		_itoa_s(m_key.GetKeycode(), szKeybindKeycode, 10);
 
@@ -747,6 +747,98 @@ private:
 	std::vector<T>& m_vec;
 };
 #endif
+
+//TODO("implement shifted keys as a second code or bool")
+struct KeyOrdinal { const char* m_szName; USHORT m_uKeyCode; };
+
+static KeyOrdinal s_Keycodes[] =
+{
+	{ "ESCAPE", DIK_ESCAPE },
+	{ "1", DIK_1 },
+	{ "2", DIK_2 },
+	{ "3", DIK_3 },
+	{ "4", DIK_4 },
+	{ "5", DIK_5 },
+	{ "6", DIK_6 },
+	{ "7", DIK_7 },
+	{ "8", DIK_8 },
+	{ "9", DIK_9 },
+	{ "0", DIK_0 },
+	{ "-", DIK_MINUS },
+	{ "=", DIK_EQUALS },
+	{ "BACKSPACE", DIK_BACK },
+	{ "TAB", DIK_TAB },
+	{ "Q", DIK_Q },
+	{ "W", DIK_W },
+	{ "E", DIK_E },
+	{ "R", DIK_R },
+	{ "T", DIK_T },
+	{ "Y", DIK_Y },
+	{ "U", DIK_U },
+	{ "I", DIK_I },
+	{ "O", DIK_O },
+	{ "P", DIK_P },
+	{ "[", DIK_LBRACKET },
+	{ "]", DIK_RBRACKET },
+	{ "ENTER", DIK_RETURN },
+	{ "LCTRL", DIK_LCONTROL },
+	{ "A", DIK_A },
+	{ "S", DIK_S },
+	{ "D", DIK_D },
+	{ "F", DIK_F },
+	{ "G", DIK_G },
+	{ "H", DIK_H },
+	{ "J", DIK_J },
+	{ "K", DIK_K },
+	{ "L", DIK_L },
+	{ ";", DIK_SEMICOLON },
+	{ "`", DIK_GRAVE },
+	{ "LSHIFT", DIK_LSHIFT },
+	{ "\\", DIK_BACKSLASH },
+	{ "Z", DIK_Z },
+	{ "X", DIK_X },
+	{ "C", DIK_C },
+	{ "V", DIK_V },
+	{ "B", DIK_B },
+	{ "N", DIK_N },
+	{ "M", DIK_M },
+	{ ",", DIK_COMMA },
+	{ ".", DIK_PERIOD },
+	{ "/", DIK_SLASH },
+	{ "RSHIFT", DIK_RSHIFT },
+	{ "MULTIPLY", DIK_MULTIPLY },
+	{ "LALT", DIK_LMENU },
+	{ "SPACE", DIK_SPACE },
+	{ "CAPSLOCK", DIK_CAPITAL },
+	{ "F1", DIK_F1 },
+	{ "F2", DIK_F2 },
+	{ "F3", DIK_F3 },
+	{ "F4", DIK_F4 },
+	{ "F5", DIK_F5 },
+	{ "F6", DIK_F6 },
+	{ "F7", DIK_F7 },
+	{ "F8", DIK_F8 },
+	{ "F9", DIK_F9 },
+	{ "F10", DIK_F10 },
+	{ "NUMLOCK", DIK_NUMLOCK },
+	{ "SCROLLLOCK", DIK_SCROLL },
+	{ "NUM7", DIK_NUMPAD7 },
+	{ "NUM8", DIK_NUMPAD8 },
+	{ "NUM9", DIK_NUMPAD9 },
+	{ "SUBTRACT", DIK_SUBTRACT },
+	{ "NUM4", DIK_NUMPAD4 },
+	{ "NUM5", DIK_NUMPAD5 },
+	{ "NUM6", DIK_NUMPAD6 },
+	{ "ADD", DIK_ADD },
+	{ "NUM1", DIK_NUMPAD1 },
+	{ "NUM2", DIK_NUMPAD2 },
+	{ "NUM3", DIK_NUMPAD3 },
+	{ "NUM0", DIK_NUMPAD0 },
+	{ "DECMIAL", DIK_DECIMAL },
+	{ "|", DIK_OEM_102 },
+	{ "F11", DIK_F11 },
+	{ "F12", DIK_F12 }
+};
 
 typedef struct _WIN32_FIND_DATA_LISTA
 {

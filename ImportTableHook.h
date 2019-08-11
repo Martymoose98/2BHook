@@ -91,9 +91,9 @@ typedef struct _PEB
 	PRTL_USER_PROCESS_PARAMETERS ProcessParameters;
 	PVOID                   SubSystemData;
 	PVOID                   ProcessHeap;
-	PVOID                   FastPebLock;
-	PPEBLOCKROUTINE         FastPebLockRoutine;
-	PPEBLOCKROUTINE         FastPebUnlockRoutine;
+	PRTL_CRITICAL_SECTION   FastPebLock;
+	PPEBLOCKROUTINE         FastPebLockRoutine; //AtlThunkSListPtr
+	PPEBLOCKROUTINE         FastPebUnlockRoutine; //IFEOKey;
 	ULONG                   EnvironmentUpdateCount;
 	PVOID*                  KernelCallbackTable;
 	PVOID                   EventLogSection;
@@ -122,7 +122,7 @@ typedef struct _PEB
 	PVOID                   GdiSharedHandleTable;
 	PVOID                   ProcessStarterHelper;
 	PVOID                   GdiDCAttributeList;
-	PVOID                   LoaderLock;
+	PRTL_CRITICAL_SECTION   LoaderLock;
 	ULONG                   OSMajorVersion;
 	ULONG                   OSMinorVersion;
 	ULONG                   OSBuildNumber;

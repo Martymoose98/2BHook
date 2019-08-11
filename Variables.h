@@ -10,6 +10,8 @@ typedef struct Variables_t
 	{	
 		bool bTraceLine;
 		float flTraceLength;
+		bool bChams;
+		int iChamType;
 		bool bEspBox;
 		bool b2DEspBox;
 		bool bEnemyInfo;

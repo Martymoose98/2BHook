@@ -237,6 +237,14 @@ static void VisualsTab(Pl0000* pCameraEnt)
 
 	ImGui::SameLine();
 
+	ImGui::Checkbox("Chams", &Vars.Visuals.bChams);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Use Shader", (bool*)&Vars.Visuals.iChamType);
+
+	ImGui::SameLine();
+
 	ImGui::Checkbox("Display Enemy Info", &Vars.Visuals.bEnemyInfo);
 
 	ImGui::SameLine();
@@ -324,7 +332,27 @@ static void ConfigTab()
 	LPCTSTR szConfig;
 
 	ImGui::Checkbox("Ignore Input", &Vars.Menu.bIgnoreInputWhenOpened);
-	ImGui::ListBox("Configs", &Vars.Menu.Config.iSelectedConfig, ConfigCallback, Vars.Menu.Config.pHead, FindDataListCount(Vars.Menu.Config.pHead));
+
+	ImGui::Columns(2);
+
+	for (auto& it : g_pConfig->GetKeybinds())
+	{
+		char szValue[33];
+
+		_itoa_s(it->GetKeycode(), szValue, 16);
+
+		ImGui::BeginCombo(it->GetName(), szValue);
+
+		for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
+			if (ImGui::Selectable(s_Keycodes[i].m_szName))
+				it->SetKeycode(s_Keycodes[i].m_uKeyCode);
+
+		ImGui::EndCombo();
+	}
+
+	ImGui::Columns();
+
+	ImGui::ListBox("Configs", &Vars.Menu.Config.iSelectedConfig, ConfigCallback, Vars.Menu.Config.pHead, (INT)FindDataListCount(Vars.Menu.Config.pHead));
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
 	ImGui::InputText("Config Name", Vars.Menu.Config.szName, _ARRAYSIZE(Vars.Menu.Config.szName));
 	ImGui::PopItemWidth();

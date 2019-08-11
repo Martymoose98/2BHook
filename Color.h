@@ -156,12 +156,12 @@ public:
 
 	operator Vector4()
 	{
-		return Vector4(BaseAlpha());
+		return Vector4(m_color[0] / 255.f, m_color[1] / 255.f, m_color[2] / 255.f, m_color[3] / 255.f);
 	}
 
 	operator XMFLOAT4()
 	{
-		return XMFLOAT4(BaseAlpha());
+		return XMFLOAT4(m_color[0] / 255.f, m_color[1] / 255.f, m_color[2] / 255.f, m_color[3] / 255.f);
 	}
 
 	void GetFloatColor(float* rgba) const
@@ -170,29 +170,6 @@ public:
 		rgba[1] = m_color[1] / 255.0f;
 		rgba[2] = m_color[2] / 255.0f;
 		rgba[3] = m_color[3] / 255.0f;
-	}
-
-	__forceinline float* Base() const
-	{
-		float clr[3];
-
-		clr[0] = m_color[0] / 255.0f;
-		clr[1] = m_color[1] / 255.0f;
-		clr[2] = m_color[2] / 255.0f;
-
-		return &clr[0];
-	}
-
-	__forceinline float* BaseAlpha() const
-	{
-		float clr[4];
-
-		clr[0] = m_color[0] / 255.0f;
-		clr[1] = m_color[1] / 255.0f;
-		clr[2] = m_color[2] / 255.0f;
-		clr[3] = m_color[3] / 255.0f;
-
-		return &clr[0];
 	}
 
 	float Hue() const

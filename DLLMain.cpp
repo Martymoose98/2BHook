@@ -38,7 +38,7 @@ void InitHooks()
 	for (MrubyImpl* it : g_pRubyInstances)
 	{
 		g_pRubyInstancesHooks.emplace_back(new VirtualTableHook((QWORD**)it));
-		oMRubyLoadScript = (MRubyLoadScriptFn)g_pRubyInstancesHooks.back()->HookFunction((QWORD)hkMRubyLoadScriptFn, 2);
+		oMRubyLoadScript = (MRubyLoadScriptFn)g_pRubyInstancesHooks.back()->HookFunction((QWORD)hkMRubyLoadScript, 2);
 	}
 
 	g_pQueryPerformanceCounterHook = new ImportTableHook("kernel32.dll", "QueryPerformanceCounter", (LPCVOID)hkQueryPerformanceCounter);
@@ -171,20 +171,20 @@ void CreateStencilDescription()
 
 HRESULT InitD3D11()
 {
-	HRESULT result = g_pSwapChain->GetDevice(IID_ID3D11Device, (void**)&g_pDevice); // i'm using IID_ID3D11Device for c compatiblity alternatively you can use __uuidof
+	HRESULT hr = g_pSwapChain->GetDevice(IID_ID3D11Device, (void**)&g_pDevice); // i'm using IID_ID3D11Device for c compatiblity alternatively you can use __uuidof
 	
-	if (FAILED(result))
+	if (FAILED(hr))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", result);
-		return result;
+		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
+		return hr;
 	}
 
-	result = g_pSwapChain->GetParent(IID_IDXGIFactory, (void**)&g_pFactory);
+	hr = g_pSwapChain->GetParent(IID_IDXGIFactory, (void**)&g_pFactory);
 
-	if (FAILED(result))
+	if (FAILED(hr))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", result);
-		return result;
+		LOG("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
+		return hr;
 	}
 
 	g_pDevice->GetImmediateContext(&g_pDeviceContext);
@@ -225,6 +225,67 @@ HRESULT InitD3D11()
 	// create a whole new rasterizer state
 	g_pDevice->CreateRasterizerState(&RenderSolidDesc, &g_pRenderSolidState);
 
+	//create sample state
+	D3D11_SAMPLER_DESC sampDesc;
+	ZeroMemory(&sampDesc, sizeof(sampDesc));
+	sampDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	sampDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	sampDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	sampDesc.MaxAnisotropy = 1;
+	sampDesc.MinLOD = 0;
+	sampDesc.MaxLOD = D3D11_FLOAT32_MAX;
+	hr = g_pDevice->CreateSamplerState(&sampDesc, &g_pSamplerState);
+	if (FAILED(hr)) { LOG("Failed to CreateSamplerState"); }
+
+	//create green texture
+	DXGI_FORMAT format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB; //format
+	static const uint32_t s_pixel = 0xff00ff00; //0xffffffff white, 0xff00ff00 green, 0xffff0000 blue, 0xff0000ff red
+	D3D11_SUBRESOURCE_DATA initData = { &s_pixel, sizeof(uint32_t), 0 };
+	D3D11_TEXTURE2D_DESC desc;
+	memset(&desc, 0, sizeof(desc));
+	desc.Width = desc.Height = desc.MipLevels = desc.ArraySize = 1;
+	desc.Format = format;
+	desc.SampleDesc.Count = 1;
+	desc.Usage = D3D11_USAGE_DEFAULT;// D3D11_USAGE_IMMUTABLE;
+	desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	hr = g_pDevice->CreateTexture2D(&desc, &initData, &g_pTexGreen);
+	if (FAILED(hr)) { LOG("Failed to CreateTexture2D"); }
+
+	//create red texture
+	static const uint32_t s_pixelr = 0xff0000ff; //0xffffffff white, 0xff00ff00 green, 0xffff0000 blue, 0xff0000ff red
+	D3D11_SUBRESOURCE_DATA initDatar = { &s_pixelr, sizeof(uint32_t), 0 };
+	D3D11_TEXTURE2D_DESC descr;
+	memset(&descr, 0, sizeof(descr));
+	descr.Width = descr.Height = descr.MipLevels = descr.ArraySize = 1;
+	descr.Format = format;
+	descr.SampleDesc.Count = 1;
+	descr.Usage = D3D11_USAGE_DEFAULT;// D3D11_USAGE_IMMUTABLE;
+	descr.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+	hr = g_pDevice->CreateTexture2D(&descr, &initDatar, &g_pTexRed);
+	if (FAILED(hr)) { LOG("Failed to CreateTexture2D"); }
+
+	//create green shaderresourceview
+	D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc;
+	memset(&SRVDesc, 0, sizeof(SRVDesc));
+	SRVDesc.Format = format;
+	SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	SRVDesc.Texture2D.MipLevels = 1;
+	hr = g_pDevice->CreateShaderResourceView(g_pTexGreen, &SRVDesc, &g_pGreenSRV);
+	if (FAILED(hr)) { LOG("Failed to CreateShaderResourceView"); }
+	g_pTexGreen->Release();
+
+	//create red shaderresourceview
+	D3D11_SHADER_RESOURCE_VIEW_DESC SRVDescr;
+	memset(&SRVDescr, 0, sizeof(SRVDescr));
+	SRVDescr.Format = format;
+	SRVDescr.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+	SRVDescr.Texture2D.MipLevels = 1;
+	hr = g_pDevice->CreateShaderResourceView(g_pTexRed, &SRVDescr, &g_pRedSRV);
+	if (FAILED(hr)) { LOG("Failed to CreateShaderResourceView"); }
+	g_pTexRed->Release();
+
 	GeneratePixelShader(g_pDevice, &g_pRed, 1.0f, 0.0f, 0.0f);
 	GeneratePixelShader(g_pDevice, &g_pGreen, 0.0f, 1.0f, 0.0f);
 
@@ -262,6 +323,7 @@ void LogOffsets(void)
 	LOG_OFFSET("CUserManager", g_pUserManager);
 	LOG_OFFSET("CWetObjectManager", g_pWetObjectManager);
 	LOG_OFFSET("CCollisionDataObjectManager", g_pCollisionDataObjectManager);
+	LOG_OFFSET("CTextureResourceManager", g_pTextureResourceManager);
 	//LOG_OFFSET("MRubyVM", g_pRubyInstances);
 	LOG_OFFSET("CGameCamera", g_pCamera);
 	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
@@ -298,9 +360,10 @@ void Setup(void)
 	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr64(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
 	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
 	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)g_pMemory->FindPatternPtr64(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
+	g_pTextureResourceManager = *(CTextureResourceManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8D 0D ?? ?? ?? ?? 4C 89 44 24 ??", 6);
 	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr64(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
-	g_pSceneEntitySystem = (CSceneEntitySystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24 ?", 3);
+	g_pSceneEntitySystem = (CSceneEntitySystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 35 ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 48 8D 54 24 ??", 3); //48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24 ?
 	g_pMemoryDevice = (CMemoryDevice*)g_pMemory->FindPatternPtr64(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8 ? ? ? ?", 6);
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
@@ -398,12 +461,6 @@ void Setup(void)
 
 void Unhook()
 {
-	Vars.Gameplay.bGodmode = false;
-	Vars.Gameplay.bNoEnemyDamage = false;
-	Vars.Gameplay.bNoWorldDamage = false;
-
-	Features::ApplyHealthMods();
-
 	g_pMemory->RestoreMemory(&bp_NoTutorialDialogs);
 	g_pMemory->RestoreMemory(&bp_Framecap);
 	g_pMemory->RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
@@ -426,6 +483,12 @@ void Unhook()
 	delete g_pMouseHook;
 	delete g_pMemory;
 
+	Vars.Gameplay.bGodmode = false;
+	Vars.Gameplay.bNoEnemyDamage = false;
+	Vars.Gameplay.bNoWorldDamage = false;
+
+	Features::ApplyHealthMods();
+
 	ImGui_ImplDX11_Shutdown();
 
 	FindDataListFree(Vars.Menu.Config.pHead);
@@ -446,7 +509,7 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD dwReason, LPVOID lpContext)
 	switch (dwReason)
 	{
 	case DLL_PROCESS_ATTACH:
-		CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)Setup, NULL, NULL, NULL);
+		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Setup, NULL, 0, NULL);
 		break;
 	case DLL_PROCESS_DETACH:
 		Unhook();

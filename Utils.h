@@ -7,6 +7,8 @@
 #include "Log.h"
 
 #define STACK_TIMER(name) StackTimer name(__FUNCTION__)
+#define CS_LOCK() ReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)()
+#define CS_LOCK_SPINCOUNT(spincount) ReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)((DWORD)(spincount))
 
 typedef struct StackTimer
 {
@@ -30,6 +32,43 @@ private:
 	const char* m_szName;
 } DebugStackTimer;
 
+struct ReadWriteLock
+{
+	ReadWriteLock() 
+	{
+		if (!m_bCriticalSectionInitalized)
+		{
+			InitializeCriticalSection(&m_CriticalSection);
+			m_bCriticalSectionInitalized = TRUE;
+			EnterCriticalSection(&m_CriticalSection);
+		}
+	}
+
+	ReadWriteLock(DWORD dwSpinCount)
+	{
+		if (!m_bCriticalSectionInitalized)
+		{
+			InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
+			m_bCriticalSectionInitalized = TRUE;
+			EnterCriticalSection(&m_CriticalSection);
+		}
+	}
+
+	~ReadWriteLock() 
+	{ 
+		if (m_bCriticalSectionInitalized)
+		{
+			LeaveCriticalSection(&m_CriticalSection);
+			DeleteCriticalSection(&m_CriticalSection);
+			m_bCriticalSectionInitalized = FALSE;
+		}
+	}
+
+private:
+	CRITICAL_SECTION m_CriticalSection;
+	BOOL m_bCriticalSectionInitalized;
+};
+
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
 	VMatrix vMatrix = *g_pViewMatrix;//*(VMatrix*)0x1419C73C0;
@@ -43,7 +82,7 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
 	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
 
-	FLOAT invw = 1.0f / w;
+	float invw = 1.0f / w;
 
 	vOut *= invw;
 
@@ -86,9 +125,9 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, 
 		{
 			szObjectName[0] = Converts[i].m_szPrefix[0];
 			szObjectName[1] = Converts[i].m_szPrefix[1];
-			szObjectName[2] = HexChars[((signed __int64)objectId >> 12) & 0xF];
-			szObjectName[3] = HexChars[((signed __int64)objectId >> 8) & 0xF];
-			szObjectName[4] = HexChars[((signed __int64)objectId >> 4) & 0xF];
+			szObjectName[2] = HexChars[(objectId >> 12) & 0xF];
+			szObjectName[3] = HexChars[(objectId >> 8) & 0xF];
+			szObjectName[4] = HexChars[(objectId >> 4) & 0xF];
 			szObjectName[5] = HexChars[objectId & 0xF];
 			szObjectName[6] = 0; //null terminator
 			
@@ -107,7 +146,6 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, 
 	else
 		strcpy_s(szObjectName, size, (objectId != 0x700000) ? "Unknow" : "Null");
 
-
 	if (*ppConvert)
 		*ppConvert = NULL;
 
@@ -120,15 +158,21 @@ static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
 										{ 0x70000, "it" }, { 0x90000, "sc" }, { 0xA0000, "um" }, { 0xC0000, "bg" }, { 0xE0000, "bh" }, { 0xF0000, "ba" } };
 
 	size_t i = 0;
+	BOOLEAN bFound = FALSE;
 
 	if (!szObjectName)
 		return FALSE;
 
 	for (; i < ARRAYSIZE(Converts); ++i)
+	{
 		if (Converts[i].m_szPrefix[0] == szObjectName[0] && Converts[i].m_szPrefix[1] == szObjectName[1])
+		{
+			bFound = TRUE;
 			break;
+		}
+	}
 
-	*pObjectId = Converts[i].m_ObjectIdBase | ((szObjectName[2] - 0x30) << 12) | ((szObjectName[3] - 0x30) << 8) | ((szObjectName[4] - 0x30) << 4) | (szObjectName[5] - 0x30);
+	*pObjectId = (bFound) ? Converts[i].m_ObjectIdBase | ((szObjectName[2] - 0x30) << 12) | ((szObjectName[3] - 0x30) << 8) | ((szObjectName[4] - 0x30) << 4) | (szObjectName[5] - 0x30) : -1;
 
 	return TRUE;
 }
@@ -150,7 +194,7 @@ static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileNam
 	pHeaders = (LPBYTE*)ppBuffer;
 	v4 = 0;
 
-	while (true)
+	while (v4 < 2)
 	{
 		pHdr = (DATHeader*)*pHeaders;
 
@@ -161,29 +205,28 @@ static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileNam
 			{
 				dwFileCount = pHdr->dwFileCount;
 				dwNextNameOffset = *(DWORD*)((LPBYTE)pHdr + dwOffset);
-				szCurrentFileName = (const char*)(pHdr + dwOffset + 4);
-				i = 0;
-				if (dwFileCount)
-				{
-					while (_stricmp(szName, szCurrentFileName))
-					{
-						++i;
-						szCurrentFileName += dwNextNameOffset;
-						if (i >= dwFileCount)
-							goto next_file;
-					}
-					result = i + (v4 << 28);
-					if (result != -1)
-						return result;
-				}
+szCurrentFileName = (const char*)(pHdr + dwOffset + 4);
+i = 0;
+if (dwFileCount)
+{
+	while (_stricmp(szName, szCurrentFileName))
+	{
+		++i;
+		szCurrentFileName += dwNextNameOffset;
+		if (i >= dwFileCount)
+			goto next_file;
+	}
+	result = i + (v4 << 28);
+	if (result != -1)
+		return result;
+}
 			}
 		}
 	next_file:
 		++v4;
 		++pHeaders;
-		if (v4 >= 2)
-			return 0xFFFFFFFF; //-1
 	}
+	return 0xFFFFFFFF; //-1
 }
 
 static void DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD* pdwFileCount)
@@ -228,13 +271,93 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 		{
 			PDWORD pFileTable = (PDWORD)((LPBYTE)pHdr + pHdr->dwFileTableOffset);
 			DWORD rva = pFileTable[dwFileIndex];
-			*ppFile = rva ? (void*)((LPBYTE)pHdr + rva) : NULL;
+			*ppFile = rva ? MakePtr(void*, pHdr, rva) : NULL;
 		}
 		else
 		{
 			*ppFile = NULL;
 		}
 	}
+}
+
+static void CreateMaterial(
+	const char* szName,
+	const char* szShader,
+	const char* szTechnique,
+	const char** szTextureNames,
+	CTextureDescription* pDescriptions,
+	int nTextures,
+	CSamplerParameterGroup* pParams,
+	CMaterial** ppMaterial
+)
+{
+	typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
+	CTargetTexture m_Textures[16];
+	int TextureIds[16];
+
+	ZeroMemory(m_Textures, sizeof(CTargetTexture[16]));
+
+	if (!ppMaterial)
+		return;
+
+	if (nTextures > 15)
+		nTextures = 15;
+
+	for (int i = 0; i < nTextures; ++i)
+	{
+		TextureIds[i] = HashStringCRC32(szTextureNames[i], strlen(szTextureNames[i]));
+
+		m_Textures[i].m_vtbl = (void*)0x140E9FA38;
+
+		if (!((CreateTextureFn)(0x140934FE0))(0, &m_Textures[i], &pDescriptions[i]))
+			return;
+	}
+
+	*ppMaterial = (CMaterial*)malloc(sizeof(CMaterial)); // use AllocHeapMem from game HeapInfo is in rdx MODELTHING*
+
+	if (!*ppMaterial)
+		return;
+
+	ZeroMemory(*ppMaterial, sizeof(CMaterial));
+
+	(*ppMaterial)->m_szName = szName;
+	(*ppMaterial)->m_szShaderName = szShader;
+	(*ppMaterial)->m_szTechniqueName = szTechnique;
+	(*ppMaterial)->m_nParameters = 0;
+
+	for (int i = 0; i < nTextures; ++i)
+	{
+		int nTexture = ((int(*)(void*, const char*))(0x143F4D0A0))(0, szTextureNames[i]); // CModelAnalyzer::FindTextureIndexByName 
+
+		if (nTexture > 15)
+			break;
+
+		(*ppMaterial)->m_TextureIds[nTexture] = TextureIds[i];
+	}
+
+	(*ppMaterial)->m_pParameterGroups = pParams;
+}
+
+static CMaterial* LoadMaterial(const char* szFile)
+{
+	CMaterial* pMetal = NULL;
+	CTextureDescription tex_desc;
+	const char* szName = "g_AlbedoMap";
+
+	ZeroMemory(&tex_desc, sizeof(CTextureDescription));
+
+	HANDLE hFile = CreateFileA(szFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	DWORD dwFileSize = GetFileSize(hFile, NULL);
+	HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
+	DDS_HEADER_WITH_MAGIC* pHdr = (DDS_HEADER_WITH_MAGIC*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
+	tex_desc.m_pDDS = pHdr;
+	tex_desc.m_uTextureSize = dwFileSize;
+	tex_desc.dword18 = 2;
+
+	CreateMaterial("Metal", "Sign_PS_XXXXX"/*"PBS00_XXXXX"*/, "Default", &szName, &tex_desc, 1, 0, &pMetal);
+
+	CloseHandle(hFile);
+	return pMetal;
 }
 
 static HRESULT MyPreloadModel(int objectId)
@@ -316,14 +439,12 @@ may occur when copying files whilst being modified by another thread. Thread
 safety will be added in the future. This method fails if the "My Documents" folder's
 path has a greater length than MAX_PATH (260).
 */
-TODO("Make this use SYSTEMTIME struct and GetSystemTime or GetLocalTime")
 static BOOL BackupSave(int nSlot)
 {
 	WCHAR szPath[MAX_PATH];
 	WCHAR szSavePath[MAX_PATH];
 	WCHAR szBackupPath[MAX_PATH];
-	char szDateTime[32];
-	tm timestruct;
+	SYSTEMTIME time;
 
 	if (!IS_SAVE_SLOTDATA(nSlot))
 		return ERROR_INVALID_PARAMETER;
@@ -335,14 +456,11 @@ static BOOL BackupSave(int nSlot)
 
 	if (nCharsWritten == -1)
 		return ERROR_NOT_ENOUGH_MEMORY;
+	
+	GetSystemTime(&time);
 
-	time_t tTime = time(NULL);
-
-	localtime_s(&timestruct, &tTime);
-
-	strftime(szDateTime, _ARRAYSIZE(szDateTime), "%F_%H-%M-%S", &timestruct);
-
-	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%S.dat.bak", szPath, nSlot, szDateTime);
+	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%4d%02d%02d_%02d%02d%02d.dat.bak", szPath, nSlot, 
+		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
 
 	if (nCharsWritten == -1)
 		return ERROR_NOT_ENOUGH_MEMORY;
@@ -417,6 +535,8 @@ static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 {
 	PROCESS_HEAP_ENTRY Entry;
 
+	UNREFERENCED_PARAMETER(phHeaps);
+	UNREFERENCED_PARAMETER(dwHeaps);
 	UNREFERENCED_PARAMETER(Entry);
 
 	//HeapWalk(p)
@@ -462,14 +582,11 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 			{
 				if (szFmt[j + 1] == 's')
 					IsStringVar[i] = TRUE;
-
-				++i;
 				
-				if (i == 3)
+				if (++i == 3)
 					break;
 			}
-			++j;
-		} while (j < length);
+		} while (++j < length);
 
 		// there is no format params just return the format string
 		if (i > 2)
@@ -479,22 +596,14 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 	if (IsStringVar[0])
 	{
 		if (IsStringVar[0] != TRUE || IsStringVar[1])
-		{
 			snprintf((char*)0x14270F500, 512, szFmt, v4, v5);
-		}
 		else
-		{
 			snprintf((char*)0x14270F500, 512, szFmt, v4, (unsigned int)v5);
-		}
 	}
 	else if (IsStringVar[1])
-	{
 		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, v5);
-	}
 	else
-	{
 		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, (unsigned int)v5);
-	}
 
 	return (char*)0x14270F500;
 }
@@ -512,7 +621,7 @@ static void CRILogCallbackConsole(const char* szFormat, unsigned int callback_ar
 		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
 
-static void CRILogCallbackVerbose(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+static void CRILogCallbackWinConsoleVerbose(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack[100];
 	SYMBOL_INFO_PACKAGE symbol;
