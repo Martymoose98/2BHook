@@ -339,6 +339,19 @@ public:
 				vMin = pCameraEntity->m_vPosition;
 				GetOBBMax(pCollision, &vMax);
 
+				Matrix4x4 matMesh;
+
+				for (int i = 0; i < pCameraEntity->m_Work.m_nMeshes; ++i)
+				{			
+					CMesh2* pMesh = &pCameraEntity->m_Work.m_pMeshes[i];
+					CModelMatrixTable** p = pCameraEntity->m_Work.m_pMatrices;
+					
+					/*	
+					CBone* pBone = &pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_pModelData, pMesh->m_pBones[0].m_sId)];
+					matMesh.InitTransform(pBone->m_vRotation, pBone->m_vPosition);
+					pList->Add3DBox(pMesh->m_vMin, pMesh->m_vMax, matMesh, ImColor(200, 100, 0));
+					*/
+				}
 				/*
 				__m128 v1 = *(__m128*)&pCollision->v0xA0;
 				vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
@@ -367,13 +380,11 @@ public:
 
 				if (Vars.Visuals.bTraceLine)
 				{
-					vStart = pCameraEntity->m_pBones[11].m_vPosition;
+					vStart = pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_pModelData, BONE_HEAD)].m_vPosition;
 					vEnd = vStart + (pCameraEntity->m_matTransform.GetAxis(FORWARD) * Vars.Visuals.flTraceLength);
 
 					if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
-					{
 						pList->AddLine(vStart2D, vEnd2D, ImColor(120, 255, 0));
-					}
 				}
 
 				if (Vars.Visuals.bDebugLocalPlayerSkeleton)
@@ -381,7 +392,7 @@ public:
 					for (int i = 0; i < pCameraEntity->m_nBones; ++i)
 					{
 						if (WorldToScreen(pCameraEntity->m_pBones[i].m_vPosition, vMax2D))
-							pList->AddTextArgs(vMax2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%i", i);
+							pList->AddTextArgs(vMax2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%i %i", i, pCameraEntity->m_pBones[i].m_Id);
 					}
 				}
 
@@ -389,34 +400,52 @@ public:
 				{
 					for (int i = 0; i < pCameraEntity->m_nBones; ++i)
 					{
-						Bone* pCur = &pCameraEntity->m_pBones[i];
+						CBone* pCur = &pCameraEntity->m_pBones[i];
 
-						if (pCur->m_pParent)
+						if (pCur->m_Id != BONE_ROOT_CHILD && pCur->m_pParent && pCur->m_pParent->m_Id != BONE_ROOT)
 							pList->AddBone(pCur->m_vPosition, pCur->m_pParent->m_vPosition, ImColor(200, 0, 0));
 					}
 				}
-			}
-		}
 
-		if (Vars.Visuals.bEnemyInfo)
-		{
-			for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
-			{
-				Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
-
-				if (pCur && g_pCamera->m_pEntity && WorldToScreen(pCur->m_vPosition, vMin2D))
+				if (Vars.Visuals.bEnemyInfo)
 				{
-					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, *MakePtr(int*, pCur, 0x28030), pCur->m_iHealth,
-						pCur->m_iMaxHealth, g_pCamera->m_pEntity->m_vPosition.DistTo(pCur->m_vPosition));
-
-					float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
-
-					if (fov < best)
+					for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 					{
-						iTarget = i;
-						best = fov;
+						Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+
+						if (pCur && pCur->m_iHealth > 0 && WorldToScreen(pCur->m_vPosition, vMin2D))
+						{
+							pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, *MakePtr(int*, pCur, 0x28030), pCur->m_iHealth,
+								pCur->m_iMaxHealth, pCameraEntity->m_vPosition.DistTo(pCur->m_vPosition));
+
+							float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
+
+							if (fov < best)
+							{
+								iTarget = i;
+								best = fov;
+							}
+						}
 					}
 				}
+#if 0
+				if (iTarget != -1)
+				{
+					Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
+					Pl0000* pPod = GetEntityFromHandle(&g_pLocalPlayer->m_hPod);
+					Vector3& vSrc = pPod->m_pBones[GetBoneIndex(pPod->m_pModelData, 1552)].m_vPosition;
+					Vector3& vDst = pTarget->m_pBones[GetBoneIndex(pTarget->m_pModelData, BONE_SPINE1)].m_vPosition;	
+
+					if (WorldToScreen(vDst, vMin2D))
+						pList->AddText(vMin2D, ImColor(255, 0, 0), "Target");
+
+					if (WorldToScreen(vSrc, vMin2D))
+						pList->AddText(vMin2D, ImColor(255, 0, 0), "Src");
+
+					if (GetAsyncKeyState(VK_XBUTTON1) & 0x8000)
+						Math::CalcAngle(vSrc, vDst, g_pCamera->m_viewangles);
+				}
+#endif
 			}
 		}
 
@@ -456,22 +485,12 @@ public:
 					pInfo = g_pEntityInfoList->m_pItems[pCur->m_uScenePropIndex].second;
 					pObject = (pInfo) ? pInfo->m_pParent : NULL;
 
-					if (pObject)
+					if (pObject && !pObject->m_vPosition.IsZero())
 					{
-						if (pObject->m_vPosition.IsZero())
-						{
-							vOrigin = pCur->m_vMin + ((pCur->m_vMax - pCur->m_vMin) / 2);
-							vMax = Vector3Aligned();
-							vMin = pCur->m_vMax - pCur->m_vMin;
-							mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), pCur->m_vMin);
-						}
-						else
-						{
-							vOrigin = pObject->m_vPosition;
-							vMax = (pCur->m_vMin - pCur->m_vMax) / 2;
-							vMin = (pCur->m_vMax - pCur->m_vMin) / 2;
-							mTrans = pObject->m_matTransform;
-						}
+						vOrigin = pObject->m_vPosition;
+						vMax = (pCur->m_vMin - pCur->m_vMax) / 2;
+						vMin = (pCur->m_vMax - pCur->m_vMin) / 2;
+						mTrans = pObject->m_matTransform;
 					}
 					else
 					{
@@ -493,23 +512,6 @@ public:
 #ifdef _DEBUG
 		if (g_pCamera)
 			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H, "ang (%f,%f,%f)", RADTODEG(g_pCamera->m_viewangles.x), RADTODEG(g_pCamera->m_viewangles.y), RADTODEG(g_pCamera->m_viewangles.z));
-
-		if (iTarget != -1)
-		{
-			Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
-
-			if (WorldToScreen(pTarget->m_vPosition, vMin2D))
-				pList->AddText(vMin2D, ImColor(255, 0, 0), "Target");
-
-			if (pTarget && GetAsyncKeyState(VK_XBUTTON1) & 0x8000)
-			{
-				g_pCamera->m_viewangles.x = Math::LookAt(g_pCamera->m_vPosition, pTarget->m_vPosition).x;
-				//Vector3 vAng = Math::CalcAngle(g_pCamera->m_matTransform.GetAxis(0), pTarget->m_vPosition);
-				//Math::VectorTAngle(pPod->m_vPosition, pTarget->m_vPosition, pPod->m_matTransform, vTAng);
-				//g_pCamera->m_viewangles = vAng;
-				//pPod->m_matTransform.GetAxis(2) = vTAng;
-			}
-		}
 #endif
 	}
 };

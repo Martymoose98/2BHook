@@ -23,7 +23,7 @@
 
 #if defined(_DEBUG) || defined(VERBOSE)
 #define LOG_OFFSETS
-#define LOG(fmt, ...) Log::Log(__FUNCTION__, fmt, __VA_ARGS__)
+#define LOG(fmt, ...) Log::Log(__FUNCSIG__, fmt, __VA_ARGS__)
 #else 
 #define LOG(fmt, ...) ((void)0)
 #endif

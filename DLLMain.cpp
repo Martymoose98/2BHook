@@ -32,8 +32,9 @@ void InitHooks()
 	g_pFactoryHook = new VirtualTableHook((QWORD**)g_pFactory);
 	g_pSwapChainHook = new VirtualTableHook((QWORD**)g_pSwapChain);
 	g_pDeviceContextHook = new VirtualTableHook((QWORD**)g_pDeviceContext);
-	g_pKeyboardHook = new VirtualTableHook((QWORD**)g_pKeyboard->pKeyboard);
+	g_pKeyboardHook = new VirtualTableHook((QWORD**)g_pKeyboard->pKeyboard); // crashes when pKeyboard->Poll() is called whilst hook cause we don't own the internal critical section
 	g_pMouseHook = new VirtualTableHook((QWORD**)g_pMouse->pMouse);
+	g_pCameraHook = new VirtualTableHook((QWORD**)g_pCamera);
 
 	for (MrubyImpl* it : g_pRubyInstances)
 	{
@@ -63,6 +64,8 @@ void InitHooks()
 	oKeyboardGetDeviceState = (GetDeviceStateFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardGetDeviceState, 9);
 	oMouseAcquire = (AcquireFn)g_pMouseHook->HookFunction((QWORD)hkMouseAcquire, 7);
 	oMouseGetDeviceState = (GetDeviceStateFn)g_pMouseHook->HookFunction((QWORD)hkMouseGetDeviceState, 9);
+	oCCameraGameSetViewAngles = (CCameraGameSetViewAnglesFn)g_pCameraHook->HookFunction((QWORD)hkCCameraGameSetViewAngles, 1);
+	oCCameraGameMove = (CCameraGameMoveFn)g_pCameraHook->HookFunction((QWORD)hkCCameraGameMove, 2);
 
 	*(QWORD*)&opcodes_save_file_io[2] = (QWORD)hkSaveFileIO;
 
@@ -336,6 +339,7 @@ void LogOffsets(void)
 	LOG_OFFSET("CKeyboard", g_pKeyboard);
 	LOG_OFFSET("CMouse", g_pMouse);
 	LOG_OFFSET("CGraphics", g_pGraphics);
+	LOG_OFFSET("COtManager", g_pOtManager);
 	LOG_OFFSET("ViewMatrix", g_pViewMatrix);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
@@ -398,6 +402,7 @@ void Setup(void)
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);
+	g_pOtManager = (COtManager*)g_pMemory->FindPatternPtr64(NULL, "4C 89 78 D8 4C 8D 2D ? ? ? ?", 7);
 	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr64(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = g_pGraphics->m_Display.m_pSwapchain->m_pSwapChain;
@@ -441,7 +446,7 @@ void Setup(void)
 	InitHooks();
 
 	// add VEH?
-	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
+	oSetUnhandledExceptionFilter(UnhandledExceptionHandler);
 	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
 
 	//InitalizeNopMemory(nop_neon_scenery, g_pMemory->FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);

@@ -119,11 +119,6 @@ enum eTransformMatrix
 class Math
 {
 public:
-	static Math* Get()
-	{
-		static Math* Instance = new Math();
-		return Instance;
-	}
 
 	static void inline SinCos(float radians, float* sine, float* cosine)
 	{
@@ -141,9 +136,9 @@ public:
 
 		if (forward)
 		{
-			forward->x = cp * cy;
-			forward->y = cp * sy;
-			forward->z = -sp;
+			forward->x = -cp * cy;
+			forward->y = -sp;
+			forward->z = cp * sy;
 		}
 	}
 
@@ -188,55 +183,30 @@ public:
 		return v1[0] * v2[0] + v1[1] * v2[1] + v1[2] * v2[2];
 	}
 
-	static float VecLength(Vector3& vec)
-	{
-		return ssesqrt(vec.x * vec.x + vec.y * vec.y + vec.z * vec.z);
-	}
-
-	static float VecDist(Vector3& fVec1, Vector3& fVec2)
-	{
-		return ssesqrt(pow(fVec1.x - fVec2.x, 2) + pow(fVec1.y - fVec2.y, 2) + pow(fVec1.z - fVec2.z, 2));
-	}
-
 	/*
 	 theta = acos(v dot u / |v| * |u|)
 	*/
 	static float GetFov(const Vector3& vForward, const Vector3& src, const Vector3& dst)
 	{
-		Vector3 ang = CalcAngle(src, dst);
+		Vector3 ang;
+		CalcAngle(src, dst, ang);
 		AngleVectors(ang, &ang);
 		return RADTODEG(acos(vForward.Dot(ang) / (vForward.Length() * ang.Length())));
 	}
-	
-	static Vector3 LookAt(const Vector3& vPlayerPos, const Vector3& vEnemyPos)
+
+	static inline void CalcAngle(const Vector3& src, const Vector3& dst, Vector3& angles)
 	{
-		Vector3 ang;
-		Vector3 relativePos = vEnemyPos - vPlayerPos;
-		float yaw = atan2f(relativePos.y, relativePos.x);
-		float pitch = -(acosf(relativePos.z  / vPlayerPos.DistTo(vEnemyPos)) - (M_PI_F / 4));
-
-		ang.x = pitch;
-		ang.y = yaw;
-
-		return ang;
-	}
-
-	//change return type to reference param maybe depends 
-	static Vector3 CalcAngle(const Vector3& PlayerPos, const Vector3& EnemyPos)
-	{
-		Vector3 AimAngles;
-		VectorAngles(PlayerPos - EnemyPos, AimAngles);
-		return AimAngles;
+		VectorAngles((dst - src).Normalize(), angles);
 	}
 
 	static inline void VectorAngles(const Vector3& dir, Vector3& angles)
 	{
-		float hyp = ssesqrt((dir.x * dir.x) + (dir.y * dir.y));
-		angles.x = atanf(dir.z / hyp);
-		angles.y = atanf(dir.y / dir.x);
+		float hyp = ssesqrt((dir.x * dir.x) + (dir.z * dir.z));
+		angles.x = atanf(dir.y / hyp);
+		angles.y = atanf(dir.x / dir.z);
 		angles.z = 0.0f;
 
-		if (dir.x >= 0.0f)
+		if (dir.z >= 0.0f)
 			angles.y += M_PI_F;
 	}
 
@@ -256,7 +226,7 @@ public:
 
 	static void VectorNormalize(Vector3& v)
 	{
-		float l = VecLength(v);
+		float l = v.Length();
 
 		if (l != 0.0f)
 		{

@@ -83,6 +83,13 @@
 #define CONFIG_SEARCH_WILDCARD _CRT_CONCATENATE(TEXT("*"), CONFIG_EXTENSION)
 #define CONFIG_DEFAULT_INI _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
 
+#ifdef UNICODE
+#define _tcsrchr wcsrchr
+#else
+#define _tcsrchr strrchr
+#endif // UNICODE
+
+
 class IKeybind
 {
 public:
@@ -397,10 +404,7 @@ public:
 
 	virtual void Write(const char* szFilename)
 	{
-		char szBuffer[33];
-
-		strcpy_s(szBuffer, (m_value) ? "true" : "false");
-		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
+		WritePrivateProfileString(m_szCategory, m_szName, (m_value) ? "true" : "false", szFilename);
 	}
 
 	bool& m_value;
@@ -820,6 +824,8 @@ static KeyOrdinal s_Keycodes[] =
 	{ "F8", DIK_F8 },
 	{ "F9", DIK_F9 },
 	{ "F10", DIK_F10 },
+	{ "F11", DIK_F11 },
+	{ "F12", DIK_F12 },
 	{ "NUMLOCK", DIK_NUMLOCK },
 	{ "SCROLLLOCK", DIK_SCROLL },
 	{ "NUM7", DIK_NUMPAD7 },
@@ -836,9 +842,36 @@ static KeyOrdinal s_Keycodes[] =
 	{ "NUM0", DIK_NUMPAD0 },
 	{ "DECMIAL", DIK_DECIMAL },
 	{ "|", DIK_OEM_102 },
-	{ "F11", DIK_F11 },
-	{ "F12", DIK_F12 }
+	{ "F13", DIK_F13 },
+	{ "F14", DIK_F14 },
+	{ "F15", DIK_F15 },
+	{ "PREV TRACK", DIK_PREVTRACK },
+	{ "NEXT TRACK", DIK_NEXTTRACK },
+	{ "NUMENTER", DIK_NUMPADENTER },
+	{ "RCTRL", DIK_RCONTROL },
+	{ "MUTE", DIK_MUTE },
+	{ "CALCULATOR", DIK_CALCULATOR },
+	{ "PLAYPAUSE", DIK_PLAYPAUSE },
+	{ "STOP", DIK_MEDIASTOP },
+	{ "VOL-", DIK_VOLUMEDOWN },
+	{ "VOL+", DIK_VOLUMEUP },
+	{ "WEBHOME", DIK_WEBHOME },
+	{ "PRINT SCREEN", DIK_SYSRQ },
+	{ "RALT", DIK_RMENU },
+	{ "PAUSE BREAK", DIK_PAUSE },
+	{ "HOME", DIK_HOME },
+	{ "UP ARROW", DIK_UP },
+	{ "PAGE UP", DIK_PRIOR },
+	{ "LEFT ARROW", DIK_LEFT },
+	{ "RIGHT ARROW", DIK_RIGHT },
+	{ "END", DIK_END },
+	{ "DOWN ARROW", DIK_DOWN },
+	{ "PAGE DOWN", DIK_NEXT },
+	{ "INSERT", DIK_INSERT },
+	{ "DELETE", DIK_DELETE }
 };
+
+KeyOrdinal* FindKeyOrdinal(USHORT uKeycode);
 
 typedef struct _WIN32_FIND_DATA_LISTA
 {
@@ -846,13 +879,15 @@ typedef struct _WIN32_FIND_DATA_LISTA
 	struct _WIN32_FIND_DATA_LISTA* m_pPrevious;
 	WIN32_FIND_DATAA m_Data;
 } WIN32_FIND_DATA_LISTA, *PWIN32_FIND_DATA_LISTA;
+typedef CONST PWIN32_FIND_DATA_LISTA PCWIN32_FIND_DATA_LISTA;
 
 typedef struct _WIN32_FIND_DATA_LISTW
 {
 	struct _WIN32_FIND_DATA_LISTW* m_pNext;
 	struct _WIN32_FIND_DATA_LISTW* m_pPrevious;
 	WIN32_FIND_DATAW m_Data;
-} WIN32_FIND_DATA_LISTW, *PWIN32_FIND_DATA_LISTW, *PCWIN32_FIND_DATA_LISTW;
+} WIN32_FIND_DATA_LISTW, *PWIN32_FIND_DATA_LISTW;
+typedef CONST PWIN32_FIND_DATA_LISTW PCWIN32_FIND_DATA_LISTW;
 
 #ifdef _UNICODE
 typedef WIN32_FIND_DATA_LISTW WIN32_FIND_DATA_LIST;

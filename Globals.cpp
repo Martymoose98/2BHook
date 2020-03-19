@@ -66,6 +66,7 @@ IDirectInput8A* g_pDirectInput8;
 Keyboard_t* g_pKeyboard;
 Mouse_t* g_pMouse;
 CGraphics* g_pGraphics;
+COtManager* g_pOtManager;
 ID3D11Device* g_pDevice;
 ID3D11DeviceContext* g_pDeviceContext;
 ID3D11RenderTargetView* g_pRenderTargetView;
@@ -90,6 +91,7 @@ VirtualTableHook* g_pSwapChainHook;
 VirtualTableHook* g_pDeviceContextHook;
 VirtualTableHook* g_pKeyboardHook;
 VirtualTableHook* g_pMouseHook;
+VirtualTableHook* g_pCameraHook;
 std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 ImportTableHook* g_pQueryPerformanceCounterHook;

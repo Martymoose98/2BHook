@@ -109,6 +109,12 @@ typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
 typedef void(*ExCollision_GetOBBMaxFn)(ExCollision* pThis, Vector3Aligned* pvMax);
 
+// render funcs
+typedef bool(*COtManager_SetTexture)(void* pThis, int nTextures, int iTextureIndex, CTargetTexture* pTexture, void* pSamplerState, unsigned int iShaderResourceView);
+
+typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
+typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
+
 typedef HeapThing*(*QueryHeapFn)(HeapThing* pResult, int objectid, int a3); // or void i guess
 typedef ObjReadSystem::Work*(*GetWorkFn)(int objectid);
 typedef ObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, ObjReadSystem::Work* pWork);
@@ -217,6 +223,7 @@ extern IDirectInput8A* g_pDirectInput8;
 extern Keyboard_t* g_pKeyboard;
 extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
+extern COtManager* g_pOtManager;
 extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
 extern ID3D11PixelShader* g_pRed;
@@ -240,6 +247,7 @@ extern VirtualTableHook* g_pSwapChainHook;
 extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
+extern VirtualTableHook* g_pCameraHook;
 extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
