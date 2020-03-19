@@ -25,9 +25,7 @@ bool CConfig::CreateConfig(LPTSTR szFilename)
 	if (!SetFilename(szFilename))
 		return false;
 
-	BOOL bConfigExists = FileExists(m_szFilename);
-
-	if (bConfigExists)
+	if (FileExists(m_szFilename))
 		Load(szFilename);
 	else if (_tcsstr(m_szFilename, CONFIG_DEFAULT_INI))
 		Save(CONFIG_DEFAULT);
@@ -42,9 +40,7 @@ void CConfig::Load(LPCTSTR szFilename)
 	if (!SetFilename(szFilename))
 		return;
 
-	BOOL bConfigExists = FileExists(m_szFilename);
-
-	if (bConfigExists)
+	if (FileExists(m_szFilename))
 	{
 		for (auto& it : m_items)
 			it->Read(m_szFilename);
@@ -203,7 +199,7 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 
 	if (szDirectory)
 	{
-		strcpy_s(szSearchDirectory, szDirectory);
+		_tcscpy_s(szSearchDirectory, szDirectory);
 	}
 	else
 	{
@@ -229,8 +225,8 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 		if (!bHeadConstructed)
 		{
 			bHeadConstructed = TRUE;
-			*ppData = (PWIN32_FIND_DATA_LIST)LocalAlloc(LPTR, sizeof(WIN32_FIND_DATA_LIST));
-			pEntry = *ppData;
+			pEntry = (PWIN32_FIND_DATA_LIST)LocalAlloc(LPTR, sizeof(WIN32_FIND_DATA_LIST));
+			*ppData = pEntry;
 		}
 		else
 		{
@@ -262,6 +258,7 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 bool CConfig::SetFilename(LPCTSTR szFilename)
 {
 	TCHAR szDLLFilename[MAX_PATH];
+	LPCTSTR	szExtension;
 
 	ZeroMemory(m_szFilename, sizeof(m_szFilename));
 	GetModuleFileName(g_hInstance, szDLLFilename, MAX_PATH);
@@ -269,8 +266,19 @@ bool CConfig::SetFilename(LPCTSTR szFilename)
 	if (SanitizePath(TEXT("\\"), szDLLFilename, MAX_PATH, m_szFilename, MAX_PATH))
 		return false;
 
-	_tcscat_s(m_szFilename, (szFilename) ? szFilename : CONFIG_DEFAULT);
-	_tcscat_s(m_szFilename, CONFIG_EXTENSION);
+	if (szFilename)
+	{
+		_tcscat_s(m_szFilename, szFilename);
+
+		szExtension = _tcsrchr(szFilename, '.');
+
+		if (szExtension && _tcsicmp(szExtension, CONFIG_EXTENSION))
+			_tcscat_s(m_szFilename, CONFIG_EXTENSION);
+	}
+	else
+	{
+		_tcscat_s(m_szFilename, CONFIG_DEFAULT_INI);
+	}
 
 	return true;
 }
@@ -311,6 +319,24 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 
 	LocalFree((HLOCAL)szPath);
 	return ERROR_SUCCESS;
+}
+
+KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
+{
+	int iLeft = 0;
+	int iRight = ARRAYSIZE(s_Keycodes);
+
+	while (iLeft <= iRight)
+	{
+		int iMiddle = (iLeft + iRight) >> 1;
+		KeyOrdinal* pMiddle = &s_Keycodes[iMiddle];
+
+		if (pMiddle->m_uKeyCode == uKeycode)
+			return pMiddle;
+
+		(pMiddle->m_uKeyCode > uKeycode) ? iRight = iMiddle - 1 : iLeft = iMiddle + 1;
+	}
+	return NULL;
 }
 
 VOID FindDataListFree(PCWIN32_FIND_DATA_LIST pList)

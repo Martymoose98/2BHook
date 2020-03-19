@@ -326,31 +326,28 @@ static void MiscTab()
 
 }
 
-TODO("v0.18 add customization for keybinds")
 static void ConfigTab()
 {
 	LPCTSTR szConfig;
 
 	ImGui::Checkbox("Ignore Input", &Vars.Menu.bIgnoreInputWhenOpened);
 
-	ImGui::Columns(2);
-
 	for (auto& it : g_pConfig->GetKeybinds())
 	{
-		char szValue[33];
+		KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
+		
+		if (pKey)
+		{
+			if (ImGui::BeginCombo(it->GetName(), pKey->m_szName))
+			{
+				for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
+					if (ImGui::Selectable(s_Keycodes[i].m_szName))
+						it->SetKeycode(s_Keycodes[i].m_uKeyCode);
 
-		_itoa_s(it->GetKeycode(), szValue, 16);
-
-		ImGui::BeginCombo(it->GetName(), szValue);
-
-		for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
-			if (ImGui::Selectable(s_Keycodes[i].m_szName))
-				it->SetKeycode(s_Keycodes[i].m_uKeyCode);
-
-		ImGui::EndCombo();
+				ImGui::EndCombo();
+			}
+		}
 	}
-
-	ImGui::Columns();
 
 	ImGui::ListBox("Configs", &Vars.Menu.Config.iSelectedConfig, ConfigCallback, Vars.Menu.Config.pHead, (INT)FindDataListCount(Vars.Menu.Config.pHead));
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
@@ -475,22 +472,22 @@ static void ApplyPodMods(Pl0000* pOwner)
 	pPod->m_pModelInfo->m_vTint.w = Vars.Gameplay.bHidePod ? 0.f : 1.f;
 
 	char szModelPart[64];
-	sprintf_s(szModelPart, "Pod ModelPart: (%s)", pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_szModelPart);
-	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodModelPart, 0, pPod->m_nModelParts - 1);
+	sprintf_s(szModelPart, "Pod Mesh: (%s)", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
+	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodMesh, 0, pPod->m_Work.m_nMeshes - 1);
 
-	sprintf_s(szModelPart, "Pod ModelPart Color: (%s)", pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_szModelPart);
+	sprintf_s(szModelPart, "Pod Mesh Color: (%s)", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
 
-	if (ImGui::Checkbox("Enabled", (bool*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bShow))
-		pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_bUpdate = TRUE;
+	if (ImGui::Checkbox("Enabled", (bool*)&pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_bShow))
+		pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_bUpdate = TRUE;
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 	
-	ImGui::ColorPicker4(szModelPart, (float*)&pPod->m_pModelParts[Vars.Gameplay.iSelectedPodModelPart].m_vColor);
+	ImGui::ColorPicker4(szModelPart, (float*)&pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_vColor);
 	
 	ImGui::PopItemWidth();
 
-	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
-	pPod->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
+	pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
+	pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
 }
 
 static void ApplyModelMods(Pl0000* pEntity)
@@ -531,34 +528,60 @@ static void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::Checkbox("Rainbow Hair", &Vars.Gameplay.bRainbowHair);
 
-	if (Vars.Gameplay.iSelectedModelPart > pEntity->m_nModelParts)
-		Vars.Gameplay.iSelectedModelPart = pEntity->m_nModelParts;
+	if (Vars.Gameplay.iSelectedModelMesh > pEntity->m_Work.m_nMeshes)
+		Vars.Gameplay.iSelectedModelMesh = pEntity->m_Work.m_nMeshes;
 
 	char szModelPart[64];
-	sprintf_s(szModelPart, "ModelPart: (%s)", pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
-	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelPart, 0, pEntity->m_nModelParts - 1);
+	sprintf_s(szModelPart, "Mesh: %s", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
+	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1);
 
-	sprintf_s(szModelPart, "ModelPart Color: (%s)", pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart);
+	sprintf_s(szModelPart, "Mesh %s Color", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
 
-	if (ImGui::Checkbox("Enabled", (bool*)&pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow))
-		pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
+	if (ImGui::Checkbox("Enabled", (bool*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow))
+		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
+
+	ImGui::InputText("Custom Texture (DDS)", Vars.Gameplay.szModelTextureName, MAX_PATH);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Load"))
+	{
+		CTextureDescription desc;
+		CTargetTexture* pTexture = CreateTexture(Vars.Gameplay.szModelTextureName, desc);
+
+		if (pTexture)
+		{
+			CMesh2* pMesh = &g_pLocalPlayer->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
+
+			for (int i = 0; i < pMesh->m_nShaderInfo; ++i)
+			{
+				CMaterial* pMat = pMesh->m_pShaderInfo[i].m_pShader->m_pMaterial;
+
+				SwapTexture(pMat->m_TextureIds[0], pTexture->m_pTexture);
+
+				/*
+				for (int k = 0; k < MAX_MATERIAL_TEXTURES - 1; ++k)
+					SwapTexture(pMat->m_TextureIds[k], pTexture->m_pTexture);
+				*/
+			}
+		}
+	}
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	if (!strcmp(pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_szModelPart, "Hair"))
+	if (!strcmp(pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName, "Hair"))
 	{
 		if (!Vars.Gameplay.bRainbowHair)
 		{
-			ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_vColor);
-			pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
-			pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
+			ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_vColor);
+			pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
+			pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
 		}
 	}
 	else
 	{
-		ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_vColor);
-		pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bUpdate = TRUE;
-		pEntity->m_pModelParts[Vars.Gameplay.iSelectedModelPart].m_bShow = TRUE;
+		ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_vColor);
+		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
+		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
 	}
 
 	ImGui::SameLine();

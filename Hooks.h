@@ -37,6 +37,8 @@ typedef void*(* CreateEntityFn)(void* pUnknown, EntityInfo* pInfo, unsigned int 
 typedef BOOL(* LoadWordBlacklistFn)(BannedWordChecker* pThis, __int64 thisrdx, QWORD *a3, const char* szBlacklistName);
 
 typedef bool(* MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
+typedef BOOL(* CCameraGameSetViewAnglesFn)(CCameraGame* pCamera);
+typedef void*(* CCameraGameMoveFn)(CCameraGame* pCamera);
 
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
@@ -58,6 +60,8 @@ extern UpdateModelPartsFn oUpdateModelParts;
 extern CreateEntityFn oCreateEntity;
 extern LoadWordBlacklistFn oLoadWordBlacklist;
 extern MRubyLoadScriptFn oMRubyLoadScript;
+extern CCameraGameSetViewAnglesFn oCCameraGameSetViewAngles;
+extern CCameraGameMoveFn oCCameraGameMove;
 extern WNDPROC oWndProc;
 
 
@@ -79,6 +83,8 @@ extern "C" void hkUpdateModelParts(Pl0000* pEntity); //proabably not a pl0000 mu
 extern "C" void* hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 extern "C" void* hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
+BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis);
+void* hkCCameraGameMove(CCameraGame* pThis);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter);

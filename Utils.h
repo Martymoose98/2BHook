@@ -34,7 +34,7 @@ private:
 
 struct ReadWriteLock
 {
-	ReadWriteLock() 
+	ReadWriteLock()
 	{
 		if (!m_bCriticalSectionInitalized)
 		{
@@ -54,8 +54,8 @@ struct ReadWriteLock
 		}
 	}
 
-	~ReadWriteLock() 
-	{ 
+	~ReadWriteLock()
+	{
 		if (m_bCriticalSectionInitalized)
 		{
 			LeaveCriticalSection(&m_CriticalSection);
@@ -110,7 +110,7 @@ static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, con
 	return (index | (pList->m_dwShift << 16)) << 8;
 }
 
-// Reversed from binary with added functionality
+// Rebuilt from binary with added functionality
 static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, ObjectIdConvert** ppConvert)
 {
 	static char HexChars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
@@ -130,7 +130,7 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, 
 			szObjectName[4] = HexChars[(objectId >> 4) & 0xF];
 			szObjectName[5] = HexChars[objectId & 0xF];
 			szObjectName[6] = 0; //null terminator
-			
+
 			if (*ppConvert)
 				*ppConvert = &Converts[i];
 
@@ -205,21 +205,21 @@ static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileNam
 			{
 				dwFileCount = pHdr->dwFileCount;
 				dwNextNameOffset = *(DWORD*)((LPBYTE)pHdr + dwOffset);
-szCurrentFileName = (const char*)(pHdr + dwOffset + 4);
-i = 0;
-if (dwFileCount)
-{
-	while (_stricmp(szName, szCurrentFileName))
-	{
-		++i;
-		szCurrentFileName += dwNextNameOffset;
-		if (i >= dwFileCount)
-			goto next_file;
-	}
-	result = i + (v4 << 28);
-	if (result != -1)
-		return result;
-}
+				szCurrentFileName = (const char*)(pHdr + dwOffset + 4);
+				i = 0;
+				if (dwFileCount)
+				{
+					while (_stricmp(szName, szCurrentFileName))
+					{
+						++i;
+						szCurrentFileName += dwNextNameOffset;
+						if (i >= dwFileCount)
+							goto next_file;
+					}
+					result = i + (v4 << 28);
+					if (result != -1)
+						return result;
+				}
 			}
 		}
 	next_file:
@@ -280,6 +280,93 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 	}
 }
 
+// Rebuilt from binary
+static short GetBoneIndex(const CModelData* pModelData, short id)
+{
+	short* pTable;
+	short iBoneIndex, t1, t2; 
+
+	pTable = pModelData->m_pBoneIndexTranslationTable2;
+
+	if (pTable)
+	{
+		t1 = pTable[(id >> 8) & 0xF];	// id / 256  clamped to 0-15
+
+		if (t1 != -1)
+		{
+			t2 = pTable[t1 + ((id >> 4) & 0xF)]; // id
+
+			if (t2 != -1)
+			{
+				iBoneIndex = pTable[t2 + (id & 0xF)];
+
+				if (iBoneIndex != 0xFFF) // 4095
+					return iBoneIndex;
+			}
+		}
+	}
+	return -1;
+}
+
+static short GetBoneId(short index)
+{
+
+}
+
+static void SwapTexture(unsigned int srcid, CTexture* pReplace)
+{
+	CTextureResource* pRes = ((CTextureResourceManager_FindResourceFn)(0x140936F60))(srcid);
+	
+	if (pRes)
+		pRes->m_pTexture = pReplace;
+}
+
+// adapt to use the game's allocation routines to avoid crashes on freeing resources
+static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& desc)
+{
+	CTargetTexture* pTexture = NULL;
+
+	ZeroMemory(&desc, sizeof(CTextureDescription));
+
+	HANDLE hFile = CreateFileA(szFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		DWORD dwFileSize = GetFileSize(hFile, NULL);
+		HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
+
+		if (hMapping != INVALID_HANDLE_VALUE)
+		{
+			TextureFile* pFile = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
+
+			desc.m_pDDS = pFile;
+			desc.m_uTextureSize = dwFileSize;
+			desc.dword18 = 2;
+
+			pTexture = (CTargetTexture*)malloc(sizeof(CTargetTexture)); //AllocHeapMemoryFn or ReserveMemory
+			ZeroMemory(pTexture, sizeof(CTargetTexture));
+
+			if (pTexture)
+			{
+				pTexture->m_vtbl = (void*)0x140E9FA38;
+
+				if (!((CreateTextureFn)(0x140934FE0))(0, pTexture, &desc))
+					return NULL;
+			}
+		}
+		CloseHandle(hFile);
+	}
+
+	return pTexture;
+}
+
+//Shitty delete doesn't check for references.
+static void DeleteTexture(CTargetTexture* pTexture, CTextureDescription& desc)
+{
+	free(pTexture);
+	UnmapViewOfFile(desc.m_pDDS);
+}
+
 static void CreateMaterial(
 	const char* szName,
 	const char* szShader,
@@ -287,11 +374,10 @@ static void CreateMaterial(
 	const char** szTextureNames,
 	CTextureDescription* pDescriptions,
 	int nTextures,
-	CSamplerParameterGroup* pParams,
+	CSamplerParameterGroup* pParams, // float* pParams, int nParams,
 	CMaterial** ppMaterial
 )
 {
-	typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
 	CTargetTexture m_Textures[16];
 	int TextureIds[16];
 
@@ -323,7 +409,7 @@ static void CreateMaterial(
 	(*ppMaterial)->m_szName = szName;
 	(*ppMaterial)->m_szShaderName = szShader;
 	(*ppMaterial)->m_szTechniqueName = szTechnique;
-	(*ppMaterial)->m_nParameters = 0;
+	(*ppMaterial)->m_nShaderParameters = 0;
 
 	for (int i = 0; i < nTextures; ++i)
 	{
@@ -334,6 +420,11 @@ static void CreateMaterial(
 
 		(*ppMaterial)->m_TextureIds[nTexture] = TextureIds[i];
 	}
+
+	// for (int i = 0; i < nVariables; ++i)
+	// {
+	//	
+	// }
 
 	(*ppMaterial)->m_pParameterGroups = pParams;
 }
@@ -349,16 +440,55 @@ static CMaterial* LoadMaterial(const char* szFile)
 	HANDLE hFile = CreateFileA(szFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 	DWORD dwFileSize = GetFileSize(hFile, NULL);
 	HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
-	DDS_HEADER_WITH_MAGIC* pHdr = (DDS_HEADER_WITH_MAGIC*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
+	TextureFile* pHdr = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
 	tex_desc.m_pDDS = pHdr;
 	tex_desc.m_uTextureSize = dwFileSize;
 	tex_desc.dword18 = 2;
 
-	CreateMaterial("Metal", "Sign_PS_XXXXX"/*"PBS00_XXXXX"*/, "Default", &szName, &tex_desc, 1, 0, &pMetal);
+	CreateMaterial("Metal", "CNS00_XXXXX", "Default", &szName, &tex_desc, 1, 0, &pMetal);
 
 	CloseHandle(hFile);
 	return pMetal;
 }
+
+struct ShaderParamter { const char* m_szName; float m_flValue; };
+
+static ShaderParamter CNS00_XXXXX_PARAMS[] = {
+	{ "Binormal0", 0.0f },
+	{ "Color0", 0.0 },
+	{ "Normal", 0.0f },
+	{ "Position", 0.0f },
+	{ "Tangent0", 0.0f },
+	{ "TexCoord0", 0.0f },
+	{ "TexCoord1", 0.0f },
+	{ "g_1BitMask", 0.0f },
+	{ "g_AlbedoColor_X", 0.5f },
+	{ "g_AlbedoColor_Y", 0.5f },
+	{ "g_AlbedoColor_Z", 0.5f },
+	{ "g_Decal", 0.0f },
+	{ "g_Intensity", 1.0f },
+	{ "g_InvalidFog", 0.0f },
+	{ "g_IsSwatchRender", 0.0f },
+	{ "g_LighIntensity0", 1.0f },
+	{ "g_LighIntensity1", 1.0f },
+	{ "g_LighIntensity2", 1.0f },
+	{ "g_LightColor0_X", 1.0f },
+	{ "g_LightColor0_Y", 1.0f },
+	{ "g_LightColor0_Z", 1.0f },
+	{ "g_LightColor1_X", 1.0f },
+	{ "g_LightColor1_Y", 1.0f },
+	{ "g_LightColor1_Z", 1.0f },
+	{ "g_LightColor2_X", 1.0f },
+	{ "g_LightColor2_Y", 1.0f },
+	{ "g_LightColor2_Z", 1.0f },
+	{ "g_Tile_X", 1.0f },
+	{ "g_Tile_Y", 1.0f },
+	{ "g_UseMultiplicationBlend", 1.0f },
+	{ "g_UseSubtractionBlend", 0.0f },
+	{ "g_UvAnimation_X", 0.0f },
+	{ "g_UvAnimation_Y", 0.0f },
+	{ "g_bAlbedoOverWrite", 0.0f }
+};
 
 static HRESULT MyPreloadModel(int objectId)
 {
@@ -456,10 +586,10 @@ static BOOL BackupSave(int nSlot)
 
 	if (nCharsWritten == -1)
 		return ERROR_NOT_ENOUGH_MEMORY;
-	
+
 	GetSystemTime(&time);
 
-	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%4d%02d%02d_%02d%02d%02d.dat.bak", szPath, nSlot, 
+	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%4d%02d%02d_%02d%02d%02d.dat.bak", szPath, nSlot,
 		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
 
 	if (nCharsWritten == -1)
@@ -479,7 +609,7 @@ static BOOL WriteMiniDump(EXCEPTION_POINTERS* pException)
 	DWORD nCharsWritten = GetModuleFileNameW(NULL, szDumpFile, MAX_PATH);
 
 	GetSystemTime(&time);
-	
+
 	wsprintfW(&szDumpFile[nCharsWritten - 4], L"_%4d%02d%02d_%02d%02d%02d.dmp", time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
 
 	HANDLE hFile = CreateFileW(szDumpFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
@@ -582,7 +712,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 			{
 				if (szFmt[j + 1] == 's')
 					IsStringVar[i] = TRUE;
-				
+
 				if (++i == 3)
 					break;
 			}
@@ -629,7 +759,7 @@ static void CRILogCallbackWinConsoleVerbose(const char* szFormat, unsigned int c
 	HANDLE hProc = GetCurrentProcess();
 
 	SymInitialize(hProc, NULL, TRUE);
-	
+
 	WORD nFrames = CaptureStackBackTrace(0, ARRAYSIZE(stack), (PVOID*)stack, NULL);
 	symbol.si.MaxNameLen = MAX_SYM_NAME;
 	symbol.si.SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -644,3 +774,321 @@ static void CRILogCallbackWinConsoleVerbose(const char* szFormat, unsigned int c
 
 	printf("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
+
+/*
+found in pl000d.wmb materials, trimmed out materials that use the same shader (have different values but same variables)
+
+CLT00_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_1BitMask: 0.0
+	g_AlbedoColor_X: 0.5
+	g_AlbedoColor_Y: 0.5
+	g_AlbedoColor_Z: 0.5
+	g_AmbientLightIntensity: 1.0
+	g_AnisoLightMode: 0.0
+	g_AnisoLightMode2: 0.0
+	g_Anisotropic: 0.0
+	g_Anisotropic_X: 0.10000000149011612
+	g_Anisotropic_Y: 0.10000000149011612
+	g_Decal: 0.0
+	g_DetailNormalTile_X: 1.0
+	g_DetailNormalTile_Y: 1.0
+	g_FuzzColorCorrection_X: 1.0
+	g_FuzzColorCorrection_Y: 1.0
+	g_FuzzColorCorrection_Z: 1.0
+	g_FuzzExponent: 2.0
+	g_FuzzMaskEffective: 1.0
+	g_FuzzMul: 0.0
+	g_FuzzReverse: 0.0
+	g_FuzzShadowLowerLimit: 0.30000001192092896
+	g_Glossiness: 0.20000000298023224
+	g_HilIghtIntensity: 1.0
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_LightIntensity: 1.0
+	g_Metallic: 0.0
+	g_NormalReverse: 0.0
+	g_ObjWetStrength: 0.0
+	g_OffShadowCast: 0.0
+	g_ReflectionIntensity: 1.0
+	g_Tile_X: 1.0
+	g_Tile_Y: 1.0
+	g_UseDetailNormalMap: 0.0
+	g_UseEnvWet: 0.0
+	g_UseNormalMap: 1.0
+	g_UseObjWet: 1.0
+	g_WetConvergenceGlossiness: 0.4000000059604645
+	g_WetConvergenceHLI: 0.0
+	g_WetConvergenceMetalic: 0.0
+	g_WetMagAlbedo: 0.4000000059604645
+	g_bAlbedoOverWrite: 0.0
+	g_bGlossinessOverWrite: 0.0
+	g_bMetalicOverWrite: 0.0
+
+Eye00_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_AddEnvCubeIntensity: 1.0
+	g_AlbedoColor_X: 0.5
+	g_AlbedoColor_Y: 0.5
+	g_AlbedoColor_Z: 0.5
+	g_AmbientLightIntensity: 1.0
+	g_Anisotropic: 0.0
+	g_Glossiness: 0.800000011920929
+	g_GlossinessIris: 0.4000000059604645
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_LightIntensity: 1.0
+	g_LightIrisIntensity: 0.6000000238418579
+	g_Metallic: 0.0
+	g_MetallicIris: 1.0
+	g_NormalReverse: 0.0
+	g_ParallaxStrength: 0.019999999552965164
+	g_ReflectionIntensity: 1.0
+	g_UseNormalMap: 1.0
+	g_bAlbedoOverWrite: 0.0
+	g_bGlossinessOverWrite: 1.0
+	g_bMetalicOverWrite: 1.0
+
+PBS00_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_1BitMask: 0.0
+	g_AlbedoColor_X: 0.5
+	g_AlbedoColor_Y: 0.5
+	g_AlbedoColor_Z: 0.5
+	g_AmbientLightIntensity: 1.0
+	g_Anisotropic: 0.0
+	g_Decal: 0.0
+	g_DetailNormalTile_X: 1.0
+	g_DetailNormalTile_Y: 1.0
+	g_Glossiness: 0.20000000298023224
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_LightIntensity: 1.0
+	g_Metallic: 0.0
+	g_NormalReverse: 0.0
+	g_ObjWetStrength: 0.0
+	g_OffShadowCast: 0.0
+	g_ReflectionIntensity: 1.0
+	g_Tile_X: 1.0
+	g_Tile_Y: 1.0
+	g_UV2Use: 0.0
+	g_UseDetailNormalMap: 0.0
+	g_UseEnvWet: 0.0
+	g_UseLightMap: 0.0
+	g_UseNormalMap: 1.0
+	g_UseObjWet: 1.0
+	g_UseOcclusionMap: 0.0
+	g_WetConvergenceGlossiness: 0.6000000238418579
+	g_WetMagAlbedo: 0.5
+	g_bAlbedoOverWrite: 0.0
+	g_bGlossinessOverWrite: 0.0
+	g_bMetalicOverWrite: 0.0
+
+CNS00_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_1BitMask: 0.0
+	g_AlbedoColor_X: 0.5
+	g_AlbedoColor_Y: 0.5
+	g_AlbedoColor_Z: 0.5
+	g_Decal: 0.0
+	g_Intensity: 1.0
+	g_InvalidFog: 0.0
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_Tile_X: 1.0
+	g_Tile_Y: 1.0
+	g_UseMultiplicationBlend: 1.0
+	g_UseSubtractionBlend: 0.0
+	g_UvAnimation_X: 0.0
+	g_UvAnimation_Y: 0.0
+	g_bAlbedoOverWrite: 0.0
+
+SKN00_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_1BitMask: 0.0
+	g_AlbedoColor_X: 0.5
+	g_AlbedoColor_Y: 0.5
+	g_AlbedoColor_Z: 0.5
+	g_AmbientLightIntensity: 1.0
+	g_Anisotropic: 0.0
+	g_DetailNormalTile_X: 50.0
+	g_DetailNormalTile_Y: 50.0
+	g_EnvRoughnessHosei: 5.0
+	g_Glossiness: 0.20000000298023224
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_LightIntensity: 1.0
+	g_Metallic: 0.0
+	g_NormalReverse: 0.0
+	g_ObjWetStrength: 0.0
+	g_OcclusionColor_X: 0.29177701473236084
+	g_OcclusionColor_Y: 0.03954600170254707
+	g_OcclusionColor_Z: 0.03954600170254707
+	g_OffShadowCast: 0.0
+	g_ReflectionIntensity: 1.0
+	g_TransMissionColor_X: 0.8069549798965454
+	g_TransMissionColor_Y: 0.30055099725723267
+	g_TransMissionColor_Z: 0.20155400037765503
+	g_UseDetailNormalMap: 1.0
+	g_UseNormalMap: 1.0
+	g_UseObjWet: 1.0
+	g_WetConvergenceGlossiness: 0.800000011920929
+	g_WetMagAlbedo: 0.6299999952316284
+	g_bAlbedoOverWrite: 0.0
+	g_bDispCurvature: 0.0
+	g_bDispSpecular: 0.0
+	g_bGlossinessOverWrite: 0.0
+	g_bMetalicOverWrite: 0.0
+	g_bUseCurvatureMap: 1.0
+	g_rho_s: 1.0
+	g_tuneCurvature: 1.0
+
+Hair01_XXXXX:
+	Binormal0: 0.0
+	Color0: 0.0
+	Normal: 0.0
+	Position: 0.0
+	Tangent0: 0.0
+	TexCoord0: 0.0
+	TexCoord1: 0.0
+	g_1BitMask: 1.0
+	g_AlbedoColor_X: 0.5149080157279968
+	g_AlbedoColor_Y: 0.47352299094200134
+	g_AlbedoColor_Z: 0.4286850094795227
+	g_AmbientLightIntensity: 1.0
+	g_AnisoLightMode: 0.0
+	g_AnisoLightMode2: 1.0
+	g_Anisotropic: 0.0
+	g_Anisotropic_X: 0.10000000149011612
+	g_Anisotropic_Y: 70.0
+	g_DetailNormalTile_X: 1.0
+	g_DetailNormalTile_Y: 1.0
+	g_EnvRoughnessHosei: 2.0
+	g_FuzzExponent: 4.0
+	g_FuzzMaskEffective: 1.0
+	g_Glossiness: 0.10000000149011612
+	g_HilIghtIntensity: 0.800000011920929
+	g_IsSwatchRender: 0.0
+	g_LighIntensity0: 1.0
+	g_LighIntensity1: 1.0
+	g_LighIntensity2: 1.0
+	g_LightColor0_X: 1.0
+	g_LightColor0_Y: 1.0
+	g_LightColor0_Z: 1.0
+	g_LightColor1_X: 1.0
+	g_LightColor1_Y: 1.0
+	g_LightColor1_Z: 1.0
+	g_LightColor2_X: 1.0
+	g_LightColor2_Y: 1.0
+	g_LightColor2_Z: 1.0
+	g_LightIntensity: 1.0
+	g_Metallic: 0.20000000298023224
+	g_NoiseTile_X: 10.0
+	g_NoiseTile_Y: 1.0
+	g_NormalReverse: 0.0
+	g_ObjWetStrength: 0.0
+	g_OffShadowCast: 0.0
+	g_ReflectionIntensity: 1.0
+	g_SecondaryGlossiness: 0.621999979019165
+	g_SecondaryMetalic: 0.800000011920929
+	g_SecondarySpecShift: -0.36000001430511475
+	g_SpecShift: 0.019999999552965164
+	g_UseDetailNormalMap: 0.0
+	g_UseNormalMap: 1.0
+	g_UseObjWet: 1.0
+	g_WetConvergenceGlossiness: 0.5
+	g_WetConvergenceHLI: 0.5
+	g_WetConvergenceSecondaryGlossiness: 1.0
+	g_WetMagAlbedo: 0.6299999952316284
+	g_WetMagNoiseTile_X: 1.0
+	g_WetMagNoiseTile_Y: 1.0
+	g_bAlbedoOverWrite: 1.0
+	g_bDispNoise: 0.0
+	g_bGlossinessOverWrite: 1.0
+	g_bMetalicOverWrite: 1.0
+*/

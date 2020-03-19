@@ -42,11 +42,12 @@ typedef struct Variables_t
 		bool bRainbowModel;
 		bool bRainbowHair;
 		float flModelTintHue;
-		int iSelectedModelPart;
+		int iSelectedModelMesh;
+		char szModelTextureName[MAX_PATH];
 		bool bRainbowPod;
 		bool bHidePod;
 		float flPodTintHue;
-		int iSelectedPodModelPart;
+		int iSelectedPodMesh;
 		int iAnimation;
 		Vector3Aligned vSpawnEntityScale;
 		int iSelectedEntityType;
@@ -69,6 +70,7 @@ typedef struct Variables_t
 	{
 		char szCpkName[32];
 		bool bCpkLoaded;
+		bool bFirstperson;
 		char szSoundName[128];
 		bool bWireframe;
 		bool bAntiVSync;

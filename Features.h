@@ -126,6 +126,7 @@ public:
 			return;
 
 		pEntity->m_HorizontalCollision.m_hOwner = 0;
+		pEntity->m_HorizontalCollision.m_bCollison = FALSE;
 	}
 
 	static void UnlockAllAchievements(void)
@@ -374,7 +375,7 @@ public:
 		memcpy(pEntA, &tmp, sizeof(CModel));
 	}
 
-	static void AddModelPart(Pl0000* pEntity)
+	static void AddModelMesh(Pl0000* pEntity)
 	{
 		CRITICAL_SECTION cs;
 
@@ -384,7 +385,7 @@ public:
 		InitializeCriticalSection(&cs);
 		EnterCriticalSection(&cs);
 
-		pEntity->m_nModelParts++;
+		pEntity->m_Work.m_nMeshes++;
 
 
 		LeaveCriticalSection(&cs);
@@ -405,7 +406,7 @@ public:
 		c.m_szName = szName;
 		c.m_ObjectIds[0] = objectId;
 		c.m_ObjectIds[1] = objectId;
-		c.m_b0x0020 = TRUE;
+		c.m_iGenerateMode = 1;
 		c.m_pSetInfo = pSetInfo;
 
 		return ((SceneEntitySystem_CreateEntityFn)(0x1404F9AA0))((CSceneEntitySystem*)0x14160DFE0, &c);
