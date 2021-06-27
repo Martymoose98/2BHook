@@ -13,8 +13,8 @@
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
 #define GetByte(x) ((GetBits((x)[0]) << 4) | GetBits((x)[1]))
 
-#define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (DWORD)(rva)))
-#define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (DWORD)(rva)))
+#define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (LONG)(rva)))
+#define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (LONG)(rva)))
 
 #define FOURCC(a, b, c, d) ( (DWORD)(((DWORD)((BYTE)a)) | (((DWORD)((BYTE)b)) << 8) | (((DWORD)((BYTE)c)) << 16) | (((DWORD)((BYTE)d)) << 24)) )
 #define EIGHTCC(a, b, c, d, e, f, g, h) ( (QWORD)(((QWORD)((BYTE)a)) | (((QWORD)((BYTE)b)) << 8) | (((QWORD)((BYTE)c)) << 16) | (((QWORD)((BYTE)d)) << 24) | (((QWORD)((BYTE)e)) << 32) | (((QWORD)((BYTE)f)) << 40) | (((QWORD)((BYTE)g)) << 48) | (((QWORD)((BYTE)h)) << 56)) )
@@ -23,7 +23,7 @@
 #define BYTE_PATCH_MEMORY_MAGIC (INT)(0x6863) // "bp"
 
 #define MINIMUM_HOOK_LENGTH32 5
-#define MINIMUM_HOOK_LENGTH64 14
+#define MINIMUM_HOOK_LENGTH64 14 //15
 
 
 #ifdef _WIN64
@@ -84,7 +84,8 @@ typedef struct _HOOK_FUNC
 	void* m_pSrcFunc;
 	BYTE* m_pOldInstructions;
 	SIZE_T m_length;
-	bool m_hooked;
+	BYTE m_Detour[MINIMUM_HOOK_LENGTH];
+	BOOLEAN m_hooked;
 } HOOK_FUNC, *PHOOK_FUNC;
 
 enum _ISBADPTR_STATUS
@@ -104,43 +105,43 @@ typedef DWORD ISBADPTR_STATUS;
 class CMemory
 {
 public:
-	DWORD_PTR FindPattern(const char* moduleName, const char* pattern)
+	ULONG_PTR FindPattern(const char* szModuleName, const char* szPattern)
 	{
-		const char* pat = pattern;
-		DWORD_PTR firstMatch = 0;
-		DWORD_PTR rangeStart = (DWORD_PTR)GetModuleHandle(moduleName);
-		MODULEINFO miModInfo;
+		const char* szPat = szPattern;
+		ULONG_PTR uFirstMatch = 0;
+		ULONG_PTR uStart = (ULONG_PTR)GetModuleHandleA(szModuleName);
+		MODULEINFO ModuleInfo;
 
-		if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)rangeStart, &miModInfo, sizeof(MODULEINFO)))
+		if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)uStart, &ModuleInfo, sizeof(MODULEINFO)))
 			return -1;
 
-		DWORD_PTR rangeEnd = rangeStart + miModInfo.SizeOfImage;
+		ULONG_PTR uRangeEnd = uStart + ModuleInfo.SizeOfImage;
 
-		for (DWORD_PTR pCur = rangeStart; pCur < rangeEnd; pCur++)
+		for (ULONG_PTR pCur = uStart; pCur < uRangeEnd; pCur++)
 		{
-			if (!*pat)
-				return firstMatch;
+			if (!*szPat)
+				return uFirstMatch;
 
-			if (*(BYTE*)pat == '\?' || *(BYTE*)pCur == GetByte(pat))
+			if (*(BYTE*)szPat == '\?' || *(BYTE*)pCur == GetByte(szPat))
 			{
-				if (!firstMatch)
-					firstMatch = pCur;
+				if (!uFirstMatch)
+					uFirstMatch = pCur;
 
-				if (!pat[2])
-					return firstMatch;
+				if (!szPat[2])
+					return uFirstMatch;
 
-				if (*(WORD*)pat == '\?\?' || *(BYTE*)pat != '\?')
-					pat += 3;
+				if (*(WORD*)szPat == '\?\?' || *(BYTE*)szPat != '\?')
+					szPat += 3;
 				else
-					pat += 2;    //one ?
+					szPat += 2;    //one ?
 			}
 			else
 			{
-				pat = pattern;
-				firstMatch = 0;
+				szPat = szPattern;
+				uFirstMatch = 0;
 			}
 		}
-		return NULL;
+		return 0;
 	}
 
 	inline DWORD CalculateJump(QWORD rip, QWORD dest, SIZE_T uOffset)
@@ -154,6 +155,24 @@ public:
 	}
 
 	/*
+	Note: When using this version of this function, the pointer has to be the first unknown
+	@params
+	szModulename - name of the module to scan (IDA or PEiD Style)
+	szPattern - the byte pattern to search the module for
+	*/
+	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern)
+	{
+		ULONG_PTR rip = FindPattern(szModulename, szPattern);
+		ULONG_PTR uOffset = 0;
+
+		while (*(szPattern + uOffset * 3) != '?' && *(WORD*)(szPattern + uOffset * 3) != '??')
+			++uOffset;
+
+		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
+		return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
+	}
+
+	/*
 		Note: When using this version of this function, the pointer has to be the first unknown.
 		Also, this is the fastest verison of this function since the uOffset is compile-time
 		known.
@@ -162,48 +181,11 @@ public:
 		szPattern - the byte pattern to search the module for
 		uOffset - the byte offset to the pointer from the beginning of szPattern
 	*/
-	QWORD FindPatternPtr64(const char* szModulename, const char* szPattern, UINT uOffset)
+	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern, UINT uOffset)
 	{
-		QWORD rip = FindPattern(szModulename, szPattern);
+		ULONG_PTR rip = FindPattern(szModulename, szPattern);
 		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
-		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
-	}
-
-	/*
-		Note: When using this version of this function, the pointer has to be the first unknown
-		@params
-		szModulename - name of the module to scan (IDA or PEiD Style)
-		szPattern - the byte pattern to search the module for
-	*/
-	QWORD FindPatternPtr64(const char* szModulename, const char* szPattern)
-	{
-		QWORD rip = FindPattern(szModulename, szPattern);
-		UINT uOffset = 0;
-
-		while (*(szPattern + uOffset * 3) != '?' && *(WORD*)(szPattern + uOffset * 3) != '??')
-			++uOffset;
-
-		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
-		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
-	}
-
-	/*
-		Note: When using this version of this function, the pointer can be anywhere in the pattern
-		@params
-		szModulename - name of the module to scan
-		szPattern - the byte pattern to search the module for (IDA or PEiD Style)
-		uOpcodeStartOffset - offset from szPattern to the pointer opcode start
-	*/
-	QWORD FindPatternPtr64Ex(const char* szModulename, const char* szPattern, UINT uOpcodeStartOffset)
-	{
-		QWORD rip = FindPattern(szModulename, szPattern) + uOpcodeStartOffset;
-		UINT uOffset = 0;
-
-		while (*(szPattern + uOpcodeStartOffset + uOffset * 3) != '?' && *(WORD*)(szPattern + uOpcodeStartOffset + uOffset * 3) != '??')
-			++uOffset;
-
-		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
-		return (QWORD)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
+		return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
 	}
 
 	VOID NopMemory(VOID* address, SIZE_T nBytes, BYTE** ppOldOpcodes)
@@ -407,24 +389,24 @@ public:
 	}
 
 	// maybe we should have different shellcodes that use other registers
-	BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pStruct)
+	BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pHook)
 	{
 		if (length < MINIMUM_HOOK_LENGTH64)
-			return false;
+			return FALSE;
 
-		if (pStruct->m_hooked)
-			return false;
+		if (pHook->m_hooked)
+			return FALSE;
 
-		DWORD oldProtect;
+		DWORD dwOldProtect;
 
-		if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &oldProtect))
-			return false;
+		if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+			return FALSE;
 
-		pStruct->m_hooked = TRUE;
-		pStruct->m_pOldInstructions = (BYTE*)malloc(length);
-		pStruct->m_pSrcFunc = pSrcFunc;
-		memcpy(pStruct->m_pOldInstructions, pSrcFunc, length);
-		pStruct->m_length = length;
+		pHook->m_hooked = TRUE;
+		pHook->m_pSrcFunc = pSrcFunc;
+		pHook->m_pOldInstructions = (BYTE*)malloc(length);
+		memcpy(pHook->m_pOldInstructions, pSrcFunc, length);
+		pHook->m_length = length;
 
 		NOPMemory((LPBYTE)pSrcFunc + MINIMUM_HOOK_LENGTH64, length - MINIMUM_HOOK_LENGTH64);
 
@@ -449,40 +431,70 @@ public:
 
 		rsp -= 16
 
-		push rax
-		movabs rax, addy
-		call rax
-		pop rax
+		push rbx
+		movabs rbx, addy
+		call rbx
+		pop rbx
 
-		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x58 }
+		{ 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B }
 		*/
-		static BYTE detour[] = { 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x58 };
-		memcpy((BYTE*)pSrcFunc, detour, sizeof(detour));
-		*(QWORD*)((BYTE*)pSrcFunc + 3) = (QWORD)pDstFunc;
+		static BYTE detour[] = { 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B };
 
-		if (!VirtualProtect(pSrcFunc, length, oldProtect, NULL))
-			return false;
+		memcpy(pHook->m_Detour, detour, sizeof(detour));
+		*(QWORD*)&pHook->m_Detour[3] = (QWORD)pDstFunc;
 
-		return true;
+		memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
+
+		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, NULL))
+			return FALSE;
+
+		//FlushInstructionCache(GetCurrentProcess(), pSrcFunc, length);
+
+		return FALSE;
 	}
 
-	BOOL UnhookFunc(HOOK_FUNC* pStruct)
+	BOOL RehookFunc(HOOK_FUNC* pHook)
 	{
-		if (!pStruct->m_hooked)
-			return false;
+		if (pHook->m_hooked)
+			return FALSE;
 
-		DWORD oldProtect;
+		DWORD dwOldProtect;
 
-		if (!VirtualProtect(pStruct->m_pSrcFunc, pStruct->m_length, PAGE_EXECUTE_READWRITE, &oldProtect))
-			return false;
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+			return FALSE;
 
-		memcpy(pStruct->m_pSrcFunc, pStruct->m_pOldInstructions, pStruct->m_length);
-		pStruct->m_hooked = false;
+		NOPMemory((LPBYTE)pHook->m_pSrcFunc + MINIMUM_HOOK_LENGTH64, pHook->m_length - MINIMUM_HOOK_LENGTH64);
 
-		if (!VirtualProtect(pStruct->m_pSrcFunc, pStruct->m_length, oldProtect, NULL))
-			return false;
+		memcpy(pHook->m_pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
+		pHook->m_hooked = TRUE;
 
-		return true;
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, NULL))
+			return FALSE;
+
+		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
+
+		return TRUE;
+	}
+
+	BOOL UnhookFunc(HOOK_FUNC* pHook)
+	{
+		if (!pHook->m_hooked)
+			return FALSE;
+
+		DWORD dwOldProtect;
+
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+			return FALSE;
+
+		memcpy(pHook->m_pSrcFunc, pHook->m_pOldInstructions, pHook->m_length);
+		pHook->m_hooked = FALSE;
+
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, NULL))
+			return FALSE;
+
+		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
+
+		return TRUE;
 	}
 
 	static ISBADPTR_STATUS IsBadReadPtr(const void* p)

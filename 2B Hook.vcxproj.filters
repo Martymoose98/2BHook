@@ -129,6 +129,9 @@
     <ClInclude Include="mot.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="MemoryDeviceHook.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">
@@ -179,11 +182,17 @@
     <ClCompile Include="ImGui\imgui_impl_dx11.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="Console.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MemoryDeviceHook.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mot.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <MASM Include="UpdateModelPartsHook.asm">
-      <Filter>Assembly Files</Filter>
-    </MASM>
     <MASM Include="LoadWordBlacklistHook.asm">
       <Filter>Assembly Files</Filter>
     </MASM>

@@ -92,15 +92,6 @@ void CConfig::ResetConfig()
 
 void CConfig::InitializeConfig()
 {
-	Vars.Keybinds.OpenMenu = KeybindToggleable("kb_open_menu", DIK_INSERT, &Vars.Menu.bOpened);
-	Vars.Keybinds.ChangePlayer = KeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer);
-	Vars.Keybinds.Airstuck = KeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck);
-	Vars.Keybinds.DuplicateBuddy = KeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC);
-	Vars.Keybinds.TeleportForward = KeybindFunctional<void>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportForward);
-	Vars.Keybinds.PlayAnimation = KeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation);
-	Vars.Keybinds.ModelGravity = KeybindDynamicToggleable("kb_model_gravity", DIK_F9, GetModelGravity);
-	Vars.Keybinds.ModelYControl = KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYPRESSED, GetOBBY, 1.f);
-
 #pragma region visuals
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_traceline", Vars.Visuals.bTraceLine));
 	m_items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_traceline", Vars.Visuals.flTraceLength));
@@ -117,7 +108,6 @@ void CConfig::InitializeConfig()
 
 #pragma region gameplay
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_freeze_player", Vars.Gameplay.bFreezePlayer));
-	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_ghostmodel", Vars.Gameplay.bGhostModel));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_godmode", Vars.Gameplay.bGodmode));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_enemy_damage", Vars.Gameplay.bNoEnemyDamage));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_world_damage", Vars.Gameplay.bNoWorldDamage));
@@ -128,7 +118,6 @@ void CConfig::InitializeConfig()
 	//m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_rainbow_model", Vars.Gameplay.bRainbowModel)); not impl-
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_speedmeister", Vars.Gameplay.bSpeedMeister));
 	m_items.emplace_back(new ConfigItemFloat(CATEGORY_GAMEPLAY, "fl_speed_multiplier", Vars.Gameplay.flSpeedMultiplier));
-	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_temporary_level", Vars.Gameplay.bTemporaryLevel));
 	//m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "fl_model_tint_hue", Vars.Gameplay.flModelTintHue)); not impl (rainbow model)
 	m_items.emplace_back(new ConfigItemInt(CATEGORY_GAMEPLAY, "i_level", Vars.Gameplay.iLevel));
 	m_items.emplace_back(new ConfigItemInt(CATEGORY_GAMEPLAY, "i_enemy_level", Vars.Gameplay.iEnemyLevel));
@@ -141,25 +130,26 @@ void CConfig::InitializeConfig()
 #pragma endregion
 
 #pragma region keybinds
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.OpenMenu));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.Airstuck));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.ChangePlayer));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.DuplicateBuddy));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.TeleportForward));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.PlayAnimation));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.ModelGravity));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.ModelYControl.m_inc));
-	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, Vars.Keybinds.ModelYControl.m_dec));
+	Vars.Keybinds.OpenMenu = KeybindToggleable("kb_open_menu", DIK_INSERT, &Vars.Menu.bOpened);
+	Vars.Keybinds.Firstperson = KeybindToggleable("kb_firstperson_camera", DIK_F1, &Vars.Misc.bFirstperson);
+	Vars.Keybinds.ChangePlayer = KeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer);
+	Vars.Keybinds.Airstuck = KeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck);
+	Vars.Keybinds.DuplicateBuddy = KeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC);
+	Vars.Keybinds.TeleportForward = KeybindFunctional<void>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportForward);
+	Vars.Keybinds.PlayAnimation = KeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation);
+	Vars.Keybinds.ModelGravity = KeybindDynamicToggleable("kb_model_gravity", DIK_F9, GetModelGravity);
+	Vars.Keybinds.ModelYControl = KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYPRESSED, GetOBBY, 1.f);
 
-	m_keybinds.emplace_back(&Vars.Keybinds.OpenMenu);
-	m_keybinds.emplace_back(&Vars.Keybinds.ChangePlayer);
-	m_keybinds.emplace_back(&Vars.Keybinds.Airstuck);
-	m_keybinds.emplace_back(&Vars.Keybinds.DuplicateBuddy);
-	m_keybinds.emplace_back(&Vars.Keybinds.TeleportForward);
-	m_keybinds.emplace_back(&Vars.Keybinds.ModelGravity);
-	m_keybinds.emplace_back(&Vars.Keybinds.PlayAnimation);
-	m_keybinds.emplace_back(&Vars.Keybinds.ModelYControl.m_inc);
-	m_keybinds.emplace_back(&Vars.Keybinds.ModelYControl.m_dec);
+	AddKeybind(&Vars.Keybinds.OpenMenu);
+	AddKeybind(&Vars.Keybinds.Firstperson);
+	AddKeybind(&Vars.Keybinds.ChangePlayer);
+	AddKeybind(&Vars.Keybinds.Airstuck);
+	AddKeybind(&Vars.Keybinds.DuplicateBuddy);
+	AddKeybind(&Vars.Keybinds.TeleportForward);
+	AddKeybind(&Vars.Keybinds.ModelGravity);
+	AddKeybind(&Vars.Keybinds.PlayAnimation);
+	AddKeybind(&Vars.Keybinds.ModelYControl.m_inc);
+	AddKeybind(&Vars.Keybinds.ModelYControl.m_dec);
 #pragma endregion
 
 #pragma region misc
@@ -184,6 +174,16 @@ void CConfig::LoadDefault()
 	PurgeConfig();
 	InitializeConfig();
 }
+
+void CConfig::AddKeybind(IKeybind* pKeybind)
+{
+	if (pKeybind)
+	{
+		m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, *pKeybind));
+		m_keybinds.emplace_back(pKeybind);
+	}
+}
+
 
 BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const
 {
@@ -289,16 +289,11 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 	LPTSTR szNextToken;
 
 	LPTSTR szTemporary = NULL;
-	LPTSTR szPath = (LPTSTR)LocalAlloc(LPTR, (cchOriginalPath + 1) * sizeof(TCHAR));
+	LPTSTR szDirPath = (LPTSTR)LocalAlloc(LPTR, (cchOriginalPath + 1) * sizeof(TCHAR));
+	BOOL Status = ERROR_DIRECTORY;
 
-	_tcscpy_s(szPath, cchOriginalPath, szOriginalPath);
+	_tcscpy_s(szDirPath, cchOriginalPath, szOriginalPath);
 	szToken = _tcstok_s(szOriginalPath, szDelimiter, &szNextToken);
-
-	if (!szToken)
-	{
-		LocalFree((HLOCAL)szPath);
-		return ERROR_DIRECTORY;
-	}
 
 	while (szToken)
 	{
@@ -306,19 +301,18 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 		szToken = _tcstok_s(NULL, szDelimiter, &szNextToken);
 	}
 
-	if (!szTemporary)
+	if (szDirPath && szTemporary)
 	{
-		LocalFree((HLOCAL)szPath);
-		return ERROR_DIRECTORY;
+		szDirPath[szTemporary - szOriginalPath] = (TCHAR)0;
+
+		if (szSanitizedPath)
+			_tcscpy_s(szSanitizedPath, cchSanitizedPath, szDirPath);
+
+		Status = ERROR_SUCCESS;
 	}
 
-	szPath[szTemporary - szOriginalPath] = (TCHAR)0;
-
-	if (szSanitizedPath)
-		_tcscpy_s(szSanitizedPath, cchSanitizedPath, szPath);
-
-	LocalFree((HLOCAL)szPath);
-	return ERROR_SUCCESS;
+	LocalFree((HLOCAL)szDirPath);
+	return Status;
 }
 
 KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)

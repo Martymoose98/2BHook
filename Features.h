@@ -2,6 +2,9 @@
 #include "ReversedStructs.h"
 #include "Vector3.h"
 #include "Log.h"
+#include "Console.h"
+
+int GetModelMeshIndex(CModelWork* pWork, const char* szMesh);
 
 class Features
 {
@@ -67,7 +70,7 @@ public:
 	}
 
 	// exprimential
-	static void AddBuddy()
+	static void AddBuddy(void)
 	{
 		CRITICAL_SECTION cs;
 		unsigned int crc;
@@ -135,6 +138,51 @@ public:
 			UnlockAchievement(0, 0, id);
 	}
 
+	//WIP: head mesh comes back on animations this needs to be fixed
+	// also camera should rotate with bone
+	static void Firstperson(Pl0000* pEntity)
+	{
+		if (pEntity && Vars.Misc.bFirstperson && !Vars.Misc.bFirstpersonOld)
+		{
+			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
+			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
+			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+
+			if (iFace != -1 && iMask != -1 && iHair != -1)
+			{
+				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 0.0f;
+				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
+				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 0.0f;
+				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
+				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 0.0f;
+				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+			}
+		}
+	}
+
+
+	//WIP: head mesh comes back on animations this needs to be fixed
+	// also camera should rotate with bone
+	static void Thirdperson(Pl0000* pEntity)
+	{
+		if (pEntity && !Vars.Misc.bFirstperson && Vars.Misc.bFirstpersonOld)
+		{
+			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
+			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
+			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+
+			if (iFace != -1 && iMask != -1 && iHair != -1)
+			{
+				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 1.0f;
+				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
+				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 1.0f;
+				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
+				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 1.0f;
+				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+			}
+		}
+	}
+
 	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(0, pEntity->m_pInfo); after the wet time has elapsed")
 	static int WetEntity(Pl0000* pEntity, byte wetness)
 	{
@@ -172,8 +220,6 @@ public:
 	{
 		if (pCameraEnt && g_pLocalPlayer)
 		{
-			pCameraEnt->m_nBones = Vars.Gameplay.nBones;
-			Vars.Gameplay.nBones = 0;
 			ChangePlayer(g_pLocalPlayer);
 			pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
 		}
@@ -184,7 +230,7 @@ public:
 		ChangePlayerEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
 	}
 
-	static void DuplicateBuddyAsNPC()
+	static void DuplicateBuddyAsNPC(void)
 	{
 		if (g_pLocalPlayer)
 			g_pLocalPlayer->m_hBuddy = 0;
@@ -262,6 +308,8 @@ public:
 
 		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
 
+		CCONSOLE_DEBUG_LOG(ImColor(0x8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
+
 		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
 		{
 			int* pHealth = MakePtr(int*, pEnemy, 0x858);
@@ -327,7 +375,7 @@ public:
 
 		if (Vars.Gameplay.bInstantEquip)
 		{
-			((UseItemFn)(0x1405DC5A0))(0, id, quantity);
+			((UseItemFn)(0x1405DC5A0))(0, id, (float)quantity); // TODO: odd parameter idk why it's float (investigate)
 		}
 	}
 
@@ -375,29 +423,13 @@ public:
 		memcpy(pEntA, &tmp, sizeof(CModel));
 	}
 
-	static void AddModelMesh(Pl0000* pEntity)
-	{
-		CRITICAL_SECTION cs;
-
-		if (!pEntity)
-			return;
-
-		InitializeCriticalSection(&cs);
-		EnterCriticalSection(&cs);
-
-		pEntity->m_Work.m_nMeshes++;
-
-
-		LeaveCriticalSection(&cs);
-	}
-
 	static void MoveSun()
 	{
 		Sun* sun = (Sun*)0x14160EB40;
 		//sun->m_vPosition.x += 3;
 	}
 
-	static EntityInfo* CreateEntity(const char* szName, int objectId, OPTIONAL set_info_t* pSetInfo)
+	static CEntityInfo* CreateEntity(const char* szName, int objectId, OPTIONAL set_info_t* pSetInfo)
 	{
 		Create_t c;
 
@@ -410,13 +442,6 @@ public:
 		c.m_pSetInfo = pSetInfo;
 
 		return ((SceneEntitySystem_CreateEntityFn)(0x1404F9AA0))((CSceneEntitySystem*)0x14160DFE0, &c);
-	}
-
-	// test
-	static void ApplyA2Wig(EntityInfo* pInfo)
-	{
-		//hkCreateEntity((void*)0x1415f6b50, pInfo, 0x10000, -1, (CHeapInstance**)0x1418f6158);
-		//sub_1404F9AA0((__int64)&qword_14160DFE0, &szA2Wig);
 	}
 
 	static CpkEntry* LoadCpk(const char* szCpkName)

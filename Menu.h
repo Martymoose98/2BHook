@@ -19,26 +19,22 @@ static void GameplayTab(Pl0000* pCameraEnt)
 
 	ImGui::InputInt("Experience:", g_piExperience, 1, 5);
 	ImGui::InputInt("Level:", &Vars.Gameplay.iLevel, 1, 5);
-	ImGui::Checkbox("Temporary Level", &Vars.Gameplay.bTemporaryLevel);
 	ImGui::SameLine();
 
 	if (ImGui::Button("Apply Level"))
 	{
-		if (Vars.Gameplay.bTemporaryLevel)
+		if (g_piExperience)
 		{
-			Level_t* pLevel = CalculateLevel(&g_pLocalPlayer->m_LevelsContainer, *g_piExperience);
-			pLevel->m_iLevel = Vars.Gameplay.iLevel;
-		}
-		else
-		{
-			if (Vars.Gameplay.iLevel > MAX_LEVELS)
-				Vars.Gameplay.iLevel = MAX_LEVELS;
-			else if (Vars.Gameplay.iLevel < 1)
-				Vars.Gameplay.iLevel = 1;
-
+			Vars.Gameplay.iLevel = min(MAX_LEVELS, max(MIN_LEVELS, Vars.Gameplay.iLevel));
 			*g_piExperience = g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
 		}
 	}
+
+	ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Max Money"))
+		*g_piMoney = MAX_MONEY;
 
 	ImGui::PopItemWidth();
 	ImGui::NextColumn();
@@ -49,12 +45,6 @@ static void GameplayTab(Pl0000* pCameraEnt)
 	ImGui::SameLine();
 	ImGui::Checkbox("Exclusively Positive", &Vars.Gameplay.bExclusivelyPositiveTolerance);
 	ImGui::Checkbox("Absolute Level", &Vars.Gameplay.bLevelBuffMode);
-
-	ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Max Money"))
-		*g_piMoney = MAX_MONEY;
 
 	ImGui::PopItemWidth();
 	ImGui::Columns();
@@ -101,8 +91,8 @@ static void GameplayTab(Pl0000* pCameraEnt)
 		set_info.m_i0x084 = 0;
 		set_info.m_i0x088 = 1;
 		set_info.m_i0x08C = -1;
-		set_info.m_i0x07C = 1;
-		set_info.m_dw0x70 = 0;
+		set_info.m_i0x07C = 1; //flags
+		set_info.m_dwSetType = 1;
 		set_info.m_dw0x74 = 0;
 		set_info.m_i0x078 = 0;
 
@@ -114,7 +104,7 @@ static void GameplayTab(Pl0000* pCameraEnt)
 		//	RequestEnd(0, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId);
 		//}
 
-		EntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId, &set_info);
+		CEntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId, &set_info);
 
 		if (pInfo)
 		{
@@ -161,13 +151,7 @@ static void GameplayTab(Pl0000* pCameraEnt)
 
 	if (ImGui::Button("Change Player"))
 	{
-		if (pCameraEnt)
-		{
-			pCameraEnt->m_nBones = Vars.Gameplay.nBones;
-			Vars.Gameplay.nBones = 0;
-			ChangePlayer(g_pLocalPlayer);
-			pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
-		}
+		Features::SwapPlayer();
 	}
 
 	ImGui::SameLine();
@@ -262,7 +246,7 @@ static void VisualsTab(Pl0000* pCameraEnt)
 	ApplyModelMods(pCameraEnt);
 }
 
-static void MiscTab()
+static void MiscTab(void)
 {
 	if (ImGui::Button("Teleport Emil To Me"))
 		Features::TeleportEntityToOther(*g_pLocalPlayerHandle, *g_pEmilHandle);
@@ -290,7 +274,7 @@ static void MiscTab()
 		LOG("RAX = %x\n", rax);
 	}
 
-	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_viewangles);
+	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_vViewangles);
 
 	ImGui::Checkbox("SpeedMeister", &Vars.Gameplay.bSpeedMeister);
 	ImGui::SameLine();
@@ -326,7 +310,7 @@ static void MiscTab()
 
 }
 
-static void ConfigTab()
+static void ConfigTab(void)
 {
 	LPCTSTR szConfig;
 
@@ -441,12 +425,14 @@ static void DisplayEntityHandles()
 			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);
 	}
 
+#ifdef  _DEBUG
 	ImGui::SameLine();
 
 	if (ImGui::Button("Set Player"))
 	{
 		Features::SetPlayer(handles[Vars.Gameplay.iSelectedEntityHandle]);
 	}
+#endif
 
 	for (int i = 0; i < count; ++i)
 		delete[] ppszHandles[i];
@@ -500,7 +486,7 @@ static void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::SameLine();
 
-	ImGui::Checkbox("Ghost Model", &Vars.Gameplay.bGhostModel);
+	ImGui::Checkbox("Firstperson", &Vars.Misc.bFirstperson);
 
 	ImGui::SameLine();
 
@@ -531,14 +517,16 @@ static void ApplyModelMods(Pl0000* pEntity)
 	if (Vars.Gameplay.iSelectedModelMesh > pEntity->m_Work.m_nMeshes)
 		Vars.Gameplay.iSelectedModelMesh = pEntity->m_Work.m_nMeshes;
 
+	CMesh2* pSelectedMesh = &pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
+
 	char szModelPart[64];
-	sprintf_s(szModelPart, "Mesh: %s", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
+	sprintf_s(szModelPart, "Mesh: %s", pSelectedMesh->m_szMeshName);
 	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1);
 
-	sprintf_s(szModelPart, "Mesh %s Color", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
+	sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
 
-	if (ImGui::Checkbox("Enabled", (bool*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow))
-		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
+	if (ImGui::Checkbox("Enabled", (bool*)&pSelectedMesh->m_bShow))
+		pSelectedMesh->m_bUpdate = TRUE;
 
 	ImGui::InputText("Custom Texture (DDS)", Vars.Gameplay.szModelTextureName, MAX_PATH);
 	ImGui::SameLine();
@@ -568,20 +556,20 @@ static void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	if (!strcmp(pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName, "Hair"))
+	if (!strcmp(pSelectedMesh->m_szMeshName, "Hair"))
 	{
 		if (!Vars.Gameplay.bRainbowHair)
 		{
-			ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_vColor);
-			pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
-			pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
+			ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
+			pSelectedMesh->m_bUpdate = TRUE;
+			pSelectedMesh->m_bShow = TRUE;
 		}
 	}
 	else
 	{
-		ImGui::ColorPicker4(szModelPart, (float*)&pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_vColor);
-		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
-		pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
+		ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
+		pSelectedMesh->m_bUpdate = TRUE;
+		pSelectedMesh->m_bShow = TRUE;
 	}
 
 	ImGui::SameLine();

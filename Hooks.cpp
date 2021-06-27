@@ -21,19 +21,37 @@ CCameraGameSetViewAnglesFn oCCameraGameSetViewAngles;
 CCameraGameMoveFn oCCameraGameMove;
 WNDPROC oWndProc;
 
-static ID3D11RasterizerState* pNorm, *pBias;
+static ID3D11RasterizerState* pNorm, * pBias;
 static bool hookupdate = false;
 VirtualTableHook m_ctxhook;
-VirtualTableHook m_Shader;
-void(*m_Draw)(CModelShaderModule*, void*);
+VirtualTableHook m_shaderhook;
 
-
-void hkCModelShaderModuleDrawModel(CModelShaderModule* pThis, CModelEntryData* pData)
+void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 {
-	/*CModelExtendWork* pExWork = MakePtr(CModelExtendWork*, MakePtr(void*, p, 0x8), 0x188);
-	Pl0000* pEnt = pExWork->m_pParent;*/
-	
-	m_Draw(pThis, pData);
+	char* pModelExtendWork = (char*)pData->m_pWork + 0x188;
+
+	/*if ((!((*(QWORD*)0x141415B10) & 0x800) || *(pModelExtendWork + 0x28) & 0x40) && pThis->m_pSetting && g_pOtManager->m_ptr98)
+	{
+		CGraphicCommand* pCmd = GetGraphicCommand(32);
+
+		if (pCmd->m_pModelData)
+			pCmd->m_pModelData->m_iVertexOffset = 10;
+	}*/
+
+	((void(*)(CModelShaderModule*, CModelEntryData*))m_shaderhook.GetFunctionAddress(3))(pThis, pData);
+
+	// Exception thrown at 0x000000014500537C in NieRAutomata.exe: 
+	// 0xC0000005: Access violation reading location 0xFFFFFFFFFFFFFFFF.
+	if (pData && GetAsyncKeyState(VK_END) & 1)
+	{
+		//14093FF50
+		typedef __int64(*R_DrawModelFn)(CModelDrawContext* a1,
+			CGraphics* pGraphics, CModelMatrixTable* pModelMatrixTable,
+			CModelInstanceParam* pModelInstanceParam, CConstantBufferInfo* a5);
+
+		((R_DrawModelFn)(0x14093FF50))(*pData->m_pCtx, g_pGraphics, *pData->m_pMatrices,
+			(pData->m_pParams) ? (*pData->m_pParams) : NULL, (CConstantBufferInfo*)&pData->m_iStartIndex);
+	}
 }
 
 BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
@@ -45,7 +63,6 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 	BOOLEAN bChams = FALSE;
 
 	BOOL b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_RenderContext, pThis->m_pContext);
-
 
 	if (g_pCamera && g_pCamera->m_pCamEntity && Vars.Visuals.bChams)
 	{
@@ -62,9 +79,9 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 			}
 		}
 	}
-	
+
 	if (bChams)
-	{	
+	{
 		pThis->m_pContext->OMGetDepthStencilState(&pDSS, &uStencilRef);
 		pDSS->Release();
 		pThis->m_pContext->RSGetState(&pRS);
@@ -98,20 +115,21 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 		}
 
 		(*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_RenderContext, pThis->m_pContext, pInfo);
-
 		pThis->m_pContext->RSSetState(pRS);
 		//pThis->m_pContext->RSSetState(pNorm);
 		pThis->m_pContext->OMSetDepthStencilState(pDSS, uStencilRef);
 
 		//b = (*(BOOL(*)(void*, ID3D11DeviceContext*))(0x140941130))(&pThis->m_RenderContext, pThis->m_pContext);
 	}
-		
+
 	return (b) ? (*(BOOL(*)(void*, ID3D11DeviceContext*, RenderInfo*))(0x140941380))(&pThis->m_RenderContext, pThis->m_pContext, pInfo) : b;
 }
 
 HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
 	ImGui::GetIO().MouseDrawCursor = Vars.Menu.bOpened;
+
+	g_pGraphics->m_iTimeStep = 0x100;
 
 	g_pQueryPerformanceCounterHook->Unhook();	//unhook cause it has the potential to fuck with imgui because it calls QueryPerformanceCounter, then rehook it
 
@@ -163,10 +181,10 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		g_pDevice->CreateRasterizerState(&rasterizer_desc, &pBias);
 	}
 
-	if (GetAsyncKeyState(VK_F7) & 1)
+	if (GetAsyncKeyState(VK_F8) & 1)
 		m_ctxhook.Unhook();
 
-	if (GetAsyncKeyState(VK_F8) & 1)
+	if (GetAsyncKeyState(VK_F9) & 1)
 		m_ctxhook.Rehook();
 
 	//byte* pCutscene = *(byte**)0x1419925E8;
@@ -181,7 +199,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	{
 		for (size_t i = 0; i < g_pEntityInfoList->m_dwSize; ++i)
 		{
-			EntityInfo* pInfo = g_pEntityInfoList->m_pItems[i].second;
+			CEntityInfo* pInfo = g_pEntityInfoList->m_pItems[i].second;
 
 			if (pInfo)
 				LOG("Entity: %s Handle: %x Address: %llx\n", pInfo->m_szEntityType, pInfo->m_hEntity, pInfo->m_pEntity);
@@ -196,14 +214,13 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (GetAsyncKeyState(VK_F4) & 1)
 	{
-#ifdef _DEBUG
-		m_Shader.Initialize((ULONG_PTR**)pCameraEnt->m_Work.m_pModelShaders[3].m_pShader);
-		m_Shader.HookFunction((ULONG_PTR)hkCModelShaderModuleDrawModel, 3);
-		m_Draw = (void(*)(CModelShaderModule*, void*))m_Shader.GetFunctionAddress(3);
-#endif // _DEBUG
-
+		if (g_pLocalPlayer)
+		{
+			m_shaderhook.Initialize((ULONG_PTR**)g_pLocalPlayer->m_Work.m_pModelShaders[10].m_pShader);
+			m_shaderhook.HookFunction((ULONG_PTR)CModelShaderModule_Draw, 3);
+		}
 #if 0
-		typedef BOOL(*CreateModelShaderModuleFn)(CModelShader *pEnt_390, CMaterialInfo *pInfo, void* pModelWork);
+		typedef BOOL(*CreateModelShaderModuleFn)(CModelShader* pEnt_390, CMaterialInfo* pInfo, void* pModelWork);
 		static bool bInit = false;
 		static CMaterial* pReplace;
 
@@ -222,9 +239,6 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		g_pLocalPlayer->m_pModelShaders[10].m_pMaterial = info.m_pMaterial;
 #endif
 	}
-
-	if (GetAsyncKeyState(VK_END) & 1)
-		((COtManager_SetTexture)(0x14092F670))((void*)0x1416A3060, 1, 0, (CTargetTexture*)0x1416A4610, (void*)0x14198F9A0, 0xffffffff);
 
 	if (GetAsyncKeyState(VK_F11) & 1)
 	{
@@ -257,15 +271,13 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 			if (Vars.Gameplay.flModelTintHue > 1.f)
 				Vars.Gameplay.flModelTintHue = 0.0f;
 
-			for (INT i = 0; i < pCameraEnt->m_Work.m_nMeshes; ++i)
+			int idx = GetModelMeshIndex(&pCameraEnt->m_Work, "Hair");
+
+			if (idx != -1)
 			{
-				if (!strcmp(pCameraEnt->m_Work.m_pMeshes[i].m_szMeshName, "Hair"))
-				{
-					pCameraEnt->m_Work.m_pMeshes[i].m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
-					pCameraEnt->m_Work.m_pMeshes[i].m_bUpdate = TRUE;
-					pCameraEnt->m_Work.m_pMeshes[i].m_bShow = TRUE;
-					break;
-				}
+				pCameraEnt->m_Work.m_pMeshes[idx].m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
+				pCameraEnt->m_Work.m_pMeshes[idx].m_bUpdate = TRUE;
+				pCameraEnt->m_Work.m_pMeshes[idx].m_bShow = TRUE;
 			}
 		}
 
@@ -279,18 +291,14 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 				if (Vars.Gameplay.flPodTintHue > 1.f)
 					Vars.Gameplay.flPodTintHue = 0.0f;
-	
-				Vector4 vRain = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
 
-				for (INT i = 0; i < pPod->m_Work.m_nMeshes; ++i)
+				int idx = GetModelMeshIndex(&pCameraEnt->m_Work, "Hair");
+
+				if (idx != -1)
 				{
-					if (!strcmp(pPod->m_Work.m_pMeshes[i].m_szMeshName, "Body"))
-					{
-						pPod->m_Work.m_pMeshes[i].m_vColor = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
-						pPod->m_Work.m_pMeshes[i].m_bUpdate = TRUE;
-						pPod->m_Work.m_pMeshes[i].m_bShow = TRUE;
-						break;
-					}
+					pPod->m_Work.m_pMeshes[idx].m_vColor = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
+					pPod->m_Work.m_pMeshes[idx].m_bUpdate = TRUE;
+					pPod->m_Work.m_pMeshes[idx].m_bShow = TRUE;
 				}
 			}
 		}
@@ -298,19 +306,6 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (Vars.Gameplay.bBalanceEnemyLevels)
 		Features::BuffEnemies();
-
-	Vars.Gameplay.bGhostModelOld = Vars.Gameplay.bGhostModel;
-
-	if (!Vars.Gameplay.nBones)
-	{
-		if (pCameraEnt && !Vars.Misc.bLoading)
-			Vars.Gameplay.nBones = pCameraEnt->m_nBones;
-		else
-			Vars.Gameplay.nBones = 0;
-	}
-
-	if (pCameraEnt && Vars.Gameplay.bGhostModel != Vars.Gameplay.bGhostModelOld)
-		pCameraEnt->m_nBones = (Vars.Gameplay.bGhostModel) ? 0 : Vars.Gameplay.nBones;
 
 	Features::ApplyHealthMods();
 
@@ -380,6 +375,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
+
 	//COtManager::GetGraphicCommand(176i64);
 	return oPresent(pThis, (Vars.Misc.bAntiVSync) ? 0 : SyncInterval, Flags);
 }
@@ -393,7 +389,7 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 	if (SUCCEEDED(hr))
 	{
 		g_pSwapChain = *ppSwapChain;
-		g_pSwapChainHook->Relocate((QWORD**)g_pSwapChain);
+		g_pSwapChainHook->Relocate((ULONG_PTR**)g_pSwapChain);
 
 		ImGui_ImplDX11_InvalidateDeviceObjects();
 	}
@@ -401,7 +397,7 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 	return hr;
 }
 
-void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const * ppShaderResourceViews)
+void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const* ppShaderResourceViews)
 {
 	D3D11_SHADER_RESOURCE_VIEW_DESC Desc;
 
@@ -434,7 +430,7 @@ void hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexL
 	ID3D11Buffer* pVertexBuffers[8];
 	UINT Strides[8];
 	UINT VertexBufferOffsets[8];
-	
+
 	pThis->IAGetVertexBuffers(0, 8, pVertexBuffers, Strides, VertexBufferOffsets);
 
 	for (int i = 0; i < 8; ++i)
@@ -479,7 +475,7 @@ HRESULT hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVO
 	memcpy(&Vars.Menu.Input.OldKeyboardState, &Vars.Menu.Input.KeyboardState, cbData);
 	memcpy(&Vars.Menu.Input.KeyboardState, lpvData, cbData);
 
-	for (auto& pKeybind : g_pConfig->GetKeybinds())
+	for (IKeybind* pKeybind : g_pConfig->GetKeybinds())
 	{
 		if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
 		{
@@ -523,13 +519,9 @@ HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID 
 	return hr;
 }
 
-void hkUpdateModelParts(Pl0000* pEntity)
-{
-	LOG("Update model hook!");
-}
-
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 {
+	CCONSOLE_DEBUG_LOG(ImColor(0x8f20d4), "FUCK");
 	g_pConsole->Log(ImColor(0.5f, 0.f, 0.7f), "Script %x loaded!", pScript->m_dwHash);
 	return oMRubyLoadScript(pThis, pScript);
 	//if (pThis->m_pNext)
@@ -541,119 +533,90 @@ bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 	//return false;
 }
 
+// ORIG FUNCTION SIG: 40 53 48 81 EC ? ? ? ? F6 05 ? ? ? ? ?
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis)
 {
+	/* failed aimbot code
+
 	int iTarget = -1;
 	float best = FLT_MAX;
 
-	if (GetAsyncKeyState(VK_XBUTTON2) & 0x8000)
-	{	
-		/*Vector3Aligned vShake, vShake2, vUnk;
-		Vector3Aligned vUp(0, 1, 0);
+for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+{
+	Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
-		*(PBOOL)0x141605554 = 1;
-
-		((byte*(*)(__int64, Vector3Aligned*, Vector3Aligned*, Vector3Aligned*, Vector3Aligned*, Vector3Aligned*))(0x1404D1490))(1, &vShake, &vUnk, &pThis->m_vPosition, &pThis->m_vTarget, &vUp);
-		BOOL f = oCCameraGameSetViewAngles(pThis);
-		if (f)
-		{
-			((__int64(*)(__int64, Vector3Aligned*))(0x1404D5BF0))(0, &vShake2);
-
-			pThis->m_Transform.m_vSource = vShake + vShake2;
-
-			((void(*)(CCameraGame*))(0x140832210))(pThis);
-		}	
-		return f;*/
-	}
-
-	if (GetAsyncKeyState(VK_XBUTTON1) & 0x1)
-		Vars.Misc.bFirstperson = !Vars.Misc.bFirstperson;
-
-	if (Vars.Misc.bFirstperson)
+	if (pCur && pCur->m_iHealth > 0)
 	{
-		Vector3 f;
-	
-		Math::AngleVectors(pThis->m_viewangles, &f);
+		float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
 
-		pThis->m_Transform.m_vSource = pThis->m_pCamEntity->m_pBones[GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD)].m_vPosition
-			+ pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
-
-		pThis->m_Transform.m_vTarget = pThis->m_pCamEntity->m_pBones[GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD)].m_vPosition
-			+ f * 12.f;
-
-		((void(*)(CCameraGame*))(0x140832210))(pThis);
-		return TRUE;
-		/* failed aimbot code 
-		for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+		if (fov < best)
 		{
-			Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
-
-			if (pCur && pCur->m_iHealth > 0)
-			{
-				float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
-
-				if (fov < best)
-				{
-					iTarget = i;
-					best = fov;
-				}
-			}
+			iTarget = i;
+			best = fov;
 		}
-
-		if (iTarget != -1)
-		{
-			Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
-			Pl0000* pPod = GetEntityFromHandle(&g_pLocalPlayer->m_hPod);
-			pThis->m_Transform.m_vSource = pTarget->m_pBones[GetBoneIndex(pTarget->m_pModelData, BONE_SPINE1)].m_vPosition; 
-			pThis->m_Transform.m_vTarget = g_pCamera->m_vPosition;
-			pThis->m_Transform.m_vUp = pPod->m_matTransform.GetAxis(UP) * -1;
-
-			((void(*)(CCameraGame*))(0x140832210))(pThis);
-		}
-		return TRUE;*/
-	}
-	else
-	{
-		return oCCameraGameSetViewAngles(pThis);
 	}
 }
 
+if (iTarget != -1)
+{
+	Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
+	Pl0000* pPod = GetEntityFromHandle(&g_pLocalPlayer->m_hPod);
+	pThis->m_Transform.m_vSource = pTarget->m_pBones[GetBoneIndex(pTarget->m_pModelData, BONE_SPINE1)].m_vPosition;
+	pThis->m_Transform.m_vTarget = g_pCamera->m_vPosition;
+	pThis->m_Transform.m_vUp = pPod->m_matTransform.GetAxis(UP) * -1;
+
+	((void(*)(CCameraGame*))(0x140832210))(pThis);
+}
+return TRUE;*/
+	
+	if (pThis->m_pCamEntity && Vars.Misc.bFirstperson )
+	{
+		Vector3 vForward;
+
+		Features::Firstperson(pThis->m_pCamEntity);
+		Math::AngleVectors(pThis->m_vViewangles, &vForward);
+
+		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD);
+
+		pThis->m_Transform.m_vSource = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition
+			+ pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
+
+		pThis->m_Transform.m_vTarget = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition + vForward * 4.f;
+
+		CameraGame_SetLookAt(pThis);
+		return TRUE;
+	}
+
+	Features::Thirdperson(pThis->m_pCamEntity);
+
+	Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
+
+	return oCCameraGameSetViewAngles(pThis);
+}
+
+// ORIG FUNCTION SIG: 40 53 57 48 83 EC 68 48 8B D9
 void* hkCCameraGameMove(CCameraGame* pThis)
 {
 	return oCCameraGameMove(pThis);
 }
 
-void* hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps)
+void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps)
 {
 	ConstructionInfo<void>* pConstruct = GetConstructionInfo(objectId);
 	void* pEntity = NULL;
-
-	if (objectId == 0x10000)
-	{
-		ObjReadSystem::Work* pWork = GetWork(0x10100);// a2
-		if (pWork)
-		{
-			BOOL s = PreloadModel(pWork);
-		}
-	}
 
 	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->szName) == Vars.Gameplay.SpawnBlacklist.cend()) //strcmp("Em4000", pConstruct->szName) && strcmp("BehaviorFunnel", pConstruct->szName)
 		pEntity = oCreateEntity(pUnknown, pInfo, objectId, flags, ppHeaps); //0x1401A2B40
 
 	if (!pEntity)
-		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
+		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId, pInfo->m_uSetType);
 	else
-		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->szName, objectId, pEntity);
-	/*
-		if (!pEntity)
-			LOG("Failed to create %s -> %s (ObjectId = %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId);
-		else
-			LOG("Created %s -> %s (ObjectId = %x) Base %llx\n", pInfo->m_szEntityType, pConstruct->szName, objectId, pEntity);*/
+		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->szName, objectId, pInfo->m_uSetType, pEntity);
 
 	return pEntity;
 }
 
-BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr8, const char* szBlacklistName)
+BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD* thisr8, const char* szBlacklistName)
 {
 #if 0
 	QWORD size;
@@ -736,7 +699,7 @@ BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr
 					current_byte = (pData++)[Index];
 					*(pData - 1) = current_byte - 19;
 				} while (--length);
-}
+			}
 			*((WCHAR*)&lpDataStart[dwWordByteLength]) = 0; 	//*((WCHAR*)(lpDataStart + dwWordByteLength)) = 0;
 			pThis->m_pEntries[i++].lpszBannedWord = (LPWSTR)lpDataStart;
 		} while (i < pThis->m_dwWordCount);
@@ -749,6 +712,52 @@ BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr
 
 	Features::DisableWordBlacklist(pThis, NULL);
 	return TRUE;
+}
+
+// for replacing the the startup picture but needs to be run really early to work
+// doesn't get run in time
+// g_pOleLoadPictureHook = new ImportTableHook("oleaut32.dll", "OleLoadPicture", (LPCVOID)hkOleLoadPicture);
+// if you find a way to make it work you need this code ^^^^ (proxy dll)
+HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID riid, LPVOID* lplpvObj)
+{
+	DWORD dwBytesRead;
+	HANDLE hFile = CreateFileA("X:\\Pictures\\Anime\\4c165dbb0f55958a27312bff6c2d1b8b86d506d8.jpg", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		DWORD dwSize = GetFileSize(hFile, NULL);
+		HGLOBAL hPicture = GlobalAlloc(GMEM_ZEROINIT, dwSize);
+
+		if (hPicture)
+		{
+			ReadFile(hFile, hPicture, dwSize, &dwBytesRead, NULL);
+
+			if (lpStream)
+			{
+				lpStream->Release();
+				lpStream = NULL;
+			}
+
+			if (SUCCEEDED(CreateStreamOnHGlobal(hPicture, FALSE, &lpStream)))
+			{
+				HGLOBAL hOriginalPicture = (HGLOBAL*)0x141584E78;
+
+				if (hOriginalPicture)
+				{
+					GlobalFree(hOriginalPicture);
+					hOriginalPicture = hPicture;
+				}
+			}
+		}
+		CloseHandle(hFile);
+	}
+
+	return ((OleLoadPictureFn)(g_pOleLoadPictureHook->GetOriginalFunction()))(lpStream, lSize, fRunmode, riid, lplpvObj);
+}
+
+BOOL hkCMemoryDeviceHeapAlloc(CMemoryDevice* pThis, CHeapInstance** ppHeap, SIZE_T nByteSize)
+{
+	return ((BOOL(*)(CMemoryDevice*, CHeapInstance**, SIZE_T))(g_pMemoryDeviceHook->GetFunctionAddress(1)))(pThis, ppHeap, nByteSize);
 }
 
 void hkSaveFileIO(CSaveDataDevice* pSavedata)
@@ -765,7 +774,6 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 		Vars.Misc.bLoading = true;
 		(*(ReadSaveDataFn)(0x14095E020))(pSavedata);
 		Vars.Misc.nSlot = pSavedata->nSlot;
-		Vars.Gameplay.nBones = 0; // read gets run when you're editing some setting
 		return;
 	case SAVE_FLAGS_WRITE:
 		(*(WriteSaveDataFn)(0x14095E330))(pSavedata);

@@ -7,8 +7,6 @@
 #include "Color.h"
 #include "Log.h"
 
-#pragma comment(lib, "d3dx9.lib")
-
 using DirectX::XMFLOAT4;
 using DirectX::XMMATRIX;
 

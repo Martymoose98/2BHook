@@ -61,6 +61,7 @@
     </Link>
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -72,6 +73,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessKeepComments>false</PreprocessKeepComments>
+      <ShowIncludes>false</ShowIncludes>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -101,6 +103,7 @@
     <ClInclude Include="Math.h" />
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="Memory.h" />
+    <ClInclude Include="MemoryDeviceHook.h" />
     <ClInclude Include="Menu.h" />
     <ClInclude Include="mot.h" />
     <ClInclude Include="Overlay.h" />
@@ -117,6 +120,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Configuration.cpp" />
+    <ClCompile Include="Console.cpp" />
     <ClCompile Include="DLLMain.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Hooks.cpp" />
@@ -127,6 +131,8 @@
     <ClCompile Include="ImGui\imgui_widgets.cpp" />
     <ClCompile Include="Log.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />
+    <ClCompile Include="MemoryDeviceHook.cpp" />
+    <ClCompile Include="mot.cpp" />
     <ClCompile Include="Overlay.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="Vector2.cpp" />
@@ -136,7 +142,6 @@
   <ItemGroup>
     <MASM Include="CreateEntityHook.asm" />
     <MASM Include="LoadWordBlacklistHook.asm" />
-    <MASM Include="UpdateModelPartsHook.asm" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ImGui\.editorconfig" />

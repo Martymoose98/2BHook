@@ -62,8 +62,12 @@ public:
 		float _30, float _31, float _32, float _33);
 
 	void InitAxisAngle(const Vector3& vAxis, float theta);
+	
 	void InitTransform(const Vector3& vAngles, const Vector3& vPosition);
+	void InitTransform(const Vector3& vAngles, const Vector3& vScale, const Vector3& vPosition);
 	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition);
+	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vScale, const Vector3& vPosition);
+
 
 	inline Matrix4x4& operator*(const Matrix4x4& matrix);
 
@@ -78,6 +82,10 @@ public:
 	inline void Transpose();
 	inline void Rotate(const Vector3& v, float theta, Vector3& vRotate);
 	inline void Transform(const Vector3& v, Vector3& vTransform) const;
+	
+	inline void Scale(float flScale);
+	inline void Scale(const Vector3& vScale);
+
 	inline Vector3& GetAxis(int i);
 	inline friend std::ostream& operator<<(std::ostream& os, const Matrix4x4& m);
 };
@@ -159,6 +167,20 @@ inline void Matrix4x4::Transform(const Vector3& v, Vector3& vTransform) const
 	vTransform.x = m[0][0] * v.x + m[1][0] * v.y + m[2][0] * v.z + m[3][0];
 	vTransform.y = m[0][1] * v.x + m[1][1] * v.y + m[2][1] * v.z + m[3][1];
 	vTransform.z = m[0][2] * v.x + m[1][2] * v.y + m[2][2] * v.z + m[3][2];
+}
+
+inline void Matrix4x4::Scale(float flScale)
+{
+	m[0][0] *= flScale;
+	m[1][1] *= flScale;
+	m[2][2] *= flScale;
+}
+
+inline void  Matrix4x4::Scale(const Vector3& vScale)
+{
+	m[0][0] *= vScale.x;
+	m[1][1] *= vScale.y;
+	m[2][2] *= vScale.z;
 }
 
 inline Vector3& Matrix4x4::GetAxis(int i)

@@ -1,16 +1,18 @@
 #pragma once
 #include <Windows.h>
+#include <OleCtl.h>
 #include <d3d11.h>
 #include <Xinput.h>
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_impl_dx11.h"
+#include "Console.h"
 #include "Log.h"
 #include "Overlay.h"
 #include "Renderer.h"
 #include "Math.h"
+#include "Menu.h"
 #include "Globals.h"
 #include "Configuration.h"
-#include "Menu.h"
 #include "Utils.h"
 
 typedef HRESULT(* PresentFn)(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
@@ -21,9 +23,9 @@ typedef void(* ClearRenderTargetViewFn)(ID3D11DeviceContext* pThis, ID3D11Render
 typedef void(* PSSetShaderResourcesFn)(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView *const *ppShaderResourceViews);
 typedef HRESULT(* AcquireFn)(IDirectInputDevice8A* pThis);
 typedef HRESULT(* GetDeviceStateFn)(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
+typedef HRESULT(* OleLoadPictureFn)(LPSTREAM lpstream, LONG lSize, BOOL fRunmode, REFIID riid, LPVOID* lplpvObj);
 typedef BOOL(* QueryPerformaceCounterFn)(LARGE_INTEGER* lpPerfomaceCount);
 typedef LPTOP_LEVEL_EXCEPTION_FILTER(* SetUnhandledExceptionFilterFn)(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter);
-
 typedef BOOL(* SetCursorPosFn)(int X, int Y);
 typedef DWORD(* XInputGetStateFn)(DWORD dwUserIndex, PXINPUT_STATE pState);
 
@@ -33,7 +35,7 @@ typedef void(* WriteSaveDataFn)(CSaveDataDevice* pSave);
 typedef void(* DeleteSaveDataFn)(CSaveDataDevice* pSave);
 
 typedef void(* UpdateModelPartsFn)(Pl0000* pEntity);
-typedef void*(* CreateEntityFn)(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
+typedef void*(* CreateEntityFn)(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 typedef BOOL(* LoadWordBlacklistFn)(BannedWordChecker* pThis, __int64 thisrdx, QWORD *a3, const char* szBlacklistName);
 
 typedef bool(* MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
@@ -80,12 +82,13 @@ extern "C" BOOL hkLoadWordBlacklistThunk(BannedWordChecker* pThis, __int64 thisr
 extern "C" BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr8, const char* szBlacklistName);
 extern "C" void hkUpdateModelPartsThunk(Pl0000* pEntity);
 extern "C" void hkUpdateModelParts(Pl0000* pEntity); //proabably not a pl0000 must be a parent
-extern "C" void* hkCreateEntityThunk(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
-extern "C" void* hkCreateEntity(void* pUnknown, EntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
+extern "C" void* hkCreateEntityThunk(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
+extern "C" void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis);
 void* hkCCameraGameMove(CCameraGame* pThis);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+HRESULT hkOleLoadPicture(LPSTREAM lpstream, LONG lSize, BOOL fRunmode, REFIID riid, LPVOID* lplpvObj);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter);
 BOOL hkSetCursorPos(int X, int Y);

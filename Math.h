@@ -110,7 +110,7 @@ enum
 
 enum eTransformMatrix
 {
-	RIGHT, // wha, maybe this is the left vec ?__?
+	RIGHT,
 	UP,
 	FORWARD,
 	POSITION
@@ -128,7 +128,6 @@ public:
 
 	static void AngleVectors(const Vector3& angles, Vector3* forward)
 	{
-
 		float sp, sy, cp, cy;
 
 		SinCos(angles[PITCH], &sp, &cp);
@@ -136,9 +135,9 @@ public:
 
 		if (forward)
 		{
-			forward->x = -cp * cy;
-			forward->y = -sp;
-			forward->z = cp * sy;
+			forward->x = cp * sy;
+			forward->y = sp;
+			forward->z = cp * cy;
 		}
 	}
 
@@ -212,14 +211,14 @@ public:
 
 	static void ClampAngle(Vector3& angles)
 	{
-		if (angles.x < -89.0f)
-			angles.x = 89.0f;
-		if (angles.x > 89.0f)
-			angles.x = 89.0f;
-		if (angles.y < -180.0f)
-			angles.y += 360.0f;
-		if (angles.y > 180.0f)
-			angles.y -= 360.0f;
+		if (angles.x < -DEGTORAD(89.0f))
+			angles.x = DEGTORAD(89.0f);
+		if (angles.x > DEGTORAD(89.0f))
+			angles.x = DEGTORAD(89.0f);
+		if (angles.y < DEGTORAD(-180.0f))
+			angles.y += DEGTORAD(360.0f);
+		if (angles.y > DEGTORAD(180.0f))
+			angles.y -= DEGTORAD(360.0f);
 		if (angles.z != 0.0f)
 			angles.z = 0.0f;
 	}

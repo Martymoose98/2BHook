@@ -2,6 +2,7 @@
 #include <VersionHelpers.h>
 #include <d3d11.h>
 #include <D3Dcompiler.h>
+#define  DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <stdio.h>
 
@@ -21,25 +22,52 @@
 CMemory* g_pMemory = new CMemory;
 
 CONST BYTE LocalJmp[] = { 0xEB };
-CONST BYTE XorRdxRdx[] = { 0x48, 0x31, 0xD2 };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
-BYTE RdiJumpHook[] = { 0x90, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7 };
-BYTE RdiJumpHook2[] = { 0x90, 0x57, 0x48, 0xBF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD7, 0x5F };
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+
 
 void InitHooks()
 {
-	g_pFactoryHook = new VirtualTableHook((QWORD**)g_pFactory);
-	g_pSwapChainHook = new VirtualTableHook((QWORD**)g_pSwapChain);
-	g_pDeviceContextHook = new VirtualTableHook((QWORD**)g_pDeviceContext);
-	g_pKeyboardHook = new VirtualTableHook((QWORD**)g_pKeyboard->pKeyboard); // crashes when pKeyboard->Poll() is called whilst hook cause we don't own the internal critical section
-	g_pMouseHook = new VirtualTableHook((QWORD**)g_pMouse->pMouse);
-	g_pCameraHook = new VirtualTableHook((QWORD**)g_pCamera);
+	g_pFactoryHook = new VirtualTableHook((ULONG_PTR**)g_pFactory);
+	g_pSwapChainHook = new VirtualTableHook((ULONG_PTR**)g_pSwapChain);
+	g_pDeviceContextHook = new VirtualTableHook((ULONG_PTR**)g_pDeviceContext);
+
+	// FIXME: DirectInput8 devices freeze on aquire when locked with their critical
+	// section. Deadlock probable; mitigate.
+
+	// Take ownership of the internal CDIDev's critical section to stop crashes
+	//IDirectInputDevice_Lock(g_pKeyboard->pDevice);
+
+	// Initalize a virtual table hook for the keyboard
+	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice); 
+
+	// Release ownership of the internal CDIDev's critical section
+	//IDirectInputDevice_Unlock(g_pKeyboard->pDevice);
+
+	g_pKeyboard->bAcquired = FALSE;
+
+	// Take ownership of the internal CDIDev's critical section to stop crashes
+	//IDirectInputDevice_Lock(g_pMouse->pDevice);
+
+	// Initalize a virtual table hook for the mouse
+	g_pMouseHook = new VirtualTableHook((ULONG_PTR**)g_pMouse->pDevice);
+
+	// Release ownership of the internal CDIDev's critical section
+	//IDirectInputDevice_Unlock(g_pMouse->pDevice);
+
+	g_pMouse->bAcquired = FALSE;
+
+	g_pCameraHook = new VirtualTableHook((ULONG_PTR**)g_pCamera);
+
+		
+#ifdef ENABLE_MEMORYDEVICE_HOOK
+	g_pMemoryDeviceHook = new VirtualTableHook((ULONG_PTR**)g_pMemoryDevice); // for larger child heap sizes
+#endif
 
 	for (MrubyImpl* it : g_pRubyInstances)
 	{
-		g_pRubyInstancesHooks.emplace_back(new VirtualTableHook((QWORD**)it));
-		oMRubyLoadScript = (MRubyLoadScriptFn)g_pRubyInstancesHooks.back()->HookFunction((QWORD)hkMRubyLoadScript, 2);
+		g_pRubyInstancesHooks.emplace_back(new VirtualTableHook((ULONG_PTR**)it));
+		oMRubyLoadScript = (MRubyLoadScriptFn)g_pRubyInstancesHooks.back()->HookFunction((ULONG_PTR)hkMRubyLoadScript, 2);
 	}
 
 	g_pQueryPerformanceCounterHook = new ImportTableHook("kernel32.dll", "QueryPerformanceCounter", (LPCVOID)hkQueryPerformanceCounter);
@@ -54,18 +82,18 @@ void InitHooks()
 	g_pSetUnhandledExceptionFilterHook = new ImportTableHook("kernel32.dll", "SetUnhandledExceptionFilter", (LPCVOID)hkSetUnhandledExceptionFilter);
 	oSetUnhandledExceptionFilter = (SetUnhandledExceptionFilterFn)g_pSetUnhandledExceptionFilterHook->GetOriginalFunction();
 
-	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((QWORD)hkPresent, 8);
-	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((QWORD)hkCreateSwapChain, 10);
-	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((QWORD)hkPSSetShaderResources, 8);
-	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((QWORD)hkDrawIndexed, 12);
-	oDraw = (DrawFn)g_pDeviceContextHook->HookFunction((QWORD)hkDraw, 13);
-	oClearRenderTargetView = (ClearRenderTargetViewFn)g_pDeviceContextHook->HookFunction((QWORD)hkClearRenderTargetView, 50);
-	oKeyboardAcquire = (AcquireFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardAcquire, 7);
-	oKeyboardGetDeviceState = (GetDeviceStateFn)g_pKeyboardHook->HookFunction((QWORD)hkKeyboardGetDeviceState, 9);
-	oMouseAcquire = (AcquireFn)g_pMouseHook->HookFunction((QWORD)hkMouseAcquire, 7);
-	oMouseGetDeviceState = (GetDeviceStateFn)g_pMouseHook->HookFunction((QWORD)hkMouseGetDeviceState, 9);
-	oCCameraGameSetViewAngles = (CCameraGameSetViewAnglesFn)g_pCameraHook->HookFunction((QWORD)hkCCameraGameSetViewAngles, 1);
-	oCCameraGameMove = (CCameraGameMoveFn)g_pCameraHook->HookFunction((QWORD)hkCCameraGameMove, 2);
+	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((ULONG_PTR)hkPresent, 8);
+	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((ULONG_PTR)hkCreateSwapChain, 10);
+	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkPSSetShaderResources, 8);
+	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkDrawIndexed, 12);
+	oDraw = (DrawFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkDraw, 13);
+	oClearRenderTargetView = (ClearRenderTargetViewFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkClearRenderTargetView, 50);
+	oKeyboardAcquire = (AcquireFn)g_pKeyboardHook->HookFunction((ULONG_PTR)hkKeyboardAcquire, 7);
+	oKeyboardGetDeviceState = (GetDeviceStateFn)g_pKeyboardHook->HookFunction((ULONG_PTR)hkKeyboardGetDeviceState, 9);
+	oMouseAcquire = (AcquireFn)g_pMouseHook->HookFunction((ULONG_PTR)hkMouseAcquire, 7);
+	oMouseGetDeviceState = (GetDeviceStateFn)g_pMouseHook->HookFunction((ULONG_PTR)hkMouseGetDeviceState, 9);
+	oCCameraGameSetViewAngles = (CCameraGameSetViewAnglesFn)g_pCameraHook->HookFunction((ULONG_PTR)hkCCameraGameSetViewAngles, 1);
+	oCCameraGameMove = (CCameraGameMoveFn)g_pCameraHook->HookFunction((ULONG_PTR)hkCCameraGameMove, 2);
 
 	*(QWORD*)&opcodes_save_file_io[2] = (QWORD)hkSaveFileIO;
 
@@ -73,32 +101,19 @@ void InitHooks()
 
 	g_pMemory->PatchBytes(&bp_save_file_io);
 
-	oUpdateModelParts = (UpdateModelPartsFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 8B EC 44 89 64 24 ?", 1);
-
-	*(QWORD*)&RdiJumpHook2[4] = (QWORD)hkUpdateModelPartsThunk;
-
-	//InitalizeBytePatchMemory(&bp_UpdateModelParts, oUpdateModelParts, RdiJumpHook2, 15);
-	//g_pMemory->PatchBytes(&bp_UpdateModelParts);
-
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
-	QWORD qwContainingFunc = g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
+	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
 
-	*(QWORD*)&RdiJumpHook[3] = (QWORD)hkCreateEntityThunk;
+	//THERE IS ANOTHER CreateEntity call at: qwContainingFunc + 0x676
 
-	//InitalizeBytePatchMemory(&bp_CreateEntity[0], qwContainingFunc + 0x676, RdiJumpHook, 13);
-	// g_pMemory->PatchBytes(&bp_CreateEntity[0]); //doesn't seem to do much
+	ZeroMemory(&g_CreateEntityHook, sizeof(HOOK_FUNC));
 
-	InitalizeBytePatchMemory(&bp_CreateEntity[1], qwContainingFunc + 0x135, RdiJumpHook, 13);
-
-	g_pMemory->PatchBytes(&bp_CreateEntity[1]); 
+	g_pMemory->HookFunc64((LPVOID)(qwContainingFunc + 0x132), hkCreateEntityThunk, 16, &g_CreateEntityHook);
 	
-	/*HOOK_FUNC hf = { 0 };
-	g_pMemory->HookFunc64((VOID*)(qwContainingFunc + 0x129), hkCreateEntityThunk, 25, &hf);*/
+	ZeroMemory(&g_LoadWordBlacklist, sizeof(HOOK_FUNC));
 
-	HOOK_FUNC hf = { 0 };
-	
 	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
-	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &hf);//callee
+	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &g_LoadWordBlacklist);//callee
 
 	InitalizeNopMemory(&nop_HairColor, g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE"), 12)
 
@@ -327,6 +342,8 @@ void LogOffsets(void)
 	LOG_OFFSET("CWetObjectManager", g_pWetObjectManager);
 	LOG_OFFSET("CCollisionDataObjectManager", g_pCollisionDataObjectManager);
 	LOG_OFFSET("CTextureResourceManager", g_pTextureResourceManager);
+	LOG_OFFSET("COtManager", g_pOtManager);
+	LOG_OFFSET("CModelManager", g_pModelManager);
 	//LOG_OFFSET("MRubyVM", g_pRubyInstances);
 	LOG_OFFSET("CGameCamera", g_pCamera);
 	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
@@ -339,12 +356,19 @@ void LogOffsets(void)
 	LOG_OFFSET("CKeyboard", g_pKeyboard);
 	LOG_OFFSET("CMouse", g_pMouse);
 	LOG_OFFSET("CGraphics", g_pGraphics);
-	LOG_OFFSET("COtManager", g_pOtManager);
+
 	LOG_OFFSET("ViewMatrix", g_pViewMatrix);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
 }
 
+/*
+* 
+*	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
+*	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
+*	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
+*	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
+*/
 void Setup(void)
 {
 #if defined(_DEBUG) || defined(VERBOSE)
@@ -353,61 +377,67 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
-	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr64(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
+	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
 	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
-	g_pEntityInfoList = (EntityInfoList*)g_pMemory->FindPatternPtr64(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
-	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
-	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
-	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
-	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr64(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
-	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr64(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
-	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr64(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
-	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
-	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)g_pMemory->FindPatternPtr64(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
-	g_pTextureResourceManager = *(CTextureResourceManager**)g_pMemory->FindPatternPtr64(NULL, "48 8B D1 48 8D 0D ?? ?? ?? ?? 4C 89 44 24 ??", 6);
-	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr64(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
-	g_pSceneStateSystem = (CSceneStateSystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
-	g_pSceneEntitySystem = (CSceneEntitySystem*)g_pMemory->FindPatternPtr64(NULL, "48 8D 35 ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 48 8D 54 24 ??", 3); //48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24 ?
-	g_pMemoryDevice = (CMemoryDevice*)g_pMemory->FindPatternPtr64(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8 ? ? ? ?", 6);
-	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
-	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
+	
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
 	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC ? 8B 11 85 D2 74"); // there is like 50 identical functions kek
-	SetLocalPlayer = (SetLocalPlayerFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B ? ? ? ? ?", 1);
-	UnlockAchievement = (UnlockAchievementFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 8B D8 83 3D ? ? ? ? ?", 1);
-	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
+	SetLocalPlayer = (SetLocalPlayerFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B ? ? ? ? ?", 1);
+	UnlockAchievement = (UnlockAchievementFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B D8 83 3D ? ? ? ? ?", 1);
+	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
 	ChangePlayer = (ChangePlayerFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
-	FindSceneState = (FindSceneStateFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 83 CE 01", 1);
-	SetSceneEntity = (SetSceneEntityFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
-	WetObjectManager_SetWet = (WetObjectManager_SetWetFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
-	WetObjectManager_SetDry = (WetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
-	WetObjectManager_AddLocalEntity = (WetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1);
+	FindSceneState = (FindSceneStateFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
+	SetSceneEntity = (SetSceneEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
+	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
+	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
+	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1);
+	CameraGame_SetLookAt = (CCameraGame_SetLookAtFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 83 7F 10 01", 1);
 	DestroyBuddy = (DestroyBuddyFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
-	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
+	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
 	HashStringCRC32 = (HashStringCRC32Fn)g_pMemory->FindPattern(NULL, "40 57 83 C8 FF");
 	GetConstructionInfo = (GetConstructorFn)g_pMemory->FindPattern(NULL, "33 D2 44 8B C9");
 	GetOBBMax = (ExCollision_GetOBBMaxFn)g_pMemory->FindPattern(NULL, "48 8B C4 48 89 68 18 56");
 
 	QueryHeap = (QueryHeapFn)g_pMemory->FindPattern(NULL, "48 83 EC 28 4C 8B D9 C7 41 ? ? ? ? ?");
 	GetWork = (GetWorkFn)g_pMemory->FindPattern(NULL, "40 57 48 83 EC 20 8B F9");
-	PreloadFile = (PreloadFileFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 8D 5F 01", 1);
-	RequestEnd = (ObjReadSystem_RequestEndFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 41 8D 46 FF", 1);
-	PreloadModel = (ObjReadSystem_PreloadModelFn)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 33 FF 45 33 C0", 1);
+	PreloadFile = (PreloadFileFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8D 5F 01", 1);
+	RequestEnd = (ObjReadSystem_RequestEndFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 8D 46 FF", 1);
+	PreloadModel = (ObjReadSystem_PreloadModelFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 33 FF 45 33 C0", 1);
+	GetGraphicCommand = (COtManager_GetGraphicCommandFn)g_pMemory->FindPattern(NULL, "48 83 EC 08 48 8B 05 ? ? ? ?");
 
 	CpkMount = (CpkMountFn)g_pMemory->FindPattern(NULL, "48 83 EC 28 44 8B C9");
-	g_szDataDirectoryPath = (LPSTR)g_pMemory->FindPatternPtr64(NULL, "E8 ? ? ? ? 48 8D 3D ? ? ? ? 48 8B CF", 8);
-	g_piMoney = (int*)g_pMemory->FindPatternPtr64(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
-	g_piExperience = (int*)g_pMemory->FindPatternPtr64(NULL, "8B 15 ? ? ? ? 75 06", 2);
-	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
-	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr64(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
-	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr64(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
-	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr64(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);
-	g_pOtManager = (COtManager*)g_pMemory->FindPatternPtr64(NULL, "4C 89 78 D8 4C 8D 2D ? ? ? ?", 7);
-	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr64(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
+	
+	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
+	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
+	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
+	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
+	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
+	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
+	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
+	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
+	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)g_pMemory->FindPatternPtr(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
+	g_pTextureResourceManager = *(CTextureResourceManager**)g_pMemory->FindPatternPtr(NULL, "48 8B D1 48 8D 0D ?? ?? ?? ?? 4C 89 44 24 ??", 6);
+	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
+	g_pSceneStateSystem = (CSceneStateSystem*)g_pMemory->FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
+	g_pSceneEntitySystem = (CSceneEntitySystem*)g_pMemory->FindPatternPtr(NULL, "48 8D 35 ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 48 8D 54 24 ??", 3); //48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24 ?
+	g_pMemoryDevice = (CMemoryDevice*)g_pMemory->FindPatternPtr(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8 ? ? ? ?", 6);
+	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
+	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
+
+	g_szDataDirectoryPath = (LPSTR)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 3D ? ? ? ? 48 8B CF", 8);
+	g_piMoney = (int*)g_pMemory->FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
+	g_piExperience = (int*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 75 06", 2);
+	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
+	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
+	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
+	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr(NULL, "48 8D 05 ? ? ? ? 48 83 C4 ? C3 CC CC CC CC CC CC CC CC 48 89 4C 24 ? 57", 3);
+	g_pOtManager = (COtManager*)g_pMemory->FindPatternPtr(NULL, "4C 89 78 D8 4C 8D 2D ? ? ? ?", 7);
+	g_pModelManager = (CModelManager*)g_pMemory->FindPatternPtr(NULL, "48 8B C7 48 89 05 ? ? ? ?", 6);
+	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
 	g_pSwapChain = g_pGraphics->m_Display.m_pSwapchain->m_pSwapChain;
 
-	if (IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
+	if (!IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
 
 	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
@@ -415,16 +445,16 @@ void Setup(void)
 	g_pAntiFramerateCap_Sleep = (byte*)g_pMemory->FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24 ?") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
-	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr64(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
+	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
 	
-	for (const MrubyImpl* pVM = *(MrubyImpl**)g_pMemory->FindPatternPtr64(NULL, "48 89 0D ? ? ? ? 48 89 81 ? ? ? ?", 3); pVM; pVM = pVM->m_pNext)
+	for (const MrubyImpl* pVM = *(MrubyImpl**)g_pMemory->FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 89 81 ? ? ? ?", 3); pVM; pVM = pVM->m_pNext)
 		g_pRubyInstances.emplace_back((MrubyImpl*)((byte*)pVM - 0x20));
 
 	LogOffsets();
-
+			
 	ExposeHiddenXInputFunctions();
 
-	QueryProcessHeaps(&g_pHeaps, NULL);
+	QueryProcessHeaps(&g_phHeaps, NULL);
 
 	InitD3D11();
 
@@ -456,8 +486,8 @@ void Setup(void)
 	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
 	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
-	InitalizeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7)
-	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, g_pMemory->FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1)
+	InitalizeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
+	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, g_pMemory->FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initalization Complete! GLHF");
 
@@ -478,9 +508,15 @@ void Unhook()
 	for (VirtualTableHook* it : g_pRubyInstancesHooks)
 		delete it;
 
+	delete g_pOleLoadPictureHook;
 	delete g_pSetUnhandledExceptionFilterHook;
 	delete g_pQueryPerformanceCounterHook;
 	delete g_pClipCursorHook;
+
+#ifdef ENABLE_MEMORYDEVICE_HOOK
+	delete g_pMemoryDeviceHook;
+#endif
+
 	delete g_pFactoryHook;
 	delete g_pSwapChainHook;
 	delete g_pDeviceContextHook;
@@ -499,6 +535,8 @@ void Unhook()
 	FindDataListFree(Vars.Menu.Config.pHead);
 
 	SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
+
+	free(g_phHeaps);
 
 #if defined(_DEBUG) || defined(VERBOSE)
 	Log::DetachConsole();
