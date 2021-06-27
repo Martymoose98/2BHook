@@ -148,7 +148,7 @@ typedef struct _PEB
 #define ProcessEnvironmentBlock GetPEB32
 #endif
 
-//still debating wheter to make this a module based hook instead of function based hook
+//TODO("Revise. Implement binary search for greater performance & create C implementation")
 class ImportTableHook
 {
 public:
@@ -208,7 +208,7 @@ public:
 					{
 						if (hModule && bResolveOrdinal)
 						{
-							for (DWORD hint = 0; hint < pExportDirectory->NumberOfNames; ++hint)
+							for (DWORD hint = 0; hint < pExportDirectory->NumberOfNames; ++hint) // FindNptProc here returns hint
 							{
 								LPCSTR szFunctionName = (LPCSTR)((ULONG_PTR)hModule + pAddressOfNames[hint]);
 
@@ -217,40 +217,22 @@ public:
 									WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[hint] + pExportDirectory->Base);
 
 									if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
-									{
-										this->m_pIAT = &pImportAddressTable[i];
-										VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
-										this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
-										this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
-										return this->m_pOriginalFunction;
-									}
+										return InitHook(&pImportAddressTable[i]);
 								}
 							}
 						}
 						else
 						{
 							if (IMAGE_ORDINAL((ULONG_PTR)szFunction) == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
-							{
-								this->m_pIAT = &pImportAddressTable[i];
-								VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
-								this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
-								this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
-								return this->m_pOriginalFunction;
-							}
+								return InitHook(&pImportAddressTable[i]);
 						}
 					}
 					else
 					{
 						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.AddressOfData))->Name;
 						
-						if (!strcmp(szFunctionName, szFunction))
-						{
-							this->m_pIAT = &pImportAddressTable[i];
-							VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
-							this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
-							this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
-							return this->m_pOriginalFunction;
-						}
+						if (!strcmp(szFunctionName, szFunction))	
+							return InitHook(&pImportAddressTable[i]);
 					}
 				}
 			}
@@ -275,14 +257,14 @@ public:
 
 private:
 
-	/*void Initalize(const char* szModule)
+	inline LPCVOID InitHook(PIMAGE_THUNK_DATA pImportAddressTable)
 	{
-		GetModuleHandleA(szModule);
-		pModuleDosHeader = (PIMAGE_DOS_HEADER)hModule;
-		pExportDataDirectory = &((PIMAGE_NT_HEADERS)((ULONG_PTR)pModuleDosHeader + pModuleDosHeader->e_lfanew))->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-		pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)hModule + pExportDataDirectory->VirtualAddress);
-		pAddressOfNames = (PDWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNames);
-	}*/
+		this->m_pIAT = pImportAddressTable;
+		VirtualProtect(this->m_pIAT, sizeof(IMAGE_THUNK_DATA), PAGE_READWRITE, &this->m_dwOldProtect);
+		this->m_pOriginalFunction = (LPCVOID)this->m_pIAT->u1.Function;
+		this->m_pIAT->u1.Function = (ULONG_PTR)m_pNewFunction;
+		return this->m_pOriginalFunction;
+	}
 
 	DWORD FindNptProc(PDWORD npt, DWORD size, PBYTE base, LPCSTR szProc)
 	{

@@ -4,11 +4,12 @@
 #include <Shlobj.h>
 #include "Globals.h"
 #include "Matrix4x4.h"
-#include "Log.h"
+#include "Console.h"
+#include "Configuration.h"
 
 #define STACK_TIMER(name) StackTimer name(__FUNCTION__)
-#define CS_LOCK() ReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)()
-#define CS_LOCK_SPINCOUNT(spincount) ReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)((DWORD)(spincount))
+#define CS_LOCK() StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)()
+#define CS_LOCK_SPINCOUNT(spincount) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)((DWORD)(spincount))
 
 typedef struct StackTimer
 {
@@ -32,29 +33,23 @@ private:
 	const char* m_szName;
 } DebugStackTimer;
 
-struct ReadWriteLock
+struct StackReadWriteLock
 {
-	ReadWriteLock()
+	StackReadWriteLock()
 	{
-		if (!m_bCriticalSectionInitalized)
-		{
-			InitializeCriticalSection(&m_CriticalSection);
-			m_bCriticalSectionInitalized = TRUE;
-			EnterCriticalSection(&m_CriticalSection);
-		}
+		InitializeCriticalSection(&m_CriticalSection);
+		m_bCriticalSectionInitalized = TRUE;
+		EnterCriticalSection(&m_CriticalSection);
 	}
 
-	ReadWriteLock(DWORD dwSpinCount)
+	StackReadWriteLock(DWORD dwSpinCount)
 	{
-		if (!m_bCriticalSectionInitalized)
-		{
-			InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
-			m_bCriticalSectionInitalized = TRUE;
-			EnterCriticalSection(&m_CriticalSection);
-		}
+		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
+		m_bCriticalSectionInitalized = TRUE;
+		EnterCriticalSection(&m_CriticalSection);
 	}
 
-	~ReadWriteLock()
+	~StackReadWriteLock()
 	{
 		if (m_bCriticalSectionInitalized)
 		{
@@ -69,34 +64,52 @@ private:
 	BOOL m_bCriticalSectionInitalized;
 };
 
+static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
+{
+	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8);
+	EnterCriticalSection((LPCRITICAL_SECTION)(rbx + 0x150));
+}
+
+static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
+{
+	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8);
+	LeaveCriticalSection((LPCRITICAL_SECTION)(rbx + 0x150));
+}
+
+/*
+	Doesn't seem to be 100% accurate.
+	I tired adding the fov math into it but no success
+	all the examples use a different method than me.
+*/
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
-	VMatrix vMatrix = *g_pViewMatrix;//*(VMatrix*)0x1419C73C0;
-	vMatrix.Transpose();
+	Vector3 vTransform;
 
-	float w = vMatrix[3][0] * vIn[0] + vMatrix[3][1] * vIn[1] + vMatrix[3][2] * vIn[2] + vMatrix[3][3];
+	VMatrix& vMatrix = g_pCamera->m_pInstance->m_ViewProjection; //*g_pViewMatrix;//*(VMatrix*)0x1419C73C0;
+
+	float w = vMatrix[0][3] * vIn[0] + vMatrix[1][3] * vIn[1] + vMatrix[2][3] * vIn[2] + vMatrix[3][3];
 
 	if (w < 0.01f)
 		return false;
 
-	vOut.x = vMatrix[0][0] * vIn[0] + vMatrix[0][1] * vIn[1] + vMatrix[0][2] * vIn[2] + vMatrix[0][3];
-	vOut.y = vMatrix[1][0] * vIn[0] + vMatrix[1][1] * vIn[1] + vMatrix[1][2] * vIn[2] + vMatrix[1][3];
+	// transform by viewmatrix
+	vMatrix.Transform(vIn, vTransform);
 
-	float invw = 1.0f / w;
-
-	vOut *= invw;
+	// multiply by inverse w 
+	vTransform *= 1.0f / w; 
 
 	int width = g_pGraphicDevice->iScreenWidth;
 	int height = g_pGraphicDevice->iScreenHeight;
 
-	float x = (float)(width / 2);
-	float y = (float)(height / 2);
+	float x = width / 2.0f;
+	float y = height / 2.0f;
+	//float focalAng = tanf(g_pCamera->m_flFov / 2.0f);
 
-	x += 0.5f * vOut.x * (float)width + 0.5f;
-	y -= 0.5f * vOut.y * (float)height + 0.5f;
+	//vOut.x = x + vTransform.x * focalAng * (float)width + 0.5f;
+	//vOut.y = y - vTransform.y * focalAng * (float)height + 0.5f;
+	vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
+	vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
 
-	vOut.x = x;
-	vOut.y = y;
 	return true;
 }
 
@@ -105,7 +118,7 @@ static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
 	return (unsigned short)((handle & 0x00FFFF00) >> 8);
 }
 
-static inline EntityHandle GenerateEntityHandle(const EntityInfoList* pList, const unsigned short index)
+static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const unsigned short index)
 {
 	return (index | (pList->m_dwShift << 16)) << 8;
 }
@@ -280,6 +293,24 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 	}
 }
 
+static CMesh2* GetModelMesh(CModelWork* pWork, const char* szMesh)
+{
+	for (int i = 0; i < pWork->m_nMeshes; ++i)
+		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
+			return &pWork->m_pMeshes[i];
+
+	return NULL;
+}
+
+static int GetModelMeshIndex(CModelWork* pWork, const char* szMesh)
+{
+	for (int i = 0; i < pWork->m_nMeshes; ++i)
+		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
+			return i;
+
+	return -1;
+}
+
 // Rebuilt from binary
 static short GetBoneIndex(const CModelData* pModelData, short id)
 {
@@ -378,10 +409,10 @@ static void CreateMaterial(
 	CMaterial** ppMaterial
 )
 {
-	CTargetTexture m_Textures[16];
+	CTargetTexture Textures[16];
 	int TextureIds[16];
 
-	ZeroMemory(m_Textures, sizeof(CTargetTexture[16]));
+	ZeroMemory(Textures, sizeof(CTargetTexture[16]));
 
 	if (!ppMaterial)
 		return;
@@ -393,9 +424,9 @@ static void CreateMaterial(
 	{
 		TextureIds[i] = HashStringCRC32(szTextureNames[i], strlen(szTextureNames[i]));
 
-		m_Textures[i].m_vtbl = (void*)0x140E9FA38;
+		Textures[i].m_vtbl = (void*)0x140E9FA38;
 
-		if (!((CreateTextureFn)(0x140934FE0))(0, &m_Textures[i], &pDescriptions[i]))
+		if (!((CreateTextureFn)(0x140934FE0))(0, &Textures[i], &pDescriptions[i]))
 			return;
 	}
 

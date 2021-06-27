@@ -28,7 +28,6 @@ typedef struct Variables_t
 		bool bNoWorldDamage;
 		bool bNoCollision;
 		int iLevel;
-		bool bTemporaryLevel;
 		bool bBalanceEnemyLevels;
 		bool bExclusivelyPositiveTolerance;
 		bool bLevelBuffMode;
@@ -54,9 +53,6 @@ typedef struct Variables_t
 		int iSelectedAnimation;
 		int iSelectedEntityHandle;
 		int iSelectedEntityLevel;
-		bool bGhostModel;
-		bool bGhostModelOld;
-		int nBones;
 		bool bFreezePlayer;
 		bool bNoTutorialDialogs;
 		bool bSpeedMeister;
@@ -71,6 +67,7 @@ typedef struct Variables_t
 		char szCpkName[32];
 		bool bCpkLoaded;
 		bool bFirstperson;
+		bool bFirstpersonOld;
 		char szSoundName[128];
 		bool bWireframe;
 		bool bAntiVSync;
@@ -111,6 +108,7 @@ typedef struct Variables_t
 		Keybinds_t() {}
 		
 		KeybindToggleable OpenMenu;
+		KeybindToggleable Firstperson;
 		KeybindFunctional<void> ChangePlayer;
 		KeybindFunctional<void> Airstuck;
 		KeybindFunctional<void> DuplicateBuddy;
@@ -213,7 +211,10 @@ typedef struct Variables_t
 		{ "Corpse1", "Corpse", 0x21080 },
 		{ "Corpse2", "Corpse", 0x21081 },
 		{ "Enemy Drop", "EmBase", 0x70001 },
-		{ "Enemy Drop 2", "EmBase", 0x20030 } //0xA2180 c, 0x21060 c, 0x20030,  0x40006, 0xF2014, 0x20030, 0x30610, 0x30240, 0x30450, 0x30050, 0x30260, 0x30261, 0x30240, 0x30070, 0x30071, 0x30080, 0x30610, 0x30450, 0x30240, 0x30050, 0x31000, 0x40006, 0x40002,  0x31000
+		{ "Enemy Drop 2", "EmBase", 0x20030 },
+		{ "MapInst", "MapInstance", 0x90001 }
+		//{ "Protagonist", "Player", 0x10000 }
+		//0xA2180 c, 0x21060 c, 0x20030,  0x40006, 0xF2014, 0x20030, 0x30610, 0x30240, 0x30450, 0x30050, 0x30260, 0x30261, 0x30240, 0x30070, 0x30071, 0x30080, 0x30610, 0x30450, 0x30240, 0x30050, 0x31000, 0x40006, 0x40002,  0x31000
 		//{ "Director2", "Et0024", 0x40012 }, CRASHES
 		//{ "BG", "Bg4440", 0xC4440}, CRASHES
 		//{ "Enemy1", "Em2101", 0x22101 }, CRASHES

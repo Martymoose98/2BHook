@@ -13,6 +13,8 @@
 #define MAKE_STRING(x) _MAKE_STRING(x)
 #endif // !MAKE_STRING
 
+// Move todo out of Log.h!!
+
 #ifndef TODO
 #ifndef TODO_CLICKABLE
 #define TODO(x) __pragma(message("TODO: " MAKE_STRING(x) " -> " __FILE__ "@" MAKE_STRING(__LINE__))) 
@@ -47,12 +49,12 @@ public:
 		va_end(args);
 	}
 
-	static void AttachConsole(const wchar_t* szConsolename)
+	static void AttachConsole(const wchar_t* szConsoleName)
 	{
 		if (!AllocConsole())
 			return;
 
-		SetConsoleTitleW(szConsolename);
+		SetConsoleTitleW(szConsoleName);
 		freopen_s(&pStdout, "CON", "w", stdout);
 		freopen_s(&pStderr, "CON", "w", stderr);
 	}
@@ -66,9 +68,7 @@ public:
 
 	static void LogOffset(const char* szName, void* p);
 
-
 private:
 	static FILE* pStdout;
 	static FILE* pStderr;
 };
-#include "Console.h"

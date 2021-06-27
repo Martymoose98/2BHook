@@ -53,6 +53,13 @@ void Matrix4x4::InitTransform(const Vector3& vAngles, const Vector3& vPosition)
 	InitTransform(vForward, vRight, vUp, vPosition);
 }
 
+void Matrix4x4::InitTransform(const Vector3& vAngles, const Vector3& vScale, const Vector3& vPosition)
+{
+	Vector3 vForward, vRight, vUp;
+	Math::AngleVectors(vAngles, &vForward, &vRight, &vUp);
+	InitTransform(vForward, vRight, vUp, vScale, vPosition);
+}
+
 void Matrix4x4::InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition)
 {
 	m[RIGHT][0] = vRight.x;
@@ -68,6 +75,29 @@ void Matrix4x4::InitTransform(const Vector3& vForward, const Vector3& vRight, co
 	m[FORWARD][0] = vForward.x;
 	m[FORWARD][1] = vForward.y;
 	m[FORWARD][2] = vForward.z;
+	m[FORWARD][3] = 0.0f;
+
+	m[POSITION][0] = vPosition.x;
+	m[POSITION][1] = vPosition.y;
+	m[POSITION][2] = vPosition.z;
+	m[POSITION][3] = 1.0f;
+}
+
+void Matrix4x4::InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vScale, const Vector3& vPosition)
+{
+	m[RIGHT][0] = vRight.x * vScale.x;
+	m[RIGHT][1] = vRight.y;
+	m[RIGHT][2] = vRight.z;
+	m[RIGHT][3] = 0.0f;
+
+	m[UP][0] = vUp.x;
+	m[UP][1] = vUp.y * vScale.y;
+	m[UP][2] = vUp.z;
+	m[UP][3] = 0.0f;
+
+	m[FORWARD][0] = vForward.x;
+	m[FORWARD][1] = vForward.y;
+	m[FORWARD][2] = vForward.z * vScale.z;
 	m[FORWARD][3] = 0.0f;
 
 	m[POSITION][0] = vPosition.x;

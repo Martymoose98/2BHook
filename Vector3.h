@@ -25,6 +25,9 @@ public:
 	inline float& operator[](int i);
 	inline float operator[](int i) const;
 
+	inline bool operator==(const Vector3& v) const;
+	inline bool operator!=(const Vector3& v) const;
+
 	inline Vector3& operator+=(const Vector3& v);
 	inline Vector3& operator-=(const Vector3& v);
 	inline Vector3& operator*=(const Vector3& v);
@@ -91,6 +94,16 @@ inline float& Vector3::operator[](int i)
 inline float Vector3::operator[](int i) const
 {
 	return ((float*)this)[i];
+}
+
+inline bool Vector3::operator==(const Vector3& v) const
+{
+	return (x == v.x && x == v.y && z == v.y);
+}
+
+inline bool Vector3::operator!=(const Vector3& v) const
+{
+	return (x != v.x || y != v.y || z != v.z);
 }
 
 inline Vector3& Vector3::operator+=(const Vector3& v)

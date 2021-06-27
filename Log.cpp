@@ -1,7 +1,6 @@
 #pragma once
 #include "Log.h"
-
-CConsole* g_pConsole = new CConsole;
+#include "Console.h"
 
 FILE* Log::pStdout;
 FILE* Log::pStderr;

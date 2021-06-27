@@ -473,7 +473,7 @@ public:
 		{
 			CCollisionDataObject* pCur;
 			Vector3Aligned vOrigin, vMax, vMin;
-			EntityInfo* pInfo;
+			CEntityInfo* pInfo;
 			Pl0000* pObject;
 			Matrix4x4 mTrans;
 
@@ -503,7 +503,11 @@ public:
 					pList->Add3DBox(vMin, vMax, mTrans, ImColor(0, 255, 222));
 #ifdef _DEBUG
 					if (WorldToScreen(vOrigin, vMin2D))
-						pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%s idx: %x f30 %x, f38 %x", (pInfo) ? pInfo->m_szEntityType : "", pCur->m_uScenePropIndex, pCur->dword30, pCur->dword38);
+					{
+						pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE,
+							"%s idx: %x f30 %x, f38 %x", (pInfo) ? pInfo->m_szEntityType : "",
+							pCur->m_uScenePropIndex, pCur->dword30, pCur->dword38);
+					}
 #endif
 				}
 			}
@@ -511,7 +515,12 @@ public:
 
 #ifdef _DEBUG
 		if (g_pCamera)
-			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H, "ang (%f,%f,%f)", RADTODEG(g_pCamera->m_viewangles.x), RADTODEG(g_pCamera->m_viewangles.y), RADTODEG(g_pCamera->m_viewangles.z));
+		{
+			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H,
+				"ang (%f,%f,%f)", RADTODEG(g_pCamera->m_vViewangles.x),
+				RADTODEG(g_pCamera->m_vViewangles.y), 
+				RADTODEG(g_pCamera->m_vViewangles.z));
+		}			
 #endif
 	}
 };

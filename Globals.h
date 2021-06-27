@@ -9,8 +9,10 @@
 #include "ReversedStructs.h"
 #include "VirtualTableHook.h"
 #include "ImportTableHook.h"
+#include "MemoryDeviceHook.h"
 
 #define MAX_LEVELS 99
+#define MIN_LEVELS 1
 #define MAX_EXPERIENCE 9999999
 #define MAX_MONEY 9999999
 
@@ -52,7 +54,6 @@
 #define NOP_FRAMECAP_SLEEP 0
 #define NOP_FRAMECAP_SPINLOCK 1
 
-
 #define XINPUT_GAMEPAD_GUIDE 0x400
 
 #define CREATE_ENTITY(pc) ((CSceneSceneSystem__CreateEntityFn)(0x1404F9AA0))((void*)0x14160DFE0, pc)
@@ -84,9 +85,10 @@ typedef bool(*UseItemFn)(__int64 pItemManager, int item_id, float flQuantity);
 typedef void(*ChangePlayerFn)(Pl0000* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
-typedef void(*WetObjectManager_AddLocalEntityFn)(__int64, EntityInfo* pInfo);
-typedef void(*WetObjectManager_SetWetFn)(__int64 pThis, byte wet_level, int index);
-typedef void(*WetObjectManager_SetDryFn)(__int64 pThis, EntityInfo *pInfo);
+typedef void(*CWetObjectManager_AddLocalEntityFn)(__int64, CEntityInfo* pInfo);
+typedef void(*CWetObjectManager_SetWetFn)(__int64 pThis, byte wet_level, int index);
+typedef void(*CWetObjectManager_SetDryFn)(__int64 pThis, CEntityInfo *pInfo);
+typedef void(*CCameraGame_SetLookAtFn)(CCameraGame* pThis);
 typedef void(*ResetCameraFn)(CCameraGame* pCamera);
 typedef bool(*DestroyBuddyFn)(Pl0000* pBuddy);
 typedef __int64(*NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
@@ -100,17 +102,18 @@ typedef void*(*FindSceneStateFn)(CRITICAL_SECTION* pCriticalSection, unsigned in
 typedef bool(*SceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef bool(*SceneStateSystem_SetInternalFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef BOOL(*SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
-typedef void(*SetSceneEntityFn)(const char*, EntityInfo*);
+typedef void(*SetSceneEntityFn)(const char*, CEntityInfo*);
 typedef __int64(*CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(*QuestState_RequestStateInternalFn)(DWORD *pQuestId);
 typedef ConstructionInfo<void>*(*GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
-typedef EntityInfo*(*SceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
+typedef CEntityInfo*(*SceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
 typedef void(*ExCollision_GetOBBMaxFn)(ExCollision* pThis, Vector3Aligned* pvMax);
 
 // render funcs
-typedef bool(*COtManager_SetTexture)(void* pThis, int nTextures, int iTextureIndex, CTargetTexture* pTexture, void* pSamplerState, unsigned int iShaderResourceView);
+typedef bool(*COtManager_SetTextureFn)(void* pThis, int nTextures, int iTextureIndex, CTargetTexture* pTexture, void* pSamplerState, unsigned int iShaderResourceView);
+typedef CGraphicCommand*(*COtManager_GetGraphicCommandFn)(__int64 uIndex);
 
 typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
@@ -161,9 +164,10 @@ extern SetLocalPlayerFn SetLocalPlayer;
 extern ResetCameraFn ResetCamera;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
-extern WetObjectManager_SetWetFn WetObjectManager_SetWet;
-extern WetObjectManager_SetDryFn WetObjectManager_SetDry;
-extern WetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
+extern CWetObjectManager_SetWetFn WetObjectManager_SetWet;
+extern CWetObjectManager_SetDryFn WetObjectManager_SetDry;
+extern CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
+extern CCameraGame_SetLookAtFn CameraGame_SetLookAt;
 extern ExCollision_GetOBBMaxFn GetOBBMax;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
@@ -176,6 +180,7 @@ extern GetWorkFn GetWork;
 extern PreloadFileFn PreloadFile;
 extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;
+extern COtManager_GetGraphicCommandFn GetGraphicCommand;
 extern CpkMountFn CpkMount;
 extern CRILogCallbackFn CRILogCallback;
 
@@ -193,7 +198,7 @@ extern int* g_piExperience;
 
 extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
-extern HANDLE* g_pHeaps;
+extern HANDLE* g_phHeaps;
 extern LPSTR g_szDataDirectoryPath;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 extern std::vector<MrubyImpl*> g_pRubyInstances;
@@ -201,7 +206,7 @@ extern std::vector<MrubyImpl*> g_pRubyInstances;
 extern Pl0000* g_pLocalPlayer;
 extern EntityHandle* g_pLocalPlayerHandle;
 extern EntityHandle* g_pEmilHandle;
-extern EntityInfoList* g_pEntityInfoList;
+extern CEntityList* g_pEntityInfoList;
 extern YorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern NPCManager* g_pNPCManager;
@@ -209,6 +214,8 @@ extern EmBaseManager* g_pEnemyManager;
 extern WetObjManager* g_pWetObjectManager;
 extern CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 extern CTextureResourceManager* g_pTextureResourceManager;
+extern COtManager* g_pOtManager;
+extern CModelManager* g_pModelManager;
 extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
 extern CSceneStateSystem* g_pSceneStateSystem;
@@ -223,7 +230,7 @@ extern IDirectInput8A* g_pDirectInput8;
 extern Keyboard_t* g_pKeyboard;
 extern Mouse_t* g_pMouse;
 extern CGraphics* g_pGraphics;
-extern COtManager* g_pOtManager;
+
 extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
 extern ID3D11PixelShader* g_pRed;
@@ -248,16 +255,20 @@ extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
 extern VirtualTableHook* g_pCameraHook;
+extern VirtualTableHook* g_pMemoryDeviceHook;
+extern VirtualTableHook* g_pMemoryDeviceHeapHook;
 extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
+
+extern MemoryDeviceHook* g_pMemoryDevHook;
 
 extern ImportTableHook* g_pQueryPerformanceCounterHook;
 extern ImportTableHook* g_pClipCursorHook;
 extern ImportTableHook* g_pXInputGetStateHook;
 extern ImportTableHook* g_pSetUnhandledExceptionFilterHook;
+extern ImportTableHook* g_pOleLoadPictureHook;
 
 extern BYTE_PATCH_MEMORY bp_save_file_io;
 extern BYTE_PATCH_MEMORY bp_UpdateModelParts;
-extern BYTE_PATCH_MEMORY bp_CreateEntity[2];
 extern BYTE_PATCH_MEMORY bp_query_performance_counter;
 extern BYTE_PATCH_MEMORY bp_Framecap;
 extern BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
@@ -265,3 +276,5 @@ extern NOP_MEMORY nop_HairColor;
 extern NOP_MEMORY nop_Health[2];
 extern NOP_MEMORY nop_neon_scenery;
 extern NOP_MEMORY nop_Framecap[2];
+extern HOOK_FUNC g_CreateEntityHook;
+extern HOOK_FUNC g_LoadWordBlacklist;

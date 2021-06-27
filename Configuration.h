@@ -924,6 +924,9 @@ private:
 
 	void PurgeConfig();
 	void LoadDefault();
+
+	void AddKeybind(IKeybind* pKeybind);
+
 	bool SetFilename(LPCTSTR szFilename);
 	BOOL FileExists(LPTSTR szFilename);
 	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath) const;

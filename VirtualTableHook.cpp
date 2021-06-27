@@ -21,6 +21,7 @@ VirtualTableHook::~VirtualTableHook()
 	free(m_NewVirtualTable);
 }
 
+//TODO("Should VirtualTableHook be hooking on creation??")
 bool VirtualTableHook::Initialize(ULONG_PTR** ppClassBase)
 {
 	m_ClassBase = ppClassBase;
@@ -28,7 +29,7 @@ bool VirtualTableHook::Initialize(ULONG_PTR** ppClassBase)
 	m_VirtualTableSize = GetVirtualTableCount(*ppClassBase);
 	m_NewVirtualTable = (ULONG_PTR*)malloc(m_VirtualTableSize * sizeof(ULONG_PTR));
 	memcpy(m_NewVirtualTable, m_OldVirtualTable, m_VirtualTableSize * sizeof(ULONG_PTR));
-	*ppClassBase = m_NewVirtualTable;
+	*m_ClassBase = m_NewVirtualTable;
 	return true;
 }
 
