@@ -25,8 +25,13 @@ CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
 
+#ifdef OLD_DENUVO_STEAM_BUILD
+#define FindOffsets FindOldDenuvoSteamOffsets
+#else
+#define FindOffsets FindNewSteamOffsets
+#endif
 
-void InitHooks()
+void InitHooks(void)
 {
 	g_pFactoryHook = new VirtualTableHook((ULONG_PTR**)g_pFactory);
 	g_pSwapChainHook = new VirtualTableHook((ULONG_PTR**)g_pSwapChain);
@@ -120,7 +125,7 @@ void InitHooks()
 	g_pMemory->NopMemory(&nop_HairColor);
 }
 
-void CreateRenderTarget()
+void CreateRenderTarget(void)
 {
 	DXGI_SWAP_CHAIN_DESC sd;
 	g_pSwapChain->GetDesc(&sd);
@@ -137,7 +142,7 @@ void CreateRenderTarget()
 	pBackBuffer->Release();
 }
 
-void CreateStencilDescription()
+void CreateStencilDescription(void)
 {
 	D3D11_DEPTH_STENCIL_DESC  StencilDesc;
 	StencilDesc.DepthFunc = D3D11_COMPARISON_LESS;
@@ -187,7 +192,7 @@ void CreateStencilDescription()
 	g_pDevice->CreateDepthStencilState(&StencilDesc, &g_pDepthStencilStates[READ_NO_WRITE]);
 }
 
-HRESULT InitD3D11()
+HRESULT InitD3D11(void)
 {
 	HRESULT hr = g_pSwapChain->GetDevice(IID_ID3D11Device, (void**)&g_pDevice); // i'm using IID_ID3D11Device for c compatiblity alternatively you can use __uuidof
 	
@@ -362,24 +367,12 @@ void LogOffsets(void)
 	g_pConsole->Log(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
 }
 
-/*
-* 
-*	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
-*	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
-*	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
-*	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
-*/
-void Setup(void)
+void FindOldDenuvoSteamOffsets(void)
 {
-#if defined(_DEBUG) || defined(VERBOSE)
-	STACK_TIMER(timer);
-	Log::AttachConsole(L"2B Hook Debug Console");
-#endif
-	srand((unsigned int)time(NULL));
 
 	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
 	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
-	
+
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
 	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC ? 8B 11 85 D2 74"); // there is like 50 identical functions kek
 	SetLocalPlayer = (SetLocalPlayerFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B ? ? ? ? ?", 1);
@@ -406,7 +399,7 @@ void Setup(void)
 	GetGraphicCommand = (COtManager_GetGraphicCommandFn)g_pMemory->FindPattern(NULL, "48 83 EC 08 48 8B 05 ? ? ? ?");
 
 	CpkMount = (CpkMountFn)g_pMemory->FindPattern(NULL, "48 83 EC 28 44 8B C9");
-	
+
 	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
@@ -446,9 +439,33 @@ void Setup(void)
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
-	
+
 	for (const MrubyImpl* pVM = *(MrubyImpl**)g_pMemory->FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 89 81 ? ? ? ?", 3); pVM; pVM = pVM->m_pNext)
 		g_pRubyInstances.emplace_back((MrubyImpl*)((byte*)pVM - 0x20));
+}
+
+void FindNewSteamOffsets(void)
+{
+	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D ? ? ? ?", 10);
+	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
+}
+
+/*
+* 
+*	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
+*	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
+*	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
+*	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
+*/
+void Setup(void)
+{
+#if defined(_DEBUG) || defined(VERBOSE)
+	STACK_TIMER(timer);
+	Log::AttachConsole(L"2B Hook Debug Console");
+#endif
+	srand((unsigned int)time(NULL));
+
+	FindOffsets();
 
 	LogOffsets();
 			
@@ -493,7 +510,7 @@ void Setup(void)
 	LOG("2B Hook Initalization Complete!\n");
 }
 
-void Unhook()
+void Unhook(void)
 {
 	g_pMemory->RestoreMemory(&bp_NoTutorialDialogs);
 	g_pMemory->RestoreMemory(&bp_Framecap);
