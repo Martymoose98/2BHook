@@ -768,18 +768,18 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 	switch (pSavedata->dwFlags)
 	{
 	case SAVE_FLAGS_READ_SLOTS:
-		(*(ReadSaveSlotsFn)(0x14095DD80))(pSavedata);
+		(*(CSaveDataDevice_ReadSaveSlotsFn)(0x14095DD80))(pSavedata);
 		return;
 	case SAVE_FLAGS_READ:
 		Vars.Misc.bLoading = true;
-		(*(ReadSaveDataFn)(0x14095E020))(pSavedata);
+		(*(CSaveDataDevice_ReadSaveDataFn)(0x14095E020))(pSavedata);
 		Vars.Misc.nSlot = pSavedata->nSlot;
 		return;
 	case SAVE_FLAGS_WRITE:
-		(*(WriteSaveDataFn)(0x14095E330))(pSavedata);
+		(*(CSaveDataDevice_WriteSaveDataFn)(0x14095E330))(pSavedata);
 		return;
 	case SAVE_FLAGS_DELETE:
-		(*(DeleteSaveDataFn)(0x14095E7B0))(pSavedata);
+		(*(CSaveDataDevice_DeleteSaveDataFn)(0x14095E7B0))(pSavedata);
 		return;
 	}
 	Vars.Misc.bLoading = false;

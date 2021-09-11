@@ -293,7 +293,7 @@ private:
 
 #ifdef FAST_HOOKING
 	HMODULE m_hModule;
-	IMAGE_EXPORT_DIRECTORY m_pExportDirectory;
+	PIMAGE_EXPORT_DIRECTORY m_pExportDirectory;
 	PDWORD m_pAddressOfNames;
 #endif
 	PIMAGE_THUNK_DATA m_pIAT;
