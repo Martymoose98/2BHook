@@ -47,7 +47,7 @@ typedef struct _NOP_MEMORY
 	VOID* Address;
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
-} NOP_MEMORY, *PNOP_MEMORY;
+} NOP_MEMORY, * PNOP_MEMORY;
 
 #define InitalizeNopMemoryDefault(pNop) memset((PBYTE)(pNop) + FIELD_OFFSET(NOP_MEMORY, Patched), 0, sizeof(NOP_MEMORY) - sizeof(INT));
 #define InitalizeNopMemory(pNop, address, cb) (pNop)->Magic = NOP_MEMORY_MAGIC;\
@@ -57,8 +57,8 @@ typedef struct _NOP_MEMORY
 												  (pNop)->nBytes = (cb);
 
 /*
-	If your going to call ZeroMemory(aka. memset(dst, 0, length);) you need to restore the Magic field to BYTE_PATCH_MEMORY_MAGIC,
-	if you are planning to free the memory with RestoreMemory.Also, if you want PatchBytes to allocate the OldOpcode buffer for
+	If your going to call ZeroMemory aka. memset(dst, 0, length); you need to restore the Magic field to BYTE_PATCH_MEMORY_MAGIC,
+	if you are planning to free the memory with RestoreMemory. Also, if you want PatchBytes to allocate the OldOpcode buffer for
 	you pOldOpcodes needs to equal null.
 */
 typedef struct _BYTE_PATCH_MEMORY
@@ -69,7 +69,7 @@ typedef struct _BYTE_PATCH_MEMORY
 	BYTE* pNewOpcodes;
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
-} BYTE_PATCH_MEMORY, *PBYTE_PATCH_MEMORY;
+} BYTE_PATCH_MEMORY, * PBYTE_PATCH_MEMORY;
 
 #define InitalizeBytePatchMemoryDefault(pBytePatch) memset((PBYTE)(pBytePatch) + FIELD_OFFSET(BYTE_PATCH_MEMORY, Patched), 0, sizeof(BYTE_PATCH_MEMORY) - sizeof(INT));
 #define InitalizeBytePatchMemory(pBytePatch, address, pOpcodes, cb) (pBytePatch)->Magic = BYTE_PATCH_MEMORY_MAGIC;\
@@ -86,7 +86,7 @@ typedef struct _HOOK_FUNC
 	SIZE_T m_length;
 	BYTE m_Detour[MINIMUM_HOOK_LENGTH];
 	BOOLEAN m_hooked;
-} HOOK_FUNC, *PHOOK_FUNC;
+} HOOK_FUNC, * PHOOK_FUNC;
 
 enum _ISBADPTR_STATUS
 {
@@ -144,6 +144,10 @@ public:
 		return 0;
 	}
 
+	// WARNING: I think this is supposed to return LONG instead of DWORD aka. ULONG
+	// rel32 jmp instructions are signed rva's.
+	// It's not a big deal currently 'cause the func is unused and therefore untested
+	// but, if used unchanged, I presume will cause issues/bugs/crashes.
 	inline DWORD CalculateJump(QWORD rip, QWORD dest, SIZE_T uOffset)
 	{
 		return (DWORD)(dest - rip - (uOffset + sizeof(DWORD)));
@@ -155,10 +159,10 @@ public:
 	}
 
 	/*
-	Note: When using this version of this function, the pointer has to be the first unknown
-	@params
-	szModulename - name of the module to scan (IDA or PEiD Style)
-	szPattern - the byte pattern to search the module for
+		NOTE: When using this version of this function, the pointer has to be the first unknown
+		@params
+		szModulename - name of the module to scan (IDA or PEiD Style)
+		szPattern - the byte pattern to search the module for
 	*/
 	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern)
 	{
@@ -173,9 +177,8 @@ public:
 	}
 
 	/*
-		Note: When using this version of this function, the pointer has to be the first unknown.
-		Also, this is the fastest verison of this function since the uOffset is compile-time
-		known.
+		NOTE: When using this version of this function, the pointer has to be the first unknown.
+		Also, this is the fastest verison of this function since the uOffset is compile-time known.
 		@params
 		szModulename - name of the module to scan (IDA or PEiD Style)
 		szPattern - the byte pattern to search the module for
@@ -197,7 +200,12 @@ public:
 			return;
 
 		if (!*ppOldOpcodes)
+		{
 			*ppOldOpcodes = (BYTE*)malloc(nBytes);
+
+			if (!*ppOldOpcodes)
+				return;
+		}
 
 		memcpy(*ppOldOpcodes, address, nBytes);
 		NOPMemory(address, nBytes);
@@ -215,7 +223,12 @@ public:
 			return;
 
 		if (!pNop->pOldOpcodes)
+		{
 			pNop->pOldOpcodes = (BYTE*)malloc(pNop->nBytes);
+		
+			if (!pNop->pOldOpcodes)
+				return;
+		}
 
 		if (pNop->Patched)
 			return;
@@ -231,7 +244,7 @@ public:
 		memcpy(pNop->pOldOpcodes, pNop->Address, pNop->nBytes);
 		NOPMemory(pNop->Address, pNop->nBytes);
 
-		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, NULL);
+		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
 
 		LeaveCriticalSection(&cs);
 		pNop->Patched = TRUE;
@@ -329,7 +342,7 @@ public:
 		EnterCriticalSection(&cs);
 
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-		
+
 		memcpy(pBytePatch->pOldOpcodes, pBytePatch->Address, pBytePatch->nBytes);
 		memcpy(pBytePatch->Address, pBytePatch->pNewOpcodes, pBytePatch->nBytes);
 
