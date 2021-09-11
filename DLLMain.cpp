@@ -361,15 +361,21 @@ void LogOffsets(void)
 	LOG_OFFSET("CKeyboard", g_pKeyboard);
 	LOG_OFFSET("CMouse", g_pMouse);
 	LOG_OFFSET("CGraphics", g_pGraphics);
-
 	LOG_OFFSET("ViewMatrix", g_pViewMatrix);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
 }
 
+/*
+*  ALL OLD SIGS FOR DENUVO PACKED STEAM VERSION
+* 
+*	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
+*	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
+*	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
+*	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
+*/
 void FindOldDenuvoSteamOffsets(void)
 {
-
 	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
 	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
 
@@ -447,16 +453,11 @@ void FindOldDenuvoSteamOffsets(void)
 void FindNewSteamOffsets(void)
 {
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D ? ? ? ?", 10);
+	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
 }
 
-/*
-* 
-*	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
-*	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
-*	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
-*	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
-*/
+
 void Setup(void)
 {
 #if defined(_DEBUG) || defined(VERBOSE)

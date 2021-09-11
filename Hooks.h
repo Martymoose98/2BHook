@@ -29,10 +29,10 @@ typedef LPTOP_LEVEL_EXCEPTION_FILTER(* SetUnhandledExceptionFilterFn)(LPTOP_LEVE
 typedef BOOL(* SetCursorPosFn)(int X, int Y);
 typedef DWORD(* XInputGetStateFn)(DWORD dwUserIndex, PXINPUT_STATE pState);
 
-typedef void(* ReadSaveSlotsFn)(CSaveDataDevice* pSave);
-typedef void(* ReadSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(* WriteSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(* DeleteSaveDataFn)(CSaveDataDevice* pSave);
+typedef void(* CSaveDataDevice_ReadSaveSlotsFn)(CSaveDataDevice* pSave);
+typedef void(* CSaveDataDevice_ReadSaveDataFn)(CSaveDataDevice* pSave);
+typedef void(* CSaveDataDevice_WriteSaveDataFn)(CSaveDataDevice* pSave);
+typedef void(* CSaveDataDevice_DeleteSaveDataFn)(CSaveDataDevice* pSave);
 
 typedef void(* UpdateModelPartsFn)(Pl0000* pEntity);
 typedef void*(* CreateEntityFn)(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
