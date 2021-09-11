@@ -28,6 +28,10 @@ bool VirtualTableHook::Initialize(ULONG_PTR** ppClassBase)
 	m_OldVirtualTable = *ppClassBase;
 	m_VirtualTableSize = GetVirtualTableCount(*ppClassBase);
 	m_NewVirtualTable = (ULONG_PTR*)malloc(m_VirtualTableSize * sizeof(ULONG_PTR));
+
+	if (!m_NewVirtualTable)
+		return false;
+
 	memcpy(m_NewVirtualTable, m_OldVirtualTable, m_VirtualTableSize * sizeof(ULONG_PTR));
 	*m_ClassBase = m_NewVirtualTable;
 	return true;

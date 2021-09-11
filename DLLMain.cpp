@@ -133,13 +133,20 @@ void CreateRenderTarget(void)
 	// Create the render target
 	ID3D11Texture2D* pBackBuffer;
 	D3D11_RENDER_TARGET_VIEW_DESC render_target_view_desc;
+
 	ZeroMemory(&render_target_view_desc, sizeof(render_target_view_desc));
+
 	render_target_view_desc.Format = sd.BufferDesc.Format;
 	render_target_view_desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+
 	g_pSwapChain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&pBackBuffer);
-	g_pDevice->CreateRenderTargetView(pBackBuffer, &render_target_view_desc, &g_pRenderTargetView);
-	g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
-	pBackBuffer->Release();
+
+	if (pBackBuffer)
+	{
+		g_pDevice->CreateRenderTargetView(pBackBuffer, &render_target_view_desc, &g_pRenderTargetView);
+		g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
+		pBackBuffer->Release();
+	}
 }
 
 void CreateStencilDescription(void)

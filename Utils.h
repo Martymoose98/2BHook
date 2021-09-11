@@ -259,9 +259,12 @@ static void DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD
 	DWORD dwNextNameOffset = *(DWORD*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset);
 
 	*pppszFiles = (const char**)malloc(sizeof(const char*) * pHdr->dwFileCount);
-
-	for (DWORD i = 0; i < pHdr->dwFileCount; ++i)
-		(*pppszFiles)[i] = (const char*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset + 4 + i * dwNextNameOffset);
+	
+	if (*pppszFiles)
+	{
+		for (DWORD i = 0; i < pHdr->dwFileCount; ++i)
+			(*pppszFiles)[i] = (const char*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset + 4 + i * dwNextNameOffset);
+	}
 }
 
 static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
@@ -469,16 +472,23 @@ static CMaterial* LoadMaterial(const char* szFile)
 	ZeroMemory(&tex_desc, sizeof(CTextureDescription));
 
 	HANDLE hFile = CreateFileA(szFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-	DWORD dwFileSize = GetFileSize(hFile, NULL);
-	HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
-	TextureFile* pHdr = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
-	tex_desc.m_pDDS = pHdr;
-	tex_desc.m_uTextureSize = dwFileSize;
-	tex_desc.dword18 = 2;
 
-	CreateMaterial("Metal", "CNS00_XXXXX", "Default", &szName, &tex_desc, 1, 0, &pMetal);
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		DWORD dwFileSize = GetFileSize(hFile, NULL);
+		HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
 
-	CloseHandle(hFile);
+		if (hMapping)
+		{
+			TextureFile* pHdr = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
+			tex_desc.m_pDDS = pHdr;
+			tex_desc.m_uTextureSize = dwFileSize;
+			tex_desc.dword18 = 2;
+
+			CreateMaterial("Metal", "CNS00_XXXXX", "Default", &szName, &tex_desc, 1, 0, &pMetal);
+		}
+		CloseHandle(hFile);
+	}
 	return pMetal;
 }
 

@@ -291,7 +291,7 @@ public:
 
 		memcpy(pNop->Address, pNop->pOldOpcodes, pNop->nBytes);
 
-		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, NULL);
+		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
 
 		LeaveCriticalSection(&cs);
 		pNop->Patched = FALSE;
@@ -309,12 +309,18 @@ public:
 			return;
 
 		if (!*ppOldOpcodes)
+		{
 			*ppOldOpcodes = (BYTE*)malloc(nBytes);
+			
+			if (!*ppOldOpcodes)
+				return;
+		}
 
 		memcpy(*ppOldOpcodes, address, nBytes);
 		memcpy(address, pNewOpcodes, nBytes);
 	}
 
+	// FIXME: All of these functions should return a value
 	VOID PatchBytes(PBYTE_PATCH_MEMORY pBytePatch)
 	{
 		if (!pBytePatch)
@@ -330,8 +336,13 @@ public:
 			return;
 
 		if (!pBytePatch->pOldOpcodes)
+		{
 			pBytePatch->pOldOpcodes = (BYTE*)malloc(pBytePatch->nBytes);
 
+			if (!pBytePatch->pOldOpcodes)
+				return;
+		}
+		
 		if (pBytePatch->Patched)
 			return;
 
@@ -346,7 +357,7 @@ public:
 		memcpy(pBytePatch->pOldOpcodes, pBytePatch->Address, pBytePatch->nBytes);
 		memcpy(pBytePatch->Address, pBytePatch->pNewOpcodes, pBytePatch->nBytes);
 
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, NULL);
+		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
 
 		LeaveCriticalSection(&cs);
 		pBytePatch->Patched = TRUE;
@@ -379,7 +390,7 @@ public:
 
 		memcpy(pBytePatch->Address, pBytePatch->pOldOpcodes, pBytePatch->nBytes);
 
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, NULL);
+		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
 
 		LeaveCriticalSection(&cs);
 		pBytePatch->Patched = FALSE;
@@ -418,6 +429,10 @@ public:
 		pHook->m_hooked = TRUE;
 		pHook->m_pSrcFunc = pSrcFunc;
 		pHook->m_pOldInstructions = (BYTE*)malloc(length);
+
+		if (!pHook->m_pOldInstructions)
+			return FALSE;
+
 		memcpy(pHook->m_pOldInstructions, pSrcFunc, length);
 		pHook->m_length = length;
 
@@ -458,7 +473,7 @@ public:
 
 		memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
 
-		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, NULL))
+		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, &dwOldProtect))
 			return FALSE;
 
 		//FlushInstructionCache(GetCurrentProcess(), pSrcFunc, length);
@@ -481,7 +496,7 @@ public:
 		memcpy(pHook->m_pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
 		pHook->m_hooked = TRUE;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, NULL))
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
 			return FALSE;
 
 		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
@@ -502,7 +517,7 @@ public:
 		memcpy(pHook->m_pSrcFunc, pHook->m_pOldInstructions, pHook->m_length);
 		pHook->m_hooked = FALSE;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, NULL))
+		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
 			return FALSE;
 
 		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
