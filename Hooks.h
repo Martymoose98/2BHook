@@ -29,11 +29,6 @@ typedef LPTOP_LEVEL_EXCEPTION_FILTER(* SetUnhandledExceptionFilterFn)(LPTOP_LEVE
 typedef BOOL(* SetCursorPosFn)(int X, int Y);
 typedef DWORD(* XInputGetStateFn)(DWORD dwUserIndex, PXINPUT_STATE pState);
 
-typedef void(* CSaveDataDevice_ReadSaveSlotsFn)(CSaveDataDevice* pSave);
-typedef void(* CSaveDataDevice_ReadSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(* CSaveDataDevice_WriteSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(* CSaveDataDevice_DeleteSaveDataFn)(CSaveDataDevice* pSave);
-
 typedef void(* UpdateModelPartsFn)(Pl0000* pEntity);
 typedef void*(* CreateEntityFn)(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps);
 typedef BOOL(* LoadWordBlacklistFn)(BannedWordChecker* pThis, __int64 thisrdx, QWORD *a3, const char* szBlacklistName);
@@ -77,7 +72,8 @@ HRESULT hkKeyboardAcquire(IDirectInputDevice8A* pThis);
 HRESULT hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
 HRESULT hkMouseAcquire(IDirectInputDevice8A* pThis);
 HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
-void hkSaveFileIO(CSaveDataDevice* pSave);
+extern "C" void hkSaveFileIOThunk(void); // idk args yet
+extern "C" void hkSaveFileIO(CSaveDataDevice * pSave);
 extern "C" BOOL hkLoadWordBlacklistThunk(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr8, const char* szBlacklistName);
 extern "C" BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD *thisr8, const char* szBlacklistName);
 extern "C" void hkUpdateModelPartsThunk(Pl0000* pEntity);

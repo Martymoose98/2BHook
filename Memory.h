@@ -23,7 +23,7 @@
 #define BYTE_PATCH_MEMORY_MAGIC (INT)(0x6863) // "bp"
 
 #define MINIMUM_HOOK_LENGTH32 5
-#define MINIMUM_HOOK_LENGTH64 14 //15
+#define MINIMUM_HOOK_LENGTH64 22 //14 //15
 
 
 #ifdef _WIN64
@@ -85,7 +85,7 @@ typedef struct _HOOK_FUNC
 	BYTE* m_pOldInstructions;
 	SIZE_T m_length;
 	BYTE m_Detour[MINIMUM_HOOK_LENGTH];
-	BOOLEAN m_hooked;
+	BOOLEAN m_bHooked;
 } HOOK_FUNC, * PHOOK_FUNC;
 
 enum _ISBADPTR_STATUS
@@ -418,7 +418,7 @@ public:
 		if (length < MINIMUM_HOOK_LENGTH64)
 			return FALSE;
 
-		if (pHook->m_hooked)
+		if (pHook->m_bHooked)
 			return FALSE;
 
 		DWORD dwOldProtect;
@@ -426,7 +426,7 @@ public:
 		if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
 			return FALSE;
 
-		pHook->m_hooked = TRUE;
+		pHook->m_bHooked = TRUE;
 		pHook->m_pSrcFunc = pSrcFunc;
 		pHook->m_pOldInstructions = (BYTE*)malloc(length);
 
@@ -439,19 +439,19 @@ public:
 		NOPMemory((LPBYTE)pSrcFunc + MINIMUM_HOOK_LENGTH64, length - MINIMUM_HOOK_LENGTH64);
 
 		/*
-		push rax
-		movabs rax, address
-		xchg rax, [rsp]
-		ret
+			push rax
+			movabs rax, address
+			xchg rax, [rsp]
+			ret
 
 		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x87, 0x04, 0x24, 0xC3 }
 
 		or
 
-		push rax
-		movabs rax, addy
-		jmp rax
-		pop rax
+			push rax
+			movabs rax, addy
+			jmp rax
+			pop rax
 
 		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0, 0x58 };
 
@@ -459,18 +459,33 @@ public:
 
 		rsp -= 16
 
-		push rbx
-		movabs rbx, addy
-		call rbx
-		pop rbx
+			push rbx
+			movabs rbx, addy
+			call rbx
+			pop rbx
 
 		{ 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B }
+		
+		or  active vvvv
+
+		Saves stack pointer
+
+				0:  53                      push   rbx
+				1:  55                      push   rbp
+				2:  48 89 e5                mov    rbp,rsp
+				5:  48 bb 00 00 00 00 00    movabs rbx, addy
+				c:  00 00 00
+				f:  ff d3                   call   rbx
+				11: 48 89 ec                mov    rsp,rbp
+				14: 5d                      pop    rbp
+				15: 5b                      pop    rbx
+
+		{ 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B }
 		*/
-		static BYTE detour[] = { 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B };
+		static BYTE detour[] = { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B };
 
 		memcpy(pHook->m_Detour, detour, sizeof(detour));
-		*(QWORD*)&pHook->m_Detour[3] = (QWORD)pDstFunc;
-
+		*(QWORD*)&pHook->m_Detour[7] = (QWORD)pDstFunc;	
 		memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
 
 		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, &dwOldProtect))
@@ -483,7 +498,7 @@ public:
 
 	BOOL RehookFunc(HOOK_FUNC* pHook)
 	{
-		if (pHook->m_hooked)
+		if (pHook->m_bHooked)
 			return FALSE;
 
 		DWORD dwOldProtect;
@@ -494,7 +509,7 @@ public:
 		NOPMemory((LPBYTE)pHook->m_pSrcFunc + MINIMUM_HOOK_LENGTH64, pHook->m_length - MINIMUM_HOOK_LENGTH64);
 
 		memcpy(pHook->m_pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
-		pHook->m_hooked = TRUE;
+		pHook->m_bHooked = TRUE;
 
 		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
 			return FALSE;
@@ -506,7 +521,7 @@ public:
 
 	BOOL UnhookFunc(HOOK_FUNC* pHook)
 	{
-		if (!pHook->m_hooked)
+		if (!pHook->m_bHooked)
 			return FALSE;
 
 		DWORD dwOldProtect;
@@ -515,7 +530,7 @@ public:
 			return FALSE;
 
 		memcpy(pHook->m_pSrcFunc, pHook->m_pOldInstructions, pHook->m_length);
-		pHook->m_hooked = FALSE;
+		pHook->m_bHooked = FALSE;
 
 		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
 			return FALSE;

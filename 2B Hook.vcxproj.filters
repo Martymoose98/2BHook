@@ -25,6 +25,9 @@
     <Filter Include="Source Files\ImGui">
       <UniqueIdentifier>{122f911a-5b7e-4332-ac8f-1342e457d8c8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\Hooks">
+      <UniqueIdentifier>{74f88468-cfc4-4a7e-8933-cd95c69775d9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Memory.h">
@@ -34,9 +37,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Log.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="VirtualTableHook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Hooks.h">
@@ -64,9 +64,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Menu.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImportTableHook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="cpk.h">
@@ -99,9 +96,6 @@
     <ClInclude Include="ConfigGetters.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ExportTableHook.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ImGui\imconfig.h">
       <Filter>Source Files\ImGui</Filter>
     </ClInclude>
@@ -131,6 +125,15 @@
     </ClInclude>
     <ClInclude Include="MemoryDeviceHook.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="VirtualTableHook.h">
+      <Filter>Header Files\Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="ImportTableHook.h">
+      <Filter>Header Files\Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="ExportTableHook.h">
+      <Filter>Header Files\Hooks</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +200,9 @@
       <Filter>Assembly Files</Filter>
     </MASM>
     <MASM Include="CreateEntityHook.asm">
+      <Filter>Assembly Files</Filter>
+    </MASM>
+    <MASM Include="SaveFileIOHook.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
   </ItemGroup>

@@ -96,17 +96,17 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	vMatrix.Transform(vIn, vTransform);
 
 	// multiply by inverse w 
-	vTransform *= 1.0f / w; 
+	vTransform *= 1.0f / w;
 
 	int width = g_pGraphicDevice->iScreenWidth;
 	int height = g_pGraphicDevice->iScreenHeight;
 
 	float x = width / 2.0f;
 	float y = height / 2.0f;
-	//float focalAng = tanf(g_pCamera->m_flFov / 2.0f);
+	//float flFocalLength = y / tanf(g_pCamera->m_flFov / 2.0f);
 
-	//vOut.x = x + vTransform.x * focalAng * (float)width + 0.5f;
-	//vOut.y = y - vTransform.y * focalAng * (float)height + 0.5f;
+	//vOut.x = x + vTransform.x * flFocalLength / vTransform.z;
+	//vOut.y = y - vTransform.y * flFocalLength / vTransform.z;
 	vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
 	vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
 
@@ -190,16 +190,16 @@ static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
 	return TRUE;
 }
 
-static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char *szFileName)
+static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char* szFileName)
 {
-	const char *szName; // r12
-	LPBYTE *pHeaders; // r15
+	const char* szName; // r12
+	LPBYTE* pHeaders; // r15
 	unsigned int v4; // esi
 	DATHeader* pHdr; // r8
 	DWORD dwOffset; // r9
 	DWORD dwFileCount; // ebp
 	DWORD dwNextNameOffset; // r14
-	const char *szCurrentFileName; // rdi
+	const char* szCurrentFileName; // rdi
 	unsigned int i; // ebx
 	DWORD result; // eax
 
@@ -259,7 +259,7 @@ static void DataFile_EnumContents(void* pBuffer, const char*** pppszFiles, DWORD
 	DWORD dwNextNameOffset = *(DWORD*)((LPBYTE)pBuffer + pHdr->dwNameTableOffset);
 
 	*pppszFiles = (const char**)malloc(sizeof(const char*) * pHdr->dwFileCount);
-	
+
 	if (*pppszFiles)
 	{
 		for (DWORD i = 0; i < pHdr->dwFileCount; ++i)
@@ -296,6 +296,64 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 	}
 }
 
+// Rebuilt from the binary for the reason that it was inlined which
+// will complicate things in the hook otherwise
+static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
+{
+	char szFilename[260];
+	DWORD v11 = pSavedata->dwStatus;
+
+	switch (pSavedata->dwStatus)
+	{
+	case 0:
+		if (((BOOL(*)(CSaveDataDevice*, char*))(0x140282BD0))(pSavedata, szFilename))
+		{
+			if (DeleteFileA(szFilename))
+			{
+				pSavedata->pSaveSlots[pSavedata->nSlot].dwAccountId = 0;
+				pSavedata->pSaveSlots[pSavedata->nSlot].bInUse = FALSE;
+
+				if (pSavedata->hFile != INVALID_HANDLE_VALUE)
+				{
+					CloseHandle(pSavedata->hFile);
+					pSavedata->hFile = INVALID_HANDLE_VALUE;
+				}
+
+				*(&pSavedata->nMaxSlot + 1) = 0;
+				pSavedata->qwFlags = 0i64;
+			}
+			else
+			{
+				pSavedata->dwStatus = 1;
+			}
+		}
+		break;
+	case 1:
+		if (pSavedata->hFile != INVALID_HANDLE_VALUE)
+		{
+			CloseHandle(pSavedata->hFile);
+			pSavedata->hFile = INVALID_HANDLE_VALUE;
+		}
+
+		*(&pSavedata->nMaxSlot + 1) = 3;
+		pSavedata->qwFlags = 0i64;
+		break;
+	case 2:
+
+		if (pSavedata->qwUnk0xC8)
+		{
+			if (!*(DWORD*)(pSavedata->qwUnk0xC8 + 8))
+				break;
+			*(DWORD*)(pSavedata->qwUnk0xC8 + 12) = 1;
+		}
+		pSavedata->qwUnk0xC8 = 0i64;
+		break;
+	default:
+		pSavedata->dwStatus = 1;
+		break;
+	}
+}
+
 static CMesh2* GetModelMesh(CModelWork* pWork, const char* szMesh)
 {
 	for (int i = 0; i < pWork->m_nMeshes; ++i)
@@ -318,7 +376,7 @@ static int GetModelMeshIndex(CModelWork* pWork, const char* szMesh)
 static short GetBoneIndex(const CModelData* pModelData, short id)
 {
 	short* pTable;
-	short iBoneIndex, t1, t2; 
+	short iBoneIndex, t1, t2;
 
 	pTable = pModelData->m_pBoneIndexTranslationTable2;
 
@@ -350,7 +408,7 @@ static short GetBoneId(short index)
 static void SwapTexture(unsigned int srcid, CTexture* pReplace)
 {
 	CTextureResource* pRes = ((CTextureResourceManager_FindResourceFn)(0x140936F60))(srcid);
-	
+
 	if (pRes)
 		pRes->m_pTexture = pReplace;
 }
@@ -739,8 +797,8 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 	BOOL IsStringVar[3];
 
 	const char* szFmt = szFormat;
-	QWORD v4 = *(QWORD *)(arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32));	// 1st arg
-	QWORD v5 = *(QWORD *)((arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32)) + 8); //2nd arg
+	QWORD v4 = *(QWORD*)(arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32));	// 1st arg
+	QWORD v5 = *(QWORD*)((arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32)) + 8); //2nd arg
 	SIZE_T length = strlen(szFormat);
 	SIZE_T j = 0;
 	DWORD i = 0;
@@ -761,7 +819,7 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 
 		// there is no format params just return the format string
 		if (i > 2)
-			return (char *)szFmt;
+			return (char*)szFmt;
 	}
 
 	if (IsStringVar[0])

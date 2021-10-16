@@ -549,16 +549,14 @@ struct CEntityInfoListEntry
 /*
 Address = 14160DF88
 */
-class CEntityList
+struct CEntityList
 {
-public:
 	DWORD m_dwItems;								//0x0000
 	DWORD m_dwSize;									//0x0004
 	DWORD m_dwBase;									//0x0008
 	DWORD m_dwShift;								//0x000C
-	std::pair<EntityHandle, CEntityInfo*>* m_pItems; //0x0010
-	CRITICAL_SECTION m_CriticalSection;				//0x0018
-	BOOL m_bCriticalSectionInitalized;				//0x0040
+	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
+	CReadWriteLock m_Lock;							//0x0018
 };
 
 struct CCollisionDataObject
@@ -2773,7 +2771,7 @@ public:
 struct CSaveSlot
 {
 	DWORD dwAccountId;
-	BOOL InUse;
+	BOOL bInUse;
 };
 
 /*
@@ -3361,21 +3359,21 @@ struct Task
 	HANDLE hSemaphore2;
 };
 
-struct WetObjManagerDelay
+struct CWetObjManagerDelay
 {
 	float m_flMaxDelay;
 	float m_flDelay;
 };
 
 /*
-Address = 0x1417BFD48
+* Denuvo ver. Address = 0x1417BFD48
 */
-struct WetObjManager
+struct CWetObjManager
 {
 	CReadWriteLock m_Lock;
 	char pad[4];
 	EntityHandle m_Localhandles[2];
-	WetObjManagerDelay m_WetDelays[2];
+	CWetObjManagerDelay m_WetDelays[2];
 	EntityHandle m_EntityHandles[256];
 	EntityHandle m_SoundHandles[32];
 };
@@ -3703,8 +3701,7 @@ typedef void(*mrb_atexit_func)(struct mrb_state*);
 typedef struct mrb_state {
 
 	struct mrb_jmpbuf* jmp;		//0x00
-	uint32_t flags;				//0x08
-	mrb_allocf allocf;			//0x10      /* memory allocation function */
+	mrb_allocf allocf;			//0x08      /* memory allocation function */
 	void* allocf_ud;            //0x18      /* auxiliary data of allocf */
 	struct mrb_context* c;		//0x20
 	struct mrb_context* root_c; //0x28

@@ -142,6 +142,7 @@
   <ItemGroup>
     <MASM Include="CreateEntityHook.asm" />
     <MASM Include="LoadWordBlacklistHook.asm" />
+    <MASM Include="SaveFileIOHook.asm" />
   </ItemGroup>
   <ItemGroup>
     <None Include="ImGui\.editorconfig" />
