@@ -141,6 +141,9 @@ Version 0.08:
 
 -Fixed a crash where if you opened the menu in a loading/any state where localplayer was invalidated
 
+# Old Denuvo IDA Database:
+https://mega.nz/folder/PiRDHSiZ#6BLoGaVzAEuVKdoJGTcmTA
+
 # Contact:
 
 There are mutiple ways to contact me:
@@ -151,7 +154,7 @@ https://discord.gg/v8Yyrrg
 
 Martino#1552 - on discord (probably the best way)
 
-Reddit  - (PM or post on the thread)
+Reddit - (PM or post on the thread)
 
-GitHub
+GitHub - You are here :D
 
