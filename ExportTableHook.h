@@ -1,8 +1,10 @@
-#pragma once
+#ifndef __EXPORTTABLEHOOK_H__
+#define __EXPORTTABLEHOOK_H__
 #include <Windows.h>
 
 class ExportTableHook
 {
+public:
 	ExportTableHook(const char* szModule, const char* szFunction, LPCVOID pHookFunction)
 		: m_pNewFunction(pHookFunction)
 	{
@@ -23,9 +25,6 @@ class ExportTableHook
 
 		for (DWORD index = 0; index < dwExportDescriptorCount; ++index)
 		{
-			if (!pExportDirectory[index].Characteristics)
-				return NULL;
-
 			if ((ULONG_PTR)szFunction > MAXWORD)
 			{
 				pAddressOfNames = (PDWORD)((ULONG_PTR)pDosHeader + pExportDirectory->AddressOfNames);
@@ -43,6 +42,7 @@ class ExportTableHook
 						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
 						pAddressOfFunctions[pAddressOfOrdinals[hint]] = m_dwNewFunctionRVA;
 						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
+						return m_pOriginalFunction;
 					}
 				}
 			}
@@ -61,10 +61,12 @@ class ExportTableHook
 						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
 						pAddressOfFunctions[pAddressOfOrdinals[hint]] = m_dwNewFunctionRVA;
 						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
+						return m_pOriginalFunction;
 					}
 				}
 			}
 		}
+		return NULL;
 	}
 
 	void Rehook()
@@ -94,3 +96,4 @@ private:
 	DWORD m_dwNewFunctionRVA;
 	DWORD m_dwOldProtect;
 };
+#endif // !__EXPORTTABLEHOOK_H__

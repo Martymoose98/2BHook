@@ -1,4 +1,6 @@
-#pragma once
+#ifndef __IMPORTTABLEHOOK_H__
+#define __IMPORTTABLEHOOK_H__
+
 #include <Windows.h>
 #include <intrin.h>
 #include <Ntsecapi.h>
@@ -200,7 +202,7 @@ public:
 			PIMAGE_THUNK_DATA pImportAddressTable = (PIMAGE_THUNK_DATA)((ULONG_PTR)pDosHeader + pImportDescriptors[index].FirstThunk);
 			LPCSTR szModuleName = (LPCSTR)((ULONG_PTR)pDosHeader + pImportDescriptors[index].Name);
 
-			if (!strcmp(szModule, szModuleName))
+			if (!_stricmp(szModule, szModuleName))
 			{
 				for (DWORD i = 0; pImportNameTable[i].u1.Function; ++i)
 				{
@@ -212,7 +214,7 @@ public:
 							{
 								LPCSTR szFunctionName = (LPCSTR)((ULONG_PTR)hModule + pAddressOfNames[hint]);
 
-								if (!strcmp(szFunctionName, szFunction))
+								if (!_stricmp(szFunctionName, szFunction))
 								{
 									WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[hint] + pExportDirectory->Base);
 
@@ -231,7 +233,7 @@ public:
 					{
 						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.AddressOfData))->Name;
 						
-						if (!strcmp(szFunctionName, szFunction))	
+						if (!_stricmp(szFunctionName, szFunction))	
 							return InitHook(&pImportAddressTable[i]);
 					}
 				}
@@ -301,3 +303,4 @@ private:
 	LPCVOID m_pNewFunction;
 	DWORD m_dwOldProtect;
 };
+#endif // !__IMPORTTABLEHOOK_H__

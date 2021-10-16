@@ -23,7 +23,8 @@ CMemory* g_pMemory = new CMemory;
 
 CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
-BYTE opcodes_save_file_io[] = { 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD0, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 };
+
+#define OLD_DENUVO_STEAM_BUILD
 
 #ifdef OLD_DENUVO_STEAM_BUILD
 #define FindOffsets FindOldDenuvoSteamOffsets
@@ -100,11 +101,9 @@ void InitHooks(void)
 	oCCameraGameSetViewAngles = (CCameraGameSetViewAnglesFn)g_pCameraHook->HookFunction((ULONG_PTR)hkCCameraGameSetViewAngles, 1);
 	oCCameraGameMove = (CCameraGameMoveFn)g_pCameraHook->HookFunction((ULONG_PTR)hkCCameraGameMove, 2);
 
-	*(QWORD*)&opcodes_save_file_io[2] = (QWORD)hkSaveFileIO;
+	ZeroMemory(&g_UserManagerSaveFileIO, sizeof(HOOK_FUNC));
 
-	InitalizeBytePatchMemory(&bp_save_file_io, g_pMemory->FindPattern(NULL, "8B 51 30 FF CA"), opcodes_save_file_io, 24);
-
-	g_pMemory->PatchBytes(&bp_save_file_io);
+	g_pMemory->HookFunc64(SaveFileIO, hkSaveFileIO, 45, &g_UserManagerSaveFileIO);
 
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
 	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
@@ -383,7 +382,7 @@ void LogOffsets(void)
 */
 void FindOldDenuvoSteamOffsets(void)
 {
-	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 3);
+	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 10);
 	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
 
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
@@ -394,6 +393,13 @@ void FindOldDenuvoSteamOffsets(void)
 	ChangePlayer = (ChangePlayerFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
 	FindSceneState = (FindSceneStateFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
 	SetSceneEntity = (SetSceneEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
+
+	SaveFileIO = (CSaveDataDevice_SaveFileIOFn)g_pMemory->FindPattern(NULL, "8B 51 30 FF CA");
+	ReadSaveSlots = (CSaveDataDevice_ReadSaveSlotsFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B AE ? ? ? ? 48 85 ED 74 38", 1);
+	ReadSaveData = (CSaveDataDevice_ReadSaveDataFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ?", 1);
+	WriteSaveData = (CSaveDataDevice_WriteSaveDataFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? EB 0C E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ? ? ", 1);
+	DeleteSaveData = (CSaveDataDevice_DeleteSaveDataFn)g_pMemory->FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
+
 	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
 	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
 	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1);
@@ -420,7 +426,7 @@ void FindOldDenuvoSteamOffsets(void)
 	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
 	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
 	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
-	g_pWetObjectManager = (WetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
+	g_pWetObjectManager = (CWetObjManager*)(g_pMemory->ReadPtr64(g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ?", 1) + 0x1B, 3));
 	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)g_pMemory->FindPatternPtr(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
 	g_pTextureResourceManager = *(CTextureResourceManager**)g_pMemory->FindPatternPtr(NULL, "48 8B D1 48 8D 0D ?? ?? ?? ?? 4C 89 44 24 ??", 6);
 	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
@@ -459,6 +465,32 @@ void FindOldDenuvoSteamOffsets(void)
 
 void FindNewSteamOffsets(void)
 {
+	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
+	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
+
+	CalculateLevel = (CalculateLevelFn)0;
+	GetConstructionInfo = (GetConstructorFn)0;
+
+	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B D3 C1 FA 08", 1);
+
+	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
+	// Probably the best solution is to rebuild the function and call that from the hook.
+	SaveFileIO = (CSaveDataDevice_SaveFileIOFn)g_pMemory->FindPattern(NULL, "8B 4B 30 83 E9 01");
+	ReadSaveSlots = (CSaveDataDevice_ReadSaveSlotsFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B B5 ? ? ? ? 48 85 F6", 1);
+	ReadSaveData = (CSaveDataDevice_ReadSaveDataFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? EB 08 48 8B CB E8 ? ? ? ? 48 8B B5 ? ? ? ?", 1);
+	WriteSaveData = (CSaveDataDevice_WriteSaveDataFn)g_pMemory->FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
+	DeleteSaveData = (CSaveDataDevice_DeleteSaveDataFn)CSaveDataDevice_DeleteSaveData; // Inlined on new version hmmm this may not work may have to rebuild function
+
+	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 8B EA 48 8B F9 83 79 28 00 74 61");
+	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
+	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF ? ? ? ?", 1);
+
+	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24 ", 3);
+	g_pWetObjectManager = (CWetObjManager*)g_pMemory->FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B ? ? ? ?", 6);
+
+	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
+	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15 ? ? ? ?", 7);
+
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D ? ? ? ?", 10);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
