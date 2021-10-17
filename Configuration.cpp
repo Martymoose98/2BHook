@@ -184,7 +184,6 @@ void CConfig::AddKeybind(IKeybind* pKeybind)
 	}
 }
 
-
 BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const
 {
 	PWIN32_FIND_DATA_LIST pEntry, pPrev = NULL;

@@ -111,7 +111,6 @@ ImportTableHook* g_pXInputGetStateHook;
 ImportTableHook* g_pSetUnhandledExceptionFilterHook;
 ImportTableHook* g_pOleLoadPictureHook;
 
-BYTE_PATCH_MEMORY bp_save_file_io;
 BYTE_PATCH_MEMORY bp_UpdateModelParts;
 BYTE_PATCH_MEMORY bp_query_performance_counter;
 BYTE_PATCH_MEMORY bp_Framecap;
