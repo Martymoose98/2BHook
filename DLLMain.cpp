@@ -19,7 +19,7 @@
 #pragma comment(lib, "d3dcompiler.lib")
 #pragma comment(lib, "dbghelp.lib")
 
-CMemory* g_pMemory = new CMemory;
+CMemory* g_pMemory = new CMemory();
 
 CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
@@ -470,6 +470,7 @@ void FindNewSteamOffsets(void)
 
 	CalculateLevel = (CalculateLevelFn)0;
 	GetConstructionInfo = (GetConstructorFn)0;
+	GetEntityFromHandle = (GetEntityFromHandleFn)0;
 
 	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B D3 C1 FA 08", 1);
 
@@ -558,8 +559,8 @@ void Unhook(void)
 	g_pMemory->RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
-	g_pMemory->RestoreMemory(&bp_save_file_io);
 
+	// FIXME: Unhook functions with hookfunc
 
 	for (VirtualTableHook* it : g_pRubyInstancesHooks)
 		delete it;

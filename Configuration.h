@@ -83,13 +83,6 @@
 #define CONFIG_SEARCH_WILDCARD _CRT_CONCATENATE(TEXT("*"), CONFIG_EXTENSION)
 #define CONFIG_DEFAULT_INI _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
 
-#ifdef UNICODE
-#define _tcsrchr wcsrchr
-#else
-#define _tcsrchr strrchr
-#endif // UNICODE
-
-
 class IKeybind
 {
 public:

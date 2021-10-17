@@ -187,14 +187,10 @@ struct OverlayDrawList : public ImDrawList
 		AddLine(vBoneStart, vBoneEnd, color);
 	}
 
-	void AddTextArgs(ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
+	void AddTextArgs(const ImFont& font, ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
 	{
 		char szBuffer[1024];
 		va_list args;
-		ImFont* pFont = ImGui::GetFont();
-
-		if (!pFont)
-			return;
 
 		va_start(args, szText);
 
@@ -206,7 +202,7 @@ struct OverlayDrawList : public ImDrawList
 		vsprintf_s(szBuffer, szText, args);
 		va_end(args);
 
-		ImVec2 size = pFont->CalcTextSizeA(pFont->FontSize, FLT_MAX, 120.f, szBuffer);
+		ImVec2 size = font.CalcTextSizeA(font.FontSize, FLT_MAX, 120.f, szBuffer);
 
 		if (flags & FRF_RIGHT)
 			pos.x -= size.x;
@@ -232,10 +228,14 @@ struct OverlayDrawList : public ImDrawList
 		AddText(pos, col, szBuffer);
 	}
 
-	void AddTextArgs(const ImFont& font, ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
+	void AddTextArgs(ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
 	{
 		char szBuffer[1024];
 		va_list args;
+		ImFont* pFont = ImGui::GetFont();
+
+		if (!pFont)
+			return;
 
 		va_start(args, szText);
 
@@ -247,7 +247,7 @@ struct OverlayDrawList : public ImDrawList
 		vsprintf_s(szBuffer, szText, args);
 		va_end(args);
 
-		ImVec2 size = font.CalcTextSizeA(font.FontSize, FLT_MAX, 120.f, szBuffer);
+		ImVec2 size = pFont->CalcTextSizeA(pFont->FontSize, FLT_MAX, 120.f, szBuffer);
 
 		if (flags & FRF_RIGHT)
 			pos.x -= size.x;

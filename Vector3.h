@@ -245,8 +245,8 @@ inline Vector3 Vector3::Cross(const Vector3& v) const
 
 inline Vector3 Vector3::Rotate(const Vector3& vAxis, float angle) const
 {
-	float SinHalfAngle = sinf(angle / 2);
-	float CosHalfAngle = cosf(angle / 2);
+	float SinHalfAngle = sinf(angle / 2.0f);
+	float CosHalfAngle = cosf(angle / 2.0f);
 
 	Vector4 Rotation(vAxis.x * SinHalfAngle, vAxis.y * SinHalfAngle, vAxis.z * SinHalfAngle, CosHalfAngle);
 	Vector4 Conjugate = Rotation.Conjugate();
@@ -294,14 +294,6 @@ public:
 		this->y = y;
 		this->z = z;
 		this->w = 1.0f;
-	}
-
-	Vector3Aligned(float x, float y, float z, float w)
-	{
-		this->x = x;
-		this->y = y;
-		this->z = z;
-		this->w = w;
 	}
 
 	Vector3Aligned(const Vector3& v)
