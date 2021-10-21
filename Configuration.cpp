@@ -28,7 +28,7 @@ bool CConfig::CreateConfig(LPTSTR szFilename)
 	if (FileExists(m_szFilename))
 		Load(szFilename);
 	else if (_tcsstr(m_szFilename, CONFIG_DEFAULT_INI))
-		Save(CONFIG_DEFAULT);
+		Save(CONFIG_DEFAULT_INI);
 	else
 		return false;
 

@@ -49,10 +49,14 @@ static void GameplayTab(Pl0000* pCameraEnt)
 	ImGui::PopItemWidth();
 	ImGui::Columns();
 
+	//0x14133B510
+	static void* pItemManager = (void*)g_pMemory->FindPatternPtr(NULL, "44 8B C0 48 8D 0D ? ? ? ? E8 ? ? ? ? C7 45 ? ? ? ? ?", 6);
 	char szDesc[64];
-	sprintf_s(szDesc, "Item Name or Id: (%s)", ((GetItemByIdFn)(0x1405E0FD0))(0, Vars.Gameplay.iSpawnItemId));
+	//char* szName = (char*)GetItemNameById(pItemManager, Vars.Gameplay.iSpawnItemId);
+	// FIXME: Broken on the new version this fucking function keeps crashing
+	// sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
 	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
-	int id = ((GetItemIdByNameFn)(0x1405DE6E0))(0, Vars.Gameplay.szItemName);
+	int id = GetItemIdByName(pItemManager, Vars.Gameplay.szItemName);
 	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
 	ImGui::InputInt("Quantity", &Vars.Gameplay.iSpawnItemQuantity);
 	ImGui::Checkbox("Instant Equip", &Vars.Gameplay.bInstantEquip);
@@ -265,7 +269,7 @@ static void MiscTab(void)
 	}
 
 	ImGui::SameLine();
-
+	
 	if (ImGui::Button("Emit Sound"))
 	{
 		//g_pLocalPlayer->EmitSound("core_level_up", g_pLocalPlayer, 5, 0x5000000, 0x200007F);

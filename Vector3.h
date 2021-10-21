@@ -285,7 +285,7 @@ public:
 		x = 0.0f;
 		y = 0.0f;
 		z = 0.0f;
-		w = 1.0f;
+	//	w = 1.0f;
 	}
 
 	Vector3Aligned(float x, float y, float z)
@@ -293,7 +293,7 @@ public:
 		this->x = x;
 		this->y = y;
 		this->z = z;
-		this->w = 1.0f;
+		//this->w = 1.0f;
 	}
 
 	Vector3Aligned(const Vector3& v)
@@ -301,7 +301,7 @@ public:
 		x = v.x;
 		y = v.y;
 		z = v.z;
-		w = 1.0f;
+		//w = 1.0f;
 	}
 
 	Vector3Aligned(const Vector3Aligned& v)
@@ -319,6 +319,6 @@ public:
 		return *(__m128*)this;
 	}
 
-private:
-	float w;
+//private:
+	//float w;
 };

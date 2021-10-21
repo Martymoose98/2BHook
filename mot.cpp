@@ -164,7 +164,10 @@ void ProcessMot(std::vector<MotInterpListEntry>& Interps, CModelWork* pWork, sho
 	{
 		switch (it.type)
 		{
-
+		case MotInterpListEntry::NONE:
+			break;
+		default:
+			break;
 		}
 	}
 }

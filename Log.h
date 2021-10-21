@@ -4,6 +4,7 @@
 
 //#define VERBOSE		// helps with debugging for retards
 #define TODO_CLICKABLE
+#define FIXME_CLICKABLE
 
 #ifndef _MAKE_STRING
 #define _MAKE_STRING(x)  #x
@@ -13,7 +14,7 @@
 #define MAKE_STRING(x) _MAKE_STRING(x)
 #endif // !MAKE_STRING
 
-// Move todo out of Log.h!!
+// Move todo & fixme macros out of Log.h!! (you lazy fuck)
 
 #ifndef TODO
 #ifndef TODO_CLICKABLE
@@ -22,6 +23,15 @@
 #define TODO(x) __pragma(message(__FILE__ "(" MAKE_STRING(__LINE__) "): TODO: " MAKE_STRING(x))) 
 #endif // !TODO_CLICKABLE
 #endif // !TODO
+
+#ifndef FIXME
+#ifndef FIXME_CLICKABLE
+#define FIXME(x) __pragma(message("FIXME: " MAKE_STRING(x) " -> " __FILE__ "@" MAKE_STRING(__LINE__))) 
+#else
+#define FIXME(x) __pragma(message(__FILE__ "(" MAKE_STRING(__LINE__) "): FIXME: " MAKE_STRING(x))) 
+#endif // !TODO_CLICKABLE
+#endif // !TODO
+
 
 #if defined(_DEBUG) || defined(VERBOSE)
 #define LOG_OFFSETS

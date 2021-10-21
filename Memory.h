@@ -440,7 +440,7 @@ public:
 
 		/*
 			push rax
-			movabs rax, address
+			movabs rax, imm64
 			xchg rax, [rsp]
 			ret
 
@@ -449,7 +449,7 @@ public:
 		or
 
 			push rax
-			movabs rax, addy
+			movabs rax, imm64
 			jmp rax
 			pop rax
 
@@ -460,7 +460,7 @@ public:
 		rsp -= 16
 
 			push rbx
-			movabs rbx, addy
+			movabs rbx, imm64
 			call rbx
 			pop rbx
 
@@ -473,7 +473,7 @@ public:
 				0:  53                      push   rbx
 				1:  55                      push   rbp
 				2:  48 89 e5                mov    rbp,rsp
-				5:  48 bb 00 00 00 00 00    movabs rbx, addy
+				5:  48 bb 00 00 00 00 00    movabs rbx, imm64
 				c:  00 00 00
 				f:  ff d3                   call   rbx
 				11: 48 89 ec                mov    rsp,rbp

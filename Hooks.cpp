@@ -129,7 +129,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
 	ImGui::GetIO().MouseDrawCursor = Vars.Menu.bOpened;
 
-	g_pGraphics->m_iTimeStep = 0x100;
+	//g_pGraphics->m_iTimeStep = 0x100;
 
 	g_pQueryPerformanceCounterHook->Unhook();	//unhook cause it has the potential to fuck with imgui because it calls QueryPerformanceCounter, then rehook it
 
@@ -140,7 +140,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
 	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
 
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(DENUVO_STEAM_BUILD)
 
 	if (!hookupdate)
 	{
@@ -600,18 +600,18 @@ void* hkCCameraGameMove(CCameraGame* pThis)
 	return oCCameraGameMove(pThis);
 }
 
-void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int flags, CHeapInstance** ppHeaps)
+void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId, int flags, CHeapInstance** ppHeaps)
 {
-	ConstructionInfo<void>* pConstruct = GetConstructionInfo(objectId);
+	ConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
 	void* pEntity = NULL;
 
 	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->szName) == Vars.Gameplay.SpawnBlacklist.cend()) //strcmp("Em4000", pConstruct->szName) && strcmp("BehaviorFunnel", pConstruct->szName)
-		pEntity = oCreateEntity(pUnknown, pInfo, objectId, flags, ppHeaps); //0x1401A2B40
+		pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, flags, ppHeaps); //0x1401A2B40
 
 	if (!pEntity)
-		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->szName, objectId, pInfo->m_uSetType);
+		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->szName, uObjectId, pInfo->m_uSetType);
 	else
-		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->szName, objectId, pInfo->m_uSetType, pEntity);
+		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->szName, uObjectId, pInfo->m_uSetType, pEntity);
 
 	return pEntity;
 }
