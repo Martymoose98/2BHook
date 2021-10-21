@@ -147,6 +147,7 @@
     <ClInclude Include="Features.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Hooks.h" />
+    <ClInclude Include="ImGui\backends\imgui_impl_win32.h" />
     <ClInclude Include="ImGui\imconfig.h" />
     <ClInclude Include="ImGui\imgui.h" />
     <ClInclude Include="ImGui\imgui_impl_dx11.h" />
@@ -182,10 +183,12 @@
     <ClCompile Include="DLLMain.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Hooks.cpp" />
+    <ClCompile Include="ImGui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="ImGui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="ImGui\imgui.cpp" />
     <ClCompile Include="ImGui\imgui_demo.cpp" />
     <ClCompile Include="ImGui\imgui_draw.cpp" />
-    <ClCompile Include="ImGui\imgui_impl_dx11.cpp" />
+    <ClCompile Include="ImGui\imgui_tables.cpp" />
     <ClCompile Include="ImGui\imgui_widgets.cpp" />
     <ClCompile Include="Log.cpp" />
     <ClCompile Include="Matrix4x4.cpp" />

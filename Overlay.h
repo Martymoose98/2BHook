@@ -295,12 +295,12 @@ public:
 	{
 		if (bUseBuiltInOverlay)
 		{
-			Render((OverlayDrawList*)ImGui::GetOverlayDrawList());
+			Render((OverlayDrawList*)ImGui::GetForegroundDrawList());
 		}
 		else
 		{
 			Render(m_pList);
-			ImGuiEx::AddDrawListToDrawData(&ImGui::GetCurrentContext()->DrawDataBuilder.Layers[0], m_pList);
+			ImGuiEx::AddDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], m_pList);
 		}
 	}
 
@@ -315,7 +315,7 @@ public:
 			return;
 
 		Render(m_pList);
-		ImGuiEx::InsertDrawListToDrawData(&ImGui::GetCurrentContext()->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
+		ImGuiEx::InsertDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
 	}
 
 	void Render(OverlayDrawList* pList)

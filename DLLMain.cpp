@@ -232,8 +232,8 @@ HRESULT InitD3D11(void)
 
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
-
-	if (!ImGui_ImplDX11_Init(g_hWnd, g_pDevice, g_pDeviceContext))
+	
+	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext) || !ImGui_ImplWin32_Init(g_hWnd))
 	{
 		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
 		return S_FALSE;
@@ -571,7 +571,7 @@ void Setup(void)
 	ImGui::GetIO().IniFilename = NULL;
 
 	oWndProc = (WNDPROC)SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
-
+	
 	if (!oWndProc)
 	{
 		LOG("2B Hook Failed Initalization!\nCould not get old wndproc function pointer!\n");

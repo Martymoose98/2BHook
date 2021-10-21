@@ -4,7 +4,8 @@
 #include <d3d11.h>
 #include <Xinput.h>
 #include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_dx11.h"
+#include "ImGui/backends/imgui_impl_dx11.h"
+#include "ImGui/backends/imgui_impl_win32.h"
 #include "Console.h"
 #include "Log.h"
 #include "Overlay.h"
