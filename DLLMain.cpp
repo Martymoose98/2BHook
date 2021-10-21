@@ -233,7 +233,7 @@ HRESULT InitD3D11(void)
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
 
-	if (!ImGui_ImplDX11_Init(g_hWnd, g_pDevice, g_pDeviceContext))
+	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext))
 	{
 		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
 		return S_FALSE;

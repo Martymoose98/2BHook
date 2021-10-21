@@ -2,7 +2,7 @@
 
 #include "ImGui/imgui.h"
 #include "ImGui/imgui_internal.h"
-#include "Math.h"
+#include "MathExt.h"
 #include "Utils.h"
 #include "Globals.h"
 #include "Configuration.h"
@@ -187,7 +187,7 @@ struct OverlayDrawList : public ImDrawList
 		AddLine(vBoneStart, vBoneEnd, color);
 	}
 
-	void AddTextArgs(const ImFont& font, ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
+	void AddTextArgsEx(const ImFont& font, ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
 	{
 		char szBuffer[1024];
 		va_list args;
@@ -228,7 +228,7 @@ struct OverlayDrawList : public ImDrawList
 		AddText(pos, col, szBuffer);
 	}
 
-	void AddTextArgs(ImVec2& pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
+	void AddTextArgs(ImVec2 pos, ImU32 col, FontRenderFlags flags, const char* szText, ...)
 	{
 		char szBuffer[1024];
 		va_list args;
@@ -295,12 +295,12 @@ public:
 	{
 		if (bUseBuiltInOverlay)
 		{
-			Render((OverlayDrawList*)ImGui::GetOverlayDrawList());
+			Render((OverlayDrawList*)ImGui::GetForegroundDrawList());
 		}
 		else
 		{
 			Render(m_pList);
-			ImGuiEx::AddDrawListToDrawData(&ImGui::GetCurrentContext()->DrawDataBuilder.Layers[0], m_pList);
+			ImGuiEx::AddDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], m_pList);
 		}
 	}
 
@@ -315,7 +315,7 @@ public:
 			return;
 
 		Render(m_pList);
-		ImGuiEx::InsertDrawListToDrawData(&ImGui::GetCurrentContext()->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
+		ImGuiEx::InsertDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
 	}
 
 	void Render(OverlayDrawList* pList)

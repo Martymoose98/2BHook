@@ -5,7 +5,7 @@
 #include <dinput.h>
 #include "StaticAssert.h"
 #include "SteamApi.h"
-#include "Math.h"
+#include "MathExt.h"
 
 #define PURE = 0
 

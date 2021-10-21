@@ -187,4 +187,4 @@ inline Vector3& Matrix4x4::GetAxis(int i)
 {
 	return *(Vector3*)((*this)[i]);
 }
-#include "Math.h"
+#include "MathExt.h"

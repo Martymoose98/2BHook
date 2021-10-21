@@ -117,7 +117,7 @@ void CConsole::Draw(const char* szTitle)
 
 	if (strlen(m_szFilter) > 0)
 	{
-		for (auto& it = m_Display.begin(); it != m_Display.end(); )
+		for (auto it = m_Display.begin(); it != m_Display.end(); )
 			if (!strstr(it->szText, m_szFilter))
 				it = m_Display.erase(it);
 			else

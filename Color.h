@@ -1,5 +1,5 @@
 #pragma once
-#include "Math.h"
+#include "MathExt.h"
 
 #define RGBA_COLOR32(r, g, b, a) (int)(((BYTE)(a) << 24) | ((BYTE)(b) << 16) | ((BYTE)(g) << 8) | (BYTE)(r))
 #define RGBX_COLOR32(r, g, b) (int)(((BYTE)(0xFF) << 24) | ((BYTE)(b) << 16) | ((BYTE)(g) << 8) | (BYTE)(r))

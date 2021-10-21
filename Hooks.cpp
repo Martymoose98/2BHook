@@ -811,7 +811,7 @@ LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION
 {
 	if (lpTopLevelExceptionFilter != UnhandledExceptionHandler)
 	{
-		auto& it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
+		auto it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
 
 		if (it == g_pExceptionHandlers.cend())
 			g_pExceptionHandlers.push_back(lpTopLevelExceptionFilter);

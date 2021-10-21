@@ -3,13 +3,13 @@
 #include <OleCtl.h>
 #include <d3d11.h>
 #include <Xinput.h>
-#include "ImGui/imgui.h"
-#include "ImGui/imgui_impl_dx11.h"
+#include "imgui.h"
+#include "backends/imgui_impl_dx11.h"
 #include "Console.h"
 #include "Log.h"
 #include "Overlay.h"
 #include "Renderer.h"
-#include "Math.h"
+#include "MathExt.h"
 #include "Menu.h"
 #include "Globals.h"
 #include "Configuration.h"
