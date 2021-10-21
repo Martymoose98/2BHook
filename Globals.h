@@ -79,7 +79,7 @@ typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
 typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
 typedef int(*GetItemIdByNameFn)(void*, const char* szItemName);			//returns a sItem* maybe?
-typedef const char*(*GetItemByIdFn)(__int64 thisrcx, int item_id);	//returns a sItem* maybe?
+typedef const char*(*GetItemNameByIdFn)(void* thisrcx, int item_id);	//returns a sItem* maybe?
 typedef bool(*AddItemFn)(__int64 pItemManager, int item_id, int quantity);
 typedef bool(*UseItemFn)(__int64 pItemManager, int item_id, float flQuantity);
 typedef void(*ChangePlayerFn)(Pl0000* pEntity);
@@ -165,6 +165,8 @@ typedef DWORD(__stdcall* XInputGetCapabilitiesExFn)(DWORD a1, DWORD dwUserIndex,
 
 extern CalculateLevelFn CalculateLevel;
 extern GetEntityFromHandleFn GetEntityFromHandle;
+extern GetItemNameByIdFn GetItemNameById;
+extern GetItemIdByNameFn GetItemIdByName;
 extern SetLocalPlayerFn SetLocalPlayer;
 extern ResetCameraFn ResetCamera;
 extern ChangePlayerFn ChangePlayer;

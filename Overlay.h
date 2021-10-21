@@ -19,7 +19,7 @@ enum eFontRenderFlags
 };
 typedef unsigned int FontRenderFlags;
 
-namespace ImGuiEx 
+namespace ImGuiEx
 {
 	static void AddDrawListToDrawData(ImVector<ImDrawList*>* out_list, ImDrawList* draw_list)
 	{
@@ -291,7 +291,7 @@ public:
 		return m_pList;
 	}
 
-	void Render(bool bUseBuiltInOverlay) 
+	void Render(bool bUseBuiltInOverlay)
 	{
 		if (bUseBuiltInOverlay)
 		{
@@ -308,7 +308,7 @@ public:
 	{
 		if (!m_pList)
 			return;
-	
+
 		ImGuiWindow* pWnd = ImGui::FindWindowByName(szParentWndName);
 
 		if (!pWnd)
@@ -335,29 +335,32 @@ public:
 			if (pCameraEntity)
 			{
 				ExCollision* pCollision = &pCameraEntity->m_VerticalCollision;
-				
+
 				vMin = pCameraEntity->m_vPosition;
-				GetOBBMax(pCollision, &vMax);
+
+				// Alternative to GetOBBMax
+				__m128 v1 = *(__m128*) & pCollision->v0xA0;
+				vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
+					_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
+						_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));
+
+
+				//GetOBBMax(pCollision, &vMax);
 
 				Matrix4x4 matMesh;
 
 				for (int i = 0; i < pCameraEntity->m_Work.m_nMeshes; ++i)
-				{			
+				{
 					CMesh2* pMesh = &pCameraEntity->m_Work.m_pMeshes[i];
 					CModelMatrixTable** p = pCameraEntity->m_Work.m_pMatrices;
-					
-					/*	
+
+					/*
 					CBone* pBone = &pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_pModelData, pMesh->m_pBones[0].m_sId)];
 					matMesh.InitTransform(pBone->m_vRotation, pBone->m_vPosition);
 					pList->Add3DBox(pMesh->m_vMin, pMesh->m_vMax, matMesh, ImColor(200, 100, 0));
 					*/
 				}
-				/*
-				__m128 v1 = *(__m128*)&pCollision->v0xA0;
-				vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
-				_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
-				_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));
-				*/
+
 
 				if (Vars.Visuals.bEspBox && WorldToScreen(vMin, vMin2D) && WorldToScreen(vMax, vMax2D))
 				{
@@ -434,7 +437,7 @@ public:
 					Pl0000* pTarget = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[iTarget]);
 					Pl0000* pPod = GetEntityFromHandle(&g_pLocalPlayer->m_hPod);
 					Vector3& vSrc = pPod->m_pBones[GetBoneIndex(pPod->m_pModelData, 1552)].m_vPosition;
-					Vector3& vDst = pTarget->m_pBones[GetBoneIndex(pTarget->m_pModelData, BONE_SPINE1)].m_vPosition;	
+					Vector3& vDst = pTarget->m_pBones[GetBoneIndex(pTarget->m_pModelData, BONE_SPINE1)].m_vPosition;
 
 					if (WorldToScreen(vDst, vMin2D))
 						pList->AddText(vMin2D, ImColor(255, 0, 0), "Target");
@@ -477,7 +480,7 @@ public:
 			Pl0000* pObject;
 			Matrix4x4 mTrans;
 
-			for (CCollisionDataObject** p = g_pCollisionDataObjectManager->m_ppData; p; p = (CCollisionDataObject**) *++p)
+			for (CCollisionDataObject** p = g_pCollisionDataObjectManager->m_ppData; p; p = (CCollisionDataObject**)*++p)
 			{
 				pCur = *p;
 				if (pCur) //dword30 = 0xff - trees
@@ -518,9 +521,9 @@ public:
 		{
 			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H,
 				"ang (%f,%f,%f)", RADTODEG(g_pCamera->m_vViewangles.x),
-				RADTODEG(g_pCamera->m_vViewangles.y), 
+				RADTODEG(g_pCamera->m_vViewangles.y),
 				RADTODEG(g_pCamera->m_vViewangles.z));
-		}			
+		}
 #endif
 	}
 };

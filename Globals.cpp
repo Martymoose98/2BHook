@@ -2,6 +2,8 @@
 
 CalculateLevelFn CalculateLevel;
 GetEntityFromHandleFn GetEntityFromHandle;
+GetItemNameByIdFn GetItemNameById;
+GetItemIdByNameFn GetItemIdByName;
 SetLocalPlayerFn SetLocalPlayer;
 ResetCameraFn ResetCamera;
 ChangePlayerFn ChangePlayer;

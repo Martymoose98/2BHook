@@ -80,6 +80,7 @@ static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
 	Doesn't seem to be 100% accurate.
 	I tired adding the fov math into it but no success
 	all the examples use a different method than me.
+	Either that or CGameCamera::m_flFov isn't the fov value and I fucked up
 */
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
@@ -95,11 +96,11 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	// transform by viewmatrix
 	vMatrix.Transform(vIn, vTransform);
 
-	// multiply by inverse w 
+	// multiply by inverse w (vTransform /= w)
 	vTransform *= 1.0f / w;
 
-	int width = g_pGraphicDevice->iScreenWidth;
-	int height = g_pGraphicDevice->iScreenHeight;
+	int width = g_pGraphicDevice->m_iScreenWidth;
+	int height = g_pGraphicDevice->m_iScreenHeight;
 
 	float x = width / 2.0f;
 	float y = height / 2.0f;
@@ -190,6 +191,7 @@ static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
 	return TRUE;
 }
 
+// FIXME: This is disgusting 
 static DWORD DataFile_QueryFileIndex(DATHeader** ppBuffer, const char* szFileName)
 {
 	const char* szName; // r12
@@ -300,8 +302,7 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 // will complicate things in the hook otherwise
 static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 {
-	char szFilename[260];
-	DWORD v11 = pSavedata->dwStatus;
+	char szFilename[MAX_PATH];
 
 	switch (pSavedata->dwStatus)
 	{
@@ -405,6 +406,7 @@ static short GetBoneId(short index)
 
 }
 
+FIXME("this is for sure broken on new version")
 static void SwapTexture(unsigned int srcid, CTexture* pReplace)
 {
 	CTextureResource* pRes = ((CTextureResourceManager_FindResourceFn)(0x140936F60))(srcid);
@@ -413,7 +415,7 @@ static void SwapTexture(unsigned int srcid, CTexture* pReplace)
 		pRes->m_pTexture = pReplace;
 }
 
-// adapt to use the game's allocation routines to avoid crashes on freeing resources
+FIXME("This is for sure broken on new version. Adapt to use the game's allocation routines to avoid crashes on freeing resources")
 static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& desc)
 {
 	CTargetTexture* pTexture = NULL;
@@ -459,6 +461,7 @@ static void DeleteTexture(CTargetTexture* pTexture, CTextureDescription& desc)
 	UnmapViewOfFile(desc.m_pDDS);
 }
 
+FIXME("this is for sure broken on new version. Probably should also be using nier's memory allocation routines")
 static void CreateMaterial(
 	const char* szName,
 	const char* szShader,
@@ -794,7 +797,7 @@ Rebuilt from the debug build
 */
 static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsigned int arg_ptr_low)
 {
-	BOOL IsStringVar[3];
+	BOOL IsStringVar[3] = { FALSE, FALSE, FALSE };
 
 	const char* szFmt = szFormat;
 	QWORD v4 = *(QWORD*)(arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32));	// 1st arg

@@ -24,12 +24,10 @@ CMemory* g_pMemory = new CMemory();
 CONST BYTE LocalJmp[] = { 0xEB };
 CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 
-#define OLD_DENUVO_STEAM_BUILD
-
-#ifdef OLD_DENUVO_STEAM_BUILD
-#define FindOffsets FindOldDenuvoSteamOffsets
+#ifdef DENUVO_STEAM_BUILD
+#define FindOffsets FindDenuvoSteamOffsets
 #else
-#define FindOffsets FindNewSteamOffsets
+#define FindOffsets FindSteamOffsets
 #endif
 
 void InitHooks(void)
@@ -45,7 +43,7 @@ void InitHooks(void)
 	//IDirectInputDevice_Lock(g_pKeyboard->pDevice);
 
 	// Initalize a virtual table hook for the keyboard
-	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice); 
+	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice);
 
 	// Release ownership of the internal CDIDev's critical section
 	//IDirectInputDevice_Unlock(g_pKeyboard->pDevice);
@@ -65,7 +63,7 @@ void InitHooks(void)
 
 	g_pCameraHook = new VirtualTableHook((ULONG_PTR**)g_pCamera);
 
-		
+
 #ifdef ENABLE_MEMORYDEVICE_HOOK
 	g_pMemoryDeviceHook = new VirtualTableHook((ULONG_PTR**)g_pMemoryDevice); // for larger child heap sizes
 #endif
@@ -102,26 +100,40 @@ void InitHooks(void)
 	oCCameraGameMove = (CCameraGameMoveFn)g_pCameraHook->HookFunction((ULONG_PTR)hkCCameraGameMove, 2);
 
 	ZeroMemory(&g_UserManagerSaveFileIO, sizeof(HOOK_FUNC));
+	ZeroMemory(&g_CreateEntityHook, sizeof(HOOK_FUNC));
+	ZeroMemory(&g_LoadWordBlacklist, sizeof(HOOK_FUNC));
 
+#ifdef DENUVO_STEAM_BUILD
 	g_pMemory->HookFunc64(SaveFileIO, hkSaveFileIO, 45, &g_UserManagerSaveFileIO);
 
+	// FIXME:  this could be moved idk it's debatable  
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
 	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
 
 	//THERE IS ANOTHER CreateEntity call at: qwContainingFunc + 0x676
-
-	ZeroMemory(&g_CreateEntityHook, sizeof(HOOK_FUNC));
-
 	g_pMemory->HookFunc64((LPVOID)(qwContainingFunc + 0x132), hkCreateEntityThunk, 16, &g_CreateEntityHook);
-	
-	ZeroMemory(&g_LoadWordBlacklist, sizeof(HOOK_FUNC));
 
+	// FIXME: sig this hard coded offset for both version clown
 	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
 	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &g_LoadWordBlacklist);//callee
+#else
+	// FIXME: This hook works but is digusting
+	g_pMemory->HookFunc64(SaveFileIO, hkSaveFileIOThunk, 46, &g_UserManagerSaveFileIO);
 
+	// FIXME: this could be moved idk it's debatable  
+	oCreateEntity = (CreateEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 89 47 60 48 85 C0 75 9D", 1);
+	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 25 48 8B CD", 1);
+
+	//THERE IS ANOTHER CreateEntity call at: qwContainingFunc + 0x6A1
+	g_pMemory->HookFunc64((LPVOID)(qwContainingFunc + 0x237), hkCreateEntityThunk, 16, &g_CreateEntityHook);
+#endif // !OLD_DENUVO_STEAM_BUILD
+
+	// FIXME: should move to more appropriate location, as it isn't a hook. 
+	// Also, forget what this does but it's not critical for the dll's operation.
+	// If I do keep I need to resig the new version
 	InitalizeNopMemory(&nop_HairColor, g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE"), 12)
 
-	g_pMemory->NopMemory(&nop_HairColor);
+		g_pMemory->NopMemory(&nop_HairColor);
 }
 
 void CreateRenderTarget(void)
@@ -201,7 +213,7 @@ void CreateStencilDescription(void)
 HRESULT InitD3D11(void)
 {
 	HRESULT hr = g_pSwapChain->GetDevice(IID_ID3D11Device, (void**)&g_pDevice); // i'm using IID_ID3D11Device for c compatiblity alternatively you can use __uuidof
-	
+
 	if (FAILED(hr))
 	{
 		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
@@ -374,19 +386,21 @@ void LogOffsets(void)
 
 /*
 *  ALL OLD SIGS FOR DENUVO PACKED STEAM VERSION
-* 
+*
 *	48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 41 56 48 83 EC 40 F7 05 ? ? ? ? ? ? ? ? - CModelShaderModule::Draw
 *	[E9 ? ? ? ? 48 89 5C 24 ? 57 48 83 EC 20 49 8B D0 + 1] - COtManager::DrawModel
 *	48 83 EC 08 48 8B 05 ? ? ? ? - COtManager::GetGraphicCommand
 *	[E8 ? ? ? ? 83 FF 58 + 1] - COtManager::RegisterGraphicCommand
 */
-void FindOldDenuvoSteamOffsets(void)
+void FindDenuvoSteamOffsets(void)
 {
 	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 10);
-	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
+	CRILogCallback = CRILogCallbackConsole; // CRILogCallbackWinConsole
 
 	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
 	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC ? 8B 11 85 D2 74"); // there is like 50 identical functions kek
+	GetItemNameById = (GetItemNameByIdFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 33 FF 8B D7", 1);
+	GetItemIdByName = (GetItemIdByNameFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 78 11", 1);
 	SetLocalPlayer = (SetLocalPlayerFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B ? ? ? ? ?", 1);
 	UnlockAchievement = (UnlockAchievementFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B D8 83 3D ? ? ? ? ?", 1);
 	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
@@ -422,6 +436,8 @@ void FindOldDenuvoSteamOffsets(void)
 	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pEmilHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
+	g_piMoney = (int*)g_pMemory->FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
+	g_piExperience = (int*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
 	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
 	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D ? ? ? ?", 10);
@@ -437,8 +453,6 @@ void FindOldDenuvoSteamOffsets(void)
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)g_pMemory->FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
 
 	g_szDataDirectoryPath = (LPSTR)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 3D ? ? ? ? 48 8B CF", 8);
-	g_piMoney = (int*)g_pMemory->FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
-	g_piExperience = (int*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr(NULL, "48 8D 0D ? ? ? ? 44 8B C3 E8 ? ? ? ?", 3);
@@ -447,13 +461,13 @@ void FindOldDenuvoSteamOffsets(void)
 	g_pModelManager = (CModelManager*)g_pMemory->FindPatternPtr(NULL, "48 8B C7 48 89 05 ? ? ? ?", 6);
 	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
-	g_pSwapChain = g_pGraphics->m_Display.m_pSwapchain->m_pSwapChain;
+	g_pSwapChain = g_pGraphics->m_Display.m_pSwapChain->m_pSwapChain;
+	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 
 	if (!IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
 
-	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
-	g_pAntiVSync = (byte*)g_pMemory->FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40");
+	g_pAntiVSync = (byte*)g_pMemory->FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40"); //unused
 	g_pAntiFramerateCap_Sleep = (byte*)g_pMemory->FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24 ?") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
 	g_pAntiFramerateCap_Test4 = (byte*)g_pMemory->FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
@@ -463,14 +477,18 @@ void FindOldDenuvoSteamOffsets(void)
 		g_pRubyInstances.emplace_back((MrubyImpl*)((byte*)pVM - 0x20));
 }
 
-void FindNewSteamOffsets(void)
+void FindSteamOffsets(void)
 {
 	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
-	CRILogCallback = CRILogCallbackConsole;//CRILogCallbackV2;//CRILogCallback;
+	CRILogCallback = CRILogCallbackConsole; //CRILogCallbackWinConsole
 
 	CalculateLevel = (CalculateLevelFn)0;
 	GetConstructionInfo = (GetConstructorFn)0;
-	GetEntityFromHandle = (GetEntityFromHandleFn)0;
+	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B EE 48 85 C0", 1);
+	GetItemNameById = (GetItemNameByIdFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 15 ? ? ? ? EB 26", 1);
+	GetItemIdByName = (GetItemIdByNameFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 8B C3 8B D0", 1);
+	ResetCamera = (ResetCameraFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 81 A6 ? ? ? ? ? ? ? ?", 1);
+	ChangePlayer = (ChangePlayerFn)g_pMemory->FindPattern(NULL, "40 53 48 83 EC 30 48 8B D9 E8 ? ? ? ? 81 25 ? ? ? ? ? ? ? ?");
 
 	FNV1Hash = (FNV1HashFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B D3 C1 FA 08", 1);
 
@@ -486,14 +504,29 @@ void FindNewSteamOffsets(void)
 	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
 	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF ? ? ? ?", 1);
 
+
 	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24 ", 3);
+	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
+	g_piMoney = (int*)g_pMemory->FindPatternPtr(NULL, "48 83 EC 68 4C 8D 05 ? ? ? ? 48 8D 15 ? ? ? ?", 7);
+	g_piExperience = (int*)g_pMemory->FindPatternPtr(NULL, "8B 15 ? ? ? ? 48 8D 8F ? ? ? ? E8 ? ? ? ? 8B 48 04", 2);
+
 	g_pWetObjectManager = (CWetObjManager*)g_pMemory->FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B ? ? ? ?", 6);
+	g_pYorhaManager = *(YorhaManager**)g_pMemory->FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91 ? ? ? ?", 3);
+	g_pNPCManager = *(NPCManager**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3);
+	g_pEnemyManager = *(EmBaseManager**)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE ? ? ? ?", 3);
+	g_pUserManager = *(CUserManager**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 74 2A", 3);
 
 	g_pCamera = (CCameraGame*)g_pMemory->FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
 	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15 ? ? ? ?", 7);
 
-	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D ? ? ? ?", 10);
+	g_pDirectInput8 = *(IDirectInput8A**)g_pMemory->FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D ? ? ? ?", 9);
+	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA ? ? ? ?", 3);
+	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr(NULL, "B8 ? ? ? ? 48 89 0D ? ? ? ? C7 05 ? ? ? ? ? ? ? ?", 8);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
+	g_pSwapChain = g_pGraphics->m_Display.m_pSwapChain->m_pSwapChain;
+	//g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
+	g_pGraphicDevice = g_pGraphics->m_pGraphicalDevice;
+
 	g_hWnd = *(HWND*)g_pMemory->FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
 }
 
@@ -509,12 +542,26 @@ void Setup(void)
 	FindOffsets();
 
 	LogOffsets();
-			
+
 	ExposeHiddenXInputFunctions();
 
 	QueryProcessHeaps(&g_phHeaps, NULL);
 
 	InitD3D11();
+
+	for (UINT i = 0; i < g_pGraphicDevice->m_uAdapters; ++i)
+	{
+		CAdapter* pAdapter = &g_pGraphicDevice->m_pAdapters[i];
+
+		LOG("ADAPTER: %ls\n", pAdapter->m_szDescription);
+
+		for (UINT j = 0; j < pAdapter->m_uOutputs; ++j)
+		{
+			COutput* pOutput = &pAdapter->m_pOutputs[j];
+
+			LOG("OUTPUT: %ls\n", pOutput->m_szDeviceName);
+		}
+	}
 
 	g_pConfig->CreateConfig(NULL);
 	g_pConfig->EnumerateConfigs(NULL, &Vars.Menu.Config.pHead);
