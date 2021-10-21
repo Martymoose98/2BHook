@@ -134,6 +134,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	g_pQueryPerformanceCounterHook->Unhook();	//unhook cause it has the potential to fuck with imgui because it calls QueryPerformanceCounter, then rehook it
 
 	ImGui_ImplDX11_NewFrame();
+	ImGui_ImplWin32_NewFrame();
 
 	g_pQueryPerformanceCounterHook->Rehook();
 

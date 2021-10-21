@@ -233,6 +233,7 @@ HRESULT InitD3D11(void)
 	ImGui::CreateContext();
 	ImGui::StyleColorsDark();
 
+	ImGui_ImplWin32_Init(g_hWnd);
 	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext))
 	{
 		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
@@ -479,7 +480,7 @@ void FindDenuvoSteamOffsets(void)
 
 void FindSteamOffsets(void)
 {
-	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
+	//CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
 	CRILogCallback = CRILogCallbackConsole; //CRILogCallbackWinConsole
 
 	CalculateLevel = (CalculateLevelFn)0;
@@ -635,6 +636,7 @@ void Unhook(void)
 	Features::ApplyHealthMods();
 
 	ImGui_ImplDX11_Shutdown();
+	ImGui_ImplWin32_Shutdown();
 
 	FindDataListFree(Vars.Menu.Config.pHead);
 

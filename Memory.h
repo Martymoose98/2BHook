@@ -186,6 +186,7 @@ public:
 	*/
 	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern, UINT uOffset)
 	{
+		MessageBoxA(nullptr, szPattern, "Looking", MB_OK);
 		ULONG_PTR rip = FindPattern(szModulename, szPattern);
 		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
 		return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
