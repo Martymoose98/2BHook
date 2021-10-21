@@ -179,10 +179,10 @@
     <ClCompile Include="imgui\backends\imgui_impl_dx11.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="imgui\backends\imgui_impl_win32.cpp">
+    <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
-    <ClCompile Include="imgui\imgui_widgets.cpp">
+    <ClCompile Include="imgui\backends\imgui_impl_win32.cpp">
       <Filter>Source Files\ImGui</Filter>
     </ClCompile>
   </ItemGroup>
