@@ -2358,7 +2358,7 @@ public:
 	DWORD dwUnk0x0014;						//0x0014
 	void* m_pConstantBuffer[2];				//0x0018
 	char _0x0030[40];						//0x0028
-	CSwapChain* m_pSwapChain;				//0x0050
+	CSwapChain* m_pWindowedSwapChain;				//0x0050
 	char _0x0060[8];						//0x0058
 	int m_iUnk;								//0x0060
 	char _0x006C[4];						//0x0064

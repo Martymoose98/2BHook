@@ -17,6 +17,7 @@
 #include "Utils.h"
 
 typedef HRESULT(* PresentFn)(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
+typedef HRESULT(* ResizeBuffersFn)(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
 typedef HRESULT(* CreateSwapChainFn)(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain);
 typedef void(* DrawIndexedFn)(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation);
 typedef void(* DrawFn)(ID3D11DeviceContext* pThis, UINT VertexCount, UINT StartVertexLocation);
@@ -41,6 +42,7 @@ typedef void*(* CCameraGameMoveFn)(CCameraGame* pCamera);
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern PresentFn oPresent;
+extern ResizeBuffersFn oResizeBuffers;
 extern CreateSwapChainFn oCreateSwapChain;
 extern DrawIndexedFn oDrawIndexed;
 extern DrawFn oDraw;
@@ -64,6 +66,7 @@ extern WNDPROC oWndProc;
 
 
 HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
+HRESULT hkResizeBuffers(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
 HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain);
 void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView *const *ppShaderResourceViews);
 void hkDraw(ID3D11DeviceContext* pThis, UINT VertexCount, UINT StartVertexLocation);
