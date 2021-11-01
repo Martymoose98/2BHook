@@ -87,6 +87,7 @@ void InitHooks(void)
 	oSetUnhandledExceptionFilter = (SetUnhandledExceptionFilterFn)g_pSetUnhandledExceptionFilterHook->GetOriginalFunction();
 
 	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((ULONG_PTR)hkPresent, 8);
+	oResizeBuffers = (ResizeBuffersFn)g_pSwapChainHook->HookFunction((ULONG_PTR)hkResizeBuffers, 13);
 	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((ULONG_PTR)hkCreateSwapChain, 10);
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkPSSetShaderResources, 8);
 	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkDrawIndexed, 12);
@@ -108,10 +109,10 @@ void InitHooks(void)
 
 	// FIXME:  this could be moved idk it's debatable  
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPattern(NULL, "48 89 5C 24 ? 48 89 4C 24 ? 55 48 83 EC 20");
-	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
+	QWORD qwCallerFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 1F 48 8B CD", 1);
 
-	//THERE IS ANOTHER CreateEntity call at: qwContainingFunc + 0x676
-	g_pMemory->HookFunc64((LPVOID)(qwContainingFunc + 0x132), hkCreateEntityThunk, 16, &g_CreateEntityHook);
+	//THERE IS ANOTHER CreateEntity call at: qwCallerFunc + 0x676
+	g_pMemory->HookFunc64((LPVOID)(qwCallerFunc + 0x132), hkCreateEntityThunk, 16, &g_CreateEntityHook);
 
 	// FIXME: sig this hard coded offset for both version clown
 	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
@@ -122,10 +123,10 @@ void InitHooks(void)
 
 	// FIXME: this could be moved idk it's debatable  
 	oCreateEntity = (CreateEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 89 47 60 48 85 C0 75 9D", 1);
-	QWORD qwContainingFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 25 48 8B CD", 1);
+	QWORD qwCallerFunc = g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 75 25 48 8B CD", 1);
 
-	//THERE IS ANOTHER CreateEntity call at: qwContainingFunc + 0x6A1
-	g_pMemory->HookFunc64((LPVOID)(qwContainingFunc + 0x237), hkCreateEntityThunk, 16, &g_CreateEntityHook);
+	//THERE IS ANOTHER CreateEntity call at: qwCallerFunc + 0x6A1
+	g_pMemory->HookFunc64((LPVOID)(qwCallerFunc + 0x237), hkCreateEntityThunk, 16, &g_CreateEntityHook);
 #endif // !OLD_DENUVO_STEAM_BUILD
 
 	// FIXME: should move to more appropriate location, as it isn't a hook. 
@@ -461,7 +462,7 @@ void FindDenuvoSteamOffsets(void)
 	g_pModelManager = (CModelManager*)g_pMemory->FindPatternPtr(NULL, "48 8B C7 48 89 05 ? ? ? ?", 6);
 	g_pViewMatrix = (VMatrix*)g_pMemory->FindPatternPtr(NULL, "0F 29 02 0F 28 2D ? ? ? ?", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)g_pMemory->FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8 ? ? ? ? ? ? ? ?", 3)) + 0xE0);
-	g_pSwapChain = g_pGraphics->m_Display.m_pSwapChain->m_pSwapChain;
+	g_pSwapChain = g_pGraphics->m_Display.m_pWindowedSwapChain->m_pSwapChain;
 	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 
 	if (!IsWindows10OrGreater()) // for some reason it causes a crash on windows 7
@@ -523,7 +524,7 @@ void FindSteamOffsets(void)
 	g_pKeyboard = (Keyboard_t*)g_pMemory->FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA ? ? ? ?", 3);
 	g_pMouse = (Mouse_t*)g_pMemory->FindPatternPtr(NULL, "B8 ? ? ? ? 48 89 0D ? ? ? ? C7 05 ? ? ? ? ? ? ? ?", 8);
 	g_pGraphics = *(CGraphics**)g_pMemory->FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
-	g_pSwapChain = g_pGraphics->m_Display.m_pSwapChain->m_pSwapChain;
+	g_pSwapChain = g_pGraphics->m_Display.m_pWindowedSwapChain->m_pSwapChain;
 	//g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 	g_pGraphicDevice = g_pGraphics->m_pGraphicalDevice;
 

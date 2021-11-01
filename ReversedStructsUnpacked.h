@@ -2367,14 +2367,14 @@ public:
 	DWORD dwUnk0x0014;						//0x0014
 	void* m_pConstantBuffer[2];				//0x0018
 	char _0x0030[64];						//0x0028
-	CSwapChain* m_pSwapChain;				//0x0068
+	CSwapChain* m_pWindowedSwapChain;		//0x0068
 	char _0x0070[8];						//0x0070
-	CSwapChain* m_pSwapChain2;				//0x0078
+	CSwapChain* m_pSwapChain;				//0x0078
 	int m_iUnk;								//0x0080
 	char _0x006C[4];						//0x0084
 	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0088
 };
-IS_OFFSET_CORRECT(CDisplay, m_pSwapChain, 0x68)
+IS_OFFSET_CORRECT(CDisplay, m_pWindowedSwapChain, 0x68)
 
 struct CHeapInfo
 {

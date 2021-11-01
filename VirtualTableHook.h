@@ -78,7 +78,7 @@ public:
 	ULONG_PTR GetFunctionAddress(UINT uIndex) const;
 
 	ULONG_PTR* GetOldVirtualTable(void)	const;
-	ULONG_PTR  HookFunction(ULONG_PTR qwNewFunc, UINT uIndex);
+	ULONG_PTR  HookFunction(ULONG_PTR uNewFunction, UINT uIndex);
 
 private:
 	ULONG_PTR GetVirtualTableCount(ULONG_PTR* pqwVirtualTable) const;

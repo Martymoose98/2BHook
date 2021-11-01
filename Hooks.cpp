@@ -1,6 +1,7 @@
 #include "Hooks.h"
 
 PresentFn oPresent;
+ResizeBuffersFn oResizeBuffers;
 CreateSwapChainFn oCreateSwapChain;
 DrawIndexedFn oDrawIndexed;
 DrawFn oDraw;
@@ -382,6 +383,28 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	return oPresent(pThis, (Vars.Misc.bAntiVSync) ? 0 : SyncInterval, Flags);
 }
 
+void CreateRenderTarget(void);
+
+HRESULT hkResizeBuffers(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
+{
+	LOG("pSwapChain %p | pWindowedSwapChain %p\n", g_pGraphics->m_Display.m_pSwapChain, g_pGraphics->m_Display.m_pWindowedSwapChain);
+
+	if (g_pRenderTargetView)
+	{
+		g_pDeviceContext->OMSetRenderTargets(0, NULL, NULL);
+		g_pRenderTargetView->Release();
+	}
+
+	HRESULT hr = oResizeBuffers(pThis, BufferCount, Width, Height, NewFormat, SwapChainFlags);
+
+	if (SUCCEEDED(hr))
+	{
+		ImGui_ImplDX11_InvalidateDeviceObjects();
+		CreateRenderTarget();
+	}
+	return hr;
+}
+
 HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
 	pDesc->BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
@@ -397,6 +420,12 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 	}
 
 	return hr;
+}
+
+HRESULT hkCreateSwapChainForHwnd(IDXGIFactory2* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
+{
+
+	return E_NOTIMPL;
 }
 
 void hkPSSetShaderResources(ID3D11DeviceContext* pThis, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const* ppShaderResourceViews)
