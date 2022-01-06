@@ -467,7 +467,7 @@ public:
 	}
 
 	// if this doesn't work might have to create critical section, enter, restore and free the backup array, then leave
-	static void DisableWordBlacklist(IN BannedWordChecker* pChecker, OUT PDWORD pdwWordCount)
+	static void DisableWordBlacklist(IN BannedWordChecker* pChecker, OPTIONAL OUT PDWORD pdwWordCount)
 	{
 		if (!pChecker || !pChecker->m_pEntries)
 			return;

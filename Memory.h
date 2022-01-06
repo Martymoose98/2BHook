@@ -43,18 +43,34 @@ typedef ULONGLONG QWORD;
 typedef struct _NOP_MEMORY
 {
 	INT Magic = NOP_MEMORY_MAGIC;
+	CRITICAL_SECTION CriticalSection;
 	BOOL Patched;
 	VOID* Address;
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
 } NOP_MEMORY, * PNOP_MEMORY;
 
-#define InitalizeNopMemoryDefault(pNop) memset((PBYTE)(pNop) + FIELD_OFFSET(NOP_MEMORY, Patched), 0, sizeof(NOP_MEMORY) - sizeof(INT));
-#define InitalizeNopMemory(pNop, address, cb) (pNop)->Magic = NOP_MEMORY_MAGIC;\
-												  (pNop)->Patched = FALSE;\
-												  (pNop)->Address = (VOID*)(address);\
-												  (pNop)->pOldOpcodes = NULL;\
-												  (pNop)->nBytes = (cb);
+VOID InitalizeNopMemoryDefault(PNOP_MEMORY pNop)
+{
+	pNop->Magic = NOP_MEMORY_MAGIC;
+	pNop->Patched = FALSE;
+	pNop->Address = NULL;
+	pNop->pOldOpcodes = NULL;
+	pNop->nBytes = 0;
+
+	InitializeCriticalSection(&pNop->CriticalSection);
+}
+
+VOID InitalizeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
+{
+	pNop->Magic = NOP_MEMORY_MAGIC;
+	pNop->Patched = FALSE;
+	pNop->Address = address;
+	pNop->pOldOpcodes = NULL;
+	pNop->nBytes = cb;
+
+	InitializeCriticalSection(&pNop->CriticalSection);
+}
 
 /*
 	If your going to call ZeroMemory aka. memset(dst, 0, length); you need to restore the Magic field to BYTE_PATCH_MEMORY_MAGIC,
@@ -64,6 +80,7 @@ typedef struct _NOP_MEMORY
 typedef struct _BYTE_PATCH_MEMORY
 {
 	INT Magic = BYTE_PATCH_MEMORY_MAGIC;
+	CRITICAL_SECTION CriticalSection;
 	BOOL Patched;
 	VOID* Address;
 	BYTE* pNewOpcodes;
@@ -71,13 +88,29 @@ typedef struct _BYTE_PATCH_MEMORY
 	SIZE_T nBytes;
 } BYTE_PATCH_MEMORY, * PBYTE_PATCH_MEMORY;
 
-#define InitalizeBytePatchMemoryDefault(pBytePatch) memset((PBYTE)(pBytePatch) + FIELD_OFFSET(BYTE_PATCH_MEMORY, Patched), 0, sizeof(BYTE_PATCH_MEMORY) - sizeof(INT));
-#define InitalizeBytePatchMemory(pBytePatch, address, pOpcodes, cb) (pBytePatch)->Magic = BYTE_PATCH_MEMORY_MAGIC;\
-																		   (pBytePatch)->Patched = FALSE;\
-																		   (pBytePatch)->Address = (VOID*)(address);\
-																		   (pBytePatch)->pNewOpcodes = (PBYTE)(pOpcodes);\
-																		   (pBytePatch)->pOldOpcodes = NULL;\
-																		   (pBytePatch)->nBytes = (cb);
+VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
+{
+	pBytePatch->Magic = NOP_MEMORY_MAGIC;
+	pBytePatch->Patched = FALSE;
+	pBytePatch->Address = NULL;
+	pBytePatch->pNewOpcodes = NULL;
+	pBytePatch->pOldOpcodes = NULL;
+	pBytePatch->nBytes = 0;
+
+	InitializeCriticalSection(&pBytePatch->CriticalSection);
+}
+
+VOID InitalizeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, PBYTE pOpcodes, SIZE_T cb)
+{
+	pBytePatch->Magic = NOP_MEMORY_MAGIC;
+	pBytePatch->Patched = FALSE;
+	pBytePatch->Address = address;
+	pBytePatch->pNewOpcodes = pOpcodes;
+	pBytePatch->pOldOpcodes = NULL;
+	pBytePatch->nBytes = cb;
+
+	InitializeCriticalSection(&pBytePatch->CriticalSection);
+}
 
 typedef struct _HOOK_FUNC
 {
@@ -95,10 +128,10 @@ enum _ISBADPTR_STATUS
 	MEMORY_FREED = 0x2,
 	GUARD_PAGE = 0x4,
 	NO_ACCESS_PAGE = 0x8,
-	EXECUTE_ONLY_PAGE = 0x10,
-	READ_ONLY_PAGE = 0x20,
-	READ_WRITE_PAGE = 0x40,
-	WRITE_COPY_PAGE = 0x80
+	EXECUTE_PAGE = 0x10,
+	READ_PAGE = 0x20,
+	WRITE_PAGE = 0x40,
+	WRITE_COPY_PAGE = 0x80,
 };
 typedef DWORD ISBADPTR_STATUS;
 
@@ -148,9 +181,9 @@ public:
 	// rel32 jmp instructions are signed rva's.
 	// It's not a big deal currently 'cause the func is unused and therefore untested
 	// but, if used unchanged, I presume will cause issues/bugs/crashes.
-	inline DWORD CalculateJump(QWORD rip, QWORD dest, SIZE_T uOffset)
+	inline LONG CalculateJump(QWORD rip, QWORD dest, SIZE_T uOffset)
 	{
-		return (DWORD)(dest - rip - (uOffset + sizeof(DWORD)));
+		return (LONG)(dest - rip - (uOffset + sizeof(LONG)));
 	}
 
 	static inline QWORD ReadPtr64(QWORD rip, SIZE_T uOffset)
@@ -225,7 +258,7 @@ public:
 		if (!pNop->pOldOpcodes)
 		{
 			pNop->pOldOpcodes = (BYTE*)malloc(pNop->nBytes);
-		
+
 			if (!pNop->pOldOpcodes)
 				return;
 		}
@@ -233,11 +266,9 @@ public:
 		if (pNop->Patched)
 			return;
 
-		CRITICAL_SECTION cs;
 		DWORD dwOldProtect;
 
-		InitializeCriticalSection(&cs);
-		EnterCriticalSection(&cs);
+		EnterCriticalSection(&pNop->CriticalSection);
 
 		VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
@@ -246,8 +277,9 @@ public:
 
 		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
 
-		LeaveCriticalSection(&cs);
 		pNop->Patched = TRUE;
+
+		LeaveCriticalSection(&pNop->CriticalSection);
 	}
 
 	VOID RestoreMemory(VOID* address, SIZE_T nBytes, BYTE* pOldOpcodes)
@@ -281,11 +313,9 @@ public:
 		if (!pNop->Patched)
 			return;
 
-		CRITICAL_SECTION cs;
 		DWORD dwOldProtect;
 
-		InitializeCriticalSection(&cs);
-		EnterCriticalSection(&cs);
+		EnterCriticalSection(&pNop->CriticalSection);
 
 		VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
@@ -293,8 +323,9 @@ public:
 
 		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
 
-		LeaveCriticalSection(&cs);
 		pNop->Patched = FALSE;
+
+		LeaveCriticalSection(&pNop->CriticalSection);
 	}
 
 	VOID PatchBytes(VOID* address, SIZE_T nBytes, BYTE* pNewOpcodes, BYTE** ppOldOpcodes)
@@ -311,7 +342,7 @@ public:
 		if (!*ppOldOpcodes)
 		{
 			*ppOldOpcodes = (BYTE*)malloc(nBytes);
-			
+
 			if (!*ppOldOpcodes)
 				return;
 		}
@@ -342,15 +373,13 @@ public:
 			if (!pBytePatch->pOldOpcodes)
 				return;
 		}
-		
+
 		if (pBytePatch->Patched)
 			return;
 
-		CRITICAL_SECTION cs;
 		DWORD dwOldProtect;
 
-		InitializeCriticalSection(&cs);
-		EnterCriticalSection(&cs);
+		EnterCriticalSection(&pBytePatch->CriticalSection);
 
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
@@ -359,8 +388,9 @@ public:
 
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
 
-		LeaveCriticalSection(&cs);
 		pBytePatch->Patched = TRUE;
+
+		LeaveCriticalSection(&pBytePatch->CriticalSection);
 	}
 
 	VOID RestoreMemoryBytePatch(CONST PBYTE_PATCH_MEMORY pBytePatch)
@@ -380,11 +410,9 @@ public:
 		if (!pBytePatch->Patched)
 			return;
 
-		CRITICAL_SECTION cs;
 		DWORD dwOldProtect;
 
-		InitializeCriticalSection(&cs);
-		EnterCriticalSection(&cs);
+		EnterCriticalSection(&pBytePatch->CriticalSection);
 
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
 
@@ -392,8 +420,9 @@ public:
 
 		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
 
-		LeaveCriticalSection(&cs);
 		pBytePatch->Patched = FALSE;
+
+		LeaveCriticalSection(&pBytePatch->CriticalSection);
 	}
 
 	VOID RestoreMemory(CONST VOID* pMem)
@@ -465,7 +494,7 @@ public:
 			pop rbx
 
 		{ 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B }
-		
+
 		or  active vvvv
 
 		Saves stack pointer
@@ -485,7 +514,7 @@ public:
 		static BYTE detour[] = { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B };
 
 		memcpy(pHook->m_Detour, detour, sizeof(detour));
-		*(QWORD*)&pHook->m_Detour[7] = (QWORD)pDstFunc;	
+		*(QWORD*)&pHook->m_Detour[7] = (QWORD)pDstFunc;
 		memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
 
 		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, &dwOldProtect))
@@ -547,8 +576,8 @@ public:
 
 		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
-		if (!nBytes || nBytes == ERROR_INVALID_PARAMETER)
-			return VIRTUAL_QUERY_FAILED;
+		if (!nBytes)
+			return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
 
 		if (mbi.State == MEM_FREE)
 			status |= MEMORY_FREED;
@@ -560,7 +589,7 @@ public:
 			status |= NO_ACCESS_PAGE;
 
 		if (mbi.Protect & PAGE_EXECUTE)
-			status |= READ_ONLY_PAGE;
+			status |= EXECUTE_PAGE;
 
 		return status;
 	}
@@ -572,8 +601,8 @@ public:
 
 		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
-		if (!nBytes || nBytes == ERROR_INVALID_PARAMETER)
-			return VIRTUAL_QUERY_FAILED;
+		if (!nBytes)
+			return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
 
 		if (mbi.State == MEM_FREE)
 			status |= MEMORY_FREED;
@@ -585,10 +614,10 @@ public:
 			status |= NO_ACCESS_PAGE;
 
 		if (mbi.Protect & PAGE_READONLY)
-			status |= READ_ONLY_PAGE;
+			status |= READ_PAGE;
 
 		if (mbi.Protect & PAGE_READWRITE)
-			status |= READ_WRITE_PAGE;
+			status |= (READ_PAGE | WRITE_PAGE);
 
 		if (mbi.Protect & PAGE_WRITECOPY)
 			status |= WRITE_COPY_PAGE;
