@@ -87,8 +87,13 @@ void InitHooks(void)
 	oSetUnhandledExceptionFilter = (SetUnhandledExceptionFilterFn)g_pSetUnhandledExceptionFilterHook->GetOriginalFunction();
 
 	oPresent = (PresentFn)g_pSwapChainHook->HookFunction((ULONG_PTR)hkPresent, 8);
+
+#ifdef DENUVO_STEAM_BUILD
+	// NOTE: This is only useful/wordks on the old version. New version uses CreateSwapChainForHwnd
+	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((ULONG_PTR)hkCreateSwapChain, 10); 
+#else
 	oResizeBuffers = (ResizeBuffersFn)g_pSwapChainHook->HookFunction((ULONG_PTR)hkResizeBuffers, 13);
-	oCreateSwapChain = (CreateSwapChainFn)g_pFactoryHook->HookFunction((ULONG_PTR)hkCreateSwapChain, 10);
+#endif // DENUVO_STEAM_BUILD
 	oPSSetShaderResources = (PSSetShaderResourcesFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkPSSetShaderResources, 8);
 	oDrawIndexed = (DrawIndexedFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkDrawIndexed, 12);
 	oDraw = (DrawFn)g_pDeviceContextHook->HookFunction((ULONG_PTR)hkDraw, 13);
@@ -117,7 +122,7 @@ void InitHooks(void)
 	// FIXME: sig this hard coded offset for both version clown
 	//g_pMemory->HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
 	g_pMemory->HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &g_LoadWordBlacklist);//callee
-#else
+#else // DENUVO_STEAM_BUILD
 	// FIXME: This hook works but is digusting
 	g_pMemory->HookFunc64(SaveFileIO, hkSaveFileIOThunk, 46, &g_UserManagerSaveFileIO);
 
@@ -483,7 +488,7 @@ void FindSteamOffsets(void)
 	CRILogCallback = (CRILogCallbackFn)g_pMemory->FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
 	CRILogCallback = CRILogCallbackConsole; //CRILogCallbackWinConsole
 
-	CalculateLevel = (CalculateLevelFn)0;
+	CalculateLevel = (CalculateLevelFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10");
 	GetConstructionInfo = (GetConstructorFn)0;
 	GetEntityFromHandle = (GetEntityFromHandleFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 8B EE 48 85 C0", 1);
 	GetItemNameById = (GetItemNameByIdFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 15 ? ? ? ? EB 26", 1);
@@ -504,7 +509,6 @@ void FindSteamOffsets(void)
 	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)g_pMemory->FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 8B EA 48 8B F9 83 79 28 00 74 61");
 	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
 	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)g_pMemory->FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF ? ? ? ?", 1);
-
 
 	g_pEntityInfoList = (CEntityList*)g_pMemory->FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24 ", 3);
 	g_pLocalPlayerHandle = (EntityHandle*)g_pMemory->FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);

@@ -424,7 +424,6 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 
 HRESULT hkCreateSwapChainForHwnd(IDXGIFactory2* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
-
 	return E_NOTIMPL;
 }
 
@@ -771,7 +770,7 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 
 			if (SUCCEEDED(CreateStreamOnHGlobal(hPicture, FALSE, &lpStream)))
 			{
-				HGLOBAL hOriginalPicture = (HGLOBAL*)0x141584E78;
+				HGLOBAL hOriginalPicture = (HGLOBAL*)0x141584E78; // FIXME: Untested and old version offset 
 
 				if (hOriginalPicture)
 				{

@@ -646,7 +646,7 @@ static HRESULT GeneratePixelShader(ID3D11Device* pDevice, ID3D11PixelShader** pp
 		" return fake;"
 		"}";
 
-	ID3D10Blob* pBlob;
+	ID3DBlob* pBlob;
 	ID3DBlob* pErrorMsgBlob;
 	char szPixelShader[1000];
 
