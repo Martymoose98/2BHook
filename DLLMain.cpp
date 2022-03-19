@@ -137,9 +137,8 @@ void InitHooks(void)
 	// FIXME: should move to more appropriate location, as it isn't a hook. 
 	// Also, forget what this does but it's not critical for the dll's operation.
 	// If I do keep I need to resig the new version
-	InitalizeNopMemory(&nop_HairColor, g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE"), 12)
-
-		g_pMemory->NopMemory(&nop_HairColor);
+	InitalizeNopMemory(&nop_HairColor, (void*)g_pMemory->FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
+	g_pMemory->NopMemory(&nop_HairColor);
 }
 
 void CreateRenderTarget(void)
@@ -596,7 +595,7 @@ void Setup(void)
 	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
 	InitalizeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
-	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, g_pMemory->FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
+	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, (void*)g_pMemory->FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initalization Complete! GLHF");
 

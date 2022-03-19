@@ -42,7 +42,7 @@ typedef ULONGLONG QWORD;
 
 typedef struct _NOP_MEMORY
 {
-	INT Magic = NOP_MEMORY_MAGIC;
+	INT Magic;
 	CRITICAL_SECTION CriticalSection;
 	BOOL Patched;
 	VOID* Address;
@@ -50,7 +50,7 @@ typedef struct _NOP_MEMORY
 	SIZE_T nBytes;
 } NOP_MEMORY, * PNOP_MEMORY;
 
-VOID InitalizeNopMemoryDefault(PNOP_MEMORY pNop)
+static VOID InitalizeNopMemoryDefault(PNOP_MEMORY pNop)
 {
 	pNop->Magic = NOP_MEMORY_MAGIC;
 	pNop->Patched = FALSE;
@@ -61,7 +61,7 @@ VOID InitalizeNopMemoryDefault(PNOP_MEMORY pNop)
 	InitializeCriticalSection(&pNop->CriticalSection);
 }
 
-VOID InitalizeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
+static VOID InitalizeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
 {
 	pNop->Magic = NOP_MEMORY_MAGIC;
 	pNop->Patched = FALSE;
@@ -79,16 +79,16 @@ VOID InitalizeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
 */
 typedef struct _BYTE_PATCH_MEMORY
 {
-	INT Magic = BYTE_PATCH_MEMORY_MAGIC;
+	INT Magic;
 	CRITICAL_SECTION CriticalSection;
 	BOOL Patched;
 	VOID* Address;
-	BYTE* pNewOpcodes;
+	CONST BYTE* pNewOpcodes;
 	BYTE* pOldOpcodes;
 	SIZE_T nBytes;
 } BYTE_PATCH_MEMORY, * PBYTE_PATCH_MEMORY;
 
-VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
+static VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
 {
 	pBytePatch->Magic = NOP_MEMORY_MAGIC;
 	pBytePatch->Patched = FALSE;
@@ -100,7 +100,7 @@ VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
 	InitializeCriticalSection(&pBytePatch->CriticalSection);
 }
 
-VOID InitalizeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, PBYTE pOpcodes, SIZE_T cb)
+static VOID InitalizeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, CONST BYTE* pOpcodes, SIZE_T cb)
 {
 	pBytePatch->Magic = NOP_MEMORY_MAGIC;
 	pBytePatch->Patched = FALSE;
@@ -131,6 +131,7 @@ enum _ISBADPTR_STATUS
 	EXECUTE_PAGE = 0x10,
 	READ_PAGE = 0x20,
 	WRITE_PAGE = 0x40,
+	READ_WRITE_PAGE = READ_PAGE | WRITE_PAGE,
 	WRITE_COPY_PAGE = 0x80,
 };
 typedef DWORD ISBADPTR_STATUS;
@@ -522,7 +523,7 @@ public:
 
 		//FlushInstructionCache(GetCurrentProcess(), pSrcFunc, length);
 
-		return FALSE;
+		return TRUE;
 	}
 
 	BOOL RehookFunc(HOOK_FUNC* pHook)
@@ -617,7 +618,7 @@ public:
 			status |= READ_PAGE;
 
 		if (mbi.Protect & PAGE_READWRITE)
-			status |= (READ_PAGE | WRITE_PAGE);
+			status |= READ_WRITE_PAGE;
 
 		if (mbi.Protect & PAGE_WRITECOPY)
 			status |= WRITE_COPY_PAGE;
