@@ -147,6 +147,9 @@
     <ClInclude Include="ImGui\backends\imgui_impl_win32.h">
       <Filter>Header Files\ImGui</Filter>
     </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">
@@ -239,5 +242,10 @@
     <Text Include="ImGui\LICENSE.txt">
       <Filter>Source Files\ImGui</Filter>
     </Text>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="2B Hook.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

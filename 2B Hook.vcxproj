@@ -165,6 +165,7 @@
     <ClInclude Include="mot.h" />
     <ClInclude Include="Overlay.h" />
     <ClInclude Include="Renderer.h" />
+    <ClInclude Include="resource.h" />
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />
@@ -212,6 +213,9 @@
   </ItemGroup>
   <ItemGroup>
     <Text Include="ImGui\LICENSE.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="2B Hook.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
