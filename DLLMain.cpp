@@ -580,7 +580,7 @@ void FindDenuvoSteamOffsets(void)
 
 	CpkMount = (CpkMountFn)FindPattern(NULL, "48 83 EC 28 44 8B C9");
 
-	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7);
+	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89 ? ? ? ?", 7) - 0x00007FF7B5D40000;
 	g_pLocalPlayerHandle = (EntityHandle*)FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05 ? ? ? ?", 6);
 	g_pEmilHandle = (EntityHandle*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
 	g_piMoney = (int*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8D 8D ? ? ? ?", 3);
