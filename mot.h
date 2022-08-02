@@ -14,6 +14,8 @@ typedef unsigned short pghalf;
 typedef unsigned int uint32;
 typedef int int32;
 
+// pghalf - https://github.com/Scobalula/Husky/blob/master/src/Husky/Husky/Utility/HalfFloats.cs
+
 /*
 Found: https://forum.xentax.com/viewtopic.php?f=10&t=16011&sid=110c6732b529049ca7dd0769afd12688&start=15
 
@@ -51,7 +53,9 @@ struct MotHeader
 	SHORT  sFrameCount;
 	UINT   uRecordOffset;
 	UINT   uRecordCount;
-	UINT   unknown; // usually 0 or 0x003c0000, maybe two uint16
+	BYTE   bUnknown;
+	BYTE   bFrameRate30;
+	WORD   pad;
 	char   szAnimName[12]; // found at most 12 bytes with terminating 0
 };
 

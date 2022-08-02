@@ -4,7 +4,6 @@
 #include <functional>
 #include <tchar.h>
 #include "Globals.h"
-#include "ConfigGetters.h"
 
 // c++ btw (just a friendly reminder to myself)
 //class ConfigItem
@@ -355,7 +354,7 @@ public:
 
 			if (pVftable)
 				for (; pVftable[count]; ++count)
-					if (CMemory::IsBadCodePtr(pVftable[count]))
+					if (IsBadCodePtr(pVftable[count]))
 						break;
 		}
 
@@ -373,6 +372,7 @@ public:
 	virtual void Read(const char* szFilename) = 0;
 	virtual void Write(const char* szFilename) = 0;	
 
+protected:
 	const char* m_szCategory;
 	const char* m_szName;
 };
@@ -817,8 +817,6 @@ static KeyOrdinal s_Keycodes[] =
 	{ "F8", DIK_F8 },
 	{ "F9", DIK_F9 },
 	{ "F10", DIK_F10 },
-	{ "F11", DIK_F11 },
-	{ "F12", DIK_F12 },
 	{ "NUMLOCK", DIK_NUMLOCK },
 	{ "SCROLLLOCK", DIK_SCROLL },
 	{ "NUM7", DIK_NUMPAD7 },
@@ -835,6 +833,8 @@ static KeyOrdinal s_Keycodes[] =
 	{ "NUM0", DIK_NUMPAD0 },
 	{ "DECMIAL", DIK_DECIMAL },
 	{ "|", DIK_OEM_102 },
+	{ "F11", DIK_F11 },
+	{ "F12", DIK_F12 },
 	{ "F13", DIK_F13 },
 	{ "F14", DIK_F14 },
 	{ "F15", DIK_F15 },

@@ -84,7 +84,7 @@ class RenderList
 public:
 	
 	RenderList()
-		: m_vertices()
+		: m_vertices(), m_uMaxVertices(0)
 	{
 
 	}
@@ -204,7 +204,17 @@ class Renderer
 {
 public:
 	 
-	Renderer() : m_RenderList(16384 * 8 * 4 * 3) {}
+	Renderer() : m_pDevice(NULL), m_pDeviceContext(NULL), 
+		m_pVertexShader(NULL), m_pOriginalVertexShader(NULL),
+		m_pVertexBuffer(NULL), m_pOriginalVertexBuffer(NULL),
+		m_pPixelShader(NULL), m_pOriginalPixelShader(NULL),
+		m_pPixelBuffer(NULL), m_pOriginalPixelBuffer(NULL),
+		m_pInputLayout(NULL), m_pOriginalInputLayout(NULL),
+		m_pViewMatrix(NULL), m_RenderList(16384 * 8 * 4 * 3) 
+	{
+		m_ViewMatrix = DirectX::XMMatrixIdentity();
+	}
+
 	~Renderer();
 
 	HRESULT Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, ID3D11Buffer* pVertexBuffer);
@@ -254,15 +264,15 @@ private:
 	ID3D11Device* m_pDevice;
 	ID3D11DeviceContext* m_pDeviceContext;
 	ID3D11VertexShader* m_pVertexShader;
-	ID3D11VertexShader* m_poVertexShader;
+	ID3D11VertexShader* m_pOriginalVertexShader;
 	ID3D11Buffer* m_pVertexBuffer;
-	ID3D11Buffer* m_poVertexBuffer;
+	ID3D11Buffer* m_pOriginalVertexBuffer;
 	ID3D11PixelShader* m_pPixelShader;
-	ID3D11PixelShader* m_poPixelShader;
+	ID3D11PixelShader* m_pOriginalPixelShader;
 	ID3D11Buffer* m_pPixelBuffer;
-	ID3D11Buffer* m_poPixelBuffer;
+	ID3D11Buffer* m_pOriginalPixelBuffer;
 	ID3D11InputLayout* m_pInputLayout;
-	ID3D11InputLayout* m_poInputLayout;
+	ID3D11InputLayout* m_pOriginalInputLayout;
 	ID3D11Buffer* m_pViewMatrix;
 	XMMATRIX m_ViewMatrix;
 	RenderList m_RenderList;
