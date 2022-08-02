@@ -22,7 +22,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 	D3D11_MAPPED_SUBRESOURCE Mapped;
 
 	if (!pDevice || !pDeviceContext)
-		return false;
+		return E_INVALIDARG;
 
 	m_pDevice = pDevice;
 	m_pDeviceContext = pDeviceContext;
@@ -166,21 +166,21 @@ HRESULT Renderer::SaveState()
 	if (!m_pDeviceContext)
 		return E_FAIL;
 
-	m_pDeviceContext->IAGetInputLayout(&m_poInputLayout);
-	m_pDeviceContext->VSGetShader(&m_poVertexShader, NULL, 0);
-	m_pDeviceContext->PSGetShader(&m_poPixelShader, NULL, 0);
+	m_pDeviceContext->IAGetInputLayout(&m_pOriginalInputLayout);
+	m_pDeviceContext->VSGetShader(&m_pOriginalVertexShader, NULL, 0);
+	m_pDeviceContext->PSGetShader(&m_pOriginalPixelShader, NULL, 0);
 
 	return S_OK;
 }
 
 HRESULT Renderer::RestoreState()
 {
-	if (!m_pDeviceContext || !m_poInputLayout)
+	if (!m_pDeviceContext || !m_pOriginalInputLayout)
 		return E_FAIL;
 
-	m_pDeviceContext->IASetInputLayout(m_poInputLayout);
-	m_pDeviceContext->VSSetShader(m_poVertexShader, NULL, 0);
-	m_pDeviceContext->PSSetShader(m_poPixelShader, NULL, 0);
+	m_pDeviceContext->IASetInputLayout(m_pOriginalInputLayout);
+	m_pDeviceContext->VSSetShader(m_pOriginalVertexShader, NULL, 0);
+	m_pDeviceContext->PSSetShader(m_pOriginalPixelShader, NULL, 0);
 
 
 	return S_OK;

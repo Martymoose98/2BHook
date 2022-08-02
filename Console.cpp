@@ -112,6 +112,7 @@ void CConsole::Draw(const char* szTitle)
 		return;
 	}
 
+	// Fix the filter so it floats at the top
 	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows))
 		ImGui::InputText("Filter", m_szFilter, ARRAYSIZE(m_szFilter));
 

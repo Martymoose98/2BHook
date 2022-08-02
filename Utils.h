@@ -44,7 +44,14 @@ struct StackReadWriteLock
 
 	StackReadWriteLock(DWORD dwSpinCount)
 	{
-		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
+		/*
+		* Windows Server 2003 and Windows XP:  If the function succeeds, the return value is nonzero. 
+		* If the function fails, the return value is zero (0). To get extended error information, call GetLastError.
+		* Starting with Windows Vista, the InitializeCriticalSectionAndSpinCount function always succeeds, even in low memory situations.
+		*/
+		if (!InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount))
+			return;
+
 		m_bCriticalSectionInitalized = TRUE;
 		EnterCriticalSection(&m_CriticalSection);
 	}
@@ -76,11 +83,21 @@ static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
 	LeaveCriticalSection((LPCRITICAL_SECTION)(rbx + 0x150));
 }
 
+// https://stackoverflow.com/questions/46182845/field-of-view-aspect-ratio-view-matrix-from-projection-matrix-hmd-ost-calib
+static float GetFovFromProjectionMatrix(void)
+{
+	return 2.0f * atan(1.0f / g_pCamera->m_pInstance->m_ViewProjection[1][1]);
+}
+
 /*
 	Doesn't seem to be 100% accurate.
 	I tired adding the fov math into it but no success
 	all the examples use a different method than me.
 	Either that or CGameCamera::m_flFov isn't the fov value and I fucked up
+	https://guidedhacking.com/threads/world2screen-direct3d-and-opengl-worldtoscreen-functions.8044/
+	https://www.cs.toronto.edu/~jepson/csc420/notes/imageProjection.pdf
+	https://www.scratchapixel.com/lessons/3d-basic-rendering/computing-pixel-coordinates-of-3d-point/mathematics-computing-2d-coordinates-of-3d-points
+	https://www.cse.unr.edu/~bebis/CS791E/Notes/CameraParameters.pdf
 */
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
@@ -104,12 +121,16 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 
 	float x = width / 2.0f;
 	float y = height / 2.0f;
-	//float flFocalLength = y / tanf(g_pCamera->m_flFov / 2.0f);
+	float flFocalLengthX = x / tanf(g_pCamera->m_flFov);
+	float flFocalLengthY = y / tanf(g_pCamera->m_flFov);
 
-	//vOut.x = x + vTransform.x * flFocalLength / vTransform.z;
-	//vOut.y = y - vTransform.y * flFocalLength / vTransform.z;
-	vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
-	vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
+	//vOut.x = x * (1.f + (vTransform.x / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
+	//vOut.y = y * (1.f - (vTransform.y / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
+
+	vOut.x = x + vTransform.x * flFocalLengthX / vTransform.z;
+	vOut.y = y - vTransform.y * flFocalLengthY / vTransform.z;
+	//vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
+	//vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
 
 	return true;
 }
@@ -307,7 +328,7 @@ static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 	switch (pSavedata->dwStatus)
 	{
 	case 0:
-		if (((BOOL(*)(CSaveDataDevice*, char*))(0x140282BD0))(pSavedata, szFilename))
+		if (((BOOL(*)(CSaveDataDevice*, char*))((LPBYTE)GetModuleHandle(NULL) + 0x282BD0))(pSavedata, szFilename)) // sub_140282BD0
 		{
 			if (DeleteFileA(szFilename))
 			{
@@ -403,13 +424,11 @@ static short GetBoneIndex(const CModelData* pModelData, short id)
 
 static short GetBoneId(short index)
 {
-
 }
 
-FIXME("this is for sure broken on new version")
 static void SwapTexture(unsigned int srcid, CTexture* pReplace)
 {
-	CTextureResource* pRes = ((CTextureResourceManager_FindResourceFn)(0x140936F60))(srcid);
+	CTextureResource* pRes = TextureResourceManager_FindResource(srcid);
 
 	if (pRes)
 		pRes->m_pTexture = pReplace;
@@ -429,7 +448,7 @@ static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& de
 		DWORD dwFileSize = GetFileSize(hFile, NULL);
 		HANDLE hMapping = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, dwFileSize, NULL);
 
-		if (hMapping != INVALID_HANDLE_VALUE)
+		if (hMapping)
 		{
 			TextureFile* pFile = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
 
@@ -438,11 +457,21 @@ static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& de
 			desc.dword18 = 2;
 
 			pTexture = (CTargetTexture*)malloc(sizeof(CTargetTexture)); //AllocHeapMemoryFn or ReserveMemory
-			ZeroMemory(pTexture, sizeof(CTargetTexture));
 
 			if (pTexture)
 			{
+				ZeroMemory(pTexture, sizeof(CTargetTexture));
+				// old sig: 33 D2 48 8D 05 ? ? ? ? 48 89 51 58
+				// old: 0x140E9FA38 | base + 0xE9FA38
+				// new sig: 48 89 58 50 48 8D 05 ? ? ? ? 
+				// new: 0x140DB1DE8 | base + 0xDB1DE8
+				//pTexture->m_vtbl = (void*)g_pMemory->FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
 				pTexture->m_vtbl = (void*)0x140E9FA38;
+
+				// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
+				// old: 0x140934FE0
+				// new sig: 48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6
+				static CreateTextureFn CreateTexture = (CreateTextureFn)FindPattern(NULL, "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6");
 
 				if (!((CreateTextureFn)(0x140934FE0))(0, pTexture, &desc))
 					return NULL;
@@ -488,8 +517,10 @@ static void CreateMaterial(
 	{
 		TextureIds[i] = HashStringCRC32(szTextureNames[i], strlen(szTextureNames[i]));
 
-		Textures[i].m_vtbl = (void*)0x140E9FA38;
+		Textures[i].m_vtbl = (void*)0x140E9FA38; // new: 0x140DB1DE8 | base + 0xDB1DE8
 
+		// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
+		// new sig: 48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6
 		if (!((CreateTextureFn)(0x140934FE0))(0, &Textures[i], &pDescriptions[i]))
 			return;
 	}
@@ -508,7 +539,7 @@ static void CreateMaterial(
 
 	for (int i = 0; i < nTextures; ++i)
 	{
-		int nTexture = ((int(*)(void*, const char*))(0x143F4D0A0))(0, szTextureNames[i]); // CModelAnalyzer::FindTextureIndexByName 
+		int nTexture = g_pModelAnalyzer->FindTextureIndexByName(szTextureNames[i]); //((int(*)(void*, const char*))(0x143F4D0A0))(0, szTextureNames[i]);
 
 		if (nTexture > 15)
 			break;
@@ -765,11 +796,10 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 
 static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 {
-	PROCESS_HEAP_ENTRY Entry;
+	//PROCESS_HEAP_ENTRY Entry;
 
 	UNREFERENCED_PARAMETER(phHeaps);
 	UNREFERENCED_PARAMETER(dwHeaps);
-	UNREFERENCED_PARAMETER(Entry);
 
 	//HeapWalk(p)
 
