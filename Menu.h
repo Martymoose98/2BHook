@@ -49,14 +49,12 @@ static void GameplayTab(Pl0000* pCameraEnt)
 	ImGui::PopItemWidth();
 	ImGui::Columns();
 
-	//0x14133B510
-	static void* pItemManager = (void*)g_pMemory->FindPatternPtr(NULL, "44 8B C0 48 8D 0D ? ? ? ? E8 ? ? ? ? C7 45 ? ? ? ? ?", 6);
 	char szDesc[64];
-	//char* szName = (char*)GetItemNameById(pItemManager, Vars.Gameplay.iSpawnItemId);
+	char* szName = (char*)ItemManager_GetItemNameById(g_pItemManager, Vars.Gameplay.iSpawnItemId);
 	// FIXME: Broken on the new version this fucking function keeps crashing
-	// sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
+	sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
 	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
-	int id = GetItemIdByName(pItemManager, Vars.Gameplay.szItemName);
+	int id = ItemManager_GetItemIdByName(g_pItemManager, Vars.Gameplay.szItemName);
 	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
 	ImGui::InputInt("Quantity", &Vars.Gameplay.iSpawnItemQuantity);
 	ImGui::Checkbox("Instant Equip", &Vars.Gameplay.bInstantEquip);
@@ -89,7 +87,7 @@ static void GameplayTab(Pl0000* pCameraEnt)
 
 		set_info.m_mat = Matrix4x4();
 		set_info.m_vPosition = pCameraEnt->m_vPosition + (pCameraEnt->m_matTransform.GetAxis(FORWARD) * 2.f);
-		set_info.m_vRotation = pCameraEnt->m_matModelToWorld.GetAxis(3); //  Vector3Aligned(0, 1, 0);
+		set_info.m_vRotation = pCameraEnt->m_matModelToWorld.GetAxis(POSITION); //  Vector3Aligned(0, 1, 0);
 		set_info.m_vScale = Vars.Gameplay.vSpawnEntityScale;
 		set_info.m_i0x080 = -1;
 		set_info.m_i0x084 = 0;
@@ -133,10 +131,11 @@ static void GameplayTab(Pl0000* pCameraEnt)
 				*g_pEmilHandle = pInfo->m_hEntity;
 				break;
 			case 0x10010:
+				typedef void (*Pl_ChangeFlightSuitFn)(void* pEnt);
 				//pCameraEnt->m_bFlightSuit = TRUE;
 				pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
-				//*MakePtr(EntityHandle*, pInfo->m_pParent, 0xC50) = pCameraEnt->m_pInfo->m_hEntity;
-				*MakePtr(DWORD*, pInfo->m_pParent, 0xC7C) = -1;
+				((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4F8300))(pCameraEnt); /*0x4E9DB0*/
+				//((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4E0340))(pCameraEnt);
 				break;
 			}
 		}
@@ -162,7 +161,9 @@ static void GameplayTab(Pl0000* pCameraEnt)
 
 	if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
 	{
-		Pl0000* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+		EntityHandle* phBuddy = MakePtr(EntityHandle*, g_pLocalPlayer, 0x1647C);
+		Pl0000* pBuddy = GetEntityFromHandle(phBuddy);
+		//Pl0000* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
 
 		if (pBuddy)
 			DestroyBuddy(pBuddy);
@@ -242,9 +243,13 @@ static void VisualsTab(Pl0000* pCameraEnt)
 	ImGui::SameLine();
 
 	ImGui::Checkbox("Display Collision Object Info", &Vars.Visuals.bCollisionObjectInfo);
+	ImGui::Checkbox("Display Collision Debug Object Info", &Vars.Visuals.bCollisionDebugObjectInfo);
 
 	ImGui::Separator();
 
+	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 300.0f);
+
+	ImGui::Separator();
 	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
 
 	ApplyModelMods(pCameraEnt);
@@ -280,7 +285,7 @@ static void MiscTab(void)
 
 	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_vViewangles);
 
-	ImGui::Checkbox("SpeedMeister", &Vars.Gameplay.bSpeedMeister);
+	ImGui::Checkbox("Speedhack", &Vars.Gameplay.bSpeedhack);
 	ImGui::SameLine();
 	ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when the framerate is uncapped this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
 	ImGui::Separator();
@@ -312,6 +317,39 @@ static void MiscTab(void)
 	ImGui::SameLine();
 	ImGui::Text(Vars.Misc.bBackupSave ? "Succeded!" : "Failed!");
 
+	static int ui_ids[3];
+
+	ImGui::InputInt3("UI Id", ui_ids);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Create UI Element"))
+	{	
+		TODO("Move function typedefs to globals!")
+		typedef unsigned int (*HashLowercaseStringCRC32Fn)(const char* szString);
+		// Retreives game text from crc32
+		typedef wchar_t*(*DialogUI_System_GetTextFn)(void* pThis, int crc32, unsigned int index);
+		// Creates a white dialog
+		typedef __int64(*DialogUI_System_CreateYesNoDialogFn)(wchar_t* szMessage);
+		// Creates a white dialog w/ options
+		typedef __int64(*DialogUI_System_CreateDialogFn)(void* pThis, wchar_t* szMessage, int bWhiteDialog, DialogUIWhiteType type, int darkness);
+		// Creates a black banner
+		typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int a1, int crc32, wchar_t* szMessage, wchar_t* szText, DialogUIBlackType type, unsigned int a8, int darkness);
+		
+
+		ULONG_PTR uNier = (ULONG_PTR)GetModuleHandle(NULL);
+
+		unsigned int crc = ((HashLowercaseStringCRC32Fn)(uNier + 0x14C4C0))("CORE_QUEST_EMP_TXT_MONEY");// CORE_MAP_VOICECNG_01
+		wchar_t* szMsg = ((DialogUI_System_GetTextFn)(uNier + 0x9BD090))((void*)(uNier + 0x14207A0), crc, 24);
+		// e8a92ebf crc32 | CORE_ITEM_NAME_935
+		//((DialogUI_System_CreateDialogFn)(uNier + 0x2F4F60))((void*)(uNier + 0xF04018), L"Cazzone", (DialogUIWhiteType)ui_ids[0], ui_ids[1], ui_ids[2]);
+		((DialogUI_System_CreateBlackBannerFn)(uNier + 0x2F5040))((void*)(uNier + 0xF04018), -1, 0, szMsg, L"It wasn't supposed to be like this!\nCazzone", (DialogUIBlackType)ui_ids[0], ui_ids[1], ui_ids[2]);
+		//((DialogUI_System_CreateYesNoDialogFn)(uNier + 0x2F4760))(L"Bad News!");
+		//CreateUIFromId(ui_id);
+	}
+
+	// new test shit
+	ImGui::InputInt("Debug Flags", (int*)((ULONG_PTR)GetModuleHandle(NULL) + 0x1029844), 1, 100, ImGuiInputTextFlags_CharsHexadecimal); 
+	ImGui::InputInt("Camera Flags", (int*)((ULONG_PTR)GetModuleHandle(NULL) + 0x1029840), 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 }
 
 static void ConfigTab(void)
@@ -363,6 +401,9 @@ static void ConfigTab(void)
 
 static void DisplayEntityHandles()
 {
+	if (!g_pNPCManager)
+		return;
+
 	int count = (int)(g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count);
 	char** ppszHandles = new char*[count];
 	EntityHandle* handles = new EntityHandle[count];

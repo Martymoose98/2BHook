@@ -102,8 +102,10 @@ void CConfig::InitializeConfig()
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_enemy_info", Vars.Visuals.bEnemyInfo));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_npc_info", Vars.Visuals.bNPCInfo));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_world_info", Vars.Visuals.bCollisionObjectInfo));
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_world_debug_info", Vars.Visuals.bCollisionDebugObjectInfo));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_skeleton", Vars.Visuals.bSkeleton));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_debug_skeleton", Vars.Visuals.bDebugLocalPlayerSkeleton));
+	m_items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_fov", Vars.Visuals.flFov));
 #pragma endregion
 
 #pragma region gameplay
@@ -116,7 +118,7 @@ void CConfig::InitializeConfig()
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_tutorial_dialogs", Vars.Gameplay.bNoTutorialDialogs));
 	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_rainbow_hair", Vars.Gameplay.bRainbowHair));
 	//m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_rainbow_model", Vars.Gameplay.bRainbowModel)); not impl-
-	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_speedmeister", Vars.Gameplay.bSpeedMeister));
+	m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_speedhack", Vars.Gameplay.bSpeedhack));
 	m_items.emplace_back(new ConfigItemFloat(CATEGORY_GAMEPLAY, "fl_speed_multiplier", Vars.Gameplay.flSpeedMultiplier));
 	//m_items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "fl_model_tint_hue", Vars.Gameplay.flModelTintHue)); not impl (rainbow model)
 	m_items.emplace_back(new ConfigItemInt(CATEGORY_GAMEPLAY, "i_level", Vars.Gameplay.iLevel));
@@ -135,10 +137,11 @@ void CConfig::InitializeConfig()
 	Vars.Keybinds.ChangePlayer = KeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer);
 	Vars.Keybinds.Airstuck = KeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck);
 	Vars.Keybinds.DuplicateBuddy = KeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC);
-	Vars.Keybinds.TeleportForward = KeybindFunctional<void>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportForward);
+	Vars.Keybinds.TeleportForward = KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, 0.5f);
+	Vars.Keybinds.TeleportBackward = KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_backward", DIK_F11, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, -0.5f);
 	Vars.Keybinds.PlayAnimation = KeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation);
-	Vars.Keybinds.ModelGravity = KeybindDynamicToggleable("kb_model_gravity", DIK_F9, GetModelGravity);
-	Vars.Keybinds.ModelYControl = KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYPRESSED, GetOBBY, 1.f);
+	Vars.Keybinds.ModelGravity = KeybindDynamicToggleable("kb_model_gravity", DIK_F9, Features::GetModelGravity);
+	Vars.Keybinds.ModelYControl = KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYDOWN, Features::GetEntityOBBY, 0.3f);
 
 	AddKeybind(&Vars.Keybinds.OpenMenu);
 	AddKeybind(&Vars.Keybinds.Firstperson);
@@ -146,6 +149,7 @@ void CConfig::InitializeConfig()
 	AddKeybind(&Vars.Keybinds.Airstuck);
 	AddKeybind(&Vars.Keybinds.DuplicateBuddy);
 	AddKeybind(&Vars.Keybinds.TeleportForward);
+	AddKeybind(&Vars.Keybinds.TeleportBackward);
 	AddKeybind(&Vars.Keybinds.ModelGravity);
 	AddKeybind(&Vars.Keybinds.PlayAnimation);
 	AddKeybind(&Vars.Keybinds.ModelYControl.m_inc);
@@ -291,26 +295,33 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 	LPTSTR szDirPath = (LPTSTR)LocalAlloc(LPTR, (cchOriginalPath + 1) * sizeof(TCHAR));
 	BOOL Status = ERROR_DIRECTORY;
 
-	_tcscpy_s(szDirPath, cchOriginalPath, szOriginalPath);
-	szToken = _tcstok_s(szOriginalPath, szDelimiter, &szNextToken);
-
-	while (szToken)
+	if (szDirPath)
 	{
-		szTemporary = szToken;
-		szToken = _tcstok_s(NULL, szDelimiter, &szNextToken);
+		_tcscpy_s(szDirPath, cchOriginalPath, szOriginalPath);
+		szToken = _tcstok_s(szOriginalPath, szDelimiter, &szNextToken);
+
+		while (szToken)
+		{
+			szTemporary = szToken;
+			szToken = _tcstok_s(NULL, szDelimiter, &szNextToken);
+		}
+
+		if (szTemporary)
+		{
+			szDirPath[szTemporary - szOriginalPath] = (TCHAR)0;
+
+			if (szSanitizedPath)
+				_tcscpy_s(szSanitizedPath, cchSanitizedPath, szDirPath);
+
+			Status = ERROR_SUCCESS;
+		}
+		LocalFree((HLOCAL)szDirPath);
+	}
+	else
+	{
+		Status = ERROR_OUTOFMEMORY;
 	}
 
-	if (szDirPath && szTemporary)
-	{
-		szDirPath[szTemporary - szOriginalPath] = (TCHAR)0;
-
-		if (szSanitizedPath)
-			_tcscpy_s(szSanitizedPath, cchSanitizedPath, szDirPath);
-
-		Status = ERROR_SUCCESS;
-	}
-
-	LocalFree((HLOCAL)szDirPath);
 	return Status;
 }
 
@@ -356,7 +367,7 @@ SIZE_T FindDataListCount(PCWIN32_FIND_DATA_LIST pList)
 
 PWIN32_FIND_DATA_LIST FindDataListNav(PCWIN32_FIND_DATA_LIST pList, INT iIndex)
 {
-	PWIN32_FIND_DATA_LIST it = pList;	
+	PWIN32_FIND_DATA_LIST it = pList;
 	INT i = 0;
 
 	for (; i < iIndex && it; ++i)

@@ -32,7 +32,6 @@
 #endif // !TODO_CLICKABLE
 #endif // !TODO
 
-
 #if defined(_DEBUG) || defined(VERBOSE)
 #define LOG_OFFSETS
 #define LOG(fmt, ...) Log::Log(__FUNCSIG__, fmt, __VA_ARGS__)

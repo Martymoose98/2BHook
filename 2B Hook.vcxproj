@@ -68,18 +68,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>$(IncludePath);$(DXSDK_DIR)Include</IncludePath>
-    <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
-    <IncludePath>$(IncludePath);$(DXSDK_DIR)Include</IncludePath>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Denuvo)|x64'">
-    <LibraryPath>$(LibraryPath);$(DXSDK_DIR)Lib\$(Platform)</LibraryPath>
-    <IncludePath>$(IncludePath);$(DXSDK_DIR)Include</IncludePath>
-  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Denuvo)|x64'" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile />
     <Link>
@@ -89,6 +80,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <ShowIncludes>false</ShowIncludes>
+      <Optimization>Disabled</Optimization>
+      <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
+      <AdditionalIncludeDirectories>K:\Steam\steamapps\common\NieRAutomata\modding\2BHook\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -101,6 +95,7 @@
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessKeepComments>false</PreprocessKeepComments>
       <ShowIncludes>false</ShowIncludes>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -119,6 +114,7 @@
       <PreprocessKeepComments>false</PreprocessKeepComments>
       <ShowIncludes>false</ShowIncludes>
       <PreprocessorDefinitions>DENUVO_STEAM_BUILD;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -139,7 +135,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Color.h" />
-    <ClInclude Include="ConfigGetters.h" />
     <ClInclude Include="Configuration.h" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="cpk.h" />
@@ -169,7 +164,6 @@
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />
-    <ClInclude Include="StaticAssert.h" />
     <ClInclude Include="SteamApi.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Variables.h" />

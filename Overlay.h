@@ -339,22 +339,19 @@ public:
 				vMin = pCameraEntity->m_vPosition;
 
 				// Alternative to GetOBBMax
-				__m128 v1 = *(__m128*) & pCollision->v0xA0;
-				vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
-					_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
-						_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));
+				//__m128 v1 = *(__m128*) & pCollision->v0xA0;
+				//vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
+				//	_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
+				//		_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));
 
-
-				//GetOBBMax(pCollision, &vMax);
-
-				Matrix4x4 matMesh;
+				ExCollision_GetOBBMax(pCollision, &vMax);
 
 				for (int i = 0; i < pCameraEntity->m_Work.m_nMeshes; ++i)
-				{
+				{/*
 					CMesh2* pMesh = &pCameraEntity->m_Work.m_pMeshes[i];
 					CModelMatrixTable** p = pCameraEntity->m_Work.m_pMatrices;
+					Matrix4x4 matMesh;
 
-					/*
 					CBone* pBone = &pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_pModelData, pMesh->m_pBones[0].m_sId)];
 					matMesh.InitTransform(pBone->m_vRotation, pBone->m_vPosition);
 					pList->Add3DBox(pMesh->m_vMin, pMesh->m_vMax, matMesh, ImColor(200, 100, 0));
@@ -474,44 +471,44 @@ public:
 
 		if (Vars.Visuals.bCollisionObjectInfo)
 		{
-			CCollisionDataObject* pCur;
 			Vector3Aligned vOrigin, vMax, vMin;
 			CEntityInfo* pInfo;
 			Pl0000* pObject;
 			Matrix4x4 mTrans;
 
-			for (CCollisionDataObject** p = g_pCollisionDataObjectManager->m_ppData; p; p = (CCollisionDataObject**)*++p)
+			for (CCollisionDataEntry* pEntry = g_pCollisionDataObjectManager->m_Data.m_pEntries2; pEntry; pEntry = pEntry->m_pNext)
 			{
-				pCur = *p;
-				if (pCur) //dword30 = 0xff - trees
+				CCollisionDataObject* pObj = pEntry->m_pObject;
+
+				if (pObj) //dword30 = 0xff - trees
 				{
-					pInfo = g_pEntityInfoList->m_pItems[pCur->m_uScenePropIndex].second;
+					pInfo = g_pEntityList->m_pItems[pObj->m_uScenePropIndex].second;
 					pObject = (pInfo) ? pInfo->m_pParent : NULL;
 
 					if (pObject && !pObject->m_vPosition.IsZero())
 					{
 						vOrigin = pObject->m_vPosition;
-						vMax = (pCur->m_vMin - pCur->m_vMax) / 2;
-						vMin = (pCur->m_vMax - pCur->m_vMin) / 2;
+						vMax = (pObj->m_vMin - pObj->m_vMax) / 2.0f;
+						vMin = (pObj->m_vMax - pObj->m_vMin) / 2.0f;
 						mTrans = pObject->m_matTransform;
 					}
 					else
 					{
-						vOrigin = pCur->m_vMin + ((pCur->m_vMax - pCur->m_vMin) / 2);
-						vMax = Vector3Aligned();
-						vMin = pCur->m_vMax - pCur->m_vMin;
-						mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), pCur->m_vMin);
+						vOrigin = pObj->m_vMin + ((pObj->m_vMax - pObj->m_vMin) / 2.0f);
+						vMax = pObj->m_vMax - pObj->m_vMin;
+						vMin = Vector3Aligned();
+
+						mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), pObj->m_vMin);
 					}
 
 					pList->Add3DBox(vMin, vMax, mTrans, ImColor(0, 255, 222));
-#ifdef _DEBUG
-					if (WorldToScreen(vOrigin, vMin2D))
+
+					if (Vars.Visuals.bCollisionDebugObjectInfo && WorldToScreen(vOrigin, vMin2D))
 					{
 						pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE,
 							"%s idx: %x f30 %x, f38 %x", (pInfo) ? pInfo->m_szEntityType : "",
-							pCur->m_uScenePropIndex, pCur->dword30, pCur->dword38);
+							pObj->m_uScenePropIndex, pObj->dword30, pObj->dword38);
 					}
-#endif
 				}
 			}
 		}
@@ -520,9 +517,10 @@ public:
 		if (g_pCamera)
 		{
 			pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H,
-				"ang (%f,%f,%f)", RADTODEG(g_pCamera->m_vViewangles.x),
+				"ang (%f,%f,%f) fov: %f", RADTODEG(g_pCamera->m_vViewangles.x),
 				RADTODEG(g_pCamera->m_vViewangles.y),
-				RADTODEG(g_pCamera->m_vViewangles.z));
+				RADTODEG(g_pCamera->m_vViewangles.z), 
+				GetFovFromProjectionMatrix());
 		}
 #endif
 	}
