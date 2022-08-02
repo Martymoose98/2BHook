@@ -1,0 +1,78 @@
+V2.3.2
+- Win10 RS4 update support
+
+V2.3.1
+- Win10 Fall Creators update support
+- STATUS_UNSUCCESSFUL codes refactored
+- Bug fixes
+
+V2.3.0
+- Win10 Creators Update support
+- Unified injection and manual mapping (injector -> target) : x86->x86, x64->x64, x86->x64, x64->x86
+- Bug fixes, stability improvements
+
+V2.2.2
+- Bug fixes, stability improvements
+
+V2.2.1
+- Win 10 10586 driver compatibility
+- Minor GUI usability fixes
+- Create process: working dir changed
+
+V2.2.0
+- Command line options
+- Separate x86/x64 profiles
+- Pure IL exe manual mapping
+
+V2.1.4
+- VS 2015 runtime
+- Win10 RTM support
+
+V2.1.3
+- Win10 build 9926 support
+- Win8.1 bug fixes
+
+V2.1.2
+- Fixed BSOD under win7 and win8.1 systems
+- Major kernel manual map bug fixes
+- Kernel logs
+
+V2.1.1
+- Some logging
+
+V2.1.0
+- Kernel manual map for user-mode dlls
+- Process handle access rights escalation
+
+V2.0.0
+- New GUI
+- Injection image list
+- Auto-injection
+- Injection profiles
+- Injection delay timers
+- Kernel injection improvements - module unlinking and init routine invocation
+- Win10 tech preview support
+
+V1.2.1
+- ManuapMap: 'Hide mapped memory region' flag
+- Manual map of system drivers
+- Self-protection option (Tools -> Protect self)
+- Improved injection into suspended process
+- 'Close after injection' flag
+
+V1.2.0
+- Kernel injection methods
+- Various bug fixes
+
+V1.1.2
+- Save/load last programm configuration
+- Added command line for process launcher
+- ManualMap: Discardable sections aren't mapped now (e.g. ".reloc")
+
+V1.1.0
+- Added module view
+- Module unloading
+
+V1.0.1:
+- Fixed bug with remote memory deallocation after manual mapping
+- Exception handler aren't created now if process has DEP turned off.
