@@ -169,6 +169,9 @@ public:
 
 	const void* Hook(const char* szModule, const char* szFunction)
 	{
+		if (!szModule || !szFunction)
+			return NULL;
+
 		PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)ProcessEnvironmentBlock->ImageBaseAddress;
 		PIMAGE_DATA_DIRECTORY pImportDirectory = &((PIMAGE_NT_HEADERS)((ULONG_PTR)pDosHeader + pDosHeader->e_lfanew))->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT];
 		PIMAGE_IMPORT_DESCRIPTOR pImportDescriptors = (PIMAGE_IMPORT_DESCRIPTOR)((ULONG_PTR)pDosHeader + pImportDirectory->VirtualAddress);
@@ -204,27 +207,28 @@ public:
 
 			if (!_stricmp(szModule, szModuleName))
 			{
-				for (DWORD i = 0; pImportNameTable[i].u1.Function; ++i)
+				for (DWORD i = 0; pImportNameTable[i].u1.AddressOfData; ++i)
 				{
+					// Check if the function is imported by ordinal or name
 					if (IMAGE_SNAP_BY_ORDINAL(pImportNameTable[i].u1.Ordinal))
 					{
 						if (hModule && bResolveOrdinal)
 						{
-							for (DWORD hint = 0; hint < pExportDirectory->NumberOfNames; ++hint) // FindNptProc here returns hint
+							// Find the function name in the name pointer table and return the hint
+							DWORD dwHint = FindNptProc(hModule, pAddressOfNames, pExportDirectory->NumberOfNames, szFunction);
+
+							// If the function name was found compare use the hint to find the function ordinal and compare
+							if (dwHint != -1)
 							{
-								LPCSTR szFunctionName = (LPCSTR)((ULONG_PTR)hModule + pAddressOfNames[hint]);
+								WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[dwHint] + pExportDirectory->Base);
 
-								if (!_stricmp(szFunctionName, szFunction))
-								{
-									WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[hint] + pExportDirectory->Base);
-
-									if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
-										return InitHook(&pImportAddressTable[i]);
-								}
+								if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
+									return InitHook(&pImportAddressTable[i]);
 							}
 						}
 						else
 						{
+							// Assume szFunction is actually an ordinal (WORD), and compare
 							if (IMAGE_ORDINAL((ULONG_PTR)szFunction) == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 								return InitHook(&pImportAddressTable[i]);
 						}
@@ -233,7 +237,8 @@ public:
 					{
 						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.AddressOfData))->Name;
 						
-						if (!_stricmp(szFunctionName, szFunction))	
+						// Compare function names
+						if (!strcmp(szFunctionName, szFunction))	
 							return InitHook(&pImportAddressTable[i]);
 					}
 				}
@@ -268,27 +273,27 @@ private:
 		return this->m_pOriginalFunction;
 	}
 
-	DWORD FindNptProc(PDWORD npt, DWORD size, PBYTE base, LPCSTR szProc)
+	DWORD FindNptProc(HMODULE hModule, PDWORD pdwAddressOfNames, DWORD dwSize, LPCSTR szProc)
 	{
-		INT   cmp;
-		DWORD max;
-		DWORD mid;
-		DWORD min;
+		INT   iCompare;
+		DWORD dwMax;
+		DWORD dwMid;
+		DWORD dwMin;
 
-		min = 0;
-		max = size - 1;
+		dwMin = 0;
+		dwMax = dwSize - 1;
 
-		while (min <= max)
+		while (dwMin <= dwMax)
 		{
-			mid = (min + max) >> 1;
-			cmp = strcmp((LPCSTR)(npt[mid] + base), szProc);
+			dwMid = (dwMin + dwMax) >> 1;
+			iCompare = strcmp((LPCSTR)((ULONG_PTR)hModule + pdwAddressOfNames[dwMid]), szProc);
 
-			if (cmp < 0)
-				min = mid + 1;
-			else if (cmp > 0)
-				max = mid - 1;
+			if (iCompare < 0)
+				dwMin = dwMid + 1;
+			else if (iCompare > 0)
+				dwMax = dwMid - 1;
 			else
-				return mid;
+				return dwMid;
 		}
 		return -1;
 	}

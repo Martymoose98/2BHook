@@ -90,7 +90,7 @@ typedef struct _BYTE_PATCH_MEMORY
 
 static VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
 {
-	pBytePatch->Magic = NOP_MEMORY_MAGIC;
+	pBytePatch->Magic = BYTE_PATCH_MEMORY_MAGIC;
 	pBytePatch->Patched = FALSE;
 	pBytePatch->Address = NULL;
 	pBytePatch->pNewOpcodes = NULL;
@@ -102,7 +102,7 @@ static VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
 
 static VOID InitalizeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, CONST BYTE* pOpcodes, SIZE_T cb)
 {
-	pBytePatch->Magic = NOP_MEMORY_MAGIC;
+	pBytePatch->Magic = BYTE_PATCH_MEMORY_MAGIC;
 	pBytePatch->Patched = FALSE;
 	pBytePatch->Address = address;
 	pBytePatch->pNewOpcodes = pOpcodes;
@@ -136,496 +136,513 @@ enum _ISBADPTR_STATUS
 };
 typedef DWORD ISBADPTR_STATUS;
 
-class CMemory
+
+static ULONG_PTR FindPattern(const char* szModuleName, const char* szPattern)
 {
-public:
-	ULONG_PTR FindPattern(const char* szModuleName, const char* szPattern)
+	const char* szPat = szPattern;
+	ULONG_PTR uFirstMatch = 0;
+	ULONG_PTR uStart = (ULONG_PTR)GetModuleHandleA(szModuleName);
+	MODULEINFO ModuleInfo;
+
+	if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)uStart, &ModuleInfo, sizeof(MODULEINFO)))
+		return -1;
+
+	ULONG_PTR uRangeEnd = uStart + ModuleInfo.SizeOfImage;
+
+	for (ULONG_PTR pCur = uStart; pCur < uRangeEnd; ++pCur)
 	{
-		const char* szPat = szPattern;
-		ULONG_PTR uFirstMatch = 0;
-		ULONG_PTR uStart = (ULONG_PTR)GetModuleHandleA(szModuleName);
-		MODULEINFO ModuleInfo;
+		if (!*szPat)
+			return uFirstMatch;
 
-		if (!GetModuleInformation(GetCurrentProcess(), (HMODULE)uStart, &ModuleInfo, sizeof(MODULEINFO)))
-			return -1;
-
-		ULONG_PTR uRangeEnd = uStart + ModuleInfo.SizeOfImage;
-
-		for (ULONG_PTR pCur = uStart; pCur < uRangeEnd; pCur++)
+		if (*(BYTE*)szPat == '\?' || *(BYTE*)pCur == GetByte(szPat))
 		{
-			if (!*szPat)
+			if (!uFirstMatch)
+				uFirstMatch = pCur;
+
+			if (!szPat[2] || !szPat[1])
 				return uFirstMatch;
 
-			if (*(BYTE*)szPat == '\?' || *(BYTE*)pCur == GetByte(szPat))
-			{
-				if (!uFirstMatch)
-					uFirstMatch = pCur;
-
-				if (!szPat[2])
-					return uFirstMatch;
-
-				if (*(WORD*)szPat == '\?\?' || *(BYTE*)szPat != '\?')
-					szPat += 3;
-				else
-					szPat += 2;    //one ?
-			}
+			if (*(WORD*)szPat == '\?\?' || *(BYTE*)szPat != '\?')
+				szPat += 3;
 			else
-			{
-				szPat = szPattern;
-				uFirstMatch = 0;
-			}
+				szPat += 2;
 		}
-		return 0;
+		else
+		{
+			szPat = szPattern;
+			uFirstMatch = 0;
+		}
 	}
+	return 0;
+}
 
-	// WARNING: I think this is supposed to return LONG instead of DWORD aka. ULONG
-	// rel32 jmp instructions are signed rva's.
-	// It's not a big deal currently 'cause the func is unused and therefore untested
-	// but, if used unchanged, I presume will cause issues/bugs/crashes.
-	inline LONG CalculateJump(QWORD rip, QWORD dest, SIZE_T uOffset)
+// WARNING: I think this is supposed to return LONG instead of DWORD aka. ULONG
+// rel32 jmp instructions are signed rva's.
+// It's not a big deal currently 'cause the func is unused and therefore untested
+// but, if used unchanged, I presume will cause issues/bugs/crashes.
+/// <summary>
+/// Calculates a relative 32 jump delta
+/// </summary>
+/// <param name="src">Instruction pointer (eip/rip)</param>
+/// <param name="dest">Destination pointer</param>
+/// <param name="uOffset">Offset in bytes to the rva</param>
+/// <returns>A relative 32 jump delta</returns>
+static inline LONG CalculateJump(ULONG_PTR src, ULONG_PTR dest, SIZE_T uOffset)
+{
+	return (LONG)(dest - src - (uOffset + sizeof(LONG)));
+}
+
+/// <summary>
+/// Reads a relative 32 jump instruction and returns the destination
+/// </summary>
+/// <param name="src">Instruction pointer (eip/rip)</param>
+/// <param name="uOffset">Offset in bytes to the rva</param>
+/// <returns>Destination pointer</returns>
+static inline ULONG_PTR ReadPtr(ULONG_PTR src, SIZE_T uOffset)
+{
+	return src + uOffset + sizeof(LONG) + *(LONG*)(src + uOffset);
+}
+
+/*
+	NOTE: When using this version of this function, the pointer has to be the first unknown
+	@params
+	szModulename - name of the module to scan (IDA or PEiD Style)
+	szPattern - the byte pattern to search the module for
+*/
+static ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern)
+{
+	ULONG_PTR rip = FindPattern(szModulename, szPattern);
+	ULONG_PTR uOffset = 0;
+
+	while (*(szPattern + uOffset * 3) != '?' && *(WORD*)(szPattern + uOffset * 3) != '??')
+		++uOffset;
+
+	SIZE_T OpcodeSize = uOffset + sizeof(LONG);
+	return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
+}
+
+/*
+	NOTE: When using this version of this function, the pointer has to be the first unknown.
+	Also, this is the fastest verison of this function since the uOffset is compile-time known.
+	@params
+	szModulename - name of the module to scan (IDA or PEiD Style)
+	szPattern - the byte pattern to search the module for
+	uOffset - the byte offset to the pointer from the beginning of szPattern
+*/
+static ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern, UINT uOffset)
+{
+	ULONG_PTR rip = FindPattern(szModulename, szPattern);
+	SIZE_T OpcodeSize = uOffset + sizeof(LONG);
+	return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
+}
+
+static VOID NopMemory(VOID* address, SIZE_T nBytes, BYTE** ppOldOpcodes)
+{
+	if (!address)
+		return;
+
+	if (!nBytes)
+		return;
+
+	if (!*ppOldOpcodes)
 	{
-		return (LONG)(dest - rip - (uOffset + sizeof(LONG)));
-	}
-
-	static inline QWORD ReadPtr64(QWORD rip, SIZE_T uOffset)
-	{
-		return rip + uOffset + sizeof(LONG) + *(LONG*)(rip + uOffset);
-	}
-
-	/*
-		NOTE: When using this version of this function, the pointer has to be the first unknown
-		@params
-		szModulename - name of the module to scan (IDA or PEiD Style)
-		szPattern - the byte pattern to search the module for
-	*/
-	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern)
-	{
-		ULONG_PTR rip = FindPattern(szModulename, szPattern);
-		ULONG_PTR uOffset = 0;
-
-		while (*(szPattern + uOffset * 3) != '?' && *(WORD*)(szPattern + uOffset * 3) != '??')
-			++uOffset;
-
-		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
-		return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
-	}
-
-	/*
-		NOTE: When using this version of this function, the pointer has to be the first unknown.
-		Also, this is the fastest verison of this function since the uOffset is compile-time known.
-		@params
-		szModulename - name of the module to scan (IDA or PEiD Style)
-		szPattern - the byte pattern to search the module for
-		uOffset - the byte offset to the pointer from the beginning of szPattern
-	*/
-	ULONG_PTR FindPatternPtr(const char* szModulename, const char* szPattern, UINT uOffset)
-	{
-		ULONG_PTR rip = FindPattern(szModulename, szPattern);
-		SIZE_T OpcodeSize = uOffset + sizeof(LONG);
-		return (ULONG_PTR)((*(LONG*)(rip + uOffset)) + OpcodeSize) + rip;
-	}
-
-	VOID NopMemory(VOID* address, SIZE_T nBytes, BYTE** ppOldOpcodes)
-	{
-		if (!address)
-			return;
-
-		if (!nBytes)
-			return;
+		*ppOldOpcodes = (BYTE*)malloc(nBytes);
 
 		if (!*ppOldOpcodes)
-		{
-			*ppOldOpcodes = (BYTE*)malloc(nBytes);
-
-			if (!*ppOldOpcodes)
-				return;
-		}
-
-		memcpy(*ppOldOpcodes, address, nBytes);
-		NOPMemory(address, nBytes);
+			return;
 	}
 
-	VOID NopMemory(PNOP_MEMORY pNop)
+	memcpy(*ppOldOpcodes, address, nBytes);
+	NOPMemory(address, nBytes);
+}
+
+static VOID NopMemory(PNOP_MEMORY pNop)
+{
+	if (!pNop)
+		return;
+
+	if (!pNop->Address)
+		return;
+
+	if (!pNop->nBytes)
+		return;
+
+	if (!pNop->pOldOpcodes)
 	{
-		if (!pNop)
-			return;
-
-		if (!pNop->Address)
-			return;
-
-		if (!pNop->nBytes)
-			return;
-
-		if (!pNop->pOldOpcodes)
-		{
-			pNop->pOldOpcodes = (BYTE*)malloc(pNop->nBytes);
-
-			if (!pNop->pOldOpcodes)
-				return;
-		}
-
-		if (pNop->Patched)
-			return;
-
-		DWORD dwOldProtect;
-
-		EnterCriticalSection(&pNop->CriticalSection);
-
-		VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-
-		memcpy(pNop->pOldOpcodes, pNop->Address, pNop->nBytes);
-		NOPMemory(pNop->Address, pNop->nBytes);
-
-		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
-
-		pNop->Patched = TRUE;
-
-		LeaveCriticalSection(&pNop->CriticalSection);
-	}
-
-	VOID RestoreMemory(VOID* address, SIZE_T nBytes, BYTE* pOldOpcodes)
-	{
-		if (!address)
-			return;
-
-		if (!nBytes)
-			return;
-
-		if (!pOldOpcodes)
-			return;
-
-		memcpy(address, pOldOpcodes, nBytes);
-	}
-
-	VOID RestoreMemoryNop(CONST PNOP_MEMORY pNop)
-	{
-		if (!pNop)
-			return;
-
-		if (!pNop->Address)
-			return;
-
-		if (!pNop->nBytes)
-			return;
+		pNop->pOldOpcodes = (BYTE*)malloc(pNop->nBytes);
 
 		if (!pNop->pOldOpcodes)
 			return;
-
-		if (!pNop->Patched)
-			return;
-
-		DWORD dwOldProtect;
-
-		EnterCriticalSection(&pNop->CriticalSection);
-
-		VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-
-		memcpy(pNop->Address, pNop->pOldOpcodes, pNop->nBytes);
-
-		VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
-
-		pNop->Patched = FALSE;
-
-		LeaveCriticalSection(&pNop->CriticalSection);
 	}
 
-	VOID PatchBytes(VOID* address, SIZE_T nBytes, BYTE* pNewOpcodes, BYTE** ppOldOpcodes)
+	if (pNop->Patched)
+		return;
+
+	DWORD dwOldProtect;
+
+	EnterCriticalSection(&pNop->CriticalSection);
+
+	VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+
+	memcpy(pNop->pOldOpcodes, pNop->Address, pNop->nBytes);
+	NOPMemory(pNop->Address, pNop->nBytes);
+
+	FlushInstructionCache(GetCurrentProcess(), pNop->Address, pNop->nBytes);
+
+	VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
+
+	pNop->Patched = TRUE;
+
+	LeaveCriticalSection(&pNop->CriticalSection);
+}
+
+static VOID RestoreMemory(VOID* address, SIZE_T nBytes, BYTE* pOldOpcodes)
+{
+	if (!address)
+		return;
+
+	if (!nBytes)
+		return;
+
+	if (!pOldOpcodes)
+		return;
+
+	memcpy(address, pOldOpcodes, nBytes);
+}
+
+static VOID RestoreMemoryNop(CONST PNOP_MEMORY pNop)
+{
+	if (!pNop)
+		return;
+
+	if (!pNop->Address)
+		return;
+
+	if (!pNop->nBytes)
+		return;
+
+	if (!pNop->pOldOpcodes)
+		return;
+
+	if (!pNop->Patched)
+		return;
+
+	DWORD dwOldProtect;
+
+	EnterCriticalSection(&pNop->CriticalSection);
+
+	VirtualProtect(pNop->Address, pNop->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+
+	memcpy(pNop->Address, pNop->pOldOpcodes, pNop->nBytes);
+
+	FlushInstructionCache(GetCurrentProcess(), pNop->Address, pNop->nBytes);
+
+	VirtualProtect(pNop->Address, pNop->nBytes, dwOldProtect, &dwOldProtect);
+
+	pNop->Patched = FALSE;
+
+	LeaveCriticalSection(&pNop->CriticalSection);
+}
+
+static VOID PatchBytes(VOID* address, SIZE_T nBytes, BYTE* pNewOpcodes, BYTE** ppOldOpcodes)
+{
+	if (!address)
+		return;
+
+	if (!nBytes)
+		return;
+
+	if (!pNewOpcodes)
+		return;
+
+	if (!*ppOldOpcodes)
 	{
-		if (!address)
-			return;
-
-		if (!nBytes)
-			return;
-
-		if (!pNewOpcodes)
-			return;
+		*ppOldOpcodes = (BYTE*)malloc(nBytes);
 
 		if (!*ppOldOpcodes)
-		{
-			*ppOldOpcodes = (BYTE*)malloc(nBytes);
-
-			if (!*ppOldOpcodes)
-				return;
-		}
-
-		memcpy(*ppOldOpcodes, address, nBytes);
-		memcpy(address, pNewOpcodes, nBytes);
+			return;
 	}
 
-	// FIXME: All of these functions should return a value
-	VOID PatchBytes(PBYTE_PATCH_MEMORY pBytePatch)
+	memcpy(*ppOldOpcodes, address, nBytes);
+	memcpy(address, pNewOpcodes, nBytes);
+}
+
+// FIXME: All of these functions should return a value
+static VOID PatchBytes(PBYTE_PATCH_MEMORY pBytePatch)
+{
+	if (!pBytePatch)
+		return;
+
+	if (!pBytePatch->Address)
+		return;
+
+	if (!pBytePatch->nBytes)
+		return;
+
+	if (!pBytePatch->pNewOpcodes)
+		return;
+
+	if (!pBytePatch->pOldOpcodes)
 	{
-		if (!pBytePatch)
-			return;
-
-		if (!pBytePatch->Address)
-			return;
-
-		if (!pBytePatch->nBytes)
-			return;
-
-		if (!pBytePatch->pNewOpcodes)
-			return;
-
-		if (!pBytePatch->pOldOpcodes)
-		{
-			pBytePatch->pOldOpcodes = (BYTE*)malloc(pBytePatch->nBytes);
-
-			if (!pBytePatch->pOldOpcodes)
-				return;
-		}
-
-		if (pBytePatch->Patched)
-			return;
-
-		DWORD dwOldProtect;
-
-		EnterCriticalSection(&pBytePatch->CriticalSection);
-
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-
-		memcpy(pBytePatch->pOldOpcodes, pBytePatch->Address, pBytePatch->nBytes);
-		memcpy(pBytePatch->Address, pBytePatch->pNewOpcodes, pBytePatch->nBytes);
-
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
-
-		pBytePatch->Patched = TRUE;
-
-		LeaveCriticalSection(&pBytePatch->CriticalSection);
-	}
-
-	VOID RestoreMemoryBytePatch(CONST PBYTE_PATCH_MEMORY pBytePatch)
-	{
-		if (!pBytePatch)
-			return;
-
-		if (!pBytePatch->Address)
-			return;
-
-		if (!pBytePatch->nBytes)
-			return;
+		pBytePatch->pOldOpcodes = (BYTE*)malloc(pBytePatch->nBytes);
 
 		if (!pBytePatch->pOldOpcodes)
 			return;
-
-		if (!pBytePatch->Patched)
-			return;
-
-		DWORD dwOldProtect;
-
-		EnterCriticalSection(&pBytePatch->CriticalSection);
-
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
-
-		memcpy(pBytePatch->Address, pBytePatch->pOldOpcodes, pBytePatch->nBytes);
-
-		VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
-
-		pBytePatch->Patched = FALSE;
-
-		LeaveCriticalSection(&pBytePatch->CriticalSection);
 	}
 
-	VOID RestoreMemory(CONST VOID* pMem)
+	if (pBytePatch->Patched)
+		return;
+
+	DWORD dwOldProtect;
+
+	EnterCriticalSection(&pBytePatch->CriticalSection);
+
+	VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+
+	memcpy(pBytePatch->pOldOpcodes, pBytePatch->Address, pBytePatch->nBytes);
+	memcpy(pBytePatch->Address, pBytePatch->pNewOpcodes, pBytePatch->nBytes);
+
+	FlushInstructionCache(GetCurrentProcess(), pBytePatch->Address, pBytePatch->nBytes);
+
+	VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
+
+	pBytePatch->Patched = TRUE;
+
+	LeaveCriticalSection(&pBytePatch->CriticalSection);
+}
+
+static VOID RestoreMemoryBytePatch(CONST PBYTE_PATCH_MEMORY pBytePatch)
+{
+	if (!pBytePatch)
+		return;
+
+	if (!pBytePatch->Address)
+		return;
+
+	if (!pBytePatch->nBytes)
+		return;
+
+	if (!pBytePatch->pOldOpcodes)
+		return;
+
+	if (!pBytePatch->Patched)
+		return;
+
+	DWORD dwOldProtect;
+
+	EnterCriticalSection(&pBytePatch->CriticalSection);
+
+	VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, PAGE_EXECUTE_READWRITE, &dwOldProtect);
+
+	memcpy(pBytePatch->Address, pBytePatch->pOldOpcodes, pBytePatch->nBytes);
+
+	FlushInstructionCache(GetCurrentProcess(), pBytePatch->Address, pBytePatch->nBytes);
+
+	VirtualProtect(pBytePatch->Address, pBytePatch->nBytes, dwOldProtect, &dwOldProtect);
+
+	pBytePatch->Patched = FALSE;
+
+	LeaveCriticalSection(&pBytePatch->CriticalSection);
+}
+
+static VOID RestoreMemory(CONST VOID* pMem)
+{
+	switch (*(INT*)pMem)
 	{
-		switch (*(INT*)pMem)
-		{
-		case NOP_MEMORY_MAGIC:
-			RestoreMemoryNop((PNOP_MEMORY)pMem);
-			return;
-		case BYTE_PATCH_MEMORY_MAGIC:
-			RestoreMemoryBytePatch((PBYTE_PATCH_MEMORY)pMem);
-			return;
-		default:
-			__debugbreak();
-			return;
-		}
+	case NOP_MEMORY_MAGIC:
+		RestoreMemoryNop((PNOP_MEMORY)pMem);
+		return;
+	case BYTE_PATCH_MEMORY_MAGIC:
+		RestoreMemoryBytePatch((PBYTE_PATCH_MEMORY)pMem);
+		return;
+	default:
+		__debugbreak();
+		return;
 	}
+}
 
-	// maybe we should have different shellcodes that use other registers
-	BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pHook)
-	{
-		if (length < MINIMUM_HOOK_LENGTH64)
-			return FALSE;
+// maybe we should have different shellcodes that use other registers
+static BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pHook)
+{
+	if (length < MINIMUM_HOOK_LENGTH64)
+		return FALSE;
 
-		if (pHook->m_bHooked)
-			return FALSE;
+	if (pHook->m_bHooked)
+		return FALSE;
 
-		DWORD dwOldProtect;
+	DWORD dwOldProtect;
 
-		if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
-			return FALSE;
+	if (!VirtualProtect(pSrcFunc, length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+		return FALSE;
 
-		pHook->m_bHooked = TRUE;
-		pHook->m_pSrcFunc = pSrcFunc;
-		pHook->m_pOldInstructions = (BYTE*)malloc(length);
+	pHook->m_pSrcFunc = pSrcFunc;
+	pHook->m_pOldInstructions = (BYTE*)malloc(length);
 
-		if (!pHook->m_pOldInstructions)
-			return FALSE;
+	if (!pHook->m_pOldInstructions)
+		return FALSE;
 
-		memcpy(pHook->m_pOldInstructions, pSrcFunc, length);
-		pHook->m_length = length;
+	memcpy(pHook->m_pOldInstructions, pSrcFunc, length);
+	pHook->m_length = length;
 
-		NOPMemory((LPBYTE)pSrcFunc + MINIMUM_HOOK_LENGTH64, length - MINIMUM_HOOK_LENGTH64);
+	NOPMemory((LPBYTE)pSrcFunc + MINIMUM_HOOK_LENGTH64, length - MINIMUM_HOOK_LENGTH64);
 
-		/*
-			push rax
-			movabs rax, imm64
-			xchg rax, [rsp]
-			ret
+	/*
+		push rax
+		movabs rax, imm64
+		xchg rax, [rsp]
+		ret
 
-		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x87, 0x04, 0x24, 0xC3 }
+	{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x48, 0x87, 0x04, 0x24, 0xC3 }
 
-		or
+	or
 
-			push rax
-			movabs rax, imm64
-			jmp rax
-			pop rax
+		push rax
+		movabs rax, imm64
+		jmp rax
+		pop rax
 
-		{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0, 0x58 };
+	{ 0x50, 0x48, 0xB8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xE0, 0x58 };
 
-		or active vvvv
+	or active vvvv
 
-		rsp -= 16
+	rsp -= 16
 
-			push rbx
-			movabs rbx, imm64
-			call rbx
-			pop rbx
+		push rbx
+		movabs rbx, imm64
+		call rbx
+		pop rbx
 
-		{ 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B }
+	{ 0x53, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x5B }
 
-		or  active vvvv
+	or  active vvvv
 
-		Saves stack pointer
+	Saves stack pointer
 
-				0:  53                      push   rbx
-				1:  55                      push   rbp
-				2:  48 89 e5                mov    rbp,rsp
-				5:  48 bb 00 00 00 00 00    movabs rbx, imm64
-				c:  00 00 00
-				f:  ff d3                   call   rbx
-				11: 48 89 ec                mov    rsp,rbp
-				14: 5d                      pop    rbp
-				15: 5b                      pop    rbx
+			0:  53                      push   rbx
+			1:  55                      push   rbp
+			2:  48 89 e5                mov    rbp,rsp
+			5:  48 bb 00 00 00 00 00    movabs rbx, imm64
+			c:  00 00 00
+			f:  ff d3                   call   rbx
+			11: 48 89 ec                mov    rsp,rbp
+			14: 5d                      pop    rbp
+			15: 5b                      pop    rbx
 
-		{ 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B }
-		*/
-		static BYTE detour[] = { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B };
+	{ 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B }
+	*/
+	static BYTE detour[] = { 0x53, 0x55, 0x48, 0x89, 0xE5, 0x48, 0xBB, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xFF, 0xD3, 0x48, 0x89, 0xEC, 0x5D, 0x5B };
 
-		memcpy(pHook->m_Detour, detour, sizeof(detour));
-		*(QWORD*)&pHook->m_Detour[7] = (QWORD)pDstFunc;
-		memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
+	memcpy(pHook->m_Detour, detour, sizeof(detour));
+	*(QWORD*)&pHook->m_Detour[7] = (QWORD)pDstFunc;
+	memcpy(pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
 
-		if (!VirtualProtect(pSrcFunc, length, dwOldProtect, &dwOldProtect))
-			return FALSE;
+	FlushInstructionCache(GetCurrentProcess(), pSrcFunc, length);
+	pHook->m_bHooked = TRUE;
 
-		//FlushInstructionCache(GetCurrentProcess(), pSrcFunc, length);
+	if (!VirtualProtect(pSrcFunc, length, dwOldProtect, &dwOldProtect))
+		return FALSE;
 
-		return TRUE;
-	}
+	return TRUE;
+}
 
-	BOOL RehookFunc(HOOK_FUNC* pHook)
-	{
-		if (pHook->m_bHooked)
-			return FALSE;
+static BOOL RehookFunc(HOOK_FUNC* pHook)
+{
+	if (pHook->m_bHooked)
+		return FALSE;
 
-		DWORD dwOldProtect;
+	DWORD dwOldProtect;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
-			return FALSE;
+	if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+		return FALSE;
 
-		NOPMemory((LPBYTE)pHook->m_pSrcFunc + MINIMUM_HOOK_LENGTH64, pHook->m_length - MINIMUM_HOOK_LENGTH64);
+	NOPMemory((LPBYTE)pHook->m_pSrcFunc + MINIMUM_HOOK_LENGTH64, pHook->m_length - MINIMUM_HOOK_LENGTH64);
 
-		memcpy(pHook->m_pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
-		pHook->m_bHooked = TRUE;
+	memcpy(pHook->m_pSrcFunc, pHook->m_Detour, MINIMUM_HOOK_LENGTH64);
+	pHook->m_bHooked = TRUE;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
-			return FALSE;
+	FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
 
-		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
+	VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect);
 
-		return TRUE;
-	}
+	if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
+		return FALSE;
 
-	BOOL UnhookFunc(HOOK_FUNC* pHook)
-	{
-		if (!pHook->m_bHooked)
-			return FALSE;
+	return TRUE;
+}
 
-		DWORD dwOldProtect;
+static BOOL UnhookFunc(HOOK_FUNC* pHook)
+{
+	if (!pHook->m_bHooked)
+		return FALSE;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
-			return FALSE;
+	DWORD dwOldProtect;
 
-		memcpy(pHook->m_pSrcFunc, pHook->m_pOldInstructions, pHook->m_length);
-		pHook->m_bHooked = FALSE;
+	if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, PAGE_EXECUTE_READWRITE, &dwOldProtect))
+		return FALSE;
 
-		if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
-			return FALSE;
+	memcpy(pHook->m_pSrcFunc, pHook->m_pOldInstructions, pHook->m_length);
 
-		//FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
+	FlushInstructionCache(GetCurrentProcess(), pHook->m_pSrcFunc, pHook->m_length);
+	pHook->m_bHooked = FALSE;
 
-		return TRUE;
-	}
+	if (!VirtualProtect(pHook->m_pSrcFunc, pHook->m_length, dwOldProtect, &dwOldProtect))
+		return FALSE;
 
-	static ISBADPTR_STATUS IsBadReadPtr(const void* p)
-	{
-		MEMORY_BASIC_INFORMATION mbi;
-		ISBADPTR_STATUS status = VALID_PTR;
+	return TRUE;
+}
 
-		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+static ISBADPTR_STATUS IsBadReadPtr(const void* p)
+{
+	MEMORY_BASIC_INFORMATION mbi;
+	ISBADPTR_STATUS status = VALID_PTR;
 
-		if (!nBytes)
-			return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
+	SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
-		if (mbi.State == MEM_FREE)
-			status |= MEMORY_FREED;
+	if (!nBytes)
+		return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
 
-		if (mbi.Protect & PAGE_GUARD)
-			status |= GUARD_PAGE;
+	if (mbi.State == MEM_FREE)
+		status |= MEMORY_FREED;
 
-		if (mbi.Protect & PAGE_NOACCESS)
-			status |= NO_ACCESS_PAGE;
+	if (mbi.Protect & PAGE_GUARD)
+		status |= GUARD_PAGE;
 
-		if (mbi.Protect & PAGE_EXECUTE)
-			status |= EXECUTE_PAGE;
+	if (mbi.Protect & PAGE_NOACCESS)
+		status |= NO_ACCESS_PAGE;
 
-		return status;
-	}
+	if (mbi.Protect & PAGE_EXECUTE)
+		status |= EXECUTE_PAGE;
 
-	static ISBADPTR_STATUS IsBadCodePtr(const void* p)
-	{
-		MEMORY_BASIC_INFORMATION mbi;
-		ISBADPTR_STATUS status = VALID_PTR;
+	return status;
+}
 
-		SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
+static ISBADPTR_STATUS IsBadCodePtr(const void* p)
+{
+	MEMORY_BASIC_INFORMATION mbi;
+	ISBADPTR_STATUS status = VALID_PTR;
 
-		if (!nBytes)
-			return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
+	SIZE_T nBytes = VirtualQuery(p, &mbi, sizeof(MEMORY_BASIC_INFORMATION));
 
-		if (mbi.State == MEM_FREE)
-			status |= MEMORY_FREED;
+	if (!nBytes)
+		return VIRTUAL_QUERY_FAILED; // To get extended error information, call GetLastError
 
-		if (mbi.Protect & PAGE_GUARD)
-			status |= GUARD_PAGE;
+	if (mbi.State == MEM_FREE)
+		status |= MEMORY_FREED;
 
-		if (mbi.Protect & PAGE_NOACCESS)
-			status |= NO_ACCESS_PAGE;
+	if (mbi.Protect & PAGE_GUARD)
+		status |= GUARD_PAGE;
 
-		if (mbi.Protect & PAGE_READONLY)
-			status |= READ_PAGE;
+	if (mbi.Protect & PAGE_NOACCESS)
+		status |= NO_ACCESS_PAGE;
 
-		if (mbi.Protect & PAGE_READWRITE)
-			status |= READ_WRITE_PAGE;
+	if (mbi.Protect & PAGE_READONLY)
+		status |= READ_PAGE;
 
-		if (mbi.Protect & PAGE_WRITECOPY)
-			status |= WRITE_COPY_PAGE;
+	if (mbi.Protect & PAGE_READWRITE)
+		status |= READ_WRITE_PAGE;
 
-		return status;
-	}
+	if (mbi.Protect & PAGE_WRITECOPY)
+		status |= WRITE_COPY_PAGE;
 
-private:
-};
-extern CMemory* g_pMemory;
+	return status;
+}

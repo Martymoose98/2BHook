@@ -4,8 +4,6 @@ class Pl0000;
 
 typedef struct Variables_t
 {
-	Variables_t() {}
-
 	struct Visuals_t
 	{	
 		bool bTraceLine;
@@ -17,8 +15,10 @@ typedef struct Variables_t
 		bool bEnemyInfo;
 		bool bNPCInfo;
 		bool bCollisionObjectInfo;
+		bool bCollisionDebugObjectInfo;
 		bool bSkeleton;
 		bool bDebugLocalPlayerSkeleton;
+		float flFov;
 	} Visuals;
 
 	struct Gameplay_t
@@ -55,7 +55,7 @@ typedef struct Variables_t
 		int iSelectedEntityLevel;
 		bool bFreezePlayer;
 		bool bNoTutorialDialogs;
-		bool bSpeedMeister;
+		bool bSpeedhack;
 		float flSpeedMultiplier;
 		int iSelectedBlacklistItem;
 		char szBlacklistName[32];
@@ -81,6 +81,8 @@ typedef struct Variables_t
 	struct Menu_t
 	{
 		bool bOpened;
+		char szAdapterUtf8[128 * 4];
+		char szOutputUtf8[32 * 4];
 		bool bIgnoreInputWhenOpened;
 
 		struct Input_t
@@ -113,7 +115,10 @@ typedef struct Variables_t
 		KeybindFunctional<void> Airstuck;
 		KeybindFunctional<void> DuplicateBuddy;
 		KeybindFunctional<void> PlayAnimation;
-		KeybindFunctional<void> TeleportForward;
+		KeybindFunctional<void, eTransformMatrix, float> TeleportForward;
+		KeybindFunctional<void, eTransformMatrix, float> TeleportBackward;
+		KeybindFunctional<void, eTransformMatrix, float> TeleportLeft;
+		KeybindFunctional<void, eTransformMatrix, float> TeleportRight;
 		KeybindDynamicToggleable ModelGravity;
 		KeybindDynamicIncrement<float> ModelYControl;
 	} Keybinds;
@@ -212,7 +217,16 @@ typedef struct Variables_t
 		{ "Corpse2", "Corpse", 0x21081 },
 		{ "Enemy Drop", "EmBase", 0x70001 },
 		{ "Enemy Drop 2", "EmBase", 0x20030 },
-		{ "MapInst", "MapInstance", 0x90001 }
+		{ "MapInst", "MapInstance", 0x90001 },
+		{ "Door", "BehaviorDoor", 0xF0016 },
+		{ "Door2", "BehaviorDoor", 0xF0432 },
+		{ "Door3", "BehaviorDoor", 0xF5500 },
+		{ "Door4", "BehaviorDoor", 0xF5501 },
+		{ "Door5", "BehaviorDoor", 0xF5502 },
+		{ "Door6", "BehaviorDoor", 0xF5503 },
+		{ "Door7", "BehaviorDoor", 0xF1600 },
+		{ "Door8", "BehaviorDoor", 0xF1610 },
+		{ "Terminal", "BehaviorTransporter", 0xC1002 }
 		//{ "Protagonist", "Player", 0x10000 }
 		//0xA2180 c, 0x21060 c, 0x20030,  0x40006, 0xF2014, 0x20030, 0x30610, 0x30240, 0x30450, 0x30050, 0x30260, 0x30261, 0x30240, 0x30070, 0x30071, 0x30080, 0x30610, 0x30450, 0x30240, 0x30050, 0x31000, 0x40006, 0x40002,  0x31000
 		//{ "Director2", "Et0024", 0x40012 }, CRASHES
@@ -241,7 +255,17 @@ typedef struct Variables_t
 		"Corpse1 (Invisible)",
 		"Corpse2 (Invisible)",
 		"Enemy Drop",
-		"Enemy Drop 2"
+		"Enemy Drop 2",
+		"MapInst",
+		"Door",
+		"Door2",
+		"Door3",
+		"Door4",
+		"Door5",
+		"Door6",
+		"Door7",
+		"Door8",
+		"Terminal"
 		//"BG", CRASHES
 		//"Enemy1",CRASHES
 		//"Enemy2", CRASHES

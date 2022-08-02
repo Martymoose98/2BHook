@@ -13,16 +13,16 @@ public:
 	static void ApplyHealthMods(void)
 	{
 		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
-			g_pMemory->NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
+			NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 
 		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoWorldDamage)
-			g_pMemory->NopMemory(&nop_Health[NOP_DAMAGE_WORLD]);
+			NopMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 
 		if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoEnemyDamage)
-			g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
+			RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 
 		if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoWorldDamage)
-			g_pMemory->RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
+			RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	}
 
 	static void AddEntityToBlackList()
@@ -32,53 +32,47 @@ public:
 
 	static void ChangeBuddy(int buddy)
 	{
-		CRITICAL_SECTION cs;
+		// I don't know what this is. It appears to be related to scene entity system
+		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
 		unsigned int crc;
 		SceneState* pScene;
 
 		switch (buddy)
 		{
 		case PROTAGONIST_2B:
-
 			crc = HashStringCRC32("Buddy/2B", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "Buddy/2B", 8);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/2B", 8);
 			LOG("return value: %x\n", pScene);
-
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
-			//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &pScene);
-
 			break;
 		case PROTAGONIST_A2:
 			crc = HashStringCRC32("Buddy/A2", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "Buddy/A2", 8);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/A2", 8);
 			LOG("return value: %x\n", pScene);
-
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
-			//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &ret); //parent function
 			break;
 		case PROTAGONIST_9S:
 			crc = HashStringCRC32("Buddy/9S", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "Buddy/9S", 8);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/9S", 8);
 			LOG("return value: %x\n", pScene);
-
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
-			//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &ret);
 			break;
 		default:
-			break;
+			return;
 		}
+		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
+		// old ver
+		//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &pScene);
 	}
 
 	// exprimential
 	static void AddBuddy(void)
 	{
-		CRITICAL_SECTION cs;
+		// I don't know what this is. It appears to be related to scene entity system
+		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
 		unsigned int crc;
 		void* pScene;
 		__int64 val;
 
 		crc = HashStringCRC32("Buddy/A2", 8);
-		pScene = FindSceneState(&cs, crc, "Buddy/A2", 8);
+		pScene = SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/A2", 8);
 
 
 		//(*(bool(*)(void*, __int64*))(0x14001EC80))((void*)0x14158CBC0, &ret);
@@ -91,7 +85,8 @@ public:
 	// exprimential
 	static void AddPlayer(int player)
 	{
-		CRITICAL_SECTION cs;
+		// I don't know what this is. It appears to be related to scene entity system
+		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
 		unsigned int crc;
 		SceneState* pScene;
 
@@ -101,15 +96,15 @@ public:
 			//crc = HashStringCRC32("PL/2B", 8);
 			//pScene = (SceneState*)FindSceneState(&cs, crc, "PL/2B", 8);
 			crc = HashStringCRC32("Load/A29S", 10);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "Load/A29S", 10); // Load/A29S | Load/A22B	
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Load/A29S", 10); // Load/A29S | Load/A22B	
+			((CSceneStateSystem_SetFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
 			break;
 
 			break;
 		case PROTAGONIST_A2:
 			crc = HashStringCRC32("PL/A2", 5);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "PL/A2", 5);
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "PL/A2", 5);
+			((CSceneStateSystem_SetFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
 		default:
 			break;
 		}
@@ -191,13 +186,13 @@ public:
 		if (!pEntity)
 			return -1;
 
-		WetObjectManager_AddLocalEntity(0, pEntity->m_pInfo);
+		WetObjectManager_AddLocalEntity(g_pWetObjectManager, pEntity->m_pInfo);
 
-		for (; i < ARRAYSIZE(g_pWetObjectManager->m_Localhandles); ++i)
-			if (g_pWetObjectManager->m_Localhandles[i] == pEntity->m_pInfo->m_hEntity)
+		for (; i < ARRAYSIZE(g_pWetObjectManager->m_LocalHandles); ++i)
+			if (g_pWetObjectManager->m_LocalHandles[i] == pEntity->m_pInfo->m_hEntity)
 				break;
 
-		WetObjectManager_SetWet(0, wetness, i);
+		WetObjectManager_SetWet(g_pWetObjectManager, wetness, i);
 
 		return i;
 	}
@@ -211,7 +206,7 @@ public:
 
 		SetLocalPlayer(&pEntity->m_pInfo->m_hEntity);
 
-		*(PDWORD)0x1419AED20 = 0x80000000;
+		//*(PDWORD)0x1419AED20 = 0x80000000;
 
 		ResetCamera(g_pCamera);
 	}
@@ -239,7 +234,7 @@ public:
 	static void Airstuck()
 	{
 		if (g_pLocalPlayer)
-			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer);
+			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer); // TODO: fix or scrap
 	}
 
 	static void TeleportEntityToOther(EntityHandle hTeleporter, EntityHandle hTeleportee)
@@ -251,15 +246,48 @@ public:
 			pTeleportee->m_vPosition = pTeleporter->m_vPosition + pTeleporter->m_matTransform.GetAxis(FORWARD) * 4.f;
 	}
 
-	static void TeleportForwardEx(Pl0000* pEntity, float flSpeed)
+	static void TeleportScalarEx(Pl0000* pEntity, eTransformMatrix Axis, float flSpeed)
 	{
 		if (pEntity)
-			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(FORWARD) * flSpeed;
+			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(Axis) * flSpeed;
 	}
 
-	static void TeleportForward(void)
+	static void TeleportScalar(eTransformMatrix Axis, float flSpeed)
 	{
-		TeleportForwardEx(GetEntityFromHandle(&g_pCamera->m_hEntity), 0.5f);
+		if (g_pCamera)
+			TeleportScalarEx(GetEntityFromHandle(&g_pCamera->m_hEntity), Axis, flSpeed);
+	}
+
+	static bool* GetModelGravityEx(Pl0000* pEntity)
+	{
+		if (!pEntity)
+			return NULL;
+
+		return (bool*)&pEntity->m_VerticalCollision.m_bEnabled;
+	}
+	
+	static bool* GetModelGravity(void)
+	{
+		if (!g_pCamera)
+			return NULL;
+
+		return GetModelGravityEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+	}
+
+	static float* GetEntityOBBYEx(Pl0000* pEntity)
+	{
+		if (!pEntity)
+			return NULL;
+
+		return &pEntity->m_VerticalCollision.m_vPosition.y;
+	}
+
+	static float* GetEntityOBBY()
+	{
+		if (!g_pCamera)
+			return NULL;
+
+		return GetEntityOBBYEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
 	}
 
 	static void PlayAnimationEx(Pl0000* pEntity)
@@ -301,6 +329,7 @@ public:
 			BalanceEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
 	}
 
+	// FIXME: for some reason pEnemy is always null even though there are enemies ??
 	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
 	{
 		if (!pEnemy)
@@ -343,7 +372,8 @@ public:
 
 	static void AddPod(int pod)
 	{
-		CRITICAL_SECTION cs;
+		// I don't know what this is. It appears to be related to scene entity system
+		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
 		unsigned int crc;
 		SceneState* pScene;
 
@@ -351,31 +381,32 @@ public:
 		{
 		case POD_A:
 			crc = HashStringCRC32("own_podA", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "own_podA", 8);
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podA", 8);
 			break;
 		case POD_B:
 			crc = HashStringCRC32("own_podB", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "own_podB", 8);
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podB", 8);
 			break;
 		case POD_C:
 			crc = HashStringCRC32("own_podC", 8);
-			pScene = (SceneState*)FindSceneState(&cs, crc, "own_podC", 8);
-			((SceneStateSystem_SetInternalFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podC", 8);
 			break;
 		default:
-			break;
+			return;
 		}
+		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
 	}
 
 	static void AddItem(int id, int quantity)
 	{
-		((AddItemFn)(0x1405DC410))(0, id, quantity);
+		// I don't know what this is. I just know it's related to the item manager
+		static CItemManager* pItemManager = (CItemManager*)FindPatternPtr(NULL, "7E CA 48 8D 15 ? ? ? ?", 5);
+
+		ItemManager_AddItem(pItemManager, id, quantity);
 
 		if (Vars.Gameplay.bInstantEquip)
 		{
-			((UseItemFn)(0x1405DC5A0))(0, id, (float)quantity); // TODO: odd parameter idk why it's float (investigate)
+			ItemManager_UseItem(pItemManager, ItemManager_GetItemNameById(g_pItemManager, id));
 		}
 	}
 
@@ -440,10 +471,11 @@ public:
 		c.m_ObjectIds[1] = objectId;
 		c.m_iGenerateMode = 1;
 		c.m_pSetInfo = pSetInfo;
-
-		return ((SceneEntitySystem_CreateEntityFn)(0x1404F9AA0))((CSceneEntitySystem*)0x14160DFE0, &c);
+		
+		return SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &c);
 	}
 
+	// broken
 	static CpkEntry* LoadCpk(const char* szCpkName)
 	{
 		char szFullpath[MAX_PATH];

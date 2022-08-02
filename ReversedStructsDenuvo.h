@@ -3,7 +3,6 @@
 
 #include <d3d11.h>
 #include <dinput.h>
-#include "StaticAssert.h"
 #include "SteamApi.h"
 #include "Math.h"
 
@@ -47,8 +46,8 @@
 #define IS_SAVE_SLOTDATA(s) ((s) > -1 && (s) < 3)
 
 // visual studio says correct offsets are wrong before compalation on interfaces rifk
-#define IS_OFFSET_CORRECT(s, m, offset) CASSERT(offsetof(s, m) == (offset), ReversedStructs)
-#define IS_SIZE_CORRECT(s, size) CASSERT(sizeof(s) == (size), ReversedStructs)
+#define IS_OFFSET_CORRECT(s, m, offset) static_assert(offsetof(s, m) == (offset), "offset of struct member is incorrect")
+#define IS_SIZE_CORRECT(s, size) static_assert(sizeof(s) == (size), "size of struct is incorrect")
 
 #define ALIGN(size, align) (((size) + (align) - 1) & ~(align))
 
@@ -281,7 +280,7 @@ struct BXMHeader
 	BIG_ENDIAN USHORT m_usNameOrdinalCount;	// this is used times 8 for mem allocation
 	BIG_ENDIAN USHORT m_usNameCount;
 	BIG_ENDIAN UINT m_uEntryCount;
-};	
+};
 
 struct BXMEntry
 {
@@ -541,7 +540,7 @@ struct CEntityInfo
 IS_OFFSET_CORRECT(CEntityInfo, m_pParent, 0x60)
 IS_OFFSET_CORRECT(CEntityInfo, m_hUnk, 0xB8)
 
-struct CEntityInfoListEntry
+struct CEntityListEntry
 {
 	EntityHandle m_hEntity;
 	CEntityInfo* m_pInfo;
@@ -577,7 +576,7 @@ struct CCollisionDataObject
 
 struct CCollisionDataObjectManager
 {
-	CReadWriteLock m_lock;
+	CReadWriteLock m_Lock;
 	char pad[32];
 	CCollisionDataObject** m_ppData; // [6] maybe?
 };
@@ -666,6 +665,7 @@ struct ExExpInfo
 	QWORD unk0x10;			//0x0010
 	QWORD unk0x18;			//0x0018
 	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
+	int m_nLevels;			//0x0AF4
 };
 
 class ExCollision : public BehaviorExtension
@@ -1151,7 +1151,7 @@ struct CTextureResourceManager
 	BYTE gap2C[52];
 	DWORD dword60;
 	DWORD dword64;
-	QWORD qword68;
+	CTextureData* m_pTextureData;
 	QWORD qword70;
 	CTextureResource* m_pTextures;
 	QWORD qword80;
@@ -1422,7 +1422,7 @@ public:
 	short m_wUnk0x00B8;						//0x00B8 | set to -1 on construction
 	char  m_pad0x000BA[6];					//0x00BA
 	Matrix4x4 m_identies[2];				//0x00C0 | end ? CEnt ?
-	CModelExtendWork m_ModelExtendWork;		//0x0140
+	CModelExtendWork m_ExtendWork;			//0x0140
 	char _0x0168[336];						//0x0168
 	BYTE m_bWetness;						//0x02B8
 	char _0x02B9[215];						//0x02B9
@@ -1438,7 +1438,7 @@ public:
 	DWORD dwFinal;							//0x0580
 };
 IS_OFFSET_CORRECT(CModel, m_identies, 0xC0)
-IS_OFFSET_CORRECT(CModel, m_ModelExtendWork, 0x140)
+IS_OFFSET_CORRECT(CModel, m_ExtendWork, 0x140)
 IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540)
 IS_OFFSET_CORRECT(CModel, m_nBones, 0x568)
 IS_OFFSET_CORRECT(CModel, dwFinal, 0x580)
@@ -1719,7 +1719,7 @@ public:
 //	EntityHandle m_hCaughtFish;				//0x03ED8 | on the pod
 
 	char _0x02B70[56056];					//0x02B70
-	int m_iHealth2;							//0x10668									
+	int m_iHealth2;							//0x10668 | used for world damage									
 	char _0x1066C[420];						//0x1066C
 	EntityHandle m_hPod;					//0x10810
 	EntityHandle m_hUnk;					//0x10814
@@ -1785,21 +1785,42 @@ IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1746C)
 
 struct CCameraInstance
 {
-	char pad0x00[128];				//0x0000
+	char pad0x00[64];				//0x0000
+	float fl0x064;					//0x0064
+	char pad0x68[60];				//0x0068
 	Matrix4x4 m_ViewProjection;		//0x0080
 	char pad0xC0[320];				//0x00C0
 	Matrix4x4 m_OldViewProjection;	//0x0200
+	void* m_ptr240;					//0x0240
+	char pad0x248[64];				//0x0248
+	void* m_ptr288;					//0x0288
 };
 
-struct CCameraTransform
+struct __declspec(align(16)) CCameraTransform
 {
-	Vector3Aligned m_vSource;		//0x00
-	Vector3Aligned m_vTarget;		//0x10
-	Vector3Aligned m_vUp;			//0x20
-	Vector3Aligned m_vViewangles;	//0x30
-	float m_flDistance;				//0x40
-	char alignment[12];				//0x44
+	virtual ~CCameraTransform();
+	//virtual QWORD* CCameraTransform::sub_140184180(char a2);
+
+	//void* m_vtable;				//0x0000
+	//char alignment8[8];			//0x0008 | align 16 padding tbh
+	Vector3Aligned m_vSource;		//0x0010
+	Vector3Aligned m_vTarget;		//0x0020
+	Vector3Aligned m_vUp;			//0x0030
+	Vector3Aligned m_vViewangles;	//0x0040
+	float m_flDistance;				//0x0050
+	//char alignment54[12];			//0x0054
 };
+IS_OFFSET_CORRECT(CCameraTransform, m_vSource, 0x10);
+
+struct __declspec(align(16)) CCameraBase : public CCameraTransform
+{
+	virtual ~CCameraBase();
+	//void* m_vtable;				//0x0000
+	//char alignment8[8];			//0x0008 | align 16 padding tbh
+	//CCameraTransform m_Transform; //0x0010
+	CCameraInstance* m_pInstance;	//0x0060
+};
+IS_OFFSET_CORRECT(CCameraBase, m_pInstance, 0x60);
 
 /*
 
@@ -1807,7 +1828,7 @@ struct CCameraTransform
 
 This struct is 16 byte aligned
 */
-class __declspec(align(16)) CCameraGame
+class __declspec(align(16)) CCameraGame : public CCameraBase
 {
 public:
 	typedef float NormalCameraFloatOffset;
@@ -1818,9 +1839,8 @@ public:
 
 	//void* m_vtable;									//0x0000
 	//char align8[8];									//0x0008 | align 16 padding tbh
-	CCameraTransform m_Transform;						//0x0010
-	CCameraInstance* m_pInstance;						//0x0060
-	char align68[8];									//0x0068
+	//CCameraBase m_Base;								//0x0010
+	//char align68[8];									//0x0068 | probably part of CCameraBase alignment
 	Vector3Aligned m_v0x70;								//0x0070
 	Vector3Aligned m_v0x80;								//0x0080
 	Vector3Aligned m_v0x90;								//0x0090
@@ -1870,7 +1890,6 @@ public:
 	char pad88F4[92];									//0x88F4
 	Vector3Aligned m_vUnknown[2];						//0x8950
 };
-IS_OFFSET_CORRECT(CCameraGame, m_Transform, 0x10)
 IS_OFFSET_CORRECT(CCameraGame, m_pLocalPlayer, 0xA8)
 IS_OFFSET_CORRECT(CCameraGame, m_hEntity, 0xD0)
 IS_OFFSET_CORRECT(CCameraGame, m_vPosition, 0xF0)
@@ -1931,9 +1950,9 @@ public:
 	void* m_p0x18;							//0x0018
 	CScenePosSystem m_pPosSystem;			//0x0028
 	char _0x0038[40];						//0x0038
-	Array<SceneState> m_oldstates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	Array<SceneState> m_OldStates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 	char _0x00[16];							//0x0080
-	Array<SceneState> m_states;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	Array<SceneState> m_States;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 };
 IS_OFFSET_CORRECT(CSceneStateSystem, m_states, 0x90)
 
@@ -2525,7 +2544,7 @@ IS_SIZE_CORRECT(CGraphics, 240)
 
 /*
 *  I feel like the old version is smaller definitely
-* 
+*
 *   Size of struct 0xB8 (184) bytes  old version (denuvo)
 *	Size of struct 0xB8 (184) bytes  new version
 */
@@ -2972,22 +2991,38 @@ struct CpkEntry
 struct CHeapInstance;
 
 template<typename T>
-struct ConstructionInfo
+struct CConstructionInfo
 {
-	int m_iObjectId;					//0x0000
-	char alignment[4];					//0x0004
-	T* (*Constructor)(CHeapInstance**); //0x0008 | not a CHeapInstance**, some parent struct
-	QWORD m_GroupId;					//0x0010
-	const char* szName;					//0x0018
-	void* pUnk;							//0x0020
+	int m_iObjectId;						//0x0000
+	char alignment[4];						//0x0004
+	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0008 
+	QWORD m_GroupId;						//0x0010
+	const char* m_szName;					//0x0018
+	void* pUnk;								//0x0020
 };
 
 template<typename T>
-struct UIConstructorInfo
+struct CUIConstructorInfo
 {
-	DWORD id;							//0x0000
-	char bs[12];						//0x0004
-	T* (*Constructor)(CHeapInstance**); //0x0010 | not a CHeapInstance**, some parent struct
+	DWORD id;								//0x0000
+	DWORD dword04;							//0x0004
+	DWORD dword08;							//0x0008
+	DWORD dword0C;							//0x000C
+	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0010 
+};
+
+enum DialogUIWhiteType
+{
+	YesNo = 0,
+	Ok
+};
+
+enum DialogUIBlackType
+{
+	YesNo = 0,
+	Message,
+	QuitRetry,
+	Persistent
 };
 
 struct CEntityInfoList
@@ -2998,7 +3033,7 @@ struct CEntityInfoList
 };
 
 
-/* 
+/*
 	Event::Work maybe??? probs
 	Size of struct 0x60 (96) bytes
 
@@ -3072,7 +3107,7 @@ struct Create_t
 	void* m_pBXM;					//0x0050
 };
 
-struct Create2_t
+struct CreateContext
 {
 	CSceneEntitySystem* m_pSceneEntitySystem;
 	void* ptr8;
@@ -3408,8 +3443,7 @@ struct CWetObjManagerDelay
 struct CWetObjManager
 {
 	CReadWriteLock m_Lock;
-	char pad[4];
-	EntityHandle m_Localhandles[2];
+	EntityHandle m_LocalHandles[2];
 	CWetObjManagerDelay m_WetDelays[2];
 	EntityHandle m_EntityHandles[256];
 	EntityHandle m_SoundHandles[32];
@@ -3896,7 +3930,7 @@ struct MrubyImpl
 	QWORD qw10;														//0x0010 | mrb_value
 	StaticArray<EventEntry, 256> m_events;							//0x0018
 	StaticArray<EventEntry, 256> m_events2;
-	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_fibers;
+	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_Fibers;
 	QWORD qword1180;//StaticArray<std::pair<lib::HashedString<sys::StringSystem::Allocator>,lib::HashedString<sys::StringSystem::Allocator>>,256,8>
 	QWORD qword1188;
 	QWORD qword1190;
@@ -3904,7 +3938,7 @@ struct MrubyImpl
 	BYTE gap11A0[4112];
 	struct MrubyImpl* m_pNext;
 };
-IS_OFFSET_CORRECT(MrubyImpl, m_fibers, 0x1058)
+IS_OFFSET_CORRECT(MrubyImpl, m_Fibers, 0x1058)
 IS_OFFSET_CORRECT(MrubyImpl, m_pNext, 0x21A8)
 IS_SIZE_CORRECT(MrubyImpl, 8624)
 

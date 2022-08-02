@@ -9,8 +9,10 @@ PSSetShaderResourcesFn oPSSetShaderResources;
 ClearRenderTargetViewFn oClearRenderTargetView;
 QueryPerformaceCounterFn oQueryPerformanceCounter;
 SetUnhandledExceptionFilterFn oSetUnhandledExceptionFilter;
+ReleaseFn oKeyboardRelease;
 AcquireFn oKeyboardAcquire;
 GetDeviceStateFn oKeyboardGetDeviceState;
+ReleaseFn oMouseRelease;
 AcquireFn oMouseAcquire;
 GetDeviceStateFn oMouseGetDeviceState;
 SetCursorPosFn oSetCursorPos;
@@ -18,8 +20,8 @@ XInputGetStateFn oXInputGetState;
 UpdateModelPartsFn oUpdateModelParts;
 CreateEntityFn oCreateEntity;
 MRubyLoadScriptFn oMRubyLoadScript;
-CCameraGameSetViewAnglesFn oCCameraGameSetViewAngles;
-CCameraGameMoveFn oCCameraGameMove;
+CCameraGame_SetViewAnglesFn oCCameraGameSetViewAngles;
+CCameraGame_MoveFn oCCameraGameMove;
 WNDPROC oWndProc;
 
 static ID3D11RasterizerState* pNorm, * pBias;
@@ -191,14 +193,6 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	if (GetAsyncKeyState(VK_F9) & 1)
 		m_ctxhook.Rehook();
 
-	//byte* pCutscene = *(byte**)0x1419925E8;
-
-	//if (pCutscene)
-	//{
-	//	char* current_cutscene = (char*)(pCutscene + 0x1F4);
-	//	LOG("Current Cutscene: %s\n", current_cutscene);
-	//}
-
 	if (GetAsyncKeyState(VK_OEM_3) & 1)
 	{
 		for (size_t i = 0; i < g_pEntityInfoList->m_dwSize; ++i)
@@ -315,29 +309,29 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (Vars.Misc.bAntiFramerateCap)
 	{
-		g_pMemory->PatchBytes(&bp_Framecap);
-		g_pMemory->NopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
+		PatchBytes(&bp_Framecap);
+		NopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
 	}
 	else
 	{
-		g_pMemory->RestoreMemory(&bp_Framecap);
-		g_pMemory->RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
+		RestoreMemory(&bp_Framecap);
+		RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
 	}
 
 	if (Vars.Gameplay.bNoTutorialDialogs)
-		g_pMemory->PatchBytes(&bp_NoTutorialDialogs);
+		PatchBytes(&bp_NoTutorialDialogs);
 	else
-		g_pMemory->RestoreMemory(&bp_NoTutorialDialogs);
+		RestoreMemory(&bp_NoTutorialDialogs);
 
 	g_pOverlay->Render(true);
 
 	if (Vars.Menu.bOpened)
 	{
-		ImGui::SetNextWindowSize(ImVec2(850, 600), ImGuiCond_FirstUseEver);
+		ImGui::SetNextWindowSize(ImVec2(875, 600), ImGuiCond_FirstUseEver);
 
 		if (ImGui::Begin("2B Hook! ~ 2B Owns Me and All :^)", &Vars.Menu.bOpened, ImGuiWindowFlags_NoResize))
 		{
-			ImGui::Text("Average %.3f ms / frame(%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::Text("%s (%s)\tAverage %.3f ms / frame(%.1f FPS)", Vars.Menu.szAdapterUtf8, Vars.Menu.szOutputUtf8, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 			if (ImGui::BeginTabBar("MainTabs"))
 			{
@@ -383,7 +377,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	return oPresent(pThis, (Vars.Misc.bAntiVSync) ? 0 : SyncInterval, Flags);
 }
 
-void CreateRenderTarget(void);
+HRESULT CreateRenderTarget(void);
 
 HRESULT hkResizeBuffers(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
@@ -483,6 +477,17 @@ void hkClearRenderTargetView(ID3D11DeviceContext* pThis, ID3D11RenderTargetView*
 	oClearRenderTargetView(pThis, pRenderTargetView, ColorRGBA);
 }
 
+ULONG hkKeyboardRelease(IDirectInputDevice8A* pThis)
+{
+	g_pKeyboardHook->Unhook();
+
+	ULONG uReferences = oKeyboardRelease(pThis);
+
+	g_pKeyboardHook->Rehook();
+
+	return uReferences;
+}
+
 HRESULT hkKeyboardAcquire(IDirectInputDevice8A* pThis)
 {
 	g_pKeyboardHook->Unhook();
@@ -520,6 +525,17 @@ HRESULT hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVO
 	}
 
 	return (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened) ? DIERR_INPUTLOST : hr;
+}
+
+ULONG hkMouseRelease(IDirectInputDevice8A* pThis)
+{
+	g_pMouseHook->Unhook();
+
+	ULONG uReferences = oMouseRelease(pThis);
+
+	g_pMouseHook->Rehook();
+
+	return uReferences;
 }
 
 HRESULT hkMouseAcquire(IDirectInputDevice8A* pThis)
@@ -563,7 +579,7 @@ bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 	//return false;
 }
 
-// ORIG FUNCTION SIG: 40 53 48 81 EC ? ? ? ? F6 05 ? ? ? ? ?
+// ORIG FUNCTION SIG: 40 53 48 81 EC ? ? ? ? F6 05
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis)
 {
 	/* failed aimbot code
@@ -598,8 +614,12 @@ if (iTarget != -1)
 	((void(*)(CCameraGame*))(0x140832210))(pThis);
 }
 return TRUE;*/
-	
-	if (pThis->m_pCamEntity && Vars.Misc.bFirstperson )
+	if (Vars.Visuals.flFov == 0.0f)
+		Vars.Visuals.flFov = RADTODEG(pThis->m_flFov);
+
+	pThis->m_flFov = DEGTORAD(Vars.Visuals.flFov);
+
+	if (pThis->m_pCamEntity && Vars.Misc.bFirstperson)
 	{
 		Vector3 vForward;
 
@@ -608,10 +628,12 @@ return TRUE;*/
 
 		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD);
 
-		pThis->m_Transform.m_vSource = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition
+		pThis->m_vSource = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition
 			+ pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
 
-		pThis->m_Transform.m_vTarget = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition + vForward * 4.f;
+		pThis->m_vTarget = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition + vForward * 4.f;
+
+		Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
 
 		CameraGame_SetLookAt(pThis);
 		return TRUE;
@@ -630,18 +652,21 @@ void* hkCCameraGameMove(CCameraGame* pThis)
 	return oCCameraGameMove(pThis);
 }
 
-void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId, int flags, CHeapInstance** ppHeaps)
+// TODO: new hook doesn't need last param and shadow space in thunk
+// FIXME: entities that are not loaded in before creation will crash the game still!
+void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId, int iGroupId, CHeapInfo* pHeapInfo)
 {
-	ConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
+	CConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
 	void* pEntity = NULL;
 
-	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->szName) == Vars.Gameplay.SpawnBlacklist.cend()) //strcmp("Em4000", pConstruct->szName) && strcmp("BehaviorFunnel", pConstruct->szName)
-		pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, flags, ppHeaps); //0x1401A2B40
+	// pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId, pHeapInfo); //0x1401A2B40 old denuvo
+	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->m_szName) == Vars.Gameplay.SpawnBlacklist.cend())
+		pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId);
 
 	if (!pEntity)
-		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->szName, uObjectId, pInfo->m_uSetType);
+		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->m_szName, uObjectId, pInfo->m_uSetType);
 	else
-		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->szName, uObjectId, pInfo->m_uSetType, pEntity);
+		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->m_szName, uObjectId, pInfo->m_uSetType, pEntity);
 
 	return pEntity;
 }
@@ -823,7 +848,7 @@ BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
 
 	BOOL result = oQueryPerformanceCounter(&liCurrentCount);
 
-	if (Vars.Gameplay.bSpeedMeister)
+	if (Vars.Gameplay.bSpeedhack)
 	{
 		liFakeCount.QuadPart += liCurrentCount.QuadPart + (ULONGLONG)((double)(liCurrentCount.QuadPart - liPreviousCount.QuadPart) * Vars.Gameplay.flSpeedMultiplier);
 		lpPerformanceCount->QuadPart = liFakeCount.QuadPart;

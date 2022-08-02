@@ -4,7 +4,6 @@
 #include <d3d11.h>
 #include <dxgi1_2.h>
 #include <dinput.h>
-#include "StaticAssert.h"
 #include "SteamApi.h"
 #include "Math.h"
 
@@ -36,6 +35,18 @@
 
 #define FILTER_2B_DIE_CLEAR 	// 0xF07DFFFF
 
+#define DBGFLGS_UNKNOWN_0		0x20
+#define DBGFLGS_UNKNOWN_1		0x80
+#define DBGFLGS_SELFDESTRUCT	0x400
+#define DBGFLGS_UNKNOWN_2		0x1000
+#define DBGFLGS_SLOWTIME		0x2000
+#define DBGFLGS_UNKNOWN_3		0x4000
+#define DBGFLGS_UNKNOWN_4		0x8000
+
+#define DBGFLGS_MAX_VALUE (DBGFLGS_UNKNOWN_0 | DBGFLGS_UNKNOWN_1 | DBGFLGS_SELFDESTRUCT | DBGFLGS_UNKNOWN_2 | DBGFLGS_SLOWTIME | DBGFLGS_UNKNOWN_3 |  DBGFLGS_UNKNOWN_4)
+
+#define CAMFLGS_LOCK 0x80000000
+
 #define DATAFILE_DATA	0
 #define DATAFILE_MODEL	1
 
@@ -48,8 +59,8 @@
 #define IS_SAVE_SLOTDATA(s) ((s) > -1 && (s) < 3)
 
 // visual studio says correct offsets are wrong before compalation on interfaces rifk
-#define IS_OFFSET_CORRECT(s, m, offset) CASSERT(offsetof(s, m) == (offset), ReversedStructs)
-#define IS_SIZE_CORRECT(s, size) CASSERT(sizeof(s) == (size), ReversedStructs)
+#define IS_OFFSET_CORRECT(s, m, offset) static_assert(offsetof(s, m) == (offset), "offset of struct member is incorrect")
+#define IS_SIZE_CORRECT(s, size) static_assert(sizeof(s) == (size), "size of struct is incorrect")
 
 #define ALIGN(size, align) (((size) + (align) - 1) & ~(align))
 
@@ -415,8 +426,8 @@ struct CTexture
 	CTextureD3D* m_pTexture;		//0x70
 	char gap78[56];					//0x78
 };
-IS_OFFSET_CORRECT(CTexture, m_Depth, 0x10)
-IS_OFFSET_CORRECT(CTexture, m_Dimension, 0x30)
+IS_OFFSET_CORRECT(CTexture, m_Depth, 0x10);
+IS_OFFSET_CORRECT(CTexture, m_Dimension, 0x30);
 
 struct CTargetTexture
 {
@@ -443,7 +454,7 @@ struct CTextureData
 	DWORD dword4C;
 	char pad0x50[16];
 };
-IS_SIZE_CORRECT(CTextureData, 96)
+IS_SIZE_CORRECT(CTextureData, 96);
 
 struct CTextureBatch
 {
@@ -452,7 +463,7 @@ struct CTextureBatch
 	BOOL m_bLast;
 	char pad24[4];
 };
-IS_SIZE_CORRECT(CTextureBatch, 40)
+IS_SIZE_CORRECT(CTextureBatch, 40);
 
 struct DDS_PIXELFORMAT
 {
@@ -539,10 +550,10 @@ struct CEntityInfo
 	char _0x0x0074[68];							//0x0074
 	EntityHandle m_hUnk;						//0x00B8
 };
-IS_OFFSET_CORRECT(CEntityInfo, m_pParent, 0x60)
-IS_OFFSET_CORRECT(CEntityInfo, m_hUnk, 0xB8)
+IS_OFFSET_CORRECT(CEntityInfo, m_pParent, 0x60);
+IS_OFFSET_CORRECT(CEntityInfo, m_hUnk, 0xB8);
 
-struct CEntityInfoListEntry
+struct CEntityListEntry
 {
 	EntityHandle m_hEntity;
 	CEntityInfo* m_pInfo;
@@ -561,6 +572,11 @@ struct CEntityList
 	CReadWriteLock m_Lock;							//0x0018
 };
 
+/*
+* CCollisionDataObjectImpl : public CCollisionDataObjectBase
+* 
+* Size of struct is 0x120 (288) bytes
+*/
 struct CCollisionDataObject
 {
 	void* vtbl;
@@ -576,11 +592,55 @@ struct CCollisionDataObject
 	DWORD dword58;
 };
 
+struct CCollisionDataEntry
+{
+	CCollisionDataObject* m_pObject;
+	struct CCollisionDataEntry* m_pNext;
+};
+
+struct CCollisionData2
+{
+	CReadWriteLock m_Lock;
+};
+
+struct CCollisionData
+{
+	CCollisionDataEntry* m_pEntries;
+	CCollisionData2* m_pData;
+	int signed10;
+	int signed14;
+	QWORD qword18;
+	CCollisionDataEntry* m_pEntries2;
+};
+
+// Size of struct is 0xC8 (200) bytes
 struct CCollisionDataObjectManager
 {
-	CReadWriteLock m_lock;
-	char pad[32];
-	CCollisionDataObject** m_ppData; // [6] maybe?
+	CReadWriteLock m_Lock;
+	CCollisionData m_Data;
+	QWORD qword58;
+	QWORD qword60;
+	DWORD dword68;
+	DWORD dword6C;
+	DWORD dword70;
+	DWORD dword74;
+	QWORD* qword78;
+	QWORD* qword80;
+	DWORD dword88;
+	int dword8C;
+	QWORD qword90;
+	DWORD dword98;
+	DWORD dword9C;
+	DWORD dwordA0;
+	DWORD dwordA4;
+	DWORD dwordA8; // CHeapInfo
+	DWORD dwordAC;
+	DWORD dwordB0;
+	DWORD dwordB4;
+	DWORD dwordB8;
+	DWORD dwordBC;
+	DWORD dwordC0;
+	DWORD dwordC4;
 };
 
 struct CModelShader;
@@ -594,6 +654,7 @@ struct MaterialShaderInfo
 struct WMBBone;
 
 /*
+* Could be called CModelPart
 Mesh struct used by the engine
 size = 0x70 (112) bytes
 */
@@ -623,6 +684,7 @@ class BehaviorExtension
 {
 public:
 	//void* m_vtable;	//0x0000
+	//void* m_pUnk;		//0x0008
 };
 
 class ExWaypoint : public BehaviorExtension
@@ -657,8 +719,7 @@ struct Level_t
 };
 
 /*
-Size [8 byte aligned] = 2808 (0xAF8) bytes
-Size [4 byte aligned] = 2804 (0xAF4) bytes
+Size of struct (0xAF8) 2808 bytes
 */
 struct ExExpInfo
 {
@@ -667,7 +728,9 @@ struct ExExpInfo
 	QWORD unk0x10;			//0x0010
 	QWORD unk0x18;			//0x0018
 	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
+	int m_nLevels;			//0x0AF4
 };
+IS_SIZE_CORRECT(ExExpInfo, 0xAF8);
 
 class ExCollision : public BehaviorExtension
 {
@@ -700,8 +763,8 @@ public:
 	DWORD dword11C;
 	Vector4 vec120;
 };
-IS_SIZE_CORRECT(ExCollision, 0x130)
-IS_OFFSET_CORRECT(ExCollision, v0xA0, 0xA0)
+IS_SIZE_CORRECT(ExCollision, 0x130);
+IS_OFFSET_CORRECT(ExCollision, v0xA0, 0xA0);
 
 class ExLockOn : public BehaviorExtension
 {
@@ -840,7 +903,7 @@ typedef struct CBone
 	short m_Id;							//0xA8
 	char _0x9A[6];						//0xAA
 } Bone;
-IS_SIZE_CORRECT(CBone, 0xB0)
+IS_SIZE_CORRECT(CBone, 0xB0);
 
 struct CBoneSets
 {
@@ -933,7 +996,7 @@ struct WMBMaterial
 	unsigned int m_uVariablesOffset;		//0x28
 	int m_nVariables;						//0x2C
 };
-IS_SIZE_CORRECT(WMBMaterial, 0x30)
+IS_SIZE_CORRECT(WMBMaterial, 0x30);
 
 // Size of struct is 120 (0x78) bytes
 struct CMaterial
@@ -948,7 +1011,7 @@ struct CMaterial
 	int m_nShaderParameters;
 	CSamplerParam* m_pParameters;
 };
-IS_SIZE_CORRECT(CMaterial, 0x78)
+IS_SIZE_CORRECT(CMaterial, 0x78);
 
 struct CBatchInfo
 {
@@ -980,7 +1043,7 @@ struct WMBMesh
 	unsigned int m_uBonesOffset;
 	int m_nBones;
 };
-IS_SIZE_CORRECT(WMBMesh, 0x2C)
+IS_SIZE_CORRECT(WMBMesh, 0x2C);
 
 struct CMesh
 {
@@ -1021,7 +1084,7 @@ struct CBatch
 	int m_nIndices;
 	int m_nPrimitives;
 };
-IS_SIZE_CORRECT(CBatch, 28)
+IS_SIZE_CORRECT(CBatch, 28);
 
 struct WMBVertexGroup
 {
@@ -1036,7 +1099,7 @@ struct WMBVertexGroup
 	unsigned int m_uIndexBufferOffset;	//0x28
 	int m_nIndices;						//0x2C
 };
-IS_SIZE_CORRECT(WMBVertexGroup, 0x30)
+IS_SIZE_CORRECT(WMBVertexGroup, 0x30);
 
 struct CVertexGroupEx
 {
@@ -1055,7 +1118,7 @@ struct CVertexGroup
 	struct CVertexBuffer* m_pVertexBuffer2;	//0x08
 	struct CIndexBuffer* m_pIndexBuffer;	//0x10
 };
-IS_SIZE_CORRECT(CVertexGroup, 24)
+IS_SIZE_CORRECT(CVertexGroup, 24);
 
 struct CModelDrawData
 {
@@ -1134,8 +1197,8 @@ struct CModelShaderModule
 	int int80;
 	float m_flWetness;
 };
-IS_SIZE_CORRECT(CModelShaderModule, 0x90)
-IS_OFFSET_CORRECT(CModelShaderModule, m_flWetness, 0x84)
+IS_SIZE_CORRECT(CModelShaderModule, 0x90);
+IS_OFFSET_CORRECT(CModelShaderModule, m_flWetness, 0x84);
 
 struct CTextureResource
 {
@@ -1152,7 +1215,7 @@ struct CTextureResourceManager
 	BYTE gap2C[52];
 	DWORD dword60;
 	DWORD dword64;
-	QWORD qword68;
+	CTextureData* m_pTextureData;
 	QWORD qword70;
 	CTextureResource* m_pTextures;
 	QWORD qword80;
@@ -1169,7 +1232,7 @@ struct CModelShader
 	char pad210[0x104];
 	int m_fFlags;	// should be 3?
 };
-IS_SIZE_CORRECT(CModelShader, 0x318)
+IS_SIZE_CORRECT(CModelShader, 0x318);
 
 struct CModelAnalyzer
 {
@@ -1231,10 +1294,10 @@ struct CModelData
 	struct CModelData* m_pNext;
 	char pad9[8];
 };
-IS_OFFSET_CORRECT(CModelData, m_pBones, 0x50)
-IS_OFFSET_CORRECT(CModelData, m_pLODS, 0xA0)
-IS_OFFSET_CORRECT(CModelData, m_pMeshes, 0xB8)
-IS_SIZE_CORRECT(CModelData, 0x140)
+IS_OFFSET_CORRECT(CModelData, m_pBones, 0x50);
+IS_OFFSET_CORRECT(CModelData, m_pLODS, 0xA0);
+IS_OFFSET_CORRECT(CModelData, m_pMeshes, 0xB8);
+IS_SIZE_CORRECT(CModelData, 0x140);
 
 struct CModelDataList
 {
@@ -1255,6 +1318,13 @@ struct CCameraDevice
 };
 
 struct CModelWork;
+struct CVertexLayout;
+
+struct __declspec(align(16)) CVertexLayoutEntry
+{
+	CVertexLayout* m_pVertex;
+	BOOL m_bInitalized;
+};
 
 //size of struct is 0x110 (272) bytes
 struct CModelManager
@@ -1279,11 +1349,12 @@ struct CModelManager
 	DWORD dword9C;
 	DWORD dwordA0;
 	DWORD dwordA4;
-	BYTE gapA8[16];
+	CVertexLayoutEntry* m_pVertexLayouts;
+	QWORD qwordB0;
 	CModelDataList m_ModelDataList;		//0xB8
 	BYTE gapF8[24];						//0xF8
 };
-IS_SIZE_CORRECT(CModelManager, 0x110)
+IS_SIZE_CORRECT(CModelManager, 0x110);
 
 // name not official
 struct CModelDataManager
@@ -1301,28 +1372,6 @@ struct ModelInfo
 	char pad10[96];				//0x0010
 	Vector3Aligned m_vPosition; //0x0070
 	UINT m_Flags;				//0x00D0
-};
-
-// had to define virtuals not right tho!
-class CModelExtendWorkBase
-{
-public:
-	virtual void function0() {};
-	virtual void function1() {};
-};
-
-// had to define virtuals not right tho!
-class CModelExtendWork : public CModelExtendWorkBase
-{
-public:
-	virtual void function2() {};
-	virtual void function3() {};
-
-	float flUnk;				//0x0008
-	DWORD _0x0010;				//0x000C
-	unsigned int m_ObjectId;	//0x0010
-	char _0x0018[12];			//0x0014
-	Pl0000* m_pParent;			//0x0020	
 };
 
 class CObjHit
@@ -1360,6 +1409,47 @@ struct CModelInstanceParam
 	DWORD m_dw0x30;				//0x30
 };
 
+/*
+	Size of struct 0xB0 (176) bytes
+
+	m_wFlags - 0x00 - NORMAL, 0x01 - ?, 0x02 - NO_ROTATION_Y, 0x04 - FLOAT_UP, 0x08 - ?, 0x10 - ? (wont set), 0x20 - ? (wont set)
+	0x40 - ?, 0x80 - ?, 0x100 - ?, 0x200 - ?, 0x400 - ?, 0x800 - ?, 0x1000 - ?, 0x2000 - ?, 0x4000 - NO_ROTATION_Y, 0x8000 - ?
+*/
+class CParts
+{
+public:
+	Matrix4x4 m_matTransform;		//0x0000
+	Vector3Aligned m_vPosition;		//0x0040
+	Matrix4x4 m_matModelToWorld;	//0x0050 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
+	void* m_pUnk0x0090;				//0x0090 | set to 0 on construction
+	short m_wFlags;					//0x0098 | set to 0 on construction
+	void* m_pUnk0x00A0;				//0x00A0 | set to 0 on construction
+	short m_wUnk0x00A8;				//0x00A8 | set to -1 on construction
+};
+IS_SIZE_CORRECT(CParts, 0xB0);
+
+// had to define virtuals not right tho!
+class CModelExtendWorkBase
+{
+public:
+	virtual void function0() {};
+	virtual void function1() {};
+};
+
+// had to define virtuals not right tho!
+class CModelExtendWork : public CModelExtendWorkBase
+{
+public:
+	virtual void function2() {};
+	virtual void function3() {};
+
+	float flUnk;				//0x0008
+	DWORD _0x0010;				//0x000C
+	unsigned int m_ObjectId;	//0x0010
+	char _0x0018[12];			//0x0014
+	Pl0000* m_pParent;			//0x0020	
+};
+
 // size of struct 0x1A8 (424) bytes
 struct CModelWork
 {
@@ -1393,37 +1483,22 @@ struct CModelWork
 	CModelWork* m_pNext;					//0x01A0
 };
 
-class CEnt
-{
-public:
-	Matrix4x4 m_matTransform;				//0x0010
-	Vector3Aligned m_vPosition;				//0x0050
-	Matrix4x4 m_matModelToWorld;			//0x0060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
-	void* m_pUnk0x00A0;						//0x00A0
-	short m_wUnk0x00A8;						//0x00A8
-	char  m_pad0x000AA[6];					//0x00AA
-};
-
 /*
 Size of struct 0x584 (1412) bytes
 
 apprently supposed to inherit cparts??
 */
-class CModel : public CEnt
+class CModel : public CParts
 {
 public:
-#if 0
+
 	virtual void function0();
-	virtual void function1();
-	virtual void function2();
-#else
-	void* vtbl;
-#endif
-	void* m_pUnk0x00B0;						//0x00B0
-	short m_wUnk0x00B8;						//0x00B8 | set to -1 on construction
-	char  m_pad0x000BA[6];					//0x00BA
-	Matrix4x4 m_identies[2];				//0x00C0 | end ? CEnt ?
-	CModelExtendWork m_ModelExtendWork;		//0x0140
+	virtual void function1(void);
+	virtual void function2(void);
+
+	Matrix4x4 m_matB0;						//0x00B0 | set to indentity matrix on construction
+	Matrix4x4 m_matF0;						//0x00F0 | set to indentity matrix on construction
+	CModelExtendWork m_ExtendWork;			//0x0140
 	char _0x0168[336];						//0x0168
 	BYTE m_bWetness;						//0x02B8
 	char _0x02B9[215];						//0x02B9
@@ -1438,11 +1513,11 @@ public:
 	char _0x056C[20];						//0x056C
 	DWORD dwFinal;							//0x0580
 };
-IS_OFFSET_CORRECT(CModel, m_identies, 0xC0)
-IS_OFFSET_CORRECT(CModel, m_ModelExtendWork, 0x140)
-IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540)
-IS_OFFSET_CORRECT(CModel, m_nBones, 0x568)
-IS_OFFSET_CORRECT(CModel, dwFinal, 0x580)
+IS_OFFSET_CORRECT(CModel, m_matTransform, 0x10);
+IS_OFFSET_CORRECT(CModel, m_ExtendWork, 0x140);
+IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540);
+IS_OFFSET_CORRECT(CModel, m_nBones, 0x568);
+IS_OFFSET_CORRECT(CModel, dwFinal, 0x580);
 
 /*
 Size of struct 0x670 (1648) bytes
@@ -1467,7 +1542,8 @@ reverse this and this structure is fucking huge!
 
 Offsets are -0x50 from the debug build
 
-Size of struct 0x178F0 (96496) bytes
+Size of struct 0x178F0 (96496) bytes old version (denuvo)
+Size of struct 0x17920 (96544) bytes new version
 */
 class Pl0000 // : CBehaviourAppBase
 {
@@ -1512,8 +1588,8 @@ public:
 	virtual void function34() PURE;
 	virtual void function35() PURE;
 	virtual void function36() PURE;
-	virtual void function37_off() PURE;
-	virtual void function38_on() PURE;
+	virtual void CollisionOff() PURE;
+	virtual void CollisionOn() PURE;
 	virtual void function39() PURE;
 	virtual __int64 EmitSound(const char* szName, Pl0000* pSourceEntity, __int64 boneId, __int64 flags, unsigned int a6) PURE;
 	virtual void function41() PURE;
@@ -1726,13 +1802,13 @@ public:
 	EntityHandle m_hUnk;					//0x10814
 	char _0x10818[9896];					//0x10818
 	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
-	char _0x130E0[10864];					//0x130E0
+	char _0x130E0[10880];					//0x130E0
 	BOOL m_bFlightSuit;						//0x15B50
-	EntityHandle m_hFlightSuit;				//0x15B54
+	EntityHandle m_hFlightSuit;				//0x15B54 now 0x15B64
 	char _0x15B58[880];						//0x15B58
 	StaticArray<EntityHandle, 64> m_Handles;//0x15EC8
 	char _0x15FE8[1156];					//0x15FE8
-	EntityHandle m_hBuddy;					//0x1646C | Localplayer = 0x1000C00, Buddy = 0x1020400
+	EntityHandle m_hBuddy;					//0x1646C now 0x1647C | Localplayer = 0x1000C00, Buddy = 0x1020400
 	EntityHandle m_hPascal;					//0x16470
 	char _0x16474[268];						//0x16474
 	StaticArray<EntityHandle, 4> m_Handles2;//0x16580
@@ -1759,56 +1835,76 @@ public:
 	Vector3Aligned m_vDestinationTarget;	//0x177F0
 	BOOL m_bWalkToTarget;					//0x17800
 	BOOL m_bRunToTarget;					//0x17804
-	char _0x17808[224];						//0x17808
+	char _0x17808[256];						//0x17808
 };
 typedef Pl0000 Entity2B;
-IS_SIZE_CORRECT(Pl0000, 0x178F0)
-IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50)
-IS_OFFSET_CORRECT(Pl0000, m_ModelExtendWork, 0x140)
-IS_OFFSET_CORRECT(Pl0000, m_bWetness, 0x2B8)
-IS_OFFSET_CORRECT(Pl0000, m_Work, 0x390)
-IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540)
-IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598)
-IS_OFFSET_CORRECT(Pl0000, m_ObjectId, 0x5B8)
-IS_OFFSET_CORRECT(Pl0000, m_pInfo, 0x610)
-IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0)
-IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858)
-IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0)
-IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078)
-IS_OFFSET_CORRECT(Pl0000, m_VerticalCollision, 0x1790)
-IS_OFFSET_CORRECT(Pl0000, m_HorizontalCollision, 0x18C0)
-IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0)
-IS_OFFSET_CORRECT(Pl0000, m_hFlightSuit, 0x15B54)
-IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1646C)
-IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CEC)
-IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1708C)
-IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1746C)
+IS_SIZE_CORRECT(Pl0000, 0x17920);
+IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50);
+IS_OFFSET_CORRECT(Pl0000, m_ModelExtendWork, 0x140);
+IS_OFFSET_CORRECT(Pl0000, m_bWetness, 0x2B8);
+IS_OFFSET_CORRECT(Pl0000, m_Work, 0x390);
+IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540);
+IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598);
+IS_OFFSET_CORRECT(Pl0000, m_ObjectId, 0x5B8);
+IS_OFFSET_CORRECT(Pl0000, m_pInfo, 0x610);
+IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0);
+IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858);
+IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0);
+IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078);
+IS_OFFSET_CORRECT(Pl0000, m_VerticalCollision, 0x1790);
+IS_OFFSET_CORRECT(Pl0000, m_HorizontalCollision, 0x18C0);
+IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0);
+IS_OFFSET_CORRECT(Pl0000, m_hFlightSuit, 0x15B64);
+IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1647C);
+IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CFC);
+IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1709C);
+IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1747C);
 
 struct CCameraInstance
 {
-	char pad0x00[128];				//0x0000
-	Matrix4x4 m_ViewProjection;		//0x0080
-	char pad0xC0[320];				//0x00C0
-	Matrix4x4 m_OldViewProjection;	//0x0200
+	Matrix4x4 m_CurrentViewProjection;	//0x0000 | current
+	Matrix4x4 m_Projection;				//0x0040
+	Matrix4x4 m_ViewProjection;			//0x0080
+	char pad0xC0[320];					//0x00C0
+	Matrix4x4 m_OldViewProjection;		//0x0200 | save
+	void* m_ptr240;						//0x0240
+	char pad0x248[64];					//0x0248
+	void* m_ptr288;						//0x0288
 };
 
-struct CCameraTransform
+struct __declspec(align(16)) CCameraTransform
 {
-	Vector3Aligned m_vSource;		//0x00
-	Vector3Aligned m_vTarget;		//0x10
-	Vector3Aligned m_vUp;			//0x20
-	Vector3Aligned m_vViewangles;	//0x30
-	float m_flDistance;				//0x40
-	char alignment[12];				//0x44
+	virtual ~CCameraTransform();
+	//virtual QWORD* CCameraTransform::sub_140184180(char a2);
+	
+	//void* m_vtable;				//0x0000
+	//char alignment8[8];			//0x0008 | align 16 padding tbh
+	Vector3Aligned m_vSource;		//0x0010
+	Vector3Aligned m_vTarget;		//0x0020
+	Vector3Aligned m_vUp;			//0x0030
+	Vector3Aligned m_vViewangles;	//0x0040
+	float m_flDistance;				//0x0050 | __m128 most likely
+	//char alignment54[12];			//0x0054
 };
+IS_OFFSET_CORRECT(CCameraTransform, m_vSource, 0x10);
+
+struct __declspec(align(16)) CCameraBase : public CCameraTransform
+{
+	virtual ~CCameraBase();
+	//void* m_vtable;				//0x0000
+	//char alignment8[8];			//0x0008 | align 16 padding tbh
+	//CCameraTransform m_Transform; //0x0010
+	CCameraInstance* m_pInstance;	//0x0060
+};
+IS_OFFSET_CORRECT(CCameraBase, m_pInstance, 0x60);
 
 /*
 
-141605310
+141020870
 
 This struct is 16 byte aligned
 */
-class __declspec(align(16)) CCameraGame
+class __declspec(align(16)) CCameraGame : public CCameraBase
 {
 public:
 	typedef float NormalCameraFloatOffset;
@@ -1819,9 +1915,8 @@ public:
 
 	//void* m_vtable;									//0x0000
 	//char align8[8];									//0x0008 | align 16 padding tbh
-	CCameraTransform m_Transform;						//0x0010
-	CCameraInstance* m_pInstance;						//0x0060
-	char align68[8];									//0x0068
+	//CCameraBase m_Base;								//0x0010
+	//char align68[8];									//0x0068 | probably part of CCameraBase alignment
 	Vector3Aligned m_v0x70;								//0x0070
 	Vector3Aligned m_v0x80;								//0x0080
 	Vector3Aligned m_v0x90;								//0x0090
@@ -1847,7 +1942,10 @@ public:
 	Vector3Aligned m_vTargetOffset;						//0x0150
 	Vector3Aligned m_vUnk3;								//0x0160
 	Vector3Aligned m_vGlobalUp;							//0x0170
-	float m_flUnks180[4];								//0x0180
+	float m_flRotationZ2;								//0x0180
+	float m_flDistance2;								//0x0184
+	float m_flFov2;										//0x0188
+	float m_flUnk;										//0x018C
 	BOOL m_bCameraShake;								//0x0190
 	char _0x0194[12];									//0x0194
 	Vector3Aligned m_vShake;							//0x01A0
@@ -1858,7 +1956,9 @@ public:
 	char _0x0240[296];									//0x0248
 	//float m_flFovy;									//0x02BC
 	Pl0000* m_pCamEntity;								//0x0370
-	char _0x0378[120];									//0x0378
+	char _0x0378[24];									//0x0378
+	unsigned int _0x390;								//0x0390
+	char _0x0394[92];									//0x0394
 	Vector3 m_vViewangles;								//0x03F0 | radians (p, y, r)
 	char pad3FC[44];									//0x03FC
 	StaticArray<NormalCameraFloatOffset, 2> m_Offsets;	//0x0428 | lib::StaticArray<NormalCameraFloatOffset,2,4>::`vftable'
@@ -1871,15 +1971,15 @@ public:
 	char pad88F4[92];									//0x88F4
 	Vector3Aligned m_vUnknown[2];						//0x8950
 };
-IS_OFFSET_CORRECT(CCameraGame, m_Transform, 0x10)
-IS_OFFSET_CORRECT(CCameraGame, m_pLocalPlayer, 0xA8)
-IS_OFFSET_CORRECT(CCameraGame, m_hEntity, 0xD0)
-IS_OFFSET_CORRECT(CCameraGame, m_vPosition, 0xF0)
-IS_OFFSET_CORRECT(CCameraGame, m_bCameraShake, 0x190)
-IS_OFFSET_CORRECT(CCameraGame, m_vShake, 0x1A0)
-IS_OFFSET_CORRECT(CCameraGame, m_vViewangles, 0x3F0)
-IS_OFFSET_CORRECT(CCameraGame, m_flUnknown2, 0x884C)
-IS_OFFSET_CORRECT(CCameraGame, m_flUnknown, 0x88F0)
+IS_OFFSET_CORRECT(CCameraGame, m_pLocalPlayer, 0xA8);
+IS_OFFSET_CORRECT(CCameraGame, m_hEntity, 0xD0);
+IS_OFFSET_CORRECT(CCameraGame, m_vPosition, 0xF0);
+IS_OFFSET_CORRECT(CCameraGame, m_bCameraShake, 0x190);
+IS_OFFSET_CORRECT(CCameraGame, m_vShake, 0x1A0);
+IS_OFFSET_CORRECT(CCameraGame, _0x390, 0x390);
+IS_OFFSET_CORRECT(CCameraGame, m_vViewangles, 0x3F0);
+IS_OFFSET_CORRECT(CCameraGame, m_flUnknown2, 0x884C);
+IS_OFFSET_CORRECT(CCameraGame, m_flUnknown, 0x88F0);
 
 // Found by Dennis
 // Address = 0x14160EB40
@@ -1932,11 +2032,11 @@ public:
 	void* m_p0x18;							//0x0018
 	CScenePosSystem m_pPosSystem;			//0x0028
 	char _0x0038[40];						//0x0038
-	Array<SceneState> m_oldstates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	Array<SceneState> m_OldStates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 	char _0x00[16];							//0x0080
-	Array<SceneState> m_states;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	Array<SceneState> m_States;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 };
-IS_OFFSET_CORRECT(CSceneStateSystem, m_states, 0x90)
+IS_OFFSET_CORRECT(CSceneStateSystem, m_States, 0x90);
 
 class CDialogWindow
 {
@@ -2082,7 +2182,7 @@ struct CBufferInfo
 	ID3D11ShaderResourceView* m_pShaderResourceView;
 	ID3D11UnorderedAccessView* m_pUnorderedAccessView;
 };
-IS_SIZE_CORRECT(CBufferInfo, 0x20)
+IS_SIZE_CORRECT(CBufferInfo, 0x20);
 
 // Size of struct is 56 (0x38) bytes
 struct CVertexBuffer
@@ -2096,7 +2196,7 @@ struct CVertexBuffer
 	CBufferInfo* m_pInfo;				//0x28
 	DWORD dword30;
 };
-IS_SIZE_CORRECT(CVertexBuffer, 0x38)
+IS_SIZE_CORRECT(CVertexBuffer, 0x38);
 
 // Size of struct is 48 (0x30) bytes
 struct CIndexBuffer
@@ -2109,7 +2209,7 @@ struct CIndexBuffer
 	CBufferInfo* m_pInfo;				//0x20
 	DWORD dword28;
 };
-IS_SIZE_CORRECT(CIndexBuffer, 0x30)
+IS_SIZE_CORRECT(CIndexBuffer, 0x30);
 
 struct CDepthStencilStateInfo;
 
@@ -2142,7 +2242,7 @@ struct CVertexLayout
 	BYTE gap0[304];
 	ID3D11InputLayout** m_ppInputlayout;
 };
-IS_SIZE_CORRECT(CVertexLayout, 320)
+IS_SIZE_CORRECT(CVertexLayout, 320);
 
 struct CConstantBuffers
 {
@@ -2313,7 +2413,7 @@ struct CGraphicRenderContext
 	CConstantBuffers m_ConstantBuffers[2];		//0x0C0
 	TextureContainer m_TextureContainer;		//0x1B0
 };
-IS_OFFSET_CORRECT(CGraphicRenderContext, m_TextureContainer, 0x1B0)
+IS_OFFSET_CORRECT(CGraphicRenderContext, m_TextureContainer, 0x1B0);
 
 struct CSwapChainInfo
 {
@@ -2341,8 +2441,8 @@ struct CSwapChain
 	HWND m_hWindow;					//0xB8
 	BOOL m_bSyncInterval;			//0xC0
 };
-IS_OFFSET_CORRECT(CSwapChain, m_bSyncInterval, 0xC0)
-IS_SIZE_CORRECT(CSwapChain, 200)
+IS_OFFSET_CORRECT(CSwapChain, m_bSyncInterval, 0xC0);
+IS_SIZE_CORRECT(CSwapChain, 200);
 
 struct CGraphicOutputDx11
 {
@@ -2374,7 +2474,7 @@ public:
 	char _0x006C[4];						//0x0084
 	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0088
 };
-IS_OFFSET_CORRECT(CDisplay, m_pWindowedSwapChain, 0x68)
+IS_OFFSET_CORRECT(CDisplay, m_pWindowedSwapChain, 0x68);
 
 struct CHeapInfo
 {
@@ -2425,7 +2525,7 @@ struct CModelEntryData
 	DWORD dword70;						//0x70
 	DWORD dword74;						//0x74
 };
-IS_OFFSET_CORRECT(CModelEntryData, m_pParams, 0x28)
+IS_OFFSET_CORRECT(CModelEntryData, m_pParams, 0x28);
 
 struct CModelEntry
 {
@@ -2452,10 +2552,10 @@ struct CGraphicCommand
 	BYTE gapC4[8];					//0xC4
 	unsigned int unsignedCC;		//0xCC
 };
-IS_OFFSET_CORRECT(CGraphicCommand, qword30, 0x30)
-IS_OFFSET_CORRECT(CGraphicCommand, m_SamplerIndex, 0x90)
-IS_OFFSET_CORRECT(CGraphicCommand, m_pModelEntry, 0xB0)
-IS_OFFSET_CORRECT(CGraphicCommand, m_iVertexIndex, 0xC0)
+IS_OFFSET_CORRECT(CGraphicCommand, qword30, 0x30);
+IS_OFFSET_CORRECT(CGraphicCommand, m_SamplerIndex, 0x90);
+IS_OFFSET_CORRECT(CGraphicCommand, m_pModelEntry, 0xB0);
+IS_OFFSET_CORRECT(CGraphicCommand, m_iVertexIndex, 0xC0);
 
 class CGraphics;
 
@@ -2469,7 +2569,7 @@ struct CGraphicCommandList
 	INT m_iCommandIndex;
 	CHAR pad28[8];
 };
-IS_SIZE_CORRECT(CGraphicCommandList, 0x30)
+IS_SIZE_CORRECT(CGraphicCommandList, 0x30);
 
 struct COtManagerPtr98
 {
@@ -2493,7 +2593,7 @@ struct COtManager
 											//0x10 | embededd struct
 	CGraphicCommandList** m_pCmdLists;		//0x50
 	BYTE gap58[8];							//0x58
-	QWORD qword60;							//0x60
+	INT* qword60;							//0x60
 	CGraphicCommandList* m_pActiveList;		//0x68
 	INT m_iGraphicListCount;				//0x70
 	INT m_nMaxGraphicListCount;				//0x74
@@ -2507,8 +2607,8 @@ struct COtManager
 	BYTE gapA0[4];							//0xA0
 	BOOL m_bGraphicListInitalized;			//0xA4
 };
-IS_OFFSET_CORRECT(COtManager, m_bGraphicListInitalized, 0xA4)
-IS_SIZE_CORRECT(COtManager, 0xA8)
+IS_OFFSET_CORRECT(COtManager, m_bGraphicListInitalized, 0xA4);
+IS_SIZE_CORRECT(COtManager, 0xA8);
 
 /*
 * Size of struct 0x0F0 (240) bytes	old version (denuvo)
@@ -2535,11 +2635,11 @@ public:
 	int m_iTimeStep;					//0x00DC |  g_flDeltaTime * 3000.0 
 	char padE0[20];						//0x00E0
 };
-IS_OFFSET_CORRECT(CGraphics, m_pContext, 0x28)
-IS_OFFSET_CORRECT(CGraphics, m_Display, 0x30)
-IS_OFFSET_CORRECT(CGraphics, m_pGraphicalDevice, 0x2B8)
-IS_OFFSET_CORRECT(CGraphics, m_Lock, 0x2C8)
-IS_SIZE_CORRECT(CGraphics, 0x320)
+IS_OFFSET_CORRECT(CGraphics, m_pContext, 0x28);
+IS_OFFSET_CORRECT(CGraphics, m_Display, 0x30);
+IS_OFFSET_CORRECT(CGraphics, m_pGraphicalDevice, 0x2B8);
+IS_OFFSET_CORRECT(CGraphics, m_Lock, 0x2C8);
+IS_SIZE_CORRECT(CGraphics, 0x320);
 
 /*
 *
@@ -2590,6 +2690,7 @@ renamed the class to it's proper name. It seems there might be a nested struct t
  */
 class CGraphicDeviceDx11
 {
+public:
 	virtual CGraphicDeviceDx11* function0();
 	virtual BOOL Create(CGraphicContextDx11** ppContext, CDisplay* pDisplay, HWND hWnd, void* pInfo);
 	virtual BOOL function2();
@@ -2605,7 +2706,7 @@ class CGraphicDeviceDx11
 	virtual BOOL function12();
 	virtual BOOL function13();
 	virtual BOOL function14();
-	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile);
+	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile); // index: 11 now according to ida
 	virtual BOOL CreateIndexBuffer(CVertexBuffer* pBuffer, __int64* a2);
 	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int* pcbVertexSizes, int index, int iElement);
 	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, unsigned int uByteWidth);
@@ -2674,10 +2775,10 @@ public:
 	BOOL m_b0x0134;							//0x0134
 	void* m_pUnk0x0138;						//0x0138
 };
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pOutput, 0x38)
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_bWindowed, 0x108)
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pAdapters, 0x128)
-IS_SIZE_CORRECT(CGraphicDeviceDx11, 320)
+IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pOutput, 0x38);
+IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_bWindowed, 0x108);
+IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pAdapters, 0x128);
+IS_SIZE_CORRECT(CGraphicDeviceDx11, 320);
 
 /*
 This struct is the same size on both versions
@@ -2822,9 +2923,9 @@ public:
 	char pad570[8];									//0x0570
 	ID3D11Device* m_pDevice;						//0x0578
 };
-IS_SIZE_CORRECT(CGraphicContextDx11, 1408)
-IS_OFFSET_CORRECT(CGraphicContextDx11, m_RenderContext, 0x98)
-IS_OFFSET_CORRECT(CGraphicContextDx11, m_iRenderWidth, 0x568)
+IS_SIZE_CORRECT(CGraphicContextDx11, 1408);
+IS_OFFSET_CORRECT(CGraphicContextDx11, m_RenderContext, 0x98);
+IS_OFFSET_CORRECT(CGraphicContextDx11, m_iRenderWidth, 0x568);
 
 class COsMainWindow
 {
@@ -3009,29 +3110,45 @@ struct CpkEntry
 struct CHeapInstance;
 
 template<typename T>
-struct ConstructionInfo
+struct CConstructionInfo
 {
-	int m_iObjectId;					//0x0000
-	char alignment[4];					//0x0004
-	T* (*Constructor)(CHeapInstance**); //0x0008 | not a CHeapInstance**, some parent struct
-	QWORD m_GroupId;					//0x0010
-	const char* szName;					//0x0018
-	void* pUnk;							//0x0020
+	int m_iObjectId;						//0x0000
+	char alignment[4];						//0x0004
+	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0008 
+	QWORD m_GroupId;						//0x0010
+	const char* m_szName;					//0x0018
+	void* pUnk;								//0x0020
 };
 
 template<typename T>
-struct UIConstructorInfo
+struct CUIConstructorInfo
 {
-	DWORD id;							//0x0000
-	char bs[12];						//0x0004
-	T* (*Constructor)(CHeapInstance**); //0x0010 | not a CHeapInstance**, some parent struct
+	DWORD id;								//0x0000
+	DWORD dword04;							//0x0004
+	DWORD dword08;							//0x0008
+	DWORD dword0C;							//0x000C
+	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0010 
+};
+
+enum DialogUIWhiteType
+{
+	DialogUIWhiteType_YesNo = 0,
+	DialogUIWhiteType_Ok
+};
+
+enum DialogUIBlackType
+{
+	DialogUIBlackType_YesNo = 0,
+	DialogUIBlackType_Message,
+	DialogUIBlackType_QuitRetry,
+	DialogUIBlackType_Persistent
 };
 
 struct CEntityInfoList
 {
 	CEntityInfo* m_pInfo;
-	struct EntityInfoList* m_pNext;
-	struct EntityInfoList* m_pPrevious;
+	struct CEntityInfoList* m_pNext;
+	struct CEntityInfoList* m_pPrevious;
 };
 
 
@@ -3109,7 +3226,7 @@ struct Create_t
 	void* m_pBXM;					//0x0050
 };
 
-struct Create2_t
+struct CreateContext
 {
 	CSceneEntitySystem* m_pSceneEntitySystem;
 	void* ptr8;
@@ -3177,7 +3294,7 @@ struct CHeapInstance
 	DWORD m_nDwords;						//0x008C
 	DWORD m_nHeaps;							//0x0090
 };
-IS_SIZE_CORRECT(CHeapInstance, 0x98)
+IS_SIZE_CORRECT(CHeapInstance, 0x98);
 
 struct CMemoryDevice
 {
@@ -3226,7 +3343,7 @@ public:
 	DWORD m_nItems;															//0x0030
 	BOOL m_bUnloaded;														//0x0034 | not sure
 };
-IS_SIZE_CORRECT(CGameContentDeviceSteam, 56)
+IS_SIZE_CORRECT(CGameContentDeviceSteam, 56);
 
 /*
 Size of is 0x48 (72) bytes
@@ -3245,7 +3362,7 @@ public:
 	CGameContentDeviceSteam* m_pSteamContent;						//0x0038
 	DWORD unk0x40;													//0x0040
 };
-IS_SIZE_CORRECT(CGameContentDevice, 72)
+IS_SIZE_CORRECT(CGameContentDevice, 72);
 
 /*
 Size of is 0x20 (32) bytes
@@ -3268,7 +3385,7 @@ class CAchievementDeviceSteam
 	ISteamUserStats011* m_pUserStats;	//0x10
 	void* m_pUnknown;					//0x18 | DWORD
 };
-IS_SIZE_CORRECT(CAchievementDeviceSteam, 32)
+IS_SIZE_CORRECT(CAchievementDeviceSteam, 32);
 
 /*
 Size of is 0x68 (104) bytes
@@ -3286,7 +3403,7 @@ public:
 	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
 	UINT m_uMaxAchievement;
 };
-IS_SIZE_CORRECT(CAchievementDevice, 104)
+IS_SIZE_CORRECT(CAchievementDevice, 104);
 
 struct CNetworkDevice;
 
@@ -3319,7 +3436,7 @@ class CRankingDevice
 	DWORD dwLeaderboardCount;			//0x70 | statically set to 32
 	DWORD dword74;
 };
-IS_SIZE_CORRECT(CRankingDevice, 120)
+IS_SIZE_CORRECT(CRankingDevice, 120);
 
 /*
 Size of is 0x?? (?) bytes
@@ -3369,7 +3486,7 @@ public:
 	BOOL m_bOverlayActive;	//0x38
 	char pad3[4];			//0x3C
 };
-IS_SIZE_CORRECT(COsSystemDeviceSteam, 64)
+IS_SIZE_CORRECT(COsSystemDeviceSteam, 64);
 
 /*
 Size of is 0x20 (32) bytes
@@ -3381,7 +3498,7 @@ public:
 	void* pUnk0x08;			//0x08
 	char unknown[16];		//0x10
 };
-IS_SIZE_CORRECT(CUserSignInProcess, 32)
+IS_SIZE_CORRECT(CUserSignInProcess, 32);
 
 /*
 This struct is an oddball and is quite fucked
@@ -3397,7 +3514,7 @@ public:
 	DWORD dword10;
 	DWORD dword14;
 };
-IS_SIZE_CORRECT(CGameBootProcess, 24)
+IS_SIZE_CORRECT(CGameBootProcess, 24);
 
 
 struct Task;
@@ -3445,8 +3562,7 @@ struct CWetObjManagerDelay
 struct CWetObjManager
 {
 	CReadWriteLock m_Lock;
-	char pad[4];
-	EntityHandle m_Localhandles[2];
+	EntityHandle m_LocalHandles[2];
 	CWetObjManagerDelay m_WetDelays[2];
 	EntityHandle m_EntityHandles[256];
 	EntityHandle m_SoundHandles[32];
@@ -3554,13 +3670,16 @@ public:
 	EntityHandle m_hEnt[7];						//0x14C0
 	CReadWriteLock m_Lock;						//0x14DC
 };
-IS_OFFSET_CORRECT(EmBaseManager, m_handles, 0x8)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0x858)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles4, 0xC78)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles5, 0x1098)
-IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
-//IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14DC) //wtf is going on
+IS_OFFSET_CORRECT(EmBaseManager, m_handles, 0x8);
+IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428);
+IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0x858);
+IS_OFFSET_CORRECT(EmBaseManager, m_handles4, 0xC78);
+IS_OFFSET_CORRECT(EmBaseManager, m_handles5, 0x1098);
+IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC);
+//IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14D8); // wtf is going on
+
+// TODO: reverse engineer this class/struct
+class CItemManager;
 
 /*
 * SteamInternal_ContextInit(&pSteam_InitInterface_WrapperFn);
@@ -3623,12 +3742,12 @@ public:
 	CAchievementDevice* m_pAchivementDevice;	//0x00F8
 	DWORD _0x100;								//0x0100
 };
-IS_SIZE_CORRECT(CUserManager, 264)
-IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38)
-IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8)
-IS_OFFSET_CORRECT(CUserManager, m_iUserIndices, 0xBC)
-IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8)
-IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0)
+IS_SIZE_CORRECT(CUserManager, 264);
+IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38);
+IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8);
+IS_OFFSET_CORRECT(CUserManager, m_iUserIndices, 0xBC);
+IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8);
+IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0);
 
 typedef uint32_t mrb_sym;
 typedef uint8_t mrb_bool;
@@ -3772,6 +3891,8 @@ typedef struct iv_tbl {
 typedef void* (*mrb_allocf)(struct mrb_state* mrb, void* ptr, size_t s, void* ud);
 typedef void(*mrb_atexit_func)(struct mrb_state*);
 
+// i think
+// size of stuct is 0x188 (392) bytes
 typedef struct mrb_state {
 
 	struct mrb_jmpbuf* jmp;		//0x00
@@ -3853,6 +3974,7 @@ typedef struct mrb_state {
 	uint16_t ecall_nest;                    /* prevent infinite recursive ecall() */
 } mrb_state;
 
+
 struct EventFiber;
 struct MrubyImpl;
 
@@ -3933,7 +4055,7 @@ struct MrubyImpl
 	QWORD qw10;														//0x0010 | mrb_value
 	StaticArray<EventEntry, 256> m_events;							//0x0018
 	StaticArray<EventEntry, 256> m_events2;
-	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_fibers;
+	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_Fibers;
 	QWORD qword1180;//StaticArray<std::pair<lib::HashedString<sys::StringSystem::Allocator>,lib::HashedString<sys::StringSystem::Allocator>>,256,8>
 	QWORD qword1188;
 	QWORD qword1190;
@@ -3941,9 +4063,9 @@ struct MrubyImpl
 	BYTE gap11A0[4112];
 	struct MrubyImpl* m_pNext;
 };
-IS_OFFSET_CORRECT(MrubyImpl, m_fibers, 0x1058)
-IS_OFFSET_CORRECT(MrubyImpl, m_pNext, 0x21A8)
-IS_SIZE_CORRECT(MrubyImpl, 8624)
+IS_OFFSET_CORRECT(MrubyImpl, m_Fibers, 0x1058);
+IS_OFFSET_CORRECT(MrubyImpl, m_pNext, 0x21A8);
+IS_SIZE_CORRECT(MrubyImpl, 8624);
 
 
 struct CUILayerString

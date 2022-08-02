@@ -91,7 +91,7 @@ ULONG_PTR VirtualTableHook::GetVirtualTableCount(ULONG_PTR* pVirtualTable) const
 	ULONG_PTR uIndex = 0;
 
 	for (; pVirtualTable[uIndex]; ++uIndex)
-		if (CMemory::IsBadCodePtr((const void*)pVirtualTable[uIndex]))
+		if (IsBadCodePtr((const void*)pVirtualTable[uIndex]))
 			break;
 
 	return uIndex;
