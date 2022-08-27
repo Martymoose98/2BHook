@@ -41,8 +41,6 @@ No Tutorial Dialogs
 
 Save Backup
 
-"Ghost Model"
-
 Wireframe (D3D11)
 
 If you want to help out or contribute contact me (See Below). If it gets enough interest I'll most likely make it open source.
@@ -78,11 +76,11 @@ F8 - Airstuck (Allows you to phase through solid objects & get stuck in mid-air)
 
 # To-Do:
 
- [OPTIONAL] Make an official injector/launcher
+Make an official injector/launcher [DONE]
  
 Add more features of course
 
-Add a config for custom hotkeys
+Add a config for custom hotkeys [DONE]
 
 Add teleport (to waypoint, poi, or objective and forward)
 
