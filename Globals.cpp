@@ -2,6 +2,7 @@
 
 CalculateLevelFn CalculateLevel;
 GetEntityFromHandleFn GetEntityFromHandle;
+GetEntityFromHandleFn GetEntityFromHandle2;
 CItemManager_GetItemNameByIdFn ItemManager_GetItemNameById;
 CItemManager_GetItemIdByNameFn ItemManager_GetItemIdByName;
 CItemManager_AddItemFn ItemManager_AddItem;
@@ -62,9 +63,9 @@ EntityHandle* g_pEmilHandle;
 CEntityList* g_pEntityList;
 CItemManager* g_pItemManager;
 CUserManager* g_pUserManager;
-YorhaManager* g_pYorhaManager;
-NPCManager* g_pNPCManager;
-EmBaseManager* g_pEnemyManager;
+CYorhaManager* g_pYorhaManager;
+CNPCManager* g_pNPCManager;
+CEmBaseManager* g_pEnemyManager;
 CWetObjManager* g_pWetObjectManager;
 CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 CTextureResourceManager* g_pTextureResourceManager;
@@ -111,7 +112,7 @@ VirtualTableHook* g_pDeviceContextHook;
 VirtualTableHook* g_pKeyboardHook;
 VirtualTableHook* g_pMouseHook;
 VirtualTableHook* g_pCameraHook;
-VirtualTableHook* g_pMemoryDeviceHook;
+MemoryDeviceHook* g_pMemoryDeviceHook;
 std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 MemoryDeviceHook* g_pMemoryDevHook;

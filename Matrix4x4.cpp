@@ -27,6 +27,17 @@ Matrix4x4::Matrix4x4(float _00, float _01, float _02, float _03,
 {
 }
 
+void Matrix4x4::InitPerspective(float flAspect, float flFov, float zNear, float zFar)
+{
+	float flTanHalfFov = tanf(flFov * 0.5f);
+	float flFarNearDelta = zFar - zNear;
+
+	m0 = _mm_setr_ps(1.0f / (flAspect * flTanHalfFov), 0.0f, 0.0f, 0.0f);
+	m1 = _mm_setr_ps(0.0f, 1.0f / flTanHalfFov, 0.0f, 0.0f);
+	m2 = _mm_setr_ps(0.0f, 0.0f, (-zFar - zNear) / flFarNearDelta, -2.0f * zFar * zNear / flFarNearDelta);
+	m2 = _mm_setr_ps(0.0f, 0.0f, -1.0f, 0.0f);
+}
+
 void Matrix4x4::InitAxisAngle(const Vector3& vAxis, float theta)
 {
 	float sin, cos, c;

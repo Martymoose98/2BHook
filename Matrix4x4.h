@@ -61,13 +61,14 @@ public:
 		float _20, float _21, float _22, float _23,
 		float _30, float _31, float _32, float _33);
 
+	void InitPerspective(float flAspect, float flFov, float zNear, float zFar);
+
 	void InitAxisAngle(const Vector3& vAxis, float theta);
 	
 	void InitTransform(const Vector3& vAngles, const Vector3& vPosition);
 	void InitTransform(const Vector3& vAngles, const Vector3& vScale, const Vector3& vPosition);
 	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition);
 	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vScale, const Vector3& vPosition);
-
 
 	inline Matrix4x4& operator*(const Matrix4x4& matrix);
 

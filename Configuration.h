@@ -923,6 +923,7 @@ private:
 	bool SetFilename(LPCTSTR szFilename);
 	BOOL FileExists(LPTSTR szFilename);
 	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath) const;
+	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath) const;
 
 	TCHAR m_szFilename[MAX_PATH];
 	std::vector<IConfigItem*> m_items;
