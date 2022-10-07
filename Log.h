@@ -104,7 +104,7 @@ public:
 		va_list Args;
 
 		va_start(Args, Fmt);
-		Write(stdout, LIGHT_RED, BLACK, szFunction, Fmt, Args);
+		Write(stderr, LIGHT_RED, BLACK, szFunction, Fmt, Args);
 		va_end(Args);
 	}
 
