@@ -1070,7 +1070,7 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 	}
 	else if (dwNumberOfHeaps > dwHeapsLength)
 	{
-		LOG("Another component created a heap between calls therefore, the result will be inaccurate.");
+		ERROR("Another component created a heap between calls therefore, the result will be inaccurate.");
 		return ERROR_INSUFFICIENT_BUFFER;
 	}
 
@@ -1095,7 +1095,7 @@ static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 static LONG UnhandledExceptionHandlerChild(EXCEPTION_POINTERS* pException)
 {
 	if (!WriteMiniDump(pException))
-		LOG("Failed to write dump file!\n");
+		ERROR("Failed to write dump file!\n");
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

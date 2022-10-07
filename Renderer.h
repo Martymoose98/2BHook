@@ -109,7 +109,7 @@ public:
 
 		if (m_vertices.size() >= m_uMaxVertices)
 		{
-			LOG("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
+			WARN("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
 			return;
 		}
 
@@ -136,7 +136,7 @@ public:
 
 		if (m_vertices.size() + uVerticeCount >= m_uMaxVertices)
 		{
-			LOG("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
+			WARN("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
 			return;
 		}
 
@@ -165,7 +165,7 @@ public:
 
 		if (m_vertices.size() + N >= m_uMaxVertices)
 		{
-			LOG("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
+			WARN("Vertex buffer exhausted! Increase the size of the vertex buffer or add a custom implementation.");
 			return;
 		}
 

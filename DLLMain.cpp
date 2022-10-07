@@ -147,7 +147,7 @@ HRESULT CreateRenderTarget(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to get swapchain description");
+		ERROR("Failed to get swapchain description");
 		return hr;
 	}
 
@@ -164,7 +164,7 @@ HRESULT CreateRenderTarget(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to get backbuffer from swapchain");
+		ERROR("Failed to get backbuffer from swapchain");
 		return hr;
 	}
 
@@ -175,7 +175,7 @@ HRESULT CreateRenderTarget(void)
 		if (SUCCEEDED(hr))
 			g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 		else
-			LOG("Failed to CreateRenderTargetView for backbuffer");
+			ERROR("Failed to CreateRenderTargetView for backbuffer");
 
 		pBackBuffer->Release();
 	}
@@ -207,7 +207,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateDepthStencilState for enabled state");
+		ERROR("Failed to CreateDepthStencilState for enabled state");
 		return hr;
 	}
 
@@ -217,7 +217,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateDepthStencilState for disabled state");
+		ERROR("Failed to CreateDepthStencilState for disabled state");
 		return hr;
 	}
 
@@ -230,7 +230,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateDepthStencilState for noreadnowrite state");
+		ERROR("Failed to CreateDepthStencilState for noreadnowrite state");
 		return hr;
 	}
 
@@ -254,7 +254,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateDepthStencilState for readnowrite state");
+		ERROR("Failed to CreateDepthStencilState for readnowrite state");
 		return hr;
 	}
 
@@ -276,7 +276,7 @@ HRESULT CreateRasterizerStates(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateRasterizerState for wireframe");
+		ERROR("Failed to CreateRasterizerState for wireframe");
 		return hr;
 	}
 
@@ -291,7 +291,7 @@ HRESULT CreateRasterizerStates(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateRasterizerState for solid");
+		ERROR("Failed to CreateRasterizerState for solid");
 		return hr;
 	}
 	return hr;
@@ -304,7 +304,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
+		ERROR("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -312,7 +312,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
+		ERROR("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -323,13 +323,13 @@ HRESULT InitD3D11(void)
 
 	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext) || !ImGui_ImplWin32_Init(g_hWnd))
 	{
-		LOG("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
+		ERROR("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
 		return S_FALSE;
 	}
 
 	if (!ImGui_ImplDX11_CreateDeviceObjects())
 	{
-		LOG("2B Hook Failed Initalization!\nCould not create device objects!\n");
+		ERROR("2B Hook Failed Initalization!\nCould not create device objects!\n");
 		return S_FALSE;
 	}
 
@@ -363,7 +363,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateSamplerState");
+		ERROR("Failed to CreateSamplerState");
 		return hr;
 	}
 
@@ -382,7 +382,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateTexture2D for green texture");
+		ERROR("Failed to CreateTexture2D for green texture");
 		return hr;
 	}
 
@@ -400,7 +400,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateTexture2D for red texture");
+		ERROR("Failed to CreateTexture2D for red texture");
 		return hr;
 	}
 
@@ -416,7 +416,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LOG("Failed to CreateShaderResourceView for green texture");
+		ERROR("Failed to CreateShaderResourceView for green texture");
 		return hr;
 	}
 
@@ -431,7 +431,7 @@ HRESULT InitD3D11(void)
 	g_pTexRed->Release();
 
 	if (FAILED(hr)) {
-		LOG("Failed to CreateShaderResourceView for red texture");
+		ERROR("Failed to CreateShaderResourceView for red texture");
 		return hr;
 	}
 
@@ -747,7 +747,7 @@ void Setup(void)
 
 	if (!oWndProc)
 	{
-		LOG("2B Hook Failed Initalization!\nCould not get old wndproc function pointer!\n");
+		ERROR("2B Hook Failed Initalization!\nCould not get old wndproc function pointer!\n");
 		return;
 	}
 
