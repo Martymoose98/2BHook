@@ -104,7 +104,24 @@
 
 typedef ULONGLONG QWORD;
 
-typedef DWORD EntityHandle;
+//
+//  EntityHandles are 32 bit values laid out as follows:
+//
+//   SSSSSSSS IIIIIIIIIIIIIIII RRRRRRRR
+//  +-------------------------+--------+
+//  | Shift  |     Index      |        |
+//  +--------+----------------+--------+
+//
+//  where
+//
+//      S - Shift - 8 bit shift value (unknown use)
+//
+//      I - Index - 16 unsigned value
+//          Index into the CEntiyList::m_pItems
+// 
+//      R - reserved bits of the handle
+//
+typedef unsigned long EntityHandle;
 
 enum TypeId {};
 
@@ -566,7 +583,7 @@ struct CEntityList
 {
 	DWORD m_dwItems;								//0x0000
 	DWORD m_dwSize;									//0x0004
-	DWORD m_dwBase;									//0x0008
+	DWORD m_dwBase;									//0x0008 | What the indices start at for handles
 	DWORD m_dwShift;								//0x000C
 	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
 	CReadWriteLock m_Lock;							//0x0018
@@ -628,7 +645,7 @@ struct CCollisionDataObjectManager
 	QWORD* qword80;
 	DWORD dword88;
 	int dword8C;
-	QWORD qword90;
+	QWORD qword90; // pointer to some struct
 	DWORD dword98;
 	DWORD dword9C;
 	DWORD dwordA0;
@@ -743,10 +760,11 @@ public:
 	BOOL dword1C;																		//0x001C
 	Vector4 m_vPosition;																//0x0020
 	float m_boundingbox[6];																//0x0030
-	BYTE gap48[64];																		//0x0048
-	DWORD dword88;
+	BYTE gap48[60];																		//0x0048
+	DWORD dwCollisionType;																//0x0084
+	DWORD dword88;																		//0x0088
 	int m_iBoneId;
-	DWORD dword90;
+	int m_iBoneId2;
 	DWORD dword94;
 	DWORD dword98;
 	DWORD dword9C;
@@ -754,7 +772,7 @@ public:
 	Vector4 v0xB0;
 	Vector4 v0xC0;
 	Vector4 v0xD0;
-	Vector3Aligned m_vMin;
+	Vector3Aligned m_vMin;	// vector pos of collision
 	void* unk[2];
 	Vector3Aligned m_vMax;
 	DWORD dword110;
@@ -764,6 +782,8 @@ public:
 	Vector4 vec120;
 };
 IS_SIZE_CORRECT(ExCollision, 0x130);
+IS_OFFSET_CORRECT(ExCollision, m_iBoneId, 0x8C);
+IS_OFFSET_CORRECT(ExCollision, m_iBoneId2, 0x90);
 IS_OFFSET_CORRECT(ExCollision, v0xA0, 0xA0);
 
 class ExLockOn : public BehaviorExtension
@@ -1708,7 +1728,7 @@ public:
 	Matrix4x4 m_identity;					//0x00100 | end ? CEnt ?
 	CModelExtendWork m_ModelExtendWork;		//0x00140
 	char _0x0168[336];						//0x00168
-	BYTE m_bWetness;						//0x002B8
+	BYTE m_Wetness;						//0x002B8
 	char _0x02B9[215];						//0x002B9
 	CModelWork m_Work;						//0x00390
 	QWORD m_qw0x538;						//0x00538
@@ -1841,7 +1861,7 @@ typedef Pl0000 Entity2B;
 IS_SIZE_CORRECT(Pl0000, 0x17920);
 IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50);
 IS_OFFSET_CORRECT(Pl0000, m_ModelExtendWork, 0x140);
-IS_OFFSET_CORRECT(Pl0000, m_bWetness, 0x2B8);
+IS_OFFSET_CORRECT(Pl0000, m_Wetness, 0x2B8);
 IS_OFFSET_CORRECT(Pl0000, m_Work, 0x390);
 IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540);
 IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598);
@@ -1862,7 +1882,7 @@ IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1747C);
 
 struct CCameraInstance
 {
-	Matrix4x4 m_CurrentViewProjection;	//0x0000 | current
+	Matrix4x4 m_CurrentViewProjection;	//0x0000 | probably inverted or smth
 	Matrix4x4 m_Projection;				//0x0040
 	Matrix4x4 m_ViewProjection;			//0x0080
 	char pad0xC0[320];					//0x00C0
@@ -3340,8 +3360,8 @@ public:
 	//void* m_pVtbl;														//0x0000
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008 | id is 1005
 	CallbackInstalled* m_pItems;											//0x0028
-	DWORD m_nItems;															//0x0030
-	BOOL m_bUnloaded;														//0x0034 | not sure
+	DWORD m_uItems;															//0x0030
+	BOOL m_bInitalized;														//0x0034
 };
 IS_SIZE_CORRECT(CGameContentDeviceSteam, 56);
 
@@ -3353,7 +3373,7 @@ class CGameContentDevice
 public:
 	void* m_pVtbl;													//0x0000
 	HandlerBase* m_pHandler;										//0x0008
-	DWORD m_nCpkCount;												//0x0010 
+	DWORD m_uCpkCount;												//0x0010 
 	DWORD unk0x014;													//0x0014 
 	DWORD unk0x18;													//0x0018
 	void(*LoadCpks)(unsigned int index, const char* szCpkName);		//0x0020
@@ -3367,7 +3387,7 @@ IS_SIZE_CORRECT(CGameContentDevice, 72);
 /*
 Size of is 0x20 (32) bytes
 
-Max achievment index = (0x2F) 47
+Max achievement index = (0x2F) 47
 */
 class CAchievementDeviceSteam
 {
@@ -3568,7 +3588,7 @@ struct CWetObjManager
 	EntityHandle m_SoundHandles[32];
 };
 
-class YorhaManager
+class CYorhaManager
 {
 public:
 	void* m_pvtable;				//0x0000
@@ -3590,7 +3610,7 @@ public:
 };
 
 /* incomplete getters say this exceeds 0x434 */
-class NPCManager
+class CNPCManager
 {
 public:
 	virtual void function0(); //maybe constructor
@@ -3609,7 +3629,7 @@ public:
 
 
 // Size of struct 0x1520 (5408) bytes
-class EmBaseManager
+class CEmBaseManager
 {
 public:
 	virtual void function0(); //maybe constructor
@@ -3670,12 +3690,12 @@ public:
 	EntityHandle m_hEnt[7];						//0x14C0
 	CReadWriteLock m_Lock;						//0x14DC
 };
-IS_OFFSET_CORRECT(EmBaseManager, m_handles, 0x8);
-IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428);
-IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0x858);
-IS_OFFSET_CORRECT(EmBaseManager, m_handles4, 0xC78);
-IS_OFFSET_CORRECT(EmBaseManager, m_handles5, 0x1098);
-IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC);
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles, 0x8);
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles2, 0x428);
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles3, 0x858);
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles4, 0xC78);
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles5, 0x1098);
+IS_OFFSET_CORRECT(CEmBaseManager, m_hEntity, 0x14BC);
 //IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14D8); // wtf is going on
 
 // TODO: reverse engineer this class/struct

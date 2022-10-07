@@ -5,6 +5,17 @@
 FILE* Log::pStdout;
 FILE* Log::pStderr;
 
+void WINAPI UserNotify(PUSER_NOTIFY pParams)
+{
+	if (pParams->hCallerEvent == INVALID_HANDLE_VALUE)
+		return;
+
+	Log::SetConsoleColors(LIGHT_PURPLE, BLACK);
+	Log::AnimateWait(pParams->szMsg, pParams->hCallerEvent, 200);
+	Log::SetConsoleColors(GREEN, BLACK);
+	LOG("%s\n", pParams->szCompletedMsg);
+}
+
 void Log::LogOffset(const char* szName, void* p)
 {
 	if (szName)

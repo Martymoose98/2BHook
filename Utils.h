@@ -2,6 +2,8 @@
 #include <dbghelp.h>
 #include <d3dcompiler.h>
 #include <Shlobj.h>
+#include <ntstatus.h>
+
 #include "Globals.h"
 #include "Matrix4x4.h"
 #include "Console.h"
@@ -45,7 +47,7 @@ struct StackReadWriteLock
 	StackReadWriteLock(DWORD dwSpinCount)
 	{
 		/*
-		* Windows Server 2003 and Windows XP:  If the function succeeds, the return value is nonzero. 
+		* Windows Server 2003 and Windows XP:  If the function succeeds, the return value is nonzero.
 		* If the function fails, the return value is zero (0). To get extended error information, call GetLastError.
 		* Starting with Windows Vista, the InitializeCriticalSectionAndSpinCount function always succeeds, even in low memory situations.
 		*/
@@ -70,6 +72,271 @@ private:
 	CRITICAL_SECTION m_CriticalSection;
 	BOOL m_bCriticalSectionInitalized;
 };
+
+enum NierVersion
+{
+	NIERVER_UNKNOWN,
+	NIERVER_100,
+	NIERVER_101,
+	NIERVER_102,
+	NIERVER_102_UNPACKED,
+	NIERVER_WINSTORE,
+	NIERVER_DEBUG,
+	NIERVER_MAX
+};
+
+static std::ostream& operator<<(std::ostream& os, const NierVersion& v)
+{
+	switch (v)
+	{
+	case NIERVER_100:
+		os << "NieR:Automata (v1.00)";
+		break;
+	case NIERVER_101:
+		os << "NieR:Automata (v1.01)";
+		break;
+	case NIERVER_102:
+		os << "NieR:Automata (v1.02)";
+		break;
+	case NIERVER_102_UNPACKED:
+		os << "NieR:Automata (v1.02 Unpacked)";
+		break;
+	case NIERVER_WINSTORE:
+		os << "NieR:Automata (Winstore)";
+		break;
+	case NIERVER_DEBUG:
+		os << "NieR:Automata (Debug)";
+		break;
+	case NIERVER_UNKNOWN:
+	default:
+		os << "NieR:Automata (Unknown Version)";
+		break;
+	}
+	return os;
+}
+
+struct NierVersionInfo
+{
+	NierVersionInfo(NierVersion Version)
+		: m_pHash(NULL), m_uHashSize(0), m_Version(Version)
+	{
+		Init();
+	}
+
+	NierVersionInfo(NierVersion Version, const char* Hash)
+		: m_pHash((BYTE*)Hash), m_uHashSize(strlen(Hash)), m_Version(Version)
+	{
+		Init();
+	}
+
+	void Init(void)
+	{
+		switch (m_Version)
+		{
+		case NIERVER_100:
+			m_szVersion = TEXT("NieR:Automata (v1.00)");
+			break;
+		case NIERVER_101:
+			m_szVersion = TEXT("NieR:Automata (v1.01)");
+			break;
+		case NIERVER_102:
+			m_szVersion = TEXT("NieR:Automata (v1.02)");
+			break;
+		case NIERVER_102_UNPACKED:
+			m_szVersion = TEXT("NieR:Automata (v1.02 Unpacked)");
+			break;
+		case NIERVER_WINSTORE:
+			m_szVersion = TEXT("NieR:Automata (Winstore)");
+			break;
+		case NIERVER_DEBUG:
+			m_szVersion = TEXT("NieR:Automata (Debug)");
+			break;
+		case NIERVER_UNKNOWN:
+		default:
+			m_szVersion = TEXT("NieR:Automata (Unknown Version)");
+			break;
+		}
+	}
+
+	bool operator==(NierVersionInfo& other) const
+	{
+		return !memcmp(this->m_pHash, other.m_pHash, m_uHashSize);
+	}
+
+	bool operator==(const BYTE* pHash) const
+	{
+		return !memcmp(this->m_pHash, pHash, m_uHashSize);
+	}
+
+	BYTE* m_pHash;
+	ULONG m_uHashSize;
+	NierVersion m_Version;
+	TCHAR* m_szVersion;
+};
+
+static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
+{
+	//	TCHAR szFileName[MAX_PATH];
+
+	// Set the inital status to success
+	NTSTATUS Status = STATUS_SUCCESS;
+
+	// Retrieve the size of the nier bin ary file path
+	uint32_t uFileNameSize = MAX_PATH;//GetModuleFileName(NULL, NULL, 0);
+
+	// Allocate the correct amount of memory
+	TCHAR* szFileName = new TCHAR[(uFileNameSize + 1) * sizeof(TCHAR)];
+
+	// Query the nier binary file path
+	GetModuleFileName(NULL, szFileName, uFileNameSize + 1);
+
+	// Query a file handle to the nier binary 
+	HANDLE hFile = CreateFile(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	// Free the nier binary file path
+	delete[] szFileName;
+
+	// If the handle is invalid, bail
+	if (hFile == INVALID_HANDLE_VALUE)
+		return STATUS_INVALID_HANDLE;
+
+	// Query the file size of the nier binary
+	DWORD dwFileSize = GetFileSize(hFile, NULL);
+	DWORD dwBytesRead;
+
+	// Allocate the memory for the nier binary
+	BYTE* pBinary = new BYTE[dwFileSize];
+
+	// Read the binary file
+	ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
+
+	// Close the file handle to the nier binary
+	CloseHandle(hFile);
+
+	// Bail out if there was a partial read
+	if (dwFileSize != dwBytesRead)
+	{
+		delete[] pBinary;
+		return ERROR_CLUSTER_PARTIAL_READ;
+	}
+
+	ULONG uHashLengthSize;
+
+	// Query the hash length
+	Status = BCryptGetProperty(BCRYPT_SHA256_ALG_HANDLE, BCRYPT_HASH_LENGTH, (PUCHAR)&Version.m_uHashSize, sizeof(ULONG), &uHashLengthSize, 0);
+
+	if (SUCCEEDED(Status))
+	{
+		// Allocate the memory for hash
+		Version.m_pHash = new BYTE[Version.m_uHashSize];
+
+		// Create the hash
+		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, Version.m_pHash, Version.m_uHashSize);
+	}
+
+	// Free the binary from memory
+	delete[] pBinary;
+
+	return Status;
+}
+
+static NTSTATUS QueryNierBinaryHash(BYTE*& pHash, ULONG& uHashSize)
+{
+	//	TCHAR szFileName[MAX_PATH];
+
+	// Set the inital status to success
+	NTSTATUS Status = STATUS_SUCCESS;
+
+	// Retrive the size of the nier binary file path
+	uint32_t uFileNameSize = MAX_PATH;//GetModuleFileName(NULL, NULL, 0);
+
+	// Allocate the correct amount of memory
+	TCHAR* szFileName = new TCHAR[(uFileNameSize + 1) * sizeof(TCHAR)];
+
+	// Query the nier binary file path
+	GetModuleFileName(NULL, szFileName, uFileNameSize + 1);
+
+	// Query a file handle to the nier binary 
+	HANDLE hFile = CreateFile(szFileName, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+
+	// Free the nier binary file path
+	delete[] szFileName;
+
+	// If the handle is invalid, bail
+	if (hFile == INVALID_HANDLE_VALUE)
+		return STATUS_INVALID_HANDLE;
+
+	// Query the file size of the nier binary
+	DWORD dwFileSize = GetFileSize(hFile, NULL);
+	DWORD dwBytesRead;
+
+	// Allocate the memory for the nier binary
+	BYTE* pBinary = new BYTE[dwFileSize];
+
+	// Read the binary file
+	ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
+
+	// Close the file handle to the nier binary
+	CloseHandle(hFile);
+
+	// Bail out if there was a partial read
+	if (dwFileSize != dwBytesRead)
+	{
+		delete[] pBinary;
+		return ERROR_CLUSTER_PARTIAL_READ;
+	}
+
+	ULONG uHashLengthSize;
+
+	// Query the hash length
+	Status = BCryptGetProperty(BCRYPT_SHA256_ALG_HANDLE, BCRYPT_HASH_LENGTH, (PUCHAR)&uHashSize, sizeof(ULONG), &uHashLengthSize, 0);
+
+	if (SUCCEEDED(Status))
+	{
+		// Allocate the memory for hash
+		pHash = new BYTE[uHashSize];
+
+		// Create the hash
+		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, pHash, uHashSize);
+	}
+
+	// Free the binary from memory
+	delete[] pBinary;
+
+	return Status;
+}
+
+static NierVersionInfo* QueryNierBinaryVersion(void)
+{
+	static NierVersionInfo Versions[] =
+	{
+		{ NIERVER_101, "\xa0\x1a\xc5\x13\x2e\x10\x92\x52\xd6\xd9\xa4\xcb\xf9\x74\x61\x4d\xec\xfb\xe3\x23\x71\x3c\x1f\xbf\x5b\xc2\x48\xf0\x12\x61\x77\x3f" },
+		{ NIERVER_102, "\x51\x71\xbe\xd0\x9e\x6f\xec\x7b\x21\xbf\x0e\xa4\x79\xdb\xd2\xe1\xb2\x28\x69\x5c\x67\xd1\xf0\xb4\x78\x54\x9a\x9b\xe2\xf5\x72\x6a" },
+		{ NIERVER_102_UNPACKED, "\x5f\x97\x20\xd8\xc7\x7c\xd5\x97\x8e\xfe\x49\x88\x89\x3a\xf8\xfd\x99\x9f\x90\xa4\x76\xa8\xde\xeb\xb3\x91\x26\x94\xf6\x18\xdc\x43" },
+		{ NIERVER_WINSTORE, "\x3d\xde\x56\x6c\xea\x3e\x3b\xc1\x5e\x45\x92\x66\x02\xfb\x4f\x24\xd4\x8f\x77\xdf\x8a\x7b\xc5\x50\xa5\xb2\xdc\xae\xcc\xcf\x09\x48" },
+		{ NIERVER_DEBUG, "\xe9\xef\x66\x01\xeb\x40\xeb\x0a\x6d\x3f\x30\xa6\x63\x95\x43\xec\x2f\x81\x71\xc2\x6a\x3d\xe8\xb2\xb1\x30\x39\xee\xbe\x3b\xc8\x1c" },
+		{ NIERVER_UNKNOWN }
+	};
+	BYTE* pHash;
+	ULONG uHashSize;
+
+	// Set the version the first entry
+	NierVersionInfo* pVersion = Versions;
+
+	// Query the nier binary hash, if it fails return NIERVER_UNKNOWN
+	if (FAILED(QueryNierBinaryHash(pHash, uHashSize)))
+		return &Versions[ARRAYSIZE(Versions) - 1];
+
+	// Traverse the array comparing the loaded binary hash to the known hashes
+	for (; pVersion->m_Version != NIERVER_UNKNOWN; ++pVersion)
+		if (*pVersion == pHash)
+			break;
+
+	// Free the hash memory
+	delete[] pHash;
+
+	return pVersion;
+}
 
 static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
 {
@@ -98,16 +365,24 @@ static float GetFovFromProjectionMatrix(void)
 	https://www.cs.toronto.edu/~jepson/csc420/notes/imageProjection.pdf
 	https://www.scratchapixel.com/lessons/3d-basic-rendering/computing-pixel-coordinates-of-3d-point/mathematics-computing-2d-coordinates-of-3d-points
 	https://www.cse.unr.edu/~bebis/CS791E/Notes/CameraParameters.pdf
+	https://github.com/VSES/SourceEngine2007/blob/master/se2007/engine/gl_rmain.cpp
+
+	Source Eng:
+	pScreen->x = 0.5f * ( pScreen->x + 1.0f ) * CurrentView().width + CurrentView().x;
+	pScreen->y = 0.5f * ( pScreen->y + 1.0f ) * CurrentView().height + CurrentView().y;
+	aka
+	pScreen->x = 0.5f * pScreen->x * CurrentView().width + 0.5f * CurrenView().width + CurrentView.x;
+	pScreen->y = 0.5f * pScreen->y * CurrentView().height + 0.5f * CurrenView().height + CurrentView.y;
 */
 static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 {
 	Vector3 vTransform;
 
-	VMatrix& vMatrix = g_pCamera->m_pInstance->m_ViewProjection; //*g_pViewMatrix;//*(VMatrix*)0x1419C73C0;
+	VMatrix& vMatrix = g_pCamera->m_pInstance->m_ViewProjection;
 
 	float w = vMatrix[0][3] * vIn[0] + vMatrix[1][3] * vIn[1] + vMatrix[2][3] * vIn[2] + vMatrix[3][3];
 
-	if (w < 0.01f)
+	if (w < 0.001f)
 		return false;
 
 	// transform by viewmatrix
@@ -121,28 +396,39 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 
 	float x = width / 2.0f;
 	float y = height / 2.0f;
-	float flFocalLengthX = x / tanf(g_pCamera->m_flFov);
-	float flFocalLengthY = y / tanf(g_pCamera->m_flFov);
+	//float flFocalLengthX = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
+	//float flFocalLengthY = (flFocalLengthX * height) / width;
 
 	//vOut.x = x * (1.f + (vTransform.x / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
 	//vOut.y = y * (1.f - (vTransform.y / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
 
-	vOut.x = x + vTransform.x * flFocalLengthX / vTransform.z;
-	vOut.y = y - vTransform.y * flFocalLengthY / vTransform.z;
-	//vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
-	//vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
+	//vOut.x = x + vTransform.x * flFocalLengthX * width / vTransform.z;
+	//vOut.y = y - vTransform.y * flFocalLengthY * height / vTransform.z;
+
+	vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
+	vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
 
 	return true;
 }
 
 static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
 {
-	return (unsigned short)((handle & 0x00FFFF00) >> 8);
+	return (unsigned short)((handle & 0x00FFFF00) >> 8); // (unsigned short)(handle >> 8)
 }
 
 static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const unsigned short index)
 {
 	return (index | (pList->m_dwShift << 16)) << 8;
+}
+
+static inline void* GetEntityByHandle(const CEntityList* pList, const EntityHandle handle)
+{
+	int idx = EntityHandleToListIndex(handle);
+
+	if (idx > pList->m_dwItems || idx < 0)
+		return NULL;
+
+	return pList->m_pItems[idx].second->m_pEntity;
 }
 
 // Rebuilt from binary with added functionality
@@ -821,6 +1107,7 @@ static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }
+
 
 /*
 Rebuilt from the debug build

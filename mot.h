@@ -15,7 +15,7 @@ typedef unsigned int uint32;
 typedef int int32;
 
 // pghalf - https://github.com/Scobalula/Husky/blob/master/src/Husky/Husky/Utility/HalfFloats.cs
-
+// https://github.com/Kerilk/noesis_bayonetta_pc/blob/master/bayonetta_pc/MotionBayo.h
 /*
 Found: https://forum.xentax.com/viewtopic.php?f=10&t=16011&sid=110c6732b529049ca7dd0769afd12688&start=15
 

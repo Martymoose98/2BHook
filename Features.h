@@ -116,6 +116,8 @@ public:
 			return;
 
 		pEntity->m_HorizontalCollision.m_hOwner = pEntity->m_pInfo->m_hEntity;
+		pEntity->m_HorizontalCollision.m_bEnabled = TRUE;
+		pEntity->m_HorizontalCollision.m_bCollison = FALSE;
 	}
 
 	static void RemoveHorizontalCollision(Pl0000* pEntity)
@@ -124,7 +126,9 @@ public:
 			return;
 
 		pEntity->m_HorizontalCollision.m_hOwner = 0;
+		pEntity->m_HorizontalCollision.m_bEnabled = FALSE;
 		pEntity->m_HorizontalCollision.m_bCollison = FALSE;
+		pEntity->m_HorizontalCollision.m_vMin = pEntity->m_vPosition;
 	}
 
 	static void UnlockAllAchievements(void)
@@ -178,7 +182,9 @@ public:
 		}
 	}
 
-	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(0, pEntity->m_pInfo); after the wet time has elapsed")
+	// Maybe for perma wet we can call WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); then, set the wet level manually
+	// then undo it when we want to go back to normal DOESN'T WORK
+	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); after the wet time has elapsed")
 	static int WetEntity(Pl0000* pEntity, byte wetness)
 	{
 		int i = 0;
@@ -216,13 +222,13 @@ public:
 		if (pCameraEnt && g_pLocalPlayer)
 		{
 			ChangePlayer(g_pLocalPlayer);
-			pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
+			//pCameraEnt = g_pCamera->m_pCamEntity;//GetEntityFromHandle(&g_pCamera->m_hEntity);
 		}
 	}
 
 	static void SwapPlayer(void)
 	{
-		ChangePlayerEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+		ChangePlayerEx(g_pCamera->m_pCamEntity);
 	}
 
 	static void DuplicateBuddyAsNPC(void)
@@ -255,7 +261,7 @@ public:
 	static void TeleportScalar(eTransformMatrix Axis, float flSpeed)
 	{
 		if (g_pCamera)
-			TeleportScalarEx(GetEntityFromHandle(&g_pCamera->m_hEntity), Axis, flSpeed);
+			TeleportScalarEx(g_pCamera->m_pCamEntity, Axis, flSpeed);
 	}
 
 	static bool* GetModelGravityEx(Pl0000* pEntity)
@@ -265,13 +271,13 @@ public:
 
 		return (bool*)&pEntity->m_VerticalCollision.m_bEnabled;
 	}
-	
+
 	static bool* GetModelGravity(void)
 	{
 		if (!g_pCamera)
 			return NULL;
 
-		return GetModelGravityEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+		return GetModelGravityEx(g_pCamera->m_pCamEntity);
 	}
 
 	static float* GetEntityOBBYEx(Pl0000* pEntity)
@@ -287,7 +293,7 @@ public:
 		if (!g_pCamera)
 			return NULL;
 
-		return GetEntityOBBYEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+		return GetEntityOBBYEx(g_pCamera->m_pCamEntity);
 	}
 
 	static void PlayAnimationEx(Pl0000* pEntity)
@@ -298,7 +304,7 @@ public:
 
 	static void PlayAnimation(void)
 	{
-		PlayAnimationEx(GetEntityFromHandle(&g_pCamera->m_hEntity));
+		PlayAnimationEx(g_pCamera->m_pCamEntity);
 	}
 
 	static void BuffEnemies(void)
@@ -317,7 +323,7 @@ public:
 
 	static void BuffEnemiesTolerance(void)
 	{
-		Pl0000* pLocal = GetEntityFromHandle(g_pLocalPlayerHandle);
+		Pl0000* pLocal = GetEntityFromHandle2(g_pLocalPlayerHandle);
 
 		if (!pLocal)
 			return;
@@ -471,7 +477,7 @@ public:
 		c.m_ObjectIds[1] = objectId;
 		c.m_iGenerateMode = 1;
 		c.m_pSetInfo = pSetInfo;
-		
+
 		return SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &c);
 	}
 

@@ -91,7 +91,24 @@
 
 typedef ULONGLONG QWORD;
 
-typedef DWORD EntityHandle;
+//
+//  EntityHandles are 32 bit values laid out as follows:
+//
+//   SSSSSSSS IIIIIIIIIIIIIIII RRRRRRRR
+//  +-------------------------+--------+
+//  | Shift  |     Index      |        |
+//  +--------+----------------+--------+
+//
+//  where
+//
+//      S - Shift - 8 bit shift value (unknown use)
+//
+//      I - Index - 16 unsigned value
+//          Index into the CEntiyList::m_pItems
+// 
+//      R - reserved bits of the handle
+//
+typedef unsigned long EntityHandle;
 
 enum TypeId {};
 
@@ -1631,7 +1648,7 @@ public:
 	Matrix4x4 m_identity;					//0x00100 | end ? CEnt ?
 	CModelExtendWork m_ModelExtendWork;		//0x00140
 	char _0x0168[336];						//0x00168
-	BYTE m_bWetness;						//0x002B8
+	BYTE m_Wetness;						//0x002B8
 	char _0x02B9[215];						//0x002B9
 	CModelWork m_Work;						//0x00390
 	QWORD m_qw0x538;						//0x00538
@@ -3221,7 +3238,7 @@ public:
 	//void* m_pVtbl;														//0x0000
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008 | id is 1005
 	CallbackInstalled* m_pItems;											//0x0028
-	DWORD m_nItems;															//0x0030
+	DWORD m_uItems;															//0x0030
 	BOOL m_bUnloaded;														//0x0034 | not sure
 };
 IS_SIZE_CORRECT(CGameContentDeviceSteam, 56)
@@ -3234,7 +3251,7 @@ class CGameContentDevice
 public:
 	void* m_pVtbl;													//0x0000
 	HandlerBase* m_pHandler;										//0x0008
-	DWORD m_nCpkCount;												//0x0010 
+	DWORD m_uCpkCount;												//0x0010 
 	DWORD unk0x014;													//0x0014 
 	DWORD unk0x18;													//0x0018
 	void(*LoadCpks)(unsigned int index, const char* szCpkName);		//0x0020
@@ -3449,7 +3466,7 @@ struct CWetObjManager
 	EntityHandle m_SoundHandles[32];
 };
 
-class YorhaManager
+class CYorhaManager
 {
 public:
 	void* m_pvtable;				//0x0000
@@ -3471,7 +3488,7 @@ public:
 };
 
 /* incomplete getters say this exceeds 0x434 */
-class NPCManager
+class CNPCManager
 {
 public:
 	virtual void function0(); //maybe constructor
@@ -3490,7 +3507,7 @@ public:
 
 
 // Size of struct 0x1520 (5408) bytes
-class EmBaseManager
+class CEmBaseManager
 {
 public:
 	virtual void function0(); //maybe constructor
@@ -3551,12 +3568,12 @@ public:
 	EntityHandle m_hEnt[7];						//0x14C0
 	CReadWriteLock m_Lock;						//0x14DC
 };
-IS_OFFSET_CORRECT(EmBaseManager, m_handles, 0x8)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles2, 0x428)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles3, 0x858)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles4, 0xC78)
-IS_OFFSET_CORRECT(EmBaseManager, m_handles5, 0x1098)
-IS_OFFSET_CORRECT(EmBaseManager, m_hEntity, 0x14BC)
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles, 0x8)
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles2, 0x428)
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles3, 0x858)
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles4, 0xC78)
+IS_OFFSET_CORRECT(CEmBaseManager, m_handles5, 0x1098)
+IS_OFFSET_CORRECT(CEmBaseManager, m_hEntity, 0x14BC)
 //IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14DC) //wtf is going on
 
 /*

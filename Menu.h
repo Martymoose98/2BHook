@@ -161,9 +161,7 @@ static void GameplayTab(Pl0000* pCameraEnt)
 
 	if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
 	{
-		EntityHandle* phBuddy = MakePtr(EntityHandle*, g_pLocalPlayer, 0x1647C);
-		Pl0000* pBuddy = GetEntityFromHandle(phBuddy);
-		//Pl0000* pBuddy = GetEntityFromHandle(&g_pLocalPlayer->m_hBuddy);
+		Pl0000* pBuddy = GetEntityFromHandle2(&g_pLocalPlayer->m_hBuddy);
 
 		if (pBuddy)
 			DestroyBuddy(pBuddy);
