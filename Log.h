@@ -39,7 +39,7 @@
 #define ERROR(fmt, ...) Log::Error(__FUNCSIG__, fmt, __VA_ARGS__)
 #else 
 #define LOG(fmt, ...) ((void)0)
-#define WARNfmt, ...) ((void)0)
+#define WARN(fmt, ...) ((void)0)
 #define ERROR(fmt, ...) ((void)0)
 #endif
 
