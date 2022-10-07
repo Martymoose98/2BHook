@@ -325,6 +325,63 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 	return Status;
 }
 
+/// <summary>
+/// 
+/// </summary>
+/// <param name="szDelimiter"></param>
+/// <param name="szOriginalPath"></param>
+/// <param name="cchOriginalPath"></param>
+/// <param name="pszSanitizedPath"></param>
+/// <param name="pcchSanitizedPath">The value in this SIZE_T is added to the sanitized file path length</param>
+/// <returns></returns>
+BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath) const
+{
+	LPTSTR szToken;
+	LPTSTR szNextToken;
+
+	BOOL Status = ERROR_DIRECTORY;
+
+	if (pszSanitizedPath && pcchSanitizedPath)
+	{
+		LPTSTR szTemporary = NULL;
+		LPTSTR szDirPath = (LPTSTR)LocalAlloc(LPTR, (cchOriginalPath + 1) * sizeof(TCHAR));
+
+		if (szDirPath)
+		{
+			_tcscpy_s(szDirPath, cchOriginalPath, szOriginalPath);
+			szToken = _tcstok_s(szOriginalPath, szDelimiter, &szNextToken);
+
+			while (szToken)
+			{
+				szTemporary = szToken;
+				szToken = _tcstok_s(NULL, szDelimiter, &szNextToken);
+			}
+
+			if (szTemporary)
+			{
+				szDirPath[szTemporary - szOriginalPath] = (TCHAR)0;
+				*pcchSanitizedPath = szTemporary - szOriginalPath + *pcchSanitizedPath + 1;
+				*pszSanitizedPath = (LPTSTR)LocalAlloc(LPTR, (*pcchSanitizedPath) * sizeof(TCHAR));
+
+				if (*pszSanitizedPath)
+				{
+					Status = ERROR_SUCCESS;
+					_tcscpy_s(*pszSanitizedPath, *pcchSanitizedPath, szDirPath);
+				}
+				else
+					Status = ERROR_OUTOFMEMORY;
+			}
+			LocalFree((HLOCAL)szDirPath);
+		}
+		else
+			Status = ERROR_OUTOFMEMORY;
+	}
+	else
+		Status = ERROR_INVALID_PARAMETER;
+
+	return Status;
+}
+
 KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
 {
 	int iLeft = 0;

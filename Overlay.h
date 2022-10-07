@@ -330,7 +330,7 @@ public:
 
 		if (g_pCamera)
 		{
-			Pl0000* pCameraEntity = GetEntityFromHandle(&g_pCamera->m_hEntity);
+			Pl0000* pCameraEntity = g_pCamera->m_pCamEntity; //GetEntityFromHandle(&g_pCamera->m_hEntity);// this func doesn't work for 
 
 			if (pCameraEntity)
 			{

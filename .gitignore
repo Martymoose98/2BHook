@@ -11,3 +11,7 @@ Build
 *.filters
 /2butterfly
 *.dds
+*.iobj
+*.ipdb
+*.res
+*.aps

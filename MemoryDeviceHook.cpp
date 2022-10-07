@@ -1,12 +1,12 @@
 #include "MemoryDeviceHook.h"
 
-static CHeapAllocInfo* hkCHeapInstanceAlloc(CHeapInstance* pThis, __int64 nBytes, unsigned __int64 align, int flags)
+CHeapAllocInfo* hkCHeapInstanceAlloc(CHeapInstance* pThis, __int64 nBytes, unsigned __int64 align, int flags)
 {
 	typedef CHeapAllocInfo* (*OriginalFn)(CHeapInstance*, __int64, unsigned __int64, int);
 
-	CHeapAllocInfo* pAlloc = ((OriginalFn)(g_pMemoryDevHook->GetHeapHook().GetFunctionAddress(4)))(pThis, nBytes, align, flags);
+	CHeapAllocInfo* pAlloc = ((OriginalFn)(g_pMemoryDeviceHook->GetHeapHook().GetFunctionAddress(4)))(pThis, nBytes, align, flags);
 
-	if (g_pMemoryDevHook->IsChildHeapAllocation(pThis))
+	if (g_pMemoryDeviceHook->IsChildHeapAllocation(pThis))
 	{
 		if (!pAlloc)
 		{
@@ -21,12 +21,12 @@ static CHeapAllocInfo* hkCHeapInstanceAlloc(CHeapInstance* pThis, __int64 nBytes
 		}
 		else
 		{
-			g_pMemoryDevHook->AddHook(pAlloc->m_pHeap);
+			//g_pMemoryDeviceHook->AddHook(pAlloc->m_pHeap);
 		}
 	}
 	else
 	{
-		g_pMemoryDevHook->ExtendHeap(pThis, nBytes);
+		g_pMemoryDeviceHook->ExtendHeap(pThis, nBytes);
 	}
 
 	return pAlloc;
