@@ -165,6 +165,7 @@ typedef DWORD(__stdcall* XInputGetCapabilitiesExFn)(DWORD a1, DWORD dwUserIndex,
 
 extern CalculateLevelFn CalculateLevel;
 extern GetEntityFromHandleFn GetEntityFromHandle;
+extern GetEntityFromHandleFn GetEntityFromHandle2;
 extern CItemManager_GetItemNameByIdFn ItemManager_GetItemNameById;
 extern CItemManager_GetItemIdByNameFn ItemManager_GetItemIdByName;
 extern CItemManager_AddItemFn ItemManager_AddItem;
@@ -228,10 +229,10 @@ extern EntityHandle* g_pLocalPlayerHandle;
 extern EntityHandle* g_pEmilHandle;
 extern CEntityList* g_pEntityList;
 extern CItemManager* g_pItemManager;
-extern YorhaManager* g_pYorhaManager;
+extern CYorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
-extern NPCManager* g_pNPCManager;
-extern EmBaseManager* g_pEnemyManager;
+extern CNPCManager* g_pNPCManager;
+extern CEmBaseManager* g_pEnemyManager;
 extern CWetObjManager* g_pWetObjectManager;
 extern CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 extern CTextureResourceManager* g_pTextureResourceManager;
@@ -277,8 +278,7 @@ extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
 extern VirtualTableHook* g_pCameraHook;
-extern VirtualTableHook* g_pMemoryDeviceHook;
-extern VirtualTableHook* g_pMemoryDeviceHeapHook;
+extern MemoryDeviceHook* g_pMemoryDeviceHook;
 extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
 extern MemoryDeviceHook* g_pMemoryDevHook;

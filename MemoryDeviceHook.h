@@ -14,6 +14,7 @@ public:
 		: m_pDevice(pDevice), m_DeviceHook((ULONG_PTR**)pDevice), m_DeviceHeapHook((ULONG_PTR**)&pDevice->m_DeviceHeap)
 	{
 		m_DeviceHeapHook.HookFunction((ULONG_PTR)hkCHeapInstanceAlloc, 4); // NOTE: can make seperate function to handle this
+		//Initalize();
 	}
 
 	// Hook all of the heaps
@@ -44,15 +45,19 @@ public:
 		// Find root heap
 		CHeapInfo* pRootInfo = pHeap->m_pInfo;
 
+		if (!pRootInfo)
+			return;
+
 		while (pRootInfo->m_pParentInfo) pRootInfo = pRootInfo->m_pParentInfo;
 
-		SIZE_T cbNeeded = pRootInfo->m_pHeap->m_pAllocationInfo->m_cbSize + nBytes;
+		SIZE_T cbNeededUnaligned = pRootInfo->m_pHeap->m_pAllocationInfo->m_cbSize + nBytes;
+		SIZE_T cbNeeded = ALIGN(cbNeededUnaligned, pRootInfo->m_pHeap->m_qwMemoryAlignment);
 
 		m_pDevice->m_Lock.Lock();
 
 		pHeap->m_Lock.Lock();
 
-		CHeapInfo* pInfo = (CHeapInfo*)HeapReAlloc(m_pDevice->m_hHeap, HEAP_NO_SERIALIZE, pHeap->m_pInfo, nBytes);
+		CHeapInfo* pInfo = (CHeapInfo*)HeapReAlloc(m_pDevice->m_hHeap, HEAP_NO_SERIALIZE, pHeap->m_pInfo, cbNeeded);
 
 		// fix parent, child, next and prev pointers
 		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo)

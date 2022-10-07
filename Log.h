@@ -45,6 +45,36 @@
 #define LOG_OFFSET(name, offset)
 #endif
 
+
+typedef struct _USER_NOTIFY
+{
+	HANDLE hCallerEvent;
+	CONST CHAR* szMsg;
+	CONST CHAR* szCompletedMsg;
+} USER_NOTIFY, * PUSER_NOTIFY;
+
+enum ConsoleColors
+{
+	BLACK = 0x0,
+	BLUE = 0x1,
+	GREEN = 0x2,
+	AQUA = 0x3,
+	RED = 0x4,
+	PURPLE = 0x5,
+	YELLOW = 0x6,
+	WHITE = 0x7,
+	GRAY = 0x8,
+	LIGHT_BLUE = 0x9,
+	LIGHT_GREEN = 0xA,
+	LIGHT_AQUA = 0xB,
+	LIGHT_RED = 0xC,
+	LIGHT_PURPLE = 0xD,
+	LIGHT_YELLOW = 0xE,
+	PURE_WHITE = 0xF
+};
+
+void WINAPI UserNotify(PUSER_NOTIFY pParams);
+
 class Log
 {
 public:
@@ -73,6 +103,66 @@ public:
 		fclose(pStdout);
 		fclose(pStderr);
 		FreeConsole();
+	}
+
+	static void SetConsoleColors(enum ConsoleColors foreground, enum ConsoleColors background)
+	{
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (foreground + (background * 16)));
+	}
+
+	static void GotoXY(SHORT x, SHORT y)
+	{
+		COORD CursorPosition = { x, y };
+		SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), CursorPosition);
+	}
+
+	static void AnimateWait(const char* szIn, HANDLE hWait, DWORD dwTickrate)
+	{
+		const static char s_animations[4] = { '|', '/', '-', '\\' };
+		INT iSequence = 0;
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		COORD now;
+
+		printf(szIn);
+
+		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+		now = csbi.dwCursorPosition;
+
+		do {
+			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+			now = csbi.dwCursorPosition;
+			printf("%c", s_animations[iSequence++]);
+			iSequence %= ARRAYSIZE(s_animations);
+			GotoXY(now.X, now.Y);
+			Sleep(dwTickrate);
+		} while (WaitForSingleObject(hWait, 0) != WAIT_OBJECT_0);
+		printf("\n");
+	}
+
+	static void AnimatePrint(const char* szIn, DWORD dwTickrate)
+	{
+		const static char s_animations[4] = { '|', '/', '-', '\\' };
+		INT iSequence = 0;
+		INT iLength = strlen(szIn);
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		COORD now;
+
+		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+		now = csbi.dwCursorPosition;
+
+		for (INT i = 0; i < iLength; )
+		{
+			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+			now = csbi.dwCursorPosition;
+			printf("%c", s_animations[iSequence++]);
+			iSequence %= ARRAYSIZE(s_animations);
+			GotoXY(now.X, now.Y);
+
+			if (!iSequence)
+				printf("%c", szIn[i++]);
+
+			Sleep(dwTickrate);
+		}
 	}
 
 	static void LogOffset(const char* szName, void* p);

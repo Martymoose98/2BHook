@@ -143,8 +143,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	g_pQueryPerformanceCounterHook->Rehook();
 
-	g_pLocalPlayer = GetEntityFromHandle(g_pLocalPlayerHandle);
-	Pl0000* pCameraEnt = GetEntityFromHandle(&g_pCamera->m_hEntity);
+	g_pLocalPlayer = GetEntityFromHandle2(g_pLocalPlayerHandle);
+	Pl0000* pCameraEnt = g_pCamera->m_pCamEntity;//GetEntityFromHandle2(&g_pCamera->m_hEntity);
 
 #if defined(_DEBUG) && defined(DENUVO_STEAM_BUILD)
 
@@ -812,7 +812,7 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 
 BOOL hkCMemoryDeviceHeapAlloc(CMemoryDevice* pThis, CHeapInstance** ppHeap, SIZE_T nByteSize)
 {
-	return ((BOOL(*)(CMemoryDevice*, CHeapInstance**, SIZE_T))(g_pMemoryDeviceHook->GetFunctionAddress(1)))(pThis, ppHeap, nByteSize);
+	return ((BOOL(*)(CMemoryDevice*, CHeapInstance**, SIZE_T))(g_pMemoryDeviceHook->GetHeapHook().GetFunctionAddress(1)))(pThis, ppHeap, nByteSize);
 }
 
 void hkSaveFileIO(CSaveDataDevice* pSavedata)

@@ -22,12 +22,6 @@
 
 using DirectX::XMFLOAT4;
 
-/*
-http://www.codeproject.com/Articles/69941/Best-Square-Root-Method-Algorithm-Function-Precisi
-
-Phone can suck a dick, this is the fastest square root possible on a computer without needing to quantum compute
-*/
-
 EXTERN_C double __forceinline __fastcall fastsqrt(double n);
 EXTERN_C float __forceinline __fastcall fastsqrtf(float n);
 EXTERN_C void __forceinline __fastcall sincos(float radians, float* sine, float* cosine);
