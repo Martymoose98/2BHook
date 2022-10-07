@@ -15,3 +15,5 @@ Build
 *.ipdb
 *.res
 *.aps
+*.recipe
+*.ilk
