@@ -49,7 +49,6 @@
 #define LOG_OFFSET(name, offset)
 #endif
 
-
 typedef struct _USER_NOTIFY
 {
 	HANDLE hCallerEvent;
@@ -82,21 +81,21 @@ void WINAPI UserNotify(PUSER_NOTIFY pParams);
 class Log
 {
 public:
-	explicit Log(const char* szFunction, const char* Fmt, ...)
+	explicit Log(const char* szFunction, const char* szFmt, ...)
 	{
 		va_list Args;
 
-		va_start(Args, Fmt);
-		Write(stdout, LIGHT_GREEN, BLACK, szFunction, Fmt, Args);
+		va_start(Args, szFmt);
+		Write(stdout, LIGHT_GREEN, BLACK, szFunction, szFmt, Args);
 		va_end(Args);
 	}
 
-	static void Warn(const char* szFunction, const char* Fmt, ...)
+	static void Warn(const char* szFunction, const char* szFmt, ...)
 	{
 		va_list Args;
 
-		va_start(Args, Fmt);
-		Write(stdout, LIGHT_YELLOW, BLACK, szFunction, Fmt, Args);
+		va_start(Args, szFmt);
+		Write(stdout, LIGHT_YELLOW, BLACK, szFunction, szFmt, Args);
 		va_end(Args);
 	}
 
@@ -109,7 +108,7 @@ public:
 		va_end(Args);
 	}
 
-	static void Write(FILE* pStream, enum ConsoleColors Foreground, enum ConsoleColors Background, const char* szFunction, const char* Fmt, va_list Args)
+	static void Write(FILE* pStream, enum ConsoleColors Foreground, enum ConsoleColors Background, const char* szFunction, const char* szFmt, va_list Args)
 	{
 		enum ConsoleColors PreviousForeground;
 		enum ConsoleColors PreviousBackground;
@@ -117,7 +116,7 @@ public:
 		GetConsoleColors(PreviousForeground, PreviousBackground);
 		fprintf(pStream, "[%s]: ", szFunction);
 		SetConsoleColors(Foreground, Background);
-		vfprintf(pStream, Fmt, Args);
+		vfprintf(pStream, szFmt, Args);
 		SetConsoleColors(PreviousForeground, PreviousBackground);
 	}
 
@@ -182,7 +181,7 @@ public:
 
 	static void AnimatePrint(const char* szIn, DWORD dwTickrate)
 	{
-		const static char s_animations[4] = { '|', '/', '-', '\\' };
+		const static char animations[4] = { '|', '/', '-', '\\' };
 		INT iSequence = 0;
 		INT iLength = strlen(szIn);
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -195,8 +194,8 @@ public:
 		{
 			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 			now = csbi.dwCursorPosition;
-			printf("%c", s_animations[iSequence++]);
-			iSequence %= ARRAYSIZE(s_animations);
+			printf("%c", animations[iSequence++]);
+			iSequence %= ARRAYSIZE(animations);
 			GotoXY(now.X, now.Y);
 
 			if (!iSequence)
