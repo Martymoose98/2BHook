@@ -35,8 +35,12 @@
 #if defined(_DEBUG) || defined(VERBOSE)
 #define LOG_OFFSETS
 #define LOG(fmt, ...) Log::Log(__FUNCSIG__, fmt, __VA_ARGS__)
+#define WARN(fmt, ...) Log::Warn(__FUNCSIG__, fmt, __VA_ARGS__)
+#define ERROR(fmt, ...) Log::Error(__FUNCSIG__, fmt, __VA_ARGS__)
 #else 
 #define LOG(fmt, ...) ((void)0)
+#define WARNfmt, ...) ((void)0)
+#define ERROR(fmt, ...) ((void)0)
 #endif
 
 #ifdef LOG_OFFSETS
@@ -78,14 +82,43 @@ void WINAPI UserNotify(PUSER_NOTIFY pParams);
 class Log
 {
 public:
-	explicit Log(const char* szFunction, const char* fmt, ...)
+	explicit Log(const char* szFunction, const char* Fmt, ...)
 	{
-		va_list args;
+		va_list Args;
 
-		printf("[%s]: ", szFunction);
-		va_start(args, fmt);
-		vprintf(fmt, args);
-		va_end(args);
+		va_start(Args, Fmt);
+		Write(stdout, LIGHT_GREEN, BLACK, szFunction, Fmt, Args);
+		va_end(Args);
+	}
+
+	static void Warn(const char* szFunction, const char* Fmt, ...)
+	{
+		va_list Args;
+
+		va_start(Args, Fmt);
+		Write(stdout, LIGHT_YELLOW, BLACK, szFunction, Fmt, Args);
+		va_end(Args);
+	}
+
+	static void Error(const char* szFunction, const char* Fmt, ...)
+	{
+		va_list Args;
+
+		va_start(Args, Fmt);
+		Write(stdout, LIGHT_RED, BLACK, szFunction, Fmt, Args);
+		va_end(Args);
+	}
+
+	static void Write(FILE* pStream, enum ConsoleColors Foreground, enum ConsoleColors Background, const char* szFunction, const char* Fmt, va_list Args)
+	{
+		enum ConsoleColors PreviousForeground;
+		enum ConsoleColors PreviousBackground;
+
+		GetConsoleColors(PreviousForeground, PreviousBackground);
+		fprintf(pStream, "[%s]: ", szFunction);
+		SetConsoleColors(Foreground, Background);
+		vfprintf(pStream, Fmt, Args);
+		SetConsoleColors(PreviousForeground, PreviousBackground);
 	}
 
 	static void AttachConsole(const wchar_t* szConsoleName)
@@ -105,9 +138,17 @@ public:
 		FreeConsole();
 	}
 
-	static void SetConsoleColors(enum ConsoleColors foreground, enum ConsoleColors background)
+	static void SetConsoleColors(enum ConsoleColors Foreground, enum ConsoleColors Background)
 	{
-		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (foreground + (background * 16)));
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Foreground | (Background << 4));
+	}
+
+	static void GetConsoleColors(enum ConsoleColors& Foreground, enum ConsoleColors& Background)
+	{
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+		Foreground = (ConsoleColors)(csbi.wAttributes & 0x0F);
+		Background = (ConsoleColors)((csbi.wAttributes & 0xF0) >> 4);
 	}
 
 	static void GotoXY(SHORT x, SHORT y)
@@ -118,7 +159,7 @@ public:
 
 	static void AnimateWait(const char* szIn, HANDLE hWait, DWORD dwTickrate)
 	{
-		const static char s_animations[4] = { '|', '/', '-', '\\' };
+		const static char animations[4] = { '|', '/', '-', '\\' };
 		INT iSequence = 0;
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
 		COORD now;
@@ -131,8 +172,8 @@ public:
 		do {
 			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 			now = csbi.dwCursorPosition;
-			printf("%c", s_animations[iSequence++]);
-			iSequence %= ARRAYSIZE(s_animations);
+			printf("%c", animations[iSequence++]);
+			iSequence %= ARRAYSIZE(animations);
 			GotoXY(now.X, now.Y);
 			Sleep(dwTickrate);
 		} while (WaitForSingleObject(hWait, 0) != WAIT_OBJECT_0);
