@@ -1,6 +1,7 @@
 #include "Globals.h"
 
 CalculateLevelFn CalculateLevel;
+GetEntityInfoFromHandleFn GetEntityInfoFromHandle;
 GetEntityFromHandleFn GetEntityFromHandle;
 GetEntityFromHandleFn GetEntityFromHandle2;
 CItemManager_GetItemNameByIdFn ItemManager_GetItemNameById;
@@ -76,6 +77,7 @@ CCameraGame* g_pCamera;
 VMatrix* g_pViewMatrix;
 CSceneStateSystem* g_pSceneStateSystem;
 CSceneEntitySystem* g_pSceneEntitySystem;
+CNetworkDevice* g_pNetworkDevice;
 CMemoryDevice* g_pMemoryDevice;
 BYTE* g_pDecreaseHealth[2];
 BYTE* g_pAntiVSync; 

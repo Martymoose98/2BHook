@@ -29,6 +29,15 @@ class Vector3;
 	*  | 0, -sin(x), cos(x),  0	|
 	*  | 0,      0,       0,  1 |
 	*  ----				     ----
+	* 
+	*	affine transform axis matrix: = mRX * mRY * mRZ + mTranslation
+    * 	----    											 ----
+    * 	| cos(y) * cos(z),			 sin(z),         -sin(y), 0 | Right
+    * 	| 		  -sin(z),	cos(z) * cos(x),          sin(x), 0 | Up
+    * 	|		   sin(y),			-sin(x), cos(x) * cos(y), 0 | Forward
+    * 	|			   tx,				 ty,			  tz, 1 | Pos
+    * 	----												 ----
+	* 
 	*  reference = http://mathworld.wolfram.com/RotationMatrix.html
 	*/
 class Matrix4x4
@@ -61,10 +70,12 @@ public:
 		float _20, float _21, float _22, float _23,
 		float _30, float _31, float _32, float _33);
 
-	void InitPerspective(float flAspect, float flFov, float zNear, float zFar);
+	void InitPerspectiveLH(float flAspect, float flFov, float zNear, float zFar);
+
+	void InitPerspectiveRH(float flAspect, float flFov, float zNear, float zFar);
 
 	void InitAxisAngle(const Vector3& vAxis, float theta);
-	
+		
 	void InitTransform(const Vector3& vAngles, const Vector3& vPosition);
 	void InitTransform(const Vector3& vAngles, const Vector3& vScale, const Vector3& vPosition);
 	void InitTransform(const Vector3& vForward, const Vector3& vRight, const Vector3& vUp, const Vector3& vPosition);

@@ -82,7 +82,7 @@
       <ShowIncludes>false</ShowIncludes>
       <Optimization>Disabled</Optimization>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
-      <AdditionalIncludeDirectories>K:\Steam\steamapps\common\NieRAutomata\modding\2BHook\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <PostBuildEvent>
       <Command>xcopy /y "$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)$(TargetExt)" "Z:\NieRAutomata\mods\$(ProjectName)$(TargetExt)" </Command>
@@ -204,6 +204,7 @@
   <ItemGroup>
     <MASM Include="CreateEntityHook.asm" />
     <MASM Include="LoadWordBlacklistHook.asm" />
+    <MASM Include="phcvtps.asm" />
     <MASM Include="SaveFileIOHook.asm" />
   </ItemGroup>
   <ItemGroup>

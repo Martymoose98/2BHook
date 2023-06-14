@@ -190,7 +190,7 @@ class KeybindDynamicIncremental : public IKeybind
 public:
 	typedef T*(*GetterFn)();
 
-	KeybindDynamicIncremental() : IKeybind(), m_pGetter(NULL) {}
+	KeybindDynamicIncremental() : IKeybind(), m_step(), m_pGetter(NULL) {}
 
 	KeybindDynamicIncremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
 		: IKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)

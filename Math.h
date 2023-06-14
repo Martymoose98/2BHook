@@ -137,7 +137,6 @@ public:
 
 	static void AngleVectors(const Vector3& angles, Vector3* forward, Vector3* right, Vector3* up)
 	{
-
 		float sr, sp, sy, cr, cp, cy;
 
 		SinCos(angles[PITCH], &sp, &cp);

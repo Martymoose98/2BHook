@@ -4,6 +4,8 @@
 #include "Log.h"
 #include "Console.h"
 
+void* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
+void* GetEntityFromHandleGlobal(EntityHandle* phEntity);
 int GetModelMeshIndex(CModelWork* pWork, const char* szMesh);
 
 class Features
@@ -318,42 +320,36 @@ public:
 	static void BuffEnemiesAbsolute(void)
 	{
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
-			SetEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), Vars.Gameplay.iEnemyLevel);
+			SetEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), Vars.Gameplay.iEnemyLevel);
 	}
 
 	static void BuffEnemiesTolerance(void)
 	{
-		Pl0000* pLocal = GetEntityFromHandle2(g_pLocalPlayerHandle);
+		Pl0000* pLocal = (Pl0000*)GetEntityFromHandleGlobal(g_pLocalPlayerHandle);
 
 		if (!pLocal)
 			return;
 
-		int iMinLevel = max(0, (Vars.Gameplay.bExclusivelyPositiveTolerance) ? pLocal->m_iLevel - 1 : pLocal->m_iLevel - Vars.Gameplay.iEnemyLevelTolerance - 1);
-		int iMaxLevel = min(MAX_LEVELS, pLocal->m_iLevel + Vars.Gameplay.iEnemyLevelTolerance - 1);
+		int iAbsLevelTolerance = labs(Vars.Gameplay.iEnemyLevelTolerance);
+		int iMinLevel = max(0, (Vars.Gameplay.bExclusivelyPositiveTolerance) ? pLocal->m_iLevel : pLocal->m_iLevel - iAbsLevelTolerance);
+		int iMaxLevel = min(MAX_LEVELS, pLocal->m_iLevel + iAbsLevelTolerance);
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
-			BalanceEnemyLevel(GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
+			BalanceEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
 	}
 
-	// FIXME: for some reason pEnemy is always null even though there are enemies ??
 	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
 	{
 		if (!pEnemy)
 			return;
-
+			
 		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		CCONSOLE_DEBUG_LOG(ImColor(0x8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
 
 		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
 		{
-			int* pHealth = MakePtr(int*, pEnemy, 0x858);
-			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
-			ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
-			Level_t* pProperLevel = &pInfo->m_levels[RandomInt(iMinLevel, iMaxLevel)];
-			*pLevel = pProperLevel->m_iLevel;
-			*pHealth = pProperLevel->m_iHealth;
-			*pMaxHealth = pProperLevel->m_iHealth;
+			SetEnemyLevel(pEnemy, RandomInt(iMinLevel, iMaxLevel));
+
+			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
 		}
 	}
 
@@ -361,14 +357,14 @@ public:
 	{
 		if (!pEnemy)
 			return;
-
+		
+		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
 		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
 
-		if ((*pLevel) != iLevel && iLevel > 0 && iLevel < MAX_LEVELS)
+		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
 		{
 			int* pHealth = MakePtr(int*, pEnemy, 0x858);
-			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
-			ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
+			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);		
 			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
 			*pLevel = pProperLevel->m_iLevel;
 			*pHealth = pProperLevel->m_iHealth;

@@ -461,6 +461,11 @@ static VOID RestoreMemory(CONST VOID* pMem)
 	}
 }
 
+// FIXME: This hook works but is digusting
+// hmm it seems yo do have to pause the threads to do this
+// if you get really unlucky you can crash
+// or find someway to syncrhronize it
+// crashed on hooking the save io stuff
 // maybe we should have different shellcodes that use other registers
 static BOOL HookFunc64(LPVOID pSrcFunc, LPVOID pDstFunc, SIZE_T length, HOOK_FUNC* pHook)
 {

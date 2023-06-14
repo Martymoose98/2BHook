@@ -51,10 +51,10 @@
 #define DATAFILE_MODEL	1
 
 #define _MM_RSHUFFLE(mask, x, y, z, w) \
-	 (x) = ((mask & 0xC) >> 2);		   \
-	 (y) = ((mask & 0x30) >> 4);	   \
-	 (z) = ((mask & 0xC0) >> 6);	   \
-	 (w) = (mask & 0x3)
+     (x) = ((mask & 0xC) >> 2);		   \
+     (y) = ((mask & 0x30) >> 4);	   \
+     (z) = ((mask & 0xC0) >> 6);	   \
+     (w) = (mask & 0x3)
 
 #define IS_SAVE_SLOTDATA(s) ((s) > -1 && (s) < 3)
 
@@ -589,25 +589,111 @@ struct CEntityList
 	CReadWriteLock m_Lock;							//0x0018
 };
 
+// they might be Vector4's
+struct CAxisAlignedBoundingBox
+{
+	Vector3Aligned m_vMax;
+	Vector3Aligned m_vMin;
+};
+
+struct CollisionInfo;
+
+struct CCollisionUnk
+{
+	char gap00[8];
+	CReadWriteLock m_Lock;
+	BYTE gap34[60];
+	QWORD qword70;
+	BYTE gap78[16];
+	DWORD dword88;
+};
+
+struct CCollisionUnknown
+{
+	CCollisionUnk* m_pUnknownArray;
+	CCollisionUnk** m_ppUnknownArray;
+	int m_nAllocatedEntries;
+	int m_nFreeEntries;
+};
+
+struct CCollisionDataSegment
+{
+	void* m_pVtbl;
+	BYTE gap8[8];
+	Vector3Aligned m_vMin;
+	Vector3Aligned m_vMax;
+	QWORD qword30;
+	QWORD qword38;
+	QWORD qword40;
+	QWORD qword48;
+	QWORD qword50;
+	QWORD qword58;
+	QWORD qword60;
+	QWORD qword68;
+	BYTE gap70[4];
+	QWORD qword74;
+	DWORD dword7C;
+	QWORD qword80;
+};
+
+struct CCollisionObjectName
+{
+	char* m_szName;
+	int m_bInitalized;
+};
+
+struct CCollisionTreeNode;
+
 /*
 * CCollisionDataObjectImpl : public CCollisionDataObjectBase
-* 
+*
 * Size of struct is 0x120 (288) bytes
 */
 struct CCollisionDataObject
 {
-	void* vtbl;
-	char pad[8];
-	Vector3Aligned m_vMax;
-	Vector3Aligned m_vMin;
-	DWORD dword30;
-	DWORD m_uScenePropIndex; // changes when a scene is loaded therefore appears to be an index
-	DWORD dword38;
-	BYTE gap3C[20];
-	DWORD dword50;
-	DWORD dword54;
-	DWORD dword58;
+	virtual __int64 function0(char a1);
+	virtual __int64 function1();
+	virtual __int64 function2();
+	virtual void function3(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckSphere(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void function5(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckBox(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void function7(float* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckCapsule(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+
+	//void* vtbl;						//0x0000
+	//char pad[8];						//0x0008
+	CAxisAlignedBoundingBox m_AABB;		//0x0010
+	DWORD dword30;						//0x0030
+	DWORD m_uScenePropIndex;			//0x0034 changes when a scene is loaded therefore appears to be an index
+	DWORD dword38;						//0x0038
+	BYTE gap3C[20];						//0x003C
+	QWORD qword50;
+	QWORD qword58;
+	CCollisionDataSegment* qword60;
+	CCollisionDataSegment* qword68;
+	char gap5C[4];
+	QWORD qword78;
+	QWORD qword80;
+	CCollisionObjectName* m_pNames;
+	int m_nNames;
+	char gap94[4];
+	CCollisionDataSegment* m_pSegments;
+	int m_nSegments;
+	char gapA4[4];
+	unsigned __int16* m_pBoneMaps;
+	int m_nBoneMaps;
+	char gapB4[74];
+	QWORD qword100;
+	CCollisionTreeNode* m_pCollisionTrees;
+	CCollisionTreeNode* m_pCollisionTree;
+	int m_nCollisionTreeNodes;
 };
+IS_OFFSET_CORRECT(CCollisionDataObject, m_AABB, 0x10);
+IS_OFFSET_CORRECT(CCollisionDataObject, m_uScenePropIndex, 0x34);
+IS_OFFSET_CORRECT(CCollisionDataObject, m_pSegments, 0x98);
+IS_OFFSET_CORRECT(CCollisionDataObject, m_pCollisionTree, 0x110);
+IS_SIZE_CORRECT(CCollisionDataObject, 0x120);
 
 struct CCollisionDataEntry
 {
@@ -615,49 +701,132 @@ struct CCollisionDataEntry
 	struct CCollisionDataEntry* m_pNext;
 };
 
-struct CCollisionData2
-{
-	CReadWriteLock m_Lock;
-};
+struct CCollisionDataObjectManager;
 
 struct CCollisionData
 {
 	CCollisionDataEntry* m_pEntries;
-	CCollisionData2* m_pData;
-	int signed10;
-	int signed14;
-	QWORD qword18;
+	CCollisionDataEntry** m_ppEntries;
+	int m_nAllocatedEntries;
+	int m_nFreeEntries;
+	CCollisionDataObjectManager* m_pOwner;
 	CCollisionDataEntry* m_pEntries2;
 };
+
+struct CCollisionVertex
+{
+	Vector4 m_vPosition;
+	Vector4 m_vBoneWeights;
+	unsigned int m_uBones[4];
+};
+
+struct CCollisionBatch
+{
+	CCollisionVertex* m_pVertices;
+	unsigned __int16* m_pIndices;
+	int m_iBoneIndex;
+	int m_iVertexCount;
+	int m_iIndiceCount;
+	int m_iPrimitiveCount;
+};
+
+struct CCollisionMesh
+{
+	DWORD m_uBatchType;
+	int m_iNameIndex;
+	DWORD m_uFlags;
+	BYTE gapC[4];
+	DWORD dword10;
+	BYTE gap14[4];
+	CCollisionBatch* m_pBatches;
+	int m_iBatchCount;
+};
+
+struct CCollisionTreeNode
+{
+	Vector3Aligned m_vP1;
+	Vector3Aligned m_vP2;
+	unsigned __int16* m_pMeshIndices;
+	int m_uMeshIndexCount;
+	int m_iLeft;
+	int m_iRight;
+	int m_iUnk;
+};
+
+struct CCollisionContext
+{
+	unsigned int m_uReferenceCount;
+	char** m_pNames;
+	DWORD m_uNameCount;
+	CCollisionMesh* m_pMeshes;
+	int m_iMeshCount;
+	QWORD m_pBoneMap;
+	DWORD m_uBoneMapCount;
+	QWORD m_pBoneMap2;
+	DWORD m_uBoneMap2Count;
+	QWORD m_pMeshMaps;
+	DWORD m_uMeshCount;
+	CCollisionTreeNode* m_pColTree;
+	int m_iColTreeNodeCount;
+	QWORD m_pPrimitives;
+	QWORD qword70;
+};
+
+struct COLHdr
+{
+	union {
+		char id[4];
+		unsigned int magic;
+	};
+	unsigned int version;
+	unsigned int offsetNames;
+	int nameCount;
+	unsigned int offsetMeshes;
+	int meshCount;
+	unsigned int offsetBoneMap;
+	unsigned int boneMapCount;
+	unsigned int offsetBoneMap2;
+	unsigned int boneMap2Count;
+	unsigned int offsetMeshMap;
+	int meshMapCount;
+	unsigned int offsetColTreeNodes;
+	int colTreeNodesCount;
+};
+
+struct CCollisionContextNode
+{
+	DWORD dword0;
+	CCollisionContextNode* m_pRoot;
+	CCollisionContextNode* m_pRight;
+	CCollisionContextNode* m_pLeft;
+	CCollisionContext m_Context;
+	COLHdr* m_pColFile;
+	CCollisionContextNode* m_pNext;
+	CCollisionContextNode* m_pPrevious;
+};
+
+struct CHeapInfo;
 
 // Size of struct is 0xC8 (200) bytes
 struct CCollisionDataObjectManager
 {
 	CReadWriteLock m_Lock;
 	CCollisionData m_Data;
-	QWORD qword58;
-	QWORD qword60;
-	DWORD dword68;
-	DWORD dword6C;
-	DWORD dword70;
+	CCollisionUnknown m_Unknown;
 	DWORD dword74;
-	QWORD* qword78;
-	QWORD* qword80;
-	DWORD dword88;
-	int dword8C;
-	QWORD qword90; // pointer to some struct
-	DWORD dword98;
-	DWORD dword9C;
-	DWORD dwordA0;
+	CCollisionContextNode* m_pCollisionContext2;
+	CCollisionContextNode** m_ppCollisionContexts;
+	int m_nAllocatedCollisionTrees;
+	int m_nFreeCollisionTrees;
+	CCollisionContextNode* m_pCollisionContext;
+	CCollisionContextNode* m_pCurrentCollision;
+	int m_nUsedCollisionTrees;
 	DWORD dwordA4;
-	DWORD dwordA8; // CHeapInfo
-	DWORD dwordAC;
-	DWORD dwordB0;
-	DWORD dwordB4;
+	CHeapInfo* m_pHeapInfo;
+	CHeapInfo* m_HeapInfo;
+	QWORD qwordB0;
 	DWORD dwordB8;
 	DWORD dwordBC;
-	DWORD dwordC0;
-	DWORD dwordC4;
 };
 
 struct CModelShader;
@@ -691,28 +860,29 @@ struct CMesh2
 	float m_flUnknown6C;				//0x006C
 };
 
-class BehaviorAppBase
+class CBehaviorExtension
 {
 public:
-	typedef DWORD TimeLimitedFlag;
+	virtual void function0(char a1);
+	virtual void function1() = 0; // no return? wtf
+	virtual void function2() = 0; // xor al, al	 ret
+	virtual void function3() = 0; // mov al, 1 ret
+	virtual void function4() = 0; // mov al, 1 ret
+	virtual void function5() = 0; // nullsub
+
+	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;	//0x0008
+};
+IS_SIZE_CORRECT(CBehaviorExtension, 0x10);
+
+class ExWaypoint : public CBehaviorExtension
+{
+
 };
 
-class BehaviorExtension
+class ExBaseInfo : public CBehaviorExtension
 {
 public:
-	//void* m_vtable;	//0x0000
-	//void* m_pUnk;		//0x0008
-};
-
-class ExWaypoint : public BehaviorExtension
-{
-
-};
-
-class ExBaseInfo : public BehaviorExtension
-{
-public:
-	virtual void function0();
+	virtual void function0(char a1);
 	virtual void function1();
 	virtual void function2();
 	virtual void function3();
@@ -749,29 +919,51 @@ struct ExExpInfo
 };
 IS_SIZE_CORRECT(ExExpInfo, 0xAF8);
 
-class ExCollision : public BehaviorExtension
+struct __declspec(align(16)) CollisionInfo
 {
+	Vector4 m_vPosition;
+	Vector3Aligned m_vMax;
+	__m128 m_vDirA3A2;
+	Vector3Aligned m_vRight;
+	float m_flLength_v20;
+};
+
+class ExCollision : public CBehaviorExtension
+{
+	enum Type : DWORD
+	{
+		COLLISION_TYPE_INVALID,
+		COLLISION_TYPE_SPHERE,
+		COLLISION_TYPE_BOX,
+		COLLISION_TYPE_CAPSULE
+	};
+
 public:
-	void* m_vtbl;																		//0x0000
-	StaticArray<std::pair<TypeId, BehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;	//0x0008
-	EntityHandle m_hOwner;																//0x0010
-	BOOL m_bEnabled;																	//0x0014
-	BOOL m_bCollison;																	//0x0018
-	BOOL dword1C;																		//0x001C
-	Vector4 m_vPosition;																//0x0020
-	float m_boundingbox[6];																//0x0030
-	BYTE gap48[60];																		//0x0048
-	DWORD dwCollisionType;																//0x0084
-	DWORD dword88;																		//0x0088
+	virtual void function0(char a1);
+	virtual void function1();
+	virtual void function2();
+	virtual void function3();
+	virtual void function4();
+	virtual void function5();
+
+	EntityHandle m_hOwner;										//0x0010
+	BOOL m_bEnabled;											//0x0014
+	BOOL m_bCollison;											//0x0018
+	BOOL dword1C;												//0x001C
+	Vector4 m_vPosition;										//0x0020 | CollisionInfo starts here	
+	float m_boundingbox[6];										//0x0030
+	BYTE gap48[60];												//0x0048
+	DWORD dwCollisionType;										//0x0084
+	DWORD dword88;												//0x0088
 	int m_iBoneId;
 	int m_iBoneId2;
 	DWORD dword94;
 	DWORD dword98;
 	DWORD dword9C;
-	Vector4 v0xA0;
+	Vector4 m_vExtents;
 	Vector4 v0xB0;
 	Vector4 v0xC0;
-	Vector4 v0xD0;
+	Vector4 m_vSphereRadius;
 	Vector3Aligned m_vMin;	// vector pos of collision
 	void* unk[2];
 	Vector3Aligned m_vMax;
@@ -784,35 +976,35 @@ public:
 IS_SIZE_CORRECT(ExCollision, 0x130);
 IS_OFFSET_CORRECT(ExCollision, m_iBoneId, 0x8C);
 IS_OFFSET_CORRECT(ExCollision, m_iBoneId2, 0x90);
-IS_OFFSET_CORRECT(ExCollision, v0xA0, 0xA0);
+IS_OFFSET_CORRECT(ExCollision, m_vExtents, 0xA0);
 
-class ExLockOn : public BehaviorExtension
+class ExLockOn : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 	void* m_pEntity;		//0x0008 
 };
 
-class ExCatch : public BehaviorExtension
+class ExCatch : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 };
 
-class ExAttack : public BehaviorExtension
+class ExAttack : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 };
 
-class ExDamage : public BehaviorExtension
+class ExDamage : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 };
 
-class ExAttackCombo : public BehaviorExtension
+class ExAttackCombo : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 };
 
-class ExActionState : public BehaviorExtension
+class ExActionState : public CBehaviorExtension
 {
 	void* m_vtable;			//0x0000
 };
@@ -820,6 +1012,8 @@ class ExActionState : public BehaviorExtension
 class CXmlBinary
 {
 	void* m_vTable;
+	void* m_pUnknown[6];	//0x0008
+	int m_iUnknown;			//0x0038
 };
 
 typedef struct WTBHeader
@@ -915,7 +1109,7 @@ typedef struct CBone
 	Vector3Aligned	m_vScale;			//0x50
 	Vector3Aligned	m_vTPosition;		//0x60 
 	Vector3Aligned	m_vUnk;				//0x70 | maybe min, max?
-	Vector3Aligned	m_vUnk2;			//0x80
+	Vector3Aligned	m_vScaledRotation;	//0x80 | definetly some rotation vector (pitch, yaw, roll)
 	CBone* m_pUnk;						//0x90
 	int m_iFlags;						//0x98 | bones in head and feathers are m_iFlags > 512 (0x200) { 0x208 (origin bone), 0x220 }
 	char _0x8C[4];						//0x9C
@@ -1073,9 +1267,10 @@ struct CMesh
 	WMBMaterial* m_pMaterials;	//0x28
 	int m_nMaterials;			//0x30
 	WMBBone* m_pBones;			//0x38
-	int m_nBones;
-	int m_iLodLevel;
+	int m_nBones;				//0x40
+	int m_iLodLevel;			//0x44
 };
+IS_SIZE_CORRECT(CMesh, 0x50);
 
 struct WMBTexture
 {
@@ -1283,7 +1478,7 @@ struct CModelData
 	CBone* m_pBones;						//0x0050
 	void* m_pBoneMaps;						//0x0058
 	int m_nBones;							//0x0060
-	char pad64[4];							//0x0064
+	BOOL m_bVisible;						//0x0064
 	short* m_pBoneIndexTranslationTable2;	//0x0068
 	CHitbox* m_pHitboxes;					//0x0070
 	int m_nHitboxes;						//0x0078
@@ -1385,7 +1580,7 @@ struct CModelDataManager
 	CModelDataList m_ModelDataList;
 };
 
-struct ModelInfo
+struct CModelInfo
 {
 	Vector4 m_vTint;			//0x0000
 	CModelData* m_pData;		//0x0008
@@ -1502,11 +1697,14 @@ struct CModelWork
 	CModelWork* m_pPrevious;				//0x0198
 	CModelWork* m_pNext;					//0x01A0
 };
+IS_SIZE_CORRECT(CModelWork, 0x1A8);
 
 /*
-Size of struct 0x584 (1412) bytes
-
-apprently supposed to inherit cparts??
+*
+* Size of struct 0x584 (1412) bytes
+* could be 0x590 bytes
+*
+* apprently supposed to inherit cparts??
 */
 class CModel : public CParts
 {
@@ -1524,7 +1722,7 @@ public:
 	char _0x02B9[215];						//0x02B9
 	CModelWork m_Work;						//0x0390
 	QWORD m_qw0x538;						//0x0538
-	ModelInfo* m_pModelInfo;				//0x0540
+	CModelInfo* m_pModelInfo;				//0x0540
 	Unknown_t* m_pUnknown0x548;				//0x0548
 	void* m_pWMB_Buffer;					//0x0550
 	void* m_p0x00558;						//0x0558
@@ -1532,28 +1730,153 @@ public:
 	int m_nBones;							//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
 	char _0x056C[20];						//0x056C
 	DWORD dwFinal;							//0x0580
+	char _0x0584[28];						//0x0584
 };
 IS_OFFSET_CORRECT(CModel, m_matTransform, 0x10);
 IS_OFFSET_CORRECT(CModel, m_ExtendWork, 0x140);
 IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540);
 IS_OFFSET_CORRECT(CModel, m_nBones, 0x568);
 IS_OFFSET_CORRECT(CModel, dwFinal, 0x580);
+IS_SIZE_CORRECT(CModel, 0x5A0);
 
 /*
-Size of struct 0x670 (1648) bytes
+* Size of struct 0x670 (1648) bytes
+*
+* Alignment: 32 bytes??
 */
 class CObj : public CModel
 {
-};
+public:
 
-//TODO("fill & verify CModel, CObj and CBehaviour struct out")
+	virtual void function0();
+	virtual void function1(void); // from CModel
+	virtual void function2(void); // CModel stub function
+	virtual void* function3(void);
+	virtual float function4(void); // return 1.0f;
+
+	DATHeader* m_pDataFiles[2];				//0x005A0
+	CTextureData* m_pTextureData;			//0x005B0
+	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regular, mech suit, and static -1)
+	unsigned int unk0x005BC;				//0x005BC
+	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
+	BYTE _0x05C4;							//0x005C4 | disable dynamic skirt?
+	BYTE _0x05C5;							//0x005C5
+	char _0x05C6[2];						//0x005C6
+	DWORD dw0x5C8;							//0x005C8
+	float fl0x5CC[7];						//0x005CC
+	Vector3 m_vInnerBrightness;				//0x005E8 (x = brightness [paired with z, not modifyable], y = unknown, z = brightness [paired with z, modifyable])
+	void* _0x5F4;							//0x005F4
+	void* _0x600;							//0x00600
+	float fl0x60C;							//0x0060C
+	CEntityInfo* m_pInfo;					//0x00610 
+	CXmlBinary m_xmlBinary;					//0x00618
+	char _0x0658[24];						//0x00658
+};
+IS_OFFSET_CORRECT(CObj, m_pTextureData, 0x5B0);
+IS_OFFSET_CORRECT(CObj, m_ObjectId, 0x5B8);
+IS_SIZE_CORRECT(CObj, 0x670);
+
+/*
+* Size of struct 0x830 () bytes
+* Approx.
+*
+* Alignment: 32 bytes??
+*/
 class CBehaviour : public CObj
 {
+public:
+
+	virtual void function0(char a1);
+	virtual void function1(void); // from CModel
+	virtual void function2(void); // CModel stub function
+	virtual void* function3(void);
+	virtual float function4(void); // return 1.0f;
+	virtual void function5() PURE;
+	virtual void function6() PURE;
+	virtual void function7() PURE;
+	virtual void function8() PURE;
+	virtual void function9() PURE;
+	virtual void function10() PURE;
+	virtual void function11() PURE;
+	virtual void function12() PURE;
+	virtual void function13() PURE;
+	virtual void function14() PURE;
+	virtual void function15() PURE;
+	virtual void function16() PURE;
+	virtual void function17() PURE;
+	virtual void Animate(unsigned int id, int mode, int a4, int a5) PURE;
+
+	int m_iAnimationId;						//0x00670
+	int m_iAnimationMode;					//0x00674
+	int m_iAnimationA4;						//0x00678
+	int m_iAnimationA5;						//0x0067C
+	char _0x0680[28];						//0x00680
+	int m_iUnknown69C;
+	void* m_pUnknown6A0; // set to 0 (on creation)
+	void* m_pUnknown6A8; // points to pThis
+	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16> m_BehaviourExtensions; // 0x06B0
+	char _0x07D0[96];
+};
+IS_OFFSET_CORRECT(CBehaviour, m_iAnimationId, 0x670);
+IS_OFFSET_CORRECT(CBehaviour, m_iAnimationMode, 0x674);
+IS_OFFSET_CORRECT(CBehaviour, m_BehaviourExtensions, 0x6B0);
+IS_SIZE_CORRECT(CBehaviour, 0x830);
+
+
+class Animation
+{
+public:
+	class Motion
+	{
+	public:
+		class NodeParallel
+		{
+		};
+
+		class NodePlay
+		{
+		public:
+			void* m_pVtbl;
+			Animation::Motion::NodeParallel* m_pParallel;
+		};
+
+		class Unit
+		{
+		public:
+			class NodeHandler
+			{
+			public:
+				Animation::Motion::NodePlay* m_pNodes;
+			};
+		};
+	};
 };
 
 //  0xC2C
+// size of  0xC50
 class CBehaviorAppBase : public CBehaviour
 {
+public:
+	typedef DWORD TimeLimitedFlag;
+
+	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
+	int m_iHealth;							//0x00858
+	int m_iMaxHealth;						//0x0085C
+	char _0x0860[36];						//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
+	BYTE m_flags;							//0x00884 | 0x40 = no collision
+	char _0x0885[91];						//0x00885
+	void* m_waypointVtbl;					//0x008E0
+	char _0x08E8[168];						//0x008E8
+	int m_iOldAnimationId;					//0x00990
+	int m_iOldAnimationMode;				//0x00994
+	int m_iOldAnimationA4;					//0x00998
+	int m_iOldAnimationA5;					//0x0099C
+	char _0x0998[16];						//0x00998
+	StaticArray<CBehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
+	char _0x09D8[2788];						//0x009D8
+	//ExNpc m_npc;							//0x00A98
+	//BOOL m_bTalkDisable;					//0x00BCC
+	//EntityHandle m_hUnk;					//0x00C50
 };
 
 /*
@@ -1564,6 +1887,8 @@ Offsets are -0x50 from the debug build
 
 Size of struct 0x178F0 (96496) bytes old version (denuvo)
 Size of struct 0x17920 (96544) bytes new version
+
+CBehaviourAppBase, CBehaviour, CObj, CModel, CParts
 */
 class Pl0000 // : CBehaviourAppBase
 {
@@ -1681,45 +2006,13 @@ public:
 
 #else
 	void* m_pVtable;						//0x00000	 
-#endif // ENTITY_REAL_VTABLE | CMODEL STARTS AT 0x0000
-	/**
-	* 	rotation z axis matrix:
-	* 	----    		     ----
-	* 	|  cos(z), sin(z), 0, 0 |
-	* 	| -sin(z), cos(z), 0, 0 |
-	* 	|     0, 	    0, 1, 0 |
-	* 	|     0, 		0, 0, 1 |
-	* 	----                 ----
-	*
-	*  rotation y axis matrix:
-	* 	----    		     ----
-	* 	| cos(y), 0, -sin(y), 0 |
-	* 	| 	   0, 1,       0, 0 |
-	* 	| sin(y), 0,  cos(y), 0 |
-	* 	|      0, 0,       0, 1 |
-	* 	----                 ----
-	*
-	* 	rotation x axis matrix:
-	*  ----	  	   		     ----
-	*  | 1, 	 0, 	  0,  0 |
-	*  | 0,  cos(x), sin(x),  0 |
-	*  | 0, -sin(x), cos(x),  0	|
-	*  | 0,      0,       0,  1 |
-	*  ----				     ----
-	*	transform axis matrix: = mRX * mRY * mRZ + mTranslation
-	* 	----    											 ----
-	* 	| cos(y) * cos(z),			 sin(z),         -sin(y), 0 | Right
-	* 	| 		  -sin(z),	cos(z) * cos(x),          sin(x), 0 | Up
-	* 	|		   sin(y),			-sin(x), cos(x) * cos(y), 0 | Forward
-	* 	|			   tx,				 ty,			  tz, 1 | Pos
-	* 	----												 ----
-	*/
+#endif // ENTITY_REAL_VTABLE
 	Matrix4x4 m_matTransform;				//0x00010 | Affine transformation matrix
 	Vector3Aligned m_vPosition;				//0x00050
 	Matrix4x4 m_matModelToWorld;			//0x00060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r) (probably not a mat4x4 now that i think about it lmao)
 	void* m_pUnk0x00A0;						//0x000A0
 	short m_wBitFlags;						//0x000A8 | 0x00 - NORMAL, 0x01 - ?, 0x02 - NO_ROTATION_Y, 0x04 - FLOAT_UP, 0x08 - ?, 0x10 - ? (wont set), 0x20 - ? (wont set)
-											//			0x40 - ?, 0x80 - ?, 0x100 - ?, 0x200 - ?, 0x400 - ?, 0x800 - ?, 0x1000 - ?, 0x2000 - ?, 0x4000 - NO_ROTATION_Y, 0x8000 - ?
+	//			0x40 - ?, 0x80 - ?, 0x100 - ?, 0x200 - ?, 0x400 - ?, 0x800 - ?, 0x1000 - ?, 0x2000 - ?, 0x4000 - NO_ROTATION_Y, 0x8000 - ?
 	char  m_pad0x000AA[6];					//0x000AA
 	void* m_pUnk0x00B0;						//0x000B0
 	short m_wUnk0x00B8;						//0x000B8 | set to -1 on construction
@@ -1728,11 +2021,11 @@ public:
 	Matrix4x4 m_identity;					//0x00100 | end ? CEnt ?
 	CModelExtendWork m_ModelExtendWork;		//0x00140
 	char _0x0168[336];						//0x00168
-	BYTE m_Wetness;						//0x002B8
+	BYTE m_Wetness;							//0x002B8
 	char _0x02B9[215];						//0x002B9
 	CModelWork m_Work;						//0x00390
 	QWORD m_qw0x538;						//0x00538
-	ModelInfo* m_pModelInfo;				//0x00540
+	CModelInfo* m_pModelInfo;				//0x00540
 	Unknown_t* m_pUnknown0x548;				//0x00548
 	CModelData* m_pModelData;				//0x00550
 	short** m_pBoneSets;					//0x00558
@@ -1766,21 +2059,22 @@ public:
 	float fl0x60C;							//0x0060C
 	CEntityInfo* m_pInfo;					//0x00610 
 	CXmlBinary m_xmlBinary;					//0x00618
-	char _0x0620[80];						//0x00620	
+	char _0x0658[24];						//0x00658	
 	int m_iAnimationId;						//0x00670
-	int m_iAnimationMode;					//0x00674 | not 100%
-	int m_iUnk0x0678;						//0x00678
-	int m_iUnk0x067C;						//0x0067C
+	int m_iAnimationMode;					//0x00674
+	int m_iAnimationA4;						//0x00678
+	int m_iAnimationA5;						//0x0067C
 	char _0x0680[32];						//0x00680
 	void* m_pUnk0x6A0;						//0x006A0
-	char _0x06A8[8];						//0x006A8
-	StaticArray<std::pair<TypeId, BehaviorExtension*>, 16, 8> m_BehaviourExtensions;//0x006B0 | lib::StaticArray<std::pair<enum  lib::TypeId,BehaviorExtension *>,16,8>  BehaviorExtension is an interface
+	void* m_pUnk0x6A8;						//0x006A8
+	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8> m_BehaviourExtensions;//0x006B0 | lib::StaticArray<std::pair<enum  lib::TypeId,BehaviorExtension *>,16,8>  BehaviorExtension is an interface
 	char _0x07D0[136];						//0x007D0
 	//2b skirt								//0x00800
 	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
 	int m_iHealth;							//0x00858
 	int m_iMaxHealth;						//0x0085C
-	char _0x0860[36];						//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
+	Animation::Motion::Unit::NodeHandler m_Handler;//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
+	char _0x0868[28];						//0x00868 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
 	BYTE m_flags;							//0x00884 | 0x40 = no collision
 	char _0x0885[91];						//0x00885
 	void* m_waypointVtbl;					//0x008E0
@@ -1788,7 +2082,7 @@ public:
 	int m_iAnimationId2;					//0x00990
 	int m_iAnimationMode2;					//0x00994 | not 100%
 	char _0x0998[16];						//0x00998
-	StaticArray<BehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
+	StaticArray<CBehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
 	char _0x09D8[2788];						//0x009D8
 	//ExNpc m_npc;							//0x00A98
 	//BOOL m_bTalkDisable;					//0x00BCC
@@ -1813,7 +2107,7 @@ public:
 	char _0x02074[4];						//0x02074
 	ExExpInfo m_LevelsContainer;			//0x02078
 
-//	EntityHandle m_hCaughtFish;				//0x03ED8 | on the pod
+	//	EntityHandle m_hCaughtFish;				//0x03ED8 | on the pod
 
 	char _0x02B70[56056];					//0x02B70
 	int m_iHealth2;							//0x10668									
@@ -1867,6 +2161,8 @@ IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540);
 IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598);
 IS_OFFSET_CORRECT(Pl0000, m_ObjectId, 0x5B8);
 IS_OFFSET_CORRECT(Pl0000, m_pInfo, 0x610);
+IS_OFFSET_CORRECT(Pl0000, m_iAnimationId, 0x670);
+IS_OFFSET_CORRECT(Pl0000, m_iAnimationMode, 0x674);
 IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0);
 IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858);
 IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0);
@@ -1885,7 +2181,8 @@ struct CCameraInstance
 	Matrix4x4 m_CurrentViewProjection;	//0x0000 | probably inverted or smth
 	Matrix4x4 m_Projection;				//0x0040
 	Matrix4x4 m_ViewProjection;			//0x0080
-	char pad0xC0[320];					//0x00C0
+	Matrix4x4 m_View;					//0x00C0
+	char pad0xC0[256];					//0x0100
 	Matrix4x4 m_OldViewProjection;		//0x0200 | save
 	void* m_ptr240;						//0x0240
 	char pad0x248[64];					//0x0248
@@ -1896,7 +2193,7 @@ struct __declspec(align(16)) CCameraTransform
 {
 	virtual ~CCameraTransform();
 	//virtual QWORD* CCameraTransform::sub_140184180(char a2);
-	
+
 	//void* m_vtable;				//0x0000
 	//char alignment8[8];			//0x0008 | align 16 padding tbh
 	Vector3Aligned m_vSource;		//0x0010
@@ -1971,7 +2268,7 @@ public:
 	Vector3Aligned m_vShake;							//0x01A0
 	Vector3Aligned m_vShake2;							//0x01B0
 	char _0x01C0[128];									//0x01C0
-														//0x0200 | world to screen matrix??
+	//0x0200 | world to screen matrix??
 	void* m_pUnk;										//0x0240
 	char _0x0240[296];									//0x0248
 	//float m_flFovy;									//0x02BC
@@ -1983,8 +2280,8 @@ public:
 	char pad3FC[44];									//0x03FC
 	StaticArray<NormalCameraFloatOffset, 2> m_Offsets;	//0x0428 | lib::StaticArray<NormalCameraFloatOffset,2,4>::`vftable'
 	char pad450[33788];									//0x0450
-														//0x04AC | affects viewangle pitch
-														//0x04B0 | affects viewangle yaw
+	//0x04AC | affects viewangle pitch
+	//0x04B0 | affects viewangle yaw
 	float m_flUnknown2;									//0x884C
 	char pad8850[160];									//0x8850
 	float m_flUnknown;									//0x88F0
@@ -2010,53 +2307,6 @@ struct Sun
 	Vector4 m_vColor;		 //0x0040
 	float m_flBloom;		 //0x0044
 };
-
-/*
-SceneStateHead
-size = 0x20 (32) bytes
-*/
-struct SceneStateHead
-{
-
-};
-
-// this has a doubly linked list for sure prbably a different struct tho
-// that is 32 bytes that is the head
-struct SceneState
-{
-	SceneStateHead* m_pHead;	//0x0000
-	SceneState* m_pNext;		//0x0008
-	SceneState* m_pLast;		//0x0010
-	char _0x0018;				//0x0018
-	bool m_bLast;				//0x0019  not 100%
-	char _0x0020[6];			//0x0020
-	DWORD m_DescriptionHash;	//crc32
-	char alignment[4];
-	char* m_szDescription;
-	size_t m_ReferenceCount;	//not sure
-};
-
-class CScenePosSystem
-{
-	void* m_vtbl;							//0x0000
-	void* m_p0x0008;						//0x0008
-	void* m_TokenStateSystem;				//0x0010 | hap::scene_state::SceneStateSystem::`vftable'{for `hap::TokenCategory'};
-};
-
-class CSceneStateSystem //const hap::scene_state::SceneStateSystem
-{
-public:
-	void* m_vtable;							//0x0000
-	void* m_p0x08;							//0x0008
-	void* m_p0x10;							//0x0010
-	void* m_p0x18;							//0x0018
-	CScenePosSystem m_pPosSystem;			//0x0028
-	char _0x0038[40];						//0x0038
-	Array<SceneState> m_OldStates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
-	char _0x00[16];							//0x0080
-	Array<SceneState> m_States;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
-};
-IS_OFFSET_CORRECT(CSceneStateSystem, m_States, 0x90);
 
 class CDialogWindow
 {
@@ -2447,7 +2697,7 @@ struct CSwapChainInfo
 
 /*
 * This struct changed across versions (size increase)
-* 
+*
 * Size of struct 0xC8 (200) bytes
 */
 struct CSwapChain
@@ -2610,7 +2860,7 @@ struct COtManager
 {
 	void* m_pVtbl;							//0x00
 	BYTE gap8[72];							//0x08
-											//0x10 | embededd struct
+	//0x10 | embededd struct
 	CGraphicCommandList** m_pCmdLists;		//0x50
 	BYTE gap58[8];							//0x58
 	INT* qword60;							//0x60
@@ -2961,6 +3211,7 @@ public:
 	BOOL m_bUpdateRect;
 	BYTE gap28[8];
 	BOOL m_bMouse[3];
+
 };
 
 struct CSaveSlot
@@ -3193,14 +3444,80 @@ struct CPhaseManager
 	StaticArray<CPhase*, 8> m_Phases;
 };
 
+
+// Red-Black tree
+struct PuidMixin
+{
+	struct PuidMixin* m_pHead;
+	struct PuidMixin* m_pRight;
+	struct PuidMixin* m_pLeft;
+	char _0x0018;
+	bool m_bLast;
+	char _0x0020[6];
+	unsigned int m_uDescriptionHash;
+	char alignment[4];
+	char* m_szDescription;
+	UINT64 m_uReferenceCount;
+};
+
+/*
+SceneStateHead
+size = 0x20 (32) bytes
+*/
+struct SceneStateHead
+{
+
+};
+
+// this has a doubly linked list for sure prbably a different struct tho
+// that is 32 bytes that is the head
+struct SceneState
+{
+	SceneStateHead* m_pHead;	//0x0000
+	SceneState* m_pNext;		//0x0008
+	SceneState* m_pLast;		//0x0010
+	char _0x0018;				//0x0018
+	bool m_bLast;				//0x0019  not 100%
+	char _0x0020[6];			//0x0020
+	DWORD m_DescriptionHash;	//crc32
+	char alignment[4];
+	char* m_szDescription;
+	size_t m_ReferenceCount;	//not sure
+};
+
+class CScenePosSystem
+{
+	void* m_vtbl;							//0x0000
+	void* m_p0x0008;						//0x0008
+	void* m_TokenStateSystem;				//0x0010 | hap::scene_state::SceneStateSystem::`vftable'{for `hap::TokenCategory'};
+};
+
+class CSceneStateSystem //const hap::scene_state::SceneStateSystem
+{
+public:
+	void* m_vtable;							//0x0000
+	void* m_p0x08;							//0x0008
+	void* m_p0x10;							//0x0010
+	void* m_p0x18;							//0x0018
+	CScenePosSystem m_pPosSystem;			//0x0028
+	char _0x0038[40];						//0x0038
+	Array<SceneState> m_OldStates;			//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	char _0x00[16];							//0x0080
+	Array<SceneState> m_States;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+};
+IS_OFFSET_CORRECT(CSceneStateSystem, m_States, 0x90);
+
 struct CSceneEntitySystem
 {
-	BYTE gap0[16];
-	QWORD qword10;
+	int m_nInfoLists;
+	int m_nMaxInfoLists;
+	QWORD qword8;
+	BYTE gap10[8];
+	QWORD qword20;
 	BOOL m_bDataExists;
 	CReadWriteLock m_Lock;
 	CEntityInfoList* m_pInfoList2;
-	QWORD qword58;
+	CEntityInfoList* qword58;
 	BYTE gap68[8];
 	SIZE_T m_nListEntriesCount;
 	CEntityInfoList* m_pInfoList3;
@@ -3339,7 +3656,7 @@ class HandlerBase;
 
 Size of struct is 0xC (12) bytes
 */
-class CallbackInstalled
+struct CallbackInstalled
 {
 	DlcInstalled_t m_installed;
 	BOOL m_bInstalled;
@@ -3355,7 +3672,7 @@ class CGameContentDeviceSteam
 {
 	virtual void* function0();
 	virtual void UnloadContent(CGameContentDevice* pGameContentDevice);
-	virtual void LoadContent(CGameContentDevice* pGameContentDevice);
+	virtual bool LoadContent(CGameContentDevice* pGameContentDevice);
 public:
 	//void* m_pVtbl;														//0x0000
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008 | id is 1005
@@ -3427,16 +3744,110 @@ IS_SIZE_CORRECT(CAchievementDevice, 104);
 
 struct CNetworkDevice;
 
+enum LeaderboardDownloadMode
+{
+	LeaderboardDownloadMode_ForUser,
+	LeaderboardDownloadMode_ForRange
+};
+
+union CLeaderboardDetails
+{
+	struct Layout {
+		int32 m_cbSize;
+		char szDetails[252];
+	} m_Layout;
+	int32 m_Raw[64];
+};
+
+struct CLeaderboardEntry
+{
+	CSteamID m_SteamID;
+	char m_szName[128];
+	int32 m_nGlobalRank;
+	BYTE gap8C[4];
+	int64 m_nScore;
+	BYTE gap98[32];
+	char* m_pszDetails;
+	int64 m_cbDetails;
+	char m_szDetails[252];
+};
+
+struct CRankingReadWork
+{
+	void* m_pVtble;
+	CRankingReadWork* m_pNext;
+	CRankingReadWork* m_pPrevious;
+	DWORD dword18;
+	BYTE gap1C[24];
+	DWORD dword34;
+	DWORD dword38;
+	BYTE gap3C[16];
+	int32 m_iLeaderboardEntry;
+	int32 m_nLeaderboardEntries;
+	CLeaderboardEntry* m_pLeaderboardEntries;
+	LeaderboardDownloadMode m_DownloadMode;
+	BYTE gap64[4];
+	SteamLeaderboard_t m_hLeaderboard;
+	CCallResult<CRankingReadWork, LeaderboardScoresDownloaded_t> m_LeaderboardDownloaded;
+	volatile int32 m_Status;
+	__unaligned __declspec(align(1)) CSteamID m_SteamID;
+	int32 m_nSteamIDs;
+	ELeaderboardDataRequest m_LeaderboardDataRequest;
+	int32 m_nRangeStart;
+	int32 m_nRangeEnd;
+	DWORD dwordB0;
+};
+
+struct CRankingWriteWork
+{
+	void* m_pVtbl;
+	CRankingWriteWork* m_pNext;
+	CRankingWriteWork* m_pPrevious;
+	DWORD dword18;
+	BYTE gap1C[24];
+	DWORD dword34;
+	DWORD dword38;
+	BYTE gap3C[4];
+	SteamLeaderboard_t m_hLeaderboard;
+	ELeaderboardUploadScoreMethod m_LeaderboardUploadScoreMethod;
+	int32 m_nScore;
+	CLeaderboardDetails m_LeaderboardDetails;
+	int32 m_nLeaderboardDetails;
+	char m_szFileName[128];
+	BYTE gap1D4[4];
+	const void* m_pvData;
+	int32 m_cbDataSize;
+	UGCHandle_t m_hFile;
+	DWORD dword1F0;
+	DWORD dword1F4;
+	BYTE gap1F8[8];
+	CCallResult<CRankingWriteWork, LeaderboardScoreUploaded_t> m_LeaderboardScoreUploaded;
+	CCallResult<CRankingWriteWork, RemoteStorageFileShareResult_t> m_RemoteStorageFileShare;
+	CCallResult<CRankingWriteWork, LeaderboardUGCSet_t> m_UGCLeaderboardSet;
+	volatile int32 m_UploadStatus;
+	volatile int32 m_WriteStatus;
+	volatile int32 m_ShareStatus;
+	volatile int32 m_UGCSetStatus;
+};
+IS_SIZE_CORRECT(CRankingWriteWork, 0x288);
+
 /*
 Size of is 0x38 (56) bytes
 */
 struct CLeaderboard
 {
-	BYTE gap0[32];
-	// CCallbackBase  0x10
-	SteamAPICall_t m_hFindLeaderboard;
-	QWORD qword28;
-	QWORD qword30;	// callback
+	uint32 m_nLeaderboards;
+	CCallResult<CRankingReadWork, LeaderboardFindResult_t> m_Leaderboards;
+};
+
+struct CServerRealTimes
+{
+	RTime32 m_uServerTimes[4];
+	int32 m_unk1;
+	int32 m_unk2;
+	int32 m_unk3;
+	int32 m_unk4;
+	int32 m_unk5;
 };
 
 /*
@@ -3446,13 +3857,17 @@ class CRankingDevice
 {
 	void* m_pVtable;					//0x00
 	CReadWriteLock m_Lock;				//0x08
-	CNetworkDevice* m_pNetworkDevice;	//0x10
-	BYTE gap10[16];
+	CNetworkDevice* m_pNetworkDevice;	//0x38
+	CHeapInfo* m_pHeapInfo;             //0x40
+	union {
+		CRankingReadWork* m_pReadWork;   //0x48
+		CRankingWriteWork* m_pWriteWork; //0x48
+	};
 	DWORD dword50;
 	BYTE gap54[4];
-	void* m_pdword58;
-	BYTE gap60[8];
-	CLeaderboard* m_pLeaderboards;		//0x68
+	CServerRealTimes* m_pServerRealTimes;
+	int32 m_Status;
+	CCallResult<CRankingDevice, LeaderboardFindResult_t>* m_pLeaderboards;		//0x68
 	DWORD dwLeaderboardCount;			//0x70 | statically set to 32
 	DWORD dword74;
 };
@@ -3487,6 +3902,7 @@ struct CNetworkDevice
 	DWORD m_dwStatus;
 };
 
+
 /*
 Size of struct is 0x40 (64) bytes
 */
@@ -3499,7 +3915,7 @@ public:
 	virtual BOOL IsOverlayActive();
 
 	//void* m_pVtable;		//0x00
-	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_overlay; //0x08 id = 331
+	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_Overlay; //0x08 id = 331
 	BOOL m_bInitalized;		//0x28
 	char pad2[4];			//0x2C
 	ISteamUser019* m_pUser;	//0x30
@@ -3890,6 +4306,27 @@ struct mrb_context {
 	mrb_bool vmexec;
 	struct RFiber* fib;
 };
+
+struct mrb_parser_state;
+
+typedef struct mrbc_context {
+	mrb_sym* syms;
+	int slen;
+	char* filename;
+	uint16_t lineno;
+	int (*partial_hook)(struct mrb_parser_state*);
+	void* partial_data;
+	struct RClass* target_class;
+	mrb_bool capture_errors : 1;
+	mrb_bool dump_result : 1;
+	mrb_bool no_exec : 1;
+	mrb_bool keep_lv : 1;
+	mrb_bool no_optimize : 1;
+	mrb_bool no_ext_ops : 1;
+	const struct RProc* upper;
+
+	size_t parser_nerr;
+} mrbc_context;
 
 struct segment;
 

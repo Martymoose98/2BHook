@@ -4,12 +4,16 @@
 #define k_SteamMusicNameMaxLength 255
 #define k_SteamMusicPNGMaxLength 65535
 
+typedef char int8;
 typedef unsigned char uint8;
+typedef short int16;
 typedef unsigned short uint16;
 typedef int int32;
 typedef unsigned int uint32;
 typedef long long int64;
 typedef unsigned long long uint64;
+
+typedef uint64 unknown_ret;
 
 typedef int32 HSteamPipe;
 typedef int32 HSteamUser;
@@ -31,6 +35,8 @@ typedef uint64 ClientUnifiedMessageHandle;
 typedef uint32 HHTMLBrowser;
 
 typedef uint64 UGCHandle_t;
+typedef uint64 UGCFileWriteStreamHandle_t;
+typedef uint64 PublishedFileUpdateHandle_t;
 
 const DepotId_t k_uDepotIdInvalid = 0x0;
 
@@ -724,6 +730,24 @@ enum EHTMLKeyModifiers
 	eHTMLKeyModifier_ShiftDown = 1 << 2,
 };
 
+// This enum is used in client API methods, do not re-number existing values.
+enum EHTTPMethod
+{
+	k_EHTTPMethodInvalid = 0,
+	k_EHTTPMethodGET,
+	k_EHTTPMethodHEAD,
+	k_EHTTPMethodPOST,
+	k_EHTTPMethodPUT,
+	k_EHTTPMethodDELETE,
+	k_EHTTPMethodOPTIONS,
+
+	// The remaining HTTP methods are not yet supported, per rfc2616 section 5.1.1 only GET and HEAD are required for 
+	// a compliant general purpose server.  We'll likely add more as we find uses for them.
+
+	// k_EHTTPMethodTRACE,
+	// k_EHTTPMethodCONNECT
+};
+
 enum EP2PSend
 {
 	// Basic UDP send. Packets can't be bigger than 1200 bytes (your typical MTU size). Can be lost, or arrive out of order (rare).
@@ -1138,6 +1162,9 @@ enum { k_cchLeaderboardNameMax = 128 };
 // maximum number of details int32's storable for a single leaderboard entry
 enum { k_cLeaderboardDetailsMax = 64 };
 
+// maximum number of details int32's storable for a single leaderboard entry
+enum { k_cchFilenameMax = 260 };
+
 // handle to a single leaderboard
 typedef uint64 SteamLeaderboard_t;
 
@@ -1197,6 +1224,98 @@ enum EGetAchievementIcon
 	k_EGetAchievementIconUser = 0,
 	k_EGetAchievementIconAchieved = 1,
 	k_EGetAchievementIconUnachieved = 2,
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#ERemoteStoragePlatform
+enum ERemoteStoragePlatform
+{
+	k_ERemoteStoragePlatformNone = 0,
+	k_ERemoteStoragePlatformWindows = 1,
+	k_ERemoteStoragePlatformOSX = 2,
+	k_ERemoteStoragePlatformPS3 = 4,
+	k_ERemoteStoragePlatformLinux = 8,
+	k_ERemoteStoragePlatformReserved2 = 16,
+	k_ERemoteStoragePlatformAll = 0xFFFFFFFF
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#ERemoteStoragePublishedFileVisibility
+enum ERemoteStoragePublishedFileVisibility
+{
+	k_ERemoteStoragePublishedFileVisibilityPublic = 0,
+	k_ERemoteStoragePublishedFileVisibilityFriendsOnly = 1,
+	k_ERemoteStoragePublishedFileVisibilityPrivate = 2,
+	k_ERemoteStoragePublishedFileVisibilityUnlisted = 3,
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#EUGCReadAction
+enum EUGCReadAction
+{
+	k_EUGCRead_ContinueReadingUntilFinished = 0,
+	k_EUGCRead_ContinueReading = 1,
+	k_EUGCRead_Close = 2,
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#EWorkshopEnumerationType
+enum EWorkshopEnumerationType
+{
+	k_EWorkshopEnumerationTypeRankedByVote = 0,
+	k_EWorkshopEnumerationTypeRecent = 1,
+	k_EWorkshopEnumerationTypeTrending = 2,
+	k_EWorkshopEnumerationTypeFavoritesOfFriends = 3,
+	k_EWorkshopEnumerationTypeVotedByFriends = 4,
+	k_EWorkshopEnumerationTypeContentByFriends = 5,
+	k_EWorkshopEnumerationTypeRecentFromFollowedUsers = 6
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#EWorkshopFileAction
+enum EWorkshopFileAction
+{
+	k_EWorkshopFileActionPlayed = 0,
+	k_EWorkshopFileActionCompleted = 1,
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#EWorkshopFileType
+enum EWorkshopFileType
+{
+	k_EWorkshopFileTypeFirst = 0,
+	k_EWorkshopFileTypeCommunity = 0,
+	k_EWorkshopFileTypeMicrotransaction = 1,
+	k_EWorkshopFileTypeCollection = 2,
+	k_EWorkshopFileTypeArt = 3,
+	k_EWorkshopFileTypeVideo = 4,
+	k_EWorkshopFileTypeScreenshot = 5,
+	k_EWorkshopFileTypeGame = 6,
+	k_EWorkshopFileTypeSoftware = 7,
+	k_EWorkshopFileTypeConcept = 8,
+	k_EWorkshopFileTypeWebGuide = 9,
+	k_EWorkshopFileTypeIntegratedGuide = 10,
+	k_EWorkshopFileTypeMerch = 11,
+	k_EWorkshopFileTypeControllerBinding = 12,
+	k_EWorkshopFileTypeSteamworksAccessInvite = 13,
+	k_EWorkshopFileTypeSteamVideo = 14,
+	k_EWorkshopFileTypeGameManagedItem = 15,
+	k_EWorkshopFileTypeMax = 16
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#EWorkshopVideoProvider
+enum EWorkshopVideoProvider
+{
+	k_EWorkshopVideoProviderNone = 0,
+	k_EWorkshopVideoProviderYoutube = 1,
+};
+
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage#SteamParamStringArray_t
+struct SteamParamStringArray_t
+{
+	const char** m_ppStrings;	// Array of strings.
+	int32 m_nNumStrings;		// The number of strings that are in m_ppStrings.
+};
+
+struct RemoteStorageFileShareResult_t
+{
+	EResult m_eResult;						// The result of the operation
+	UGCHandle_t m_hFile;					// The handle that can be shared with users and features
+	char m_rgchFilename[k_cchFilenameMax];	// The name of the file that was shared
 };
 
 #pragma pack( push, 1 )
@@ -1822,6 +1941,84 @@ private:
 	func_t m_Func;
 };
 
+//-----------------------------------------------------------------------------
+// Purpose: maps a steam async call result to a class member function
+//			template params: T = local class, P = parameter struct
+//-----------------------------------------------------------------------------
+template< class T, class P >
+class CCallResult : private CCallbackBase
+{
+public:
+	typedef void (T::* func_t)(P*, bool);
+
+	CCallResult()
+	{
+		m_hAPICall = k_uAPICallInvalid;
+		m_pObj = NULL;
+		m_Func = NULL;
+		m_iCallback = P::k_iCallback;
+	}
+
+	void Set(SteamAPICall_t hAPICall, T* p, func_t func)
+	{
+		if (m_hAPICall)
+			SteamAPI_UnregisterCallResult(this, m_hAPICall);
+
+		m_hAPICall = hAPICall;
+		m_pObj = p;
+		m_Func = func;
+
+		if (hAPICall)
+			SteamAPI_RegisterCallResult(this, hAPICall);
+	}
+
+	bool IsActive() const
+	{
+		return (m_hAPICall != k_uAPICallInvalid);
+	}
+
+	void Cancel()
+	{
+		if (m_hAPICall != k_uAPICallInvalid)
+		{
+			SteamAPI_UnregisterCallResult(this, m_hAPICall);
+			m_hAPICall = k_uAPICallInvalid;
+		}
+
+	}
+
+	~CCallResult()
+	{
+		Cancel();
+	}
+
+private:
+	virtual void Run(void* pvParam)
+	{
+		m_hAPICall = k_uAPICallInvalid; // caller unregisters for us
+		(m_pObj->*m_Func)((P*)pvParam, false);
+	}
+
+	void Run(void* pvParam, bool bIOFailure, SteamAPICall_t hSteamAPICall)
+	{
+		if (hSteamAPICall == m_hAPICall)
+		{
+			m_hAPICall = k_uAPICallInvalid; // caller unregisters for us
+			(m_pObj->*m_Func)((P*)pvParam, bIOFailure);
+		}
+	}
+
+	int GetCallbackSizeBytes()
+	{
+		return sizeof(P);
+	}
+
+	SteamAPICall_t m_hAPICall;
+	T* m_pObj;
+	func_t m_Func;
+};
+
+
 void SteamAPI_RegisterCallback(CCallbackBase* pCallback, int iCallback);
 void SteamAPI_UnregisterCallback(CCallbackBase* pCallback);
 
@@ -2002,6 +2199,72 @@ struct GlobalStatsReceived_t
 #pragma pack(pop)
 
 struct GameOverlayActivated_t { bool m_bActive; };
+
+//-----------------------------------------------------------------------------
+// Purpose: list of states a friend can be in
+//-----------------------------------------------------------------------------
+enum EPersonaState
+{
+	k_EPersonaStateOffline = 0,			// friend is not currently logged on
+	k_EPersonaStateOnline = 1,			// friend is logged on
+	k_EPersonaStateBusy = 2,			// user is on, but busy
+	k_EPersonaStateAway = 3,			// auto-away feature
+	k_EPersonaStateSnooze = 4,			// auto-away for a long time
+	k_EPersonaStateLookingToTrade = 5,	// Online, trading
+	k_EPersonaStateLookingToPlay = 6,	// Online, wanting to play
+	k_EPersonaStateMax,
+};
+
+
+//-----------------------------------------------------------------------------
+// Purpose: set of relationships to other users
+//-----------------------------------------------------------------------------
+enum EFriendRelationship
+{
+	k_EFriendRelationshipNone = 0,
+	k_EFriendRelationshipBlocked = 1,
+	k_EFriendRelationshipRequestRecipient = 2,
+	k_EFriendRelationshipFriend = 3,
+	k_EFriendRelationshipRequestInitiator = 4,
+	k_EFriendRelationshipIgnored = 5,
+	k_EFriendRelationshipIgnoredFriend = 6,
+	k_EFriendRelationshipSuggested = 7,
+
+	// keep this updated
+	k_EFriendRelationshipMax = 8,
+};
+
+//-----------------------------------------------------------------------------
+// Purpose: user restriction flags
+//-----------------------------------------------------------------------------
+enum EUserRestriction
+{
+	k_nUserRestrictionNone = 0,	// no known chat/content restriction
+	k_nUserRestrictionUnknown = 1,	// we don't know yet (user offline)
+	k_nUserRestrictionAnyChat = 2,	// user is not allowed to (or can't) send/recv any chat
+	k_nUserRestrictionVoiceChat = 4,	// user is not allowed to (or can't) send/recv voice chat
+	k_nUserRestrictionGroupChat = 8,	// user is not allowed to (or can't) send/recv group chat
+	k_nUserRestrictionRating = 16,	// user is too young according to rating in current region
+	k_nUserRestrictionGameInvites = 32,	// user cannot send or recv game invites (e.g. mobile)
+	k_nUserRestrictionTrading = 64,	// user cannot participate in trading (console, mobile)
+};
+
+enum EOverlayToStoreFlag
+{
+	k_EOverlayToStoreFlagNone = 0,
+	k_EOverlayToStoreFlagAddToCart = 1,
+};
+
+//Information about the game a friend is playing.
+// Obtainable from : GetFriendGamePlayed.
+struct FriendGameInfo_t
+{
+	CGameID m_gameID;			// The game ID that the friend is playing.
+	uint32 m_unGameIP;			// The IP of the server the friend is playing on.
+	uint16 m_usGamePort;		// The port of the server the friend is playing on.
+	uint16 m_usQueryPort;		// The query port of the server the friend is playing on.
+	CSteamID m_steamIDLobby;	// The Steam ID of the lobby the friend is in.
+};
 
 // interface predec
 class ISteamClient;
@@ -2295,7 +2558,84 @@ public:
 	virtual bool BIsTwoFactorEnabled() = 0;
 };
 
-class ISteamFriends015;
+//-----------------------------------------------------------------------------
+// Purpose: interface to accessing information about individual users,
+//			that can be a friend, in a group, on a game server or in a lobby with the local user
+//-----------------------------------------------------------------------------
+class ISteamFriends015
+{
+public:
+	virtual const char* GetPersonaName() = 0;
+	virtual SteamAPICall_t SetPersonaName(const char* pchPersonaName) = 0;
+	virtual EPersonaState GetPersonaState() = 0;
+	virtual int GetFriendCount(int iFriendFlags) = 0;
+	virtual CSteamID GetFriendByIndex(int iFriend, int iFriendFlags) = 0;
+	virtual EFriendRelationship GetFriendRelationship(CSteamID steamIDFriend) = 0;
+	virtual EPersonaState GetFriendPersonaState(CSteamID steamIDFriend) = 0;
+	virtual const char* GetFriendPersonaName(CSteamID steamIDFriend) = 0;
+	virtual bool GetFriendGamePlayed(CSteamID steamID, FriendGameInfo_t* pGamePlayInfo) = 0;
+	virtual const char* GetFriendPersonaNameHistory(CSteamID steamIDFriend, int iPersonaName) = 0;
+	virtual int GetFriendSteamLevel(CSteamID steamIDFriend) = 0;
+	virtual const char* GetPlayerNickname(CSteamID steamIDPlayer) = 0;
+	virtual int16 GetFriendsGroupCount() = 0;
+	virtual int16 GetFriendsGroupIDByIndex(int32) = 0;
+	virtual const char* GetFriendsGroupName(int16) = 0;
+	virtual unknown_ret GetFriendsGroupMembersCount(int16) = 0;
+	virtual unknown_ret GetFriendsGroupMembersList(int16, CSteamID*, int32) = 0;
+	virtual bool HasFriend(CSteamID steamIDFriend, int iFriendFlags) = 0;
+	virtual int GetClanCount() = 0;
+	virtual CSteamID GetClanByIndex( int iClan ) = 0;
+	virtual const char* GetClanName(CSteamID steamIDClan) = 0;
+	virtual const char* GetClanTag(CSteamID steamIDClan) = 0;
+	virtual bool GetClanActivityCounts(CSteamID steamID, int* pnOnline, int* pnInGame, int* pnChatting) = 0;
+	virtual SteamAPICall_t DownloadClanActivityCounts(CSteamID groupIDs[], int nIds) = 0;
+	virtual int GetFriendCountFromSource(CSteamID steamIDSource) = 0;
+	virtual CSteamID GetFriendFromSourceByIndex(CSteamID steamIDSource, int iFriend) = 0;
+	virtual bool IsUserInSource(CSteamID steamIDUser, CSteamID steamIDSource) = 0;
+	virtual void SetInGameVoiceSpeaking(CSteamID steamIDUser, bool bSpeaking) = 0;
+	virtual void ActivateGameOverlay(const char* pchDialog) = 0;
+	virtual void ActivateGameOverlayToUser(const char* pchDialog, CSteamID steamID) = 0;
+	virtual void ActivateGameOverlayToWebPage(const char* pchURL) = 0;
+	virtual void ActivateGameOverlayToStore(AppId_t nAppID, EOverlayToStoreFlag eFlag) = 0;
+	virtual void SetPlayedWith(CSteamID steamIDUserPlayedWith) = 0;
+	virtual void ActivateGameOverlayInviteDialog(CSteamID steamIDLobby) = 0;
+	virtual int GetSmallFriendAvatar(CSteamID steamIDFriend) = 0;
+	virtual int GetMediumFriendAvatar(CSteamID steamIDFriend) = 0;
+	virtual int GetLargeFriendAvatar(CSteamID steamIDFriend) = 0;
+	virtual bool RequestUserInformation(CSteamID steamIDUser, bool bRequireNameOnly) = 0;
+	virtual SteamAPICall_t RequestClanOfficerList(CSteamID steamIDClan) = 0;
+	virtual CSteamID GetClanOwner(CSteamID steamIDClan) = 0;
+	virtual int GetClanOfficerCount(CSteamID steamIDClan) = 0;
+	virtual CSteamID GetClanOfficerByIndex( CSteamID steamIDClan, int iOfficer) = 0;
+	virtual EUserRestriction GetUserRestrictions() = 0;
+	virtual bool SetRichPresence(const char* pchKey, const char* pchValue) = 0;
+	virtual void ClearRichPresence() = 0;
+	virtual const char* GetFriendRichPresence(CSteamID steamIDFriend, const char* pchKey) = 0;
+	virtual int GetFriendRichPresenceKeyCount(CSteamID steamIDFriend) = 0;
+	virtual const char* GetFriendRichPresenceKeyByIndex(CSteamID steamIDFriend, int iKey) = 0;
+	virtual void RequestFriendRichPresence(CSteamID steamIDFriend) = 0;
+	virtual bool InviteUserToGame(CSteamID steamIDFriend, const char* pchConnectString) = 0;
+	virtual int GetCoplayFriendCount() = 0;
+	virtual CSteamID GetCoplayFriend(int iCoplayFriend) = 0;
+	virtual int GetFriendCoplayTime(CSteamID steamIDFriend) = 0;
+	virtual AppId_t GetFriendCoplayGame(CSteamID steamIDFriend) = 0;
+	virtual SteamAPICall_t JoinClanChatRoom(CSteamID steamIDClan) = 0;
+	virtual bool LeaveClanChatRoom(CSteamID steamIDClan) = 0;
+	virtual int GetClanChatMemberCount(CSteamID steamIDClan) = 0;
+	virtual CSteamID GetChatMemberByIndex( CSteamID steamIDClan, int iUser ) = 0;
+	virtual bool SendClanChatMessage(CSteamID steamIDClanChat, const char* pchText) = 0;
+	virtual int GetClanChatMessage(CSteamID steamIDClanChat, int iMessage, void* prgchText, int cchTextMax, EChatEntryType* peChatEntryType, CSteamID* pSteamIDChatter) = 0;
+	virtual bool IsClanChatAdmin(CSteamID steamIDClanChat, CSteamID steamIDUser) = 0;
+	virtual bool IsClanChatWindowOpenInSteam(CSteamID steamIDClanChat) = 0;
+	virtual bool OpenClanChatWindowInSteam(CSteamID steamIDClanChat) = 0;
+	virtual bool CloseClanChatWindowInSteam(CSteamID steamIDClanChat) = 0;
+	virtual bool SetListenForFriendsMessages(bool bInterceptEnabled) = 0;
+	virtual bool ReplyToFriendMessage(CSteamID steamIDFriend, const char* pchMsgToSend) = 0;
+	virtual int GetFriendMessage(CSteamID steamIDFriend, int iMessageID, void* pvData, int cubData, EChatEntryType* peChatEntryType) = 0;
+	virtual SteamAPICall_t GetFollowerCount(CSteamID steamID) = 0;
+	virtual SteamAPICall_t IsFollowing(CSteamID steamID) = 0;
+	virtual SteamAPICall_t EnumerateFollowingList(uint32 unStartIndex) = 0;
+};
 
 class ISteamUtils008
 {
@@ -2312,7 +2652,7 @@ public:
 
 	// returns the 2 digit ISO 3166-1-alpha-2 format country code this client is running in (as looked up via an IP-to-location database)
 	// e.g "US" or "UK".
-	virtual const char *GetIPCountry() = 0;
+	virtual const char* GetIPCountry() = 0;
 
 	// returns true if the image exists, and valid sizes were filled out
 	virtual bool GetImageSize(int iImage, uint32 *pnWidth, uint32 *pnHeight) = 0;
@@ -2402,7 +2742,7 @@ public:
 	virtual bool GetEnteredGamepadTextInput(char *pchText, uint32 cchText) = 0;
 
 	// returns the language the steam client is running in, you probably want ISteamApps::GetCurrentGameLanguage instead, this is for very special usage cases
-	virtual const char *GetSteamUILanguage() = 0;
+	virtual const char* GetSteamUILanguage() = 0;
 
 	// returns true if Steam itself is running in VR mode
 	virtual bool IsSteamRunningInVR() = 0;
@@ -2484,7 +2824,7 @@ public:
 	// should only be called after a LobbyMatchList_t callback is received
 	// iLobby is of the range [0, LobbyMatchList_t::m_nLobbiesMatching)
 	// the returned CSteamID::IsValid() will be false if iLobby is out of range
-	virtual CSteamID GetLobbyByIndex(int iLobby) = 0;
+	virtual void GetLobbyByIndex(CSteamID& steamIDLobby, int iLobby) = 0;
 
 	// Create a lobby on the Steam servers.
 	// If private, then the lobby will not be returned by any RequestLobbyList() call; the CSteamID
@@ -2522,7 +2862,7 @@ public:
 	// returns the CSteamID of a user in the lobby
 	// iMember is of range [0,GetNumLobbyMembers())
 	// note that the current user must be in a lobby to retrieve CSteamIDs of other users in that lobby
-	virtual CSteamID GetLobbyMemberByIndex(CSteamID steamIDLobby, int iMember) = 0;
+	virtual void GetLobbyMemberByIndex(CSteamID& memberIDLobby, CSteamID steamIDLobby, int iMember) = 0;
 
 	// Get data associated with this lobby
 	// takes a simple key, and returns the string associated with it
@@ -2595,7 +2935,7 @@ public:
 	// you must be a member of the lobby to access this
 	// there always one lobby owner - if the current owner leaves, another user will become the owner
 	// it is possible (bur rare) to join a lobby just as the owner is leaving, thus entering a lobby with self as the owner
-	virtual CSteamID GetLobbyOwner(CSteamID steamIDLobby) = 0;
+	virtual void GetLobbyOwner(CSteamID& steamIDOwner, CSteamID steamIDLobby) = 0;
 
 	// changes who the lobby owner is
 	// you must be the lobby owner for this to succeed, and steamIDNewOwner must be in the lobby
@@ -2634,6 +2974,7 @@ public:
 
 	// Get a list of relevant lobbies
 	virtual void RequestLobbyList();
+
 	virtual CSteamID GetLobbyByIndex(int iLobby) = 0;
 	// Create a lobby - you'll get the SteamID of it on success
 	virtual void CreateLobby(bool bPrivate) = 0;
@@ -2940,11 +3281,11 @@ public:
 
 	virtual int GetAppBuildId() = 0;
 	//below have unknown return types
-	virtual __int64 RequestAllProofOfPurchaseKeys() = 0;
+	virtual unknown_ret RequestAllProofOfPurchaseKeys() = 0;
 
-	virtual __int64 GetFileDetails(const char *) = 0;
+	virtual unknown_ret GetFileDetails(const char *) = 0;
 
-	virtual __int64 GetLaunchCommandLine(char*, int) = 0;
+	virtual unknown_ret GetLaunchCommandLine(char*, int) = 0;
 };
 
 class ISteamNetworking005
@@ -3084,7 +3425,68 @@ public:
 	virtual int GetMaxPacketSize(SNetSocket_t hSocket) = 0;
 };
 
-class ISteamRemoteStorage014;
+// https://partner.steamgames.com/doc/api/ISteamRemoteStorage
+class ISteamRemoteStorage014
+{
+public:
+	virtual bool FileWrite(const char* pchFile, const void* pvData, int32 cubData) = 0;
+	virtual int32 FileRead(const char* pchFile, const void* pvData, int32 cubDataToRead) = 0;
+	virtual SteamAPICall_t FileWriteAsync(const char* pchFile, const void* pvData, uint32 cubData) = 0;
+	virtual SteamAPICall_t FileReadAsync(const char* pchFile, uint32 nOffset, uint32 cubToRead) = 0;
+	virtual bool FileReadAsyncComplete(SteamAPICall_t hReadCall, void* pvBuffer, uint32 cubToRead) = 0;
+	virtual bool FileForget(const char* pchFile) = 0;
+	virtual bool FileDelete(const char* pchFile) = 0;
+	virtual SteamAPICall_t FileShare(const char* pchFile) = 0;
+	virtual bool SetSyncPlatforms(const char* pchFile, ERemoteStoragePlatform eRemoteStoragePlatform) = 0;
+	virtual UGCFileWriteStreamHandle_t FileWriteStreamOpen(const char* pchFile) = 0;
+	virtual bool FileWriteStreamWriteChunk(UGCFileWriteStreamHandle_t writeHandle, const void* pvData, int32 cubData) = 0;
+	virtual bool FileWriteStreamClose(UGCFileWriteStreamHandle_t writeHandle) = 0;
+	virtual bool FileWriteStreamCancel(UGCFileWriteStreamHandle_t writeHandle) = 0;
+	virtual bool FileExists(const char* pchFile) = 0;
+	virtual bool FilePersisted(const char* pchFile) = 0;
+	virtual int32 GetFileSize(const char* pchFile) = 0;
+	virtual int64 GetFileTimestamp(const char* pchFile) = 0;
+	virtual ERemoteStoragePlatform GetSyncPlatforms(const char* pchFile) = 0;
+	virtual int32 GetFileCount() = 0;
+	virtual const char* GetFileNameAndSize(int32 iFile, int32* pnFileSizeInBytes) = 0;
+	virtual bool GetQuota(uint64* pnTotalBytes, uint64* puAvailableBytes) = 0;
+	virtual bool IsCloudEnabledForAccount() = 0;
+	virtual bool IsCloudEnabledForApp() = 0;
+	virtual void SetCloudEnabledForApp(bool bEnabled) = 0;
+	virtual SteamAPICall_t UGCDownload(UGCHandle_t hContent, uint32 unPriority) = 0;
+	virtual bool GetUGCDownloadProgress(UGCHandle_t hContent, int32* pnBytesDownloaded, int32* pnBytesExpected) = 0;
+	virtual bool GetUGCDetails(UGCHandle_t hContent, AppId_t* pnAppID, char** ppchName, int32* pnFileSizeInBytes, CSteamID* pSteamIDOwner) = 0;
+	virtual int32 UGCRead(UGCHandle_t hContent, void* pvData, int32 cubDataToRead, uint32 cOffset, EUGCReadAction eAction) = 0;
+	virtual int32 GetCachedUGCCount() = 0;
+	virtual UGCHandle_t GetCachedUGCHandle(int32 iCachedContent) = 0;
+	virtual SteamAPICall_t PublishWorkshopFile(const char* pchFile, const char* pchPreviewFile, AppId_t nConsumerAppId, const char* pchTitle, const char* pchDescription, 
+		ERemoteStoragePublishedFileVisibility eVisibility, SteamParamStringArray_t* pTags, EWorkshopFileType eWorkshopFileType) = 0;
+	virtual PublishedFileUpdateHandle_t CreatePublishedFileUpdateRequest(PublishedFileId_t unPublishedFileId) = 0;
+	virtual bool UpdatePublishedFileFile(PublishedFileUpdateHandle_t updateHandle, const char* pchFile) = 0;
+	virtual bool UpdatePublishedFilePreviewFile(PublishedFileUpdateHandle_t updateHandle, const char* pchPreviewFile) = 0;
+	virtual bool UpdatePublishedFileTitle(PublishedFileUpdateHandle_t updateHandle, const char* pchTitle) = 0;
+	virtual bool UpdatePublishedFileDescription(PublishedFileUpdateHandle_t updateHandle, const char* pchDescription) = 0;
+	virtual bool UpdatePublishedFileVisibility(PublishedFileUpdateHandle_t updateHandle, ERemoteStoragePublishedFileVisibility eVisibility) = 0;
+	virtual bool UpdatePublishedFileTags(PublishedFileUpdateHandle_t updateHandle, SteamParamStringArray_t* pTags) = 0;
+	virtual SteamAPICall_t CommitPublishedFileUpdate(PublishedFileUpdateHandle_t updateHandle) = 0;
+	virtual SteamAPICall_t GetPublishedFileDetails(PublishedFileId_t unPublishedFileId, uint32 unMaxSecondsOld) = 0;
+	virtual SteamAPICall_t DeletePublishedFile(PublishedFileId_t unPublishedFileId) = 0;
+	virtual SteamAPICall_t EnumerateUserPublishedFiles(uint32 unStartIndex) = 0;
+	virtual SteamAPICall_t SubscribePublishedFile(PublishedFileId_t unPublishedFileId) = 0;
+	virtual SteamAPICall_t EnumerateUserSubscribedFiles(uint32 unStartIndex) = 0;
+	virtual SteamAPICall_t UnsubscribePublishedFile(PublishedFileId_t unPublishedFileId) = 0;
+	virtual bool UpdatePublishedFileSetChangeDescription(PublishedFileUpdateHandle_t updateHandle, const char* pchChangeDescription) = 0;
+	virtual SteamAPICall_t GetPublishedItemVoteDetails(PublishedFileId_t unPublishedFileId) = 0;
+	virtual SteamAPICall_t UpdateUserPublishedItemVote(PublishedFileId_t unPublishedFileId, bool bVoteUp) = 0;
+	virtual SteamAPICall_t GetUserPublishedItemVoteDetails(PublishedFileId_t unPublishedFileId) = 0;
+	virtual SteamAPICall_t EnumerateUserSharedWorkshopFiles(CSteamID steamId, uint32 unStartIndex, SteamParamStringArray_t* pRequiredTags, SteamParamStringArray_t* pExcludedTags) = 0;
+	virtual SteamAPICall_t PublishVideo(EWorkshopVideoProvider eVideoProvider, const char* pchVideoAccount, const char* pchVideoIdentifier, const char* pchPreviewFile, AppId_t nConsumerAppId, 
+		const char* pchTitle, const char* pchDescription, ERemoteStoragePublishedFileVisibility eVisibility, SteamParamStringArray_t* pTags) = 0;
+	virtual SteamAPICall_t SetUserPublishedFileAction(PublishedFileId_t unPublishedFileId, EWorkshopFileAction eAction) = 0;
+	virtual SteamAPICall_t EnumeratePublishedFilesByUserAction(EWorkshopFileAction eAction, uint32 unStartIndex) = 0;
+	virtual SteamAPICall_t EnumeratePublishedWorkshopFiles(EWorkshopEnumerationType eEnumerationType, uint32 unStartIndex, uint32 unCount, uint32 unDays, SteamParamStringArray_t* pTags, SteamParamStringArray_t* pUserTags) = 0;
+	virtual SteamAPICall_t UGCDownloadToLocation(UGCHandle_t hContent, const char* pchLocation, uint32 unPriority) = 0;
+};
 
 class ISteamScreenshots003
 {
@@ -3120,7 +3522,86 @@ public:
 	virtual ScreenshotHandle AddVRScreenshotToLibrary(EVRScreenshotType eType, const char *pchFilename, const char *pchVRFilename) = 0;
 };
 
-class ISteamHTTP002;
+class ISteamHTTP002
+{
+public:
+
+	// Initializes a new HTTP request, returning a handle to use in further operations on it.  Requires
+	// the method (GET or POST) and the absolute URL for the request.  Only http requests (ie, not https) are
+	// currently supported, so this string must start with http:// or https:// and should look like http://store.steampowered.com/app/250/ 
+	// or such.
+	virtual HTTPRequestHandle CreateHTTPRequest(EHTTPMethod eHTTPRequestMethod, const char* pchAbsoluteURL) = 0;
+
+	// Set a context value for the request, which will be returned in the HTTPRequestCompleted_t callback after
+	// sending the request.  This is just so the caller can easily keep track of which callbacks go with which request data.
+	virtual bool SetHTTPRequestContextValue(HTTPRequestHandle hRequest, uint64 ulContextValue) = 0;
+
+	// Set a timeout in seconds for the HTTP request, must be called prior to sending the request.  Default
+	// timeout is 60 seconds if you don't call this.  Returns false if the handle is invalid, or the request
+	// has already been sent.
+	virtual bool SetHTTPRequestNetworkActivityTimeout(HTTPRequestHandle hRequest, uint32 unTimeoutSeconds) = 0;
+
+	// Set a request header value for the request, must be called prior to sending the request.  Will 
+	// return false if the handle is invalid or the request is already sent.
+	virtual bool SetHTTPRequestHeaderValue(HTTPRequestHandle hRequest, const char* pchHeaderName, const char* pchHeaderValue) = 0;
+
+	// Set a GET or POST parameter value on the request, which is set will depend on the EHTTPMethod specified
+	// when creating the request.  Must be called prior to sending the request.  Will return false if the 
+	// handle is invalid or the request is already sent.
+	virtual bool SetHTTPRequestGetOrPostParameter(HTTPRequestHandle hRequest, const char* pchParamName, const char* pchParamValue) = 0;
+
+	// Sends the HTTP request, will return false on a bad handle, otherwise use SteamCallHandle to wait on
+	// asyncronous response via callback.
+	//
+	// Note: If the user is in offline mode in Steam, then this will add a only-if-cached cache-control 
+	// header and only do a local cache lookup rather than sending any actual remote request.
+	virtual bool SendHTTPRequest(HTTPRequestHandle hRequest, SteamAPICall_t* pCallHandle) = 0;
+
+	virtual bool SendHTTPRequestAndStreamResponse(HTTPRequestHandle hRequest, SteamAPICall_t* pCallHandle) = 0;
+
+	// Defers a request you have sent, the actual HTTP client code may have many requests queued, and this will move
+	// the specified request to the tail of the queue.  Returns false on invalid handle, or if the request is not yet sent.
+	virtual bool DeferHTTPRequest(HTTPRequestHandle hRequest) = 0;
+
+	// Prioritizes a request you have sent, the actual HTTP client code may have many requests queued, and this will move
+	// the specified request to the head of the queue.  Returns false on invalid handle, or if the request is not yet sent.
+	virtual bool PrioritizeHTTPRequest(HTTPRequestHandle hRequest) = 0;
+
+	// Checks if a response header is present in a HTTP response given a handle from HTTPRequestCompleted_t, also 
+	// returns the size of the header value if present so the caller and allocate a correctly sized buffer for
+	// GetHTTPResponseHeaderValue.
+	virtual bool GetHTTPResponseHeaderSize(HTTPRequestHandle hRequest, const char* pchHeaderName, uint32* unResponseHeaderSize) = 0;
+
+	// Gets header values from a HTTP response given a handle from HTTPRequestCompleted_t, will return false if the
+	// header is not present or if your buffer is too small to contain it's value.  You should first call 
+	// BGetHTTPResponseHeaderSize to check for the presence of the header and to find out the size buffer needed.
+	virtual bool GetHTTPResponseHeaderValue(HTTPRequestHandle hRequest, const char* pchHeaderName, uint8* pHeaderValueBuffer, uint32 unBufferSize) = 0;
+
+	// Gets the size of the body data from a HTTP response given a handle from HTTPRequestCompleted_t, will return false if the 
+	// handle is invalid.
+	virtual bool GetHTTPResponseBodySize(HTTPRequestHandle hRequest, uint32* unBodySize) = 0;
+
+	// Gets the body data from a HTTP response given a handle from HTTPRequestCompleted_t, will return false if the 
+	// handle is invalid or if the provided buffer is not the correct size.  Use BGetHTTPResponseBodySize first to find out
+	// the correct buffer size to use.
+	virtual bool GetHTTPResponseBodyData(HTTPRequestHandle hRequest, uint8* pBodyDataBuffer, uint32 unBufferSize) = 0;
+
+	virtual bool GetHTTPStreamingResponseBodyData(HTTPRequestHandle hRequest, uint32 cOffset, uint8* pBodyDataBuffer, uint32 unBufferSize) = 0;
+
+	// Releases an HTTP response handle, should always be called to free resources after receiving a HTTPRequestCompleted_t
+	// callback and finishing using the response.
+	virtual bool ReleaseHTTPRequest(HTTPRequestHandle hRequest) = 0;
+
+	// Gets progress on downloading the body for the request.  This will be zero unless a response header has already been
+	// received which included a content-length field.  For responses that contain no content-length it will report
+	// zero for the duration of the request as the size is unknown until the connection closes.
+	virtual bool GetHTTPDownloadProgressPct(HTTPRequestHandle hRequest, float* pflPercentOut) = 0;
+
+	// Sets the body for an HTTP Post request.  Will fail and return false on a GET request, and will fail if POST params
+	// have already been set for the request.  Setting this raw body makes it the only contents for the post, the pchContentType
+	// parameter will set the content-type header for the request so the server may know how to interpret the body.
+	virtual bool SetHTTPRequestRawPostBody(HTTPRequestHandle hRequest, const char* pchContentType, uint8* pubBody, uint32 unBodyLen) = 0;
+};
 
 class ISteamUnifiedMessages001
 {

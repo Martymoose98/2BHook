@@ -119,7 +119,12 @@ void InitHooks(void)
 	//HookFunc64((VOID*)0x140607011, hkLoadWordBlacklist, 157, &hf); //caller
 	HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &g_LoadWordBlacklist);//callee
 #else // DENUVO_STEAM_BUILD
+
 	// FIXME: This hook works but is digusting
+	//	hmm it seems yo do have to pause the threads to do this
+	//	if you get really unlucky you can crash
+	//	or find someway to syncrhronize it
+	//	crashed on hooking the save io stuff
 	HookFunc64(SaveFileIO, hkSaveFileIOThunk, 46, &g_UserManagerSaveFileIO);
 
 	// FIXME: this could be moved idk it's debatable  
@@ -465,6 +470,7 @@ void LogOffsets(void)
 {
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Function Pointers]");
 	LOG_OFFSET("CRILogCallback", CRILogCallback);
+	LOG_OFFSET("GetEntityInfoFromHandle", GetEntityInfoFromHandle);
 	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
 	LOG_OFFSET("GetItemNameById", ItemManager_GetItemNameById);
 	LOG_OFFSET("GetItemIdByName", ItemManager_GetItemIdByName);
@@ -507,6 +513,7 @@ void LogOffsets(void)
 	LOG_OFFSET("CModelAnalyzer", g_pModelAnalyzer);
 	//LOG_OFFSET("MRubyVM", g_pRubyInstances);
 	LOG_OFFSET("CGameCamera", g_pCamera);
+	LOG_OFFSET("CNetworkDevice", g_pNetworkDevice);
 	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
 	LOG_OFFSET("CalculateLevel", CalculateLevel);
 	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
@@ -631,6 +638,7 @@ void FindSteamOffsets(void)
 
 	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10");
 	GetConstructionInfo = (GetConstructorFn)FindPattern(NULL, "33 D2 48 8D 05 ? ? ? ? 44 8B C2");
+	GetEntityInfoFromHandle = (GetEntityInfoFromHandleFn)FindPattern(NULL, "8B 11 85 D2 74 ?? 8B C2"); // gets CEntityInfo for everything
 	GetEntityFromHandle = (GetEntityFromHandleFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 85 C0 75 5C", 1); // for enemies
 	GetEntityFromHandle2 = (GetEntityFromHandleFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B EE 48 85 C0", 1); // for localplayer, cam entity etc...
 	ItemManager_GetItemNameById = (CItemManager_GetItemNameByIdFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 15 ? ? ? ? EB 26", 1);
@@ -689,6 +697,7 @@ void FindSteamOffsets(void)
 	g_pNPCManager = *(CNPCManager**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3);
 	g_pEnemyManager = *(CEmBaseManager**)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE", 3);
 	g_pUserManager = *(CUserManager**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 74 2A", 3);
+	g_pNetworkDevice = *(CNetworkDevice**)FindPatternPtr(NULL, "48 8B 3D ? ? ? ? 33 DB 48 8B EA", 3);
 	g_pMemoryDevice = (CMemoryDevice*)FindPatternPtr(NULL, "4C 89 64 24 ? 48 8D 0D ? ? ? ? 4C 89 7C 24", 8);
 
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
