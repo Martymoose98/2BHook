@@ -220,6 +220,9 @@
     <MASM Include="SaveFileIOHook.asm">
       <Filter>Assembly Files</Filter>
     </MASM>
+    <MASM Include="phcvtps.asm">
+      <Filter>Assembly Files</Filter>
+    </MASM>
   </ItemGroup>
   <ItemGroup>
     <None Include="ImGui\.editorconfig">

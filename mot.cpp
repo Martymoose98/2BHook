@@ -61,7 +61,7 @@ void ReadMot(void* pMot, std::vector<MotInterpListEntry>& Interps)
 			entry.pInterp2 = pInterp2Internal;
 			Interps.push_back(entry);
 			break;
-		case 3:
+		case 3: // _mm_cvtneeph_ps 
 			pInterp3 = MakePtr(MotInterpolation3*, pMot, pRecords[i].offset);
 			pInterp3Internal = (MotInterpolation3Internal*)malloc(sizeof(MotInterpolation3Internal));
 			pInterp3Internal->m_scpCount = pRecords[i].elemNumber;
@@ -90,7 +90,7 @@ void ReadMot(void* pMot, std::vector<MotInterpListEntry>& Interps)
 			entry.pInterp5 = pInterp5Internal;
 			Interps.push_back(entry);
 			break;
-		case 6:
+		case 6: // _mm_cvtneeph_ps 
 			pInterp6 = MakePtr(MotInterpolation6*, pMot, pRecords[i].offset);
 			pInterp6Internal = (MotInterpolation6Internal*)malloc(sizeof(MotInterpolation6Internal));
 			pInterp6Internal->m_values = pInterp6->values;
@@ -100,7 +100,7 @@ void ReadMot(void* pMot, std::vector<MotInterpListEntry>& Interps)
 			entry.pInterp6 = pInterp6Internal;
 			Interps.push_back(entry);
 			break;
-		case 7:
+		case 7: //_mm_cvtneeph_ps 
 			pInterp7 = MakePtr(MotInterpolation7*, pMot, pRecords[i].offset);
 			pInterp7Internal = (MotInterpolation7Internal*)malloc(sizeof(MotInterpolation7Internal));
 			pInterp7Internal->m_values = pInterp7->values;
@@ -110,7 +110,7 @@ void ReadMot(void* pMot, std::vector<MotInterpListEntry>& Interps)
 			entry.pInterp7 = pInterp7Internal;
 			Interps.push_back(entry);
 			break;
-		case 8:
+		case 8: //_mm_cvtneeph_ps 
 			pInterp8 = MakePtr(MotInterpolation8*, pMot, pRecords[i].offset);
 			pInterp8Internal = (MotInterpolation8Internal*)malloc(sizeof(MotInterpolation8Internal));
 			pInterp8Internal->m_values = pInterp8->values;
@@ -152,7 +152,7 @@ void ApplyMotion(CModelData* pData)
 }
 
 //https://github.com/Kerilk/noesis_bayonetta_pc/blob/master/bayonetta_pc/MotionBayo.h
-void ProcessMot(std::vector<MotInterpListEntry>& Interps, CModelWork* pWork, short sFrameCount)
+void ProcessMot(std::vector<MotInterpListEntry>&Interps, CModelWork * pWork, short sFrameCount)
 {
 
 	for (;;)
@@ -166,10 +166,27 @@ void ProcessMot(std::vector<MotInterpListEntry>& Interps, CModelWork* pWork, sho
 		{
 		case MotInterpListEntry::NONE:
 			break;
+		case MotInterpListEntry::INTERP3:
+		{
+			float dp = ConvertFP16ToFP32(it.pInterp3->m_Values.dp);
+			float p = ConvertFP16ToFP32(it.pInterp3->m_Values.p);
+		}
+			
 		default:
 			break;
 		}
 	}
+}
+
+float HalfFloatToFloat(hfloat value)
+{
+	//_mm_cvtsbh_ss(value); // idk if this will work bh is not hfloat
+	//_cvtsh_ss();
+	//_mm_cvtsh_ss(); // avx512
+	//_mm_set1_ph();
+	__m128h mmhfloat = _mm_set1_epi16(value);
+	__m128 mmfloat = _mm_cvtph_ps(mmhfloat);
+	return _mm_cvtss_f32(mmfloat);
 }
 
 template<typename T>
@@ -190,7 +207,7 @@ static T read_big_endian(T v)
 	return bev;
 }
 
-static double Readpghalf(pghalf value)
+static double Readpghalf(hfloat value)
 {
 	int32 sexponent;
 	double f = 0.0;
@@ -263,7 +280,7 @@ static double Readpghalf(pghalf value)
 	return f;
 }
 
-static uint32_t halfbits_to_floatbits(pghalf h)
+static uint32_t halfbits_to_floatbits(hfloat h)
 {
 	uint16_t h_exp, h_sig;
 	uint32_t f_sgn, f_exp, f_sig;
@@ -295,12 +312,12 @@ static uint32_t halfbits_to_floatbits(pghalf h)
 	}
 }
 
-static float half_to_float(pghalf h)
+static float half_to_float(hfloat h)
 {
 	return (float)halfbits_to_floatbits(h);
 }
 
-static pghalf make_half_float(float f)
+static hfloat make_half_float(float f)
 {
 
 	union {

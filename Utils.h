@@ -9,16 +9,16 @@
 #include "Console.h"
 #include "Configuration.h"
 
-#define STACK_TIMER(name) StackTimer name(__FUNCTION__)
-#define CS_LOCK() StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)()
-#define CS_LOCK_SPINCOUNT(spincount) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)((DWORD)(spincount))
+#define STACK_TIMER(Name) StackTimer Name(__FUNCTION__)
+#define CS_LOCK(pCriticalSection) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)(pCriticalSection)
+#define CS_LOCK_SPINCOUNT(pCriticalSection, Spincount) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)(pCriticalSection, (DWORD)(Spincount))
 
 typedef struct StackTimer
 {
 	StackTimer(const char* szName)
+		: m_szName(szName), m_start(clock()), m_end(0), m_duration(0.0)
 	{
-		m_szName = szName;
-		m_start = clock();
+
 	}
 
 	~StackTimer()
@@ -37,39 +37,42 @@ private:
 
 struct StackReadWriteLock
 {
-	StackReadWriteLock()
+	StackReadWriteLock(LPCRITICAL_SECTION pCriticalSection)
 	{
-		InitializeCriticalSection(&m_CriticalSection);
+		m_pCriticalSection = pCriticalSection;
+		InitializeCriticalSection(m_pCriticalSection);
 		m_bCriticalSectionInitalized = TRUE;
-		EnterCriticalSection(&m_CriticalSection);
+		EnterCriticalSection(m_pCriticalSection);
 	}
 
-	StackReadWriteLock(DWORD dwSpinCount)
+	StackReadWriteLock(LPCRITICAL_SECTION pCriticalSection, DWORD dwSpinCount)
+		: m_bCriticalSectionInitalized(FALSE)
 	{
+		m_pCriticalSection = pCriticalSection;
 		/*
 		* Windows Server 2003 and Windows XP:  If the function succeeds, the return value is nonzero.
 		* If the function fails, the return value is zero (0). To get extended error information, call GetLastError.
 		* Starting with Windows Vista, the InitializeCriticalSectionAndSpinCount function always succeeds, even in low memory situations.
 		*/
-		if (!InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount))
+		if (!InitializeCriticalSectionAndSpinCount(m_pCriticalSection, dwSpinCount))
 			return;
 
 		m_bCriticalSectionInitalized = TRUE;
-		EnterCriticalSection(&m_CriticalSection);
+		EnterCriticalSection(m_pCriticalSection);
 	}
 
 	~StackReadWriteLock()
 	{
 		if (m_bCriticalSectionInitalized)
 		{
-			LeaveCriticalSection(&m_CriticalSection);
-			DeleteCriticalSection(&m_CriticalSection);
+			LeaveCriticalSection(m_pCriticalSection);
+			DeleteCriticalSection(m_pCriticalSection);
 			m_bCriticalSectionInitalized = FALSE;
 		}
 	}
 
 private:
-	CRITICAL_SECTION m_CriticalSection;
+	LPCRITICAL_SECTION m_pCriticalSection;
 	BOOL m_bCriticalSectionInitalized;
 };
 
@@ -169,7 +172,7 @@ struct NierVersionInfo
 	}
 
 	BYTE* m_pHash;
-	ULONG m_uHashSize;
+	ULONG_PTR m_uHashSize;
 	NierVersion m_Version;
 	TCHAR* m_szVersion;
 };
@@ -396,8 +399,8 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 
 	float x = width / 2.0f;
 	float y = height / 2.0f;
-	//float flFocalLengthX = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
-	//float flFocalLengthY = (flFocalLengthX * height) / width;
+	//float flFocalLengthY = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
+	//float flFocalLengthX = flFocalLengthX / (width / height);
 
 	//vOut.x = x * (1.f + (vTransform.x / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
 	//vOut.y = y * (1.f - (vTransform.y / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
@@ -411,9 +414,9 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	return true;
 }
 
-static inline unsigned short EntityHandleToListIndex(const EntityHandle handle)
+static inline unsigned short EntityHandleToListIndex(const EntityHandle hEntity)
 {
-	return (unsigned short)((handle & 0x00FFFF00) >> 8); // (unsigned short)(handle >> 8)
+	return (unsigned short)((hEntity & 0x00FFFF00) >> 8); // (unsigned short)(handle >> 8)
 }
 
 static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const unsigned short index)
@@ -421,14 +424,32 @@ static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const 
 	return (index | (pList->m_dwShift << 16)) << 8;
 }
 
-static inline void* GetEntityByHandle(const CEntityList* pList, const EntityHandle handle)
+// NOTE: You should use these functions two get entity's by their handle from now on.
+// It is the proper way to do it, since it doesn't do any filtering.
+static void* GetEntityByHandle(const CEntityList* pList, const EntityHandle hEntity)
 {
-	int idx = EntityHandleToListIndex(handle);
+	int idx = EntityHandleToListIndex(hEntity);
 
-	if (idx > pList->m_dwItems || idx < 0)
+	// Check if the index is valid and the top 24-bits of the handles match
+	if (idx > pList->m_dwItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
 		return NULL;
 
-	return pList->m_pItems[idx].second->m_pEntity;
+	CEntityInfo* pEntityInfo = pList->m_pItems[idx].second;
+
+	if (!pEntityInfo || pEntityInfo->m_Flags & 3)
+		return NULL;
+
+	return pEntityInfo->m_pEntity;
+}
+
+// global func to get all the entity's from handle
+// actual standalone function doesn't exist in the binary no more
+// NOTE: You should use these functions two get entity's by their handle from now on.
+// It is the proper way to do it, since it doesn't do any filtering.
+static void* GetEntityFromHandleGlobal(EntityHandle* phEntity)
+{
+	CEntityInfo* pEntityInfo = GetEntityInfoFromHandle(phEntity);
+	return pEntityInfo ? pEntityInfo->m_pParent : NULL;
 }
 
 // Rebuilt from binary with added functionality

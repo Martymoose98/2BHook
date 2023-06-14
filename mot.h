@@ -1,6 +1,7 @@
 #pragma once
 
 
+#include <immintrin.h>
 #include <vector> //tmp
 #include "Memory.h"
 #include "ReversedStructs.h"
@@ -10,11 +11,10 @@
 #define MOT_MAGIC FOURCC('m', 'o', 't', '\0')
 
 typedef unsigned short uint16;
-typedef unsigned short pghalf;
+typedef unsigned short hfloat;
 typedef unsigned int uint32;
 typedef int int32;
 
-// pghalf - https://github.com/Scobalula/Husky/blob/master/src/Husky/Husky/Utility/HalfFloats.cs
 // https://github.com/Kerilk/noesis_bayonetta_pc/blob/master/bayonetta_pc/MotionBayo.h
 /*
 Found: https://forum.xentax.com/viewtopic.php?f=10&t=16011&sid=110c6732b529049ca7dd0769afd12688&start=15
@@ -106,8 +106,8 @@ struct MotInterpolation2Internal
 
 struct MotInterpolation3Values
 {
-	pghalf p;
-	pghalf dp;
+	hfloat p;
+	hfloat dp;
 };
 
 struct MotInterpolation3
@@ -176,12 +176,12 @@ struct MotInterpolation5Internal
 
 struct MotInterpolation6Values
 {
-	pghalf p;
-	pghalf dp;
-	pghalf m0;
-	pghalf dm0;
-	pghalf m1;
-	pghalf dm1;
+	hfloat p;
+	hfloat dp;
+	hfloat m0;
+	hfloat dm0;
+	hfloat m1;
+	hfloat dm1;
 };
 typedef MotInterpolation6Values MotInterpolation7Values;
 
@@ -229,12 +229,12 @@ struct MotInterpolation7Internal
 
 struct MotInterpolation8Values
 {
-	pghalf p;
-	pghalf dp;
-	pghalf m0;
-	pghalf dm0;
-	pghalf m1;
-	pghalf dm1;
+	hfloat p;
+	hfloat dp;
+	hfloat m0;
+	hfloat dm0;
+	hfloat m1;
+	hfloat dm1;
 };
 
 struct MotInterpolation8Key
@@ -287,3 +287,6 @@ struct MotInterpListEntry
 		MotInterpolation8Internal* pInterp8;
 	};
 };
+
+EXTERN_C float __fastcall ConvertFP16ToFP32(hfloat value);
+extern "C" void ProcessMot(std::vector<MotInterpListEntry>&Interps, CModelWork * pWork, short sFrameCount);

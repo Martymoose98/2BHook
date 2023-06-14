@@ -567,7 +567,7 @@ HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID 
 
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 {
-	CCONSOLE_DEBUG_LOG(ImColor(0x8f20d4), "FUCK");
+	CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "FUCK");
 	g_pConsole->Log(ImColor(0.5f, 0.f, 0.7f), "Script %x loaded!", pScript->m_dwHash);
 	return oMRubyLoadScript(pThis, pScript);
 	//if (pThis->m_pNext)

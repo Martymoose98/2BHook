@@ -75,6 +75,7 @@ typedef ULONGLONG QWORD;
 
 typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
 typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef CEntityInfo*(*GetEntityInfoFromHandleFn)(EntityHandle* pHandle);
 typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
 typedef int(*CItemManager_GetItemIdByNameFn)(CItemManager* pThis, const char* szItemName);			//returns a sItem* maybe?
 typedef const char*(*CItemManager_GetItemNameByIdFn)(CItemManager* pThis, int item_id);	//returns a sItem* maybe?
@@ -164,6 +165,7 @@ typedef DWORD(__stdcall* XInputGetBaseBusInformationFn)(DWORD dwUserIndex, XINPU
 typedef DWORD(__stdcall* XInputGetCapabilitiesExFn)(DWORD a1, DWORD dwUserIndex, DWORD dwFlags, XINPUT_CAPABILITIES_EX *pCapabilities);	// Ordinal = 108
 
 extern CalculateLevelFn CalculateLevel;
+extern GetEntityInfoFromHandleFn GetEntityInfoFromHandle;
 extern GetEntityFromHandleFn GetEntityFromHandle;
 extern GetEntityFromHandleFn GetEntityFromHandle2;
 extern CItemManager_GetItemNameByIdFn ItemManager_GetItemNameById;
@@ -243,6 +245,7 @@ extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern CSceneEntitySystem* g_pSceneEntitySystem;
+extern CNetworkDevice* g_pNetworkDevice;
 extern CMemoryDevice* g_pMemoryDevice;
 extern BYTE* g_pDecreaseHealth[2];
 extern BYTE* g_pAntiVSync;

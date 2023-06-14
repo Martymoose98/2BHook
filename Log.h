@@ -88,7 +88,7 @@ public:
 		va_start(Args, szFmt);
 		Write(stdout, LIGHT_GREEN, BLACK, szFunction, szFmt, Args);
 		va_end(Args);
-	}
+	}	
 
 	static void Warn(const char* szFunction, const char* szFmt, ...)
 	{
@@ -99,12 +99,12 @@ public:
 		va_end(Args);
 	}
 
-	static void Error(const char* szFunction, const char* Fmt, ...)
+	static void Error(const char* szFunction, const char* szFmt, ...)
 	{
 		va_list Args;
 
-		va_start(Args, Fmt);
-		Write(stderr, LIGHT_RED, BLACK, szFunction, Fmt, Args);
+		va_start(Args, szFmt);
+		Write(stderr, LIGHT_RED, BLACK, szFunction, szFmt, Args);
 		va_end(Args);
 	}
 
@@ -139,7 +139,9 @@ public:
 
 	static void SetConsoleColors(enum ConsoleColors Foreground, enum ConsoleColors Background)
 	{
-		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Foreground | (Background << 4));
+		CONSOLE_SCREEN_BUFFER_INFO csbi;
+		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (csbi.wAttributes & 0xFF00) | Foreground | (Background << 4));
 	}
 
 	static void GetConsoleColors(enum ConsoleColors& Foreground, enum ConsoleColors& Background)
@@ -183,14 +185,14 @@ public:
 	{
 		const static char animations[4] = { '|', '/', '-', '\\' };
 		INT iSequence = 0;
-		INT iLength = strlen(szIn);
+		SIZE_T iLength = strlen(szIn);
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
 		COORD now;
 
 		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 		now = csbi.dwCursorPosition;
 
-		for (INT i = 0; i < iLength; )
+		for (SIZE_T i = 0; i < iLength; )
 		{
 			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 			now = csbi.dwCursorPosition;
