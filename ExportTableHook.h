@@ -16,6 +16,10 @@ public:
 	const void* Hook(const char* szModule, const char* szFunction)
 	{
 		PIMAGE_DOS_HEADER pDosHeader = (PIMAGE_DOS_HEADER)GetModuleHandleA(szModule);
+
+		if (!pDosHeader)
+			return NULL;
+
 		PIMAGE_DATA_DIRECTORY pExportDataDirectory = &((PIMAGE_NT_HEADERS)((ULONG_PTR)pDosHeader + pDosHeader->e_lfanew))->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
 		PIMAGE_EXPORT_DIRECTORY pExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((ULONG_PTR)pDosHeader + pExportDataDirectory->VirtualAddress);
 		DWORD dwExportDescriptorCount = pExportDataDirectory->Size / sizeof(IMAGE_EXPORT_DIRECTORY);
@@ -23,46 +27,28 @@ public:
 		PWORD pAddressOfOrdinals = (PWORD)((ULONG_PTR)pDosHeader + pExportDirectory->AddressOfNameOrdinals);
 		PDWORD pAddressOfNames;
 
-		for (DWORD index = 0; index < dwExportDescriptorCount; ++index)
+		for (DWORD dwIndex = 0; dwIndex < dwExportDescriptorCount; ++dwIndex)
 		{
 			if ((ULONG_PTR)szFunction > MAXWORD)
 			{
 				pAddressOfNames = (PDWORD)((ULONG_PTR)pDosHeader + pExportDirectory->AddressOfNames);
 
-				for (DWORD hint = 0; hint < pExportDirectory->NumberOfNames; ++hint)
+				for (DWORD dwHint = 0; dwHint < pExportDirectory->NumberOfNames; ++dwHint)
 				{
-					LPSTR szFunctionName = (LPSTR)((ULONG_PTR)pDosHeader + pAddressOfNames[hint]);
+					LPSTR szFunctionName = (LPSTR)((ULONG_PTR)pDosHeader + pAddressOfNames[dwHint]);
 
 					if (!strcmp(szFunctionName, szFunction))
-					{
-						m_pdwFuncRVA = &pAddressOfFunctions[pAddressOfOrdinals[hint]];
-						m_dwNewFunctionRVA = (ULONG_PTR)m_pNewFunction - (ULONG_PTR)pDosHeader;
-						m_dwOrginalFunctionRVA = pAddressOfFunctions[pAddressOfOrdinals[hint]];
-						m_pOriginalFunction = (LPCVOID)((ULONG_PTR)pDosHeader + m_dwOrginalFunctionRVA);
-						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
-						pAddressOfFunctions[pAddressOfOrdinals[hint]] = m_dwNewFunctionRVA;
-						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
-						return m_pOriginalFunction;
-					}
+						return InitHook(pDosHeader, pAddressOfFunctions, pAddressOfOrdinals, dwHint);
 				}
 			}
-			else 
+			else
 			{
-				for (DWORD hint = 0; hint < pExportDirectory->NumberOfNames; ++hint)
+				for (DWORD dwHint = 0; dwHint < pExportDirectory->NumberOfNames; ++dwHint)
 				{
-					WORD ordinal = (WORD)(pAddressOfOrdinals[hint] + pExportDirectory->Base);
-				
+					WORD ordinal = (WORD)(pAddressOfOrdinals[dwHint] + pExportDirectory->Base);
+
 					if (IMAGE_ORDINAL((ULONG_PTR)szFunction) == ordinal)
-					{
-						m_pdwFuncRVA = &pAddressOfFunctions[pAddressOfOrdinals[hint]];
-						m_dwNewFunctionRVA = (ULONG_PTR)m_pNewFunction - (ULONG_PTR)pDosHeader;
-						m_dwOrginalFunctionRVA = pAddressOfFunctions[pAddressOfOrdinals[hint]];
-						m_pOriginalFunction = (LPCVOID)((ULONG_PTR)pDosHeader + m_dwOrginalFunctionRVA);
-						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
-						pAddressOfFunctions[pAddressOfOrdinals[hint]] = m_dwNewFunctionRVA;
-						VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
-						return m_pOriginalFunction;
-					}
+						return InitHook(pDosHeader, pAddressOfFunctions, pAddressOfOrdinals, dwHint);
 				}
 			}
 		}
@@ -73,19 +59,33 @@ public:
 	{
 		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
 		*m_pdwFuncRVA = m_dwNewFunctionRVA;
-		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
+		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, &m_dwOldProtect);
 	}
 
 	void Unhook()
 	{
 		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
 		*m_pdwFuncRVA = m_dwOrginalFunctionRVA;
-		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, NULL);
+		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, &m_dwOldProtect);
 	}
 
 	inline LPCVOID GetOriginalFunction() const
 	{
 		return this->m_pOriginalFunction;
+	}
+
+private:
+
+	inline LPCVOID InitHook(PIMAGE_DOS_HEADER pDosHeader, PDWORD pAddressOfFunctions, PWORD pAddressOfOrdinals, DWORD dwHint)
+	{
+		m_pdwFuncRVA = &pAddressOfFunctions[pAddressOfOrdinals[dwHint]];
+		m_dwNewFunctionRVA = (ULONG_PTR)m_pNewFunction - (ULONG_PTR)pDosHeader;
+		m_dwOrginalFunctionRVA = pAddressOfFunctions[pAddressOfOrdinals[dwHint]];
+		m_pOriginalFunction = (LPCVOID)((ULONG_PTR)pDosHeader + m_dwOrginalFunctionRVA);
+		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), PAGE_READWRITE, &m_dwOldProtect);
+		pAddressOfFunctions[pAddressOfOrdinals[dwHint]] = m_dwNewFunctionRVA;
+		VirtualProtect(m_pdwFuncRVA, sizeof(DWORD), m_dwOldProtect, &m_dwOldProtect);
+		return m_pOriginalFunction;
 	}
 
 private:
