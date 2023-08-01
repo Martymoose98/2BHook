@@ -3471,6 +3471,7 @@ struct SceneStateHead
 
 // this has a doubly linked list for sure prbably a different struct tho
 // that is 32 bytes that is the head
+// RED BLACK TREE iirc
 struct SceneState
 {
 	SceneStateHead* m_pHead;	//0x0000

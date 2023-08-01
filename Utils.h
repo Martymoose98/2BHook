@@ -71,6 +71,11 @@ struct StackReadWriteLock
 		}
 	}
 
+	// Delete Copy Constructor
+	StackReadWriteLock(const StackReadWriteLock&) = delete;
+
+	StackReadWriteLock& operator=(const StackReadWriteLock&) = delete;
+
 private:
 	LPCRITICAL_SECTION m_pCriticalSection;
 	BOOL m_bCriticalSectionInitalized;
