@@ -107,9 +107,9 @@ typedef ULONGLONG QWORD;
 //
 //  EntityHandles are 32 bit values laid out as follows:
 //
-//   SSSSSSSS IIIIIIIIIIIIIIII RRRRRRRR
-//  +-------------------------+--------+
-//  | Shift  |     Index      |        |
+//   RRRRRRRR IIIIIIIIIIIIIIII SSSSSSSS
+//  +--------+----------------+--------+
+//  |        |      Index     | Shift  |
 //  +--------+----------------+--------+
 //
 //  where
