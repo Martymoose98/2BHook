@@ -2,7 +2,7 @@
 #include <Windows.h>
 #include <stdio.h>
 
-//#define VERBOSE		// helps with debugging for retards
+//#define VERBOSE		// Useless TODO and FIXME marcos superceeded by vs tasklist
 #define TODO_CLICKABLE
 #define FIXME_CLICKABLE
 
@@ -14,7 +14,7 @@
 #define MAKE_STRING(x) _MAKE_STRING(x)
 #endif // !MAKE_STRING
 
-// Move todo & fixme macros out of Log.h!! (you lazy fuck)
+// Move todo & fixme macros out of Log.h!!
 
 #ifndef TODO
 #ifndef TODO_CLICKABLE
