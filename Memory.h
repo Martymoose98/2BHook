@@ -13,8 +13,8 @@
 #define GetBits(x) (INRANGE(((x) & (~0x20)), 'A', 'F') ? (((x) & (~0x20)) - 'A' + 0xA) : (INRANGE((x), '0', '9') ? (x) - '0' : 0))
 #define GetByte(x) ((GetBits((x)[0]) << 4) | GetBits((x)[1]))
 
-#define MakePtr32(cast, ptr, rva) ((cast)((BYTE* __ptr32)(ptr) + (LONG)(rva)))
-#define MakePtr64(cast, ptr, rva) ((cast)((BYTE* __ptr64)(ptr) + (LONG)(rva)))
+#define MakePtr32(type, ptr, rva) ((type)((BYTE* __ptr32)(ptr) + (LONG)(rva)))
+#define MakePtr64(type, ptr, rva) ((type)((BYTE* __ptr64)(ptr) + (LONG)(rva)))
 
 #define FOURCC(a, b, c, d) ( (DWORD)(((DWORD)((BYTE)a)) | (((DWORD)((BYTE)b)) << 8) | (((DWORD)((BYTE)c)) << 16) | (((DWORD)((BYTE)d)) << 24)) )
 #define EIGHTCC(a, b, c, d, e, f, g, h) ( (QWORD)(((QWORD)((BYTE)a)) | (((QWORD)((BYTE)b)) << 8) | (((QWORD)((BYTE)c)) << 16) | (((QWORD)((BYTE)d)) << 24) | (((QWORD)((BYTE)e)) << 32) | (((QWORD)((BYTE)f)) << 40) | (((QWORD)((BYTE)g)) << 48) | (((QWORD)((BYTE)h)) << 56)) )

@@ -8,10 +8,8 @@ void* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
 void* GetEntityFromHandleGlobal(EntityHandle* phEntity);
 int GetModelMeshIndex(CModelWork* pWork, const char* szMesh);
 
-class Features
+namespace Features
 {
-public:
-
 	static void ApplyHealthMods(void)
 	{
 		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
@@ -309,12 +307,38 @@ public:
 		PlayAnimationEx(g_pCamera->m_pCamEntity);
 	}
 
-	static void BuffEnemies(void)
+	static void SetEnemyLevel(void* pEnemy, int iLevel)
 	{
-		if (Vars.Gameplay.bLevelBuffMode)
-			BuffEnemiesAbsolute();
-		else
-			BuffEnemiesTolerance();
+		if (!pEnemy)
+			return;
+
+		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
+		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+
+		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
+		{
+			int* pHealth = MakePtr(int*, pEnemy, 0x858);
+			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
+			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
+			*pLevel = pProperLevel->m_iLevel;
+			*pHealth = pProperLevel->m_iHealth;
+			*pMaxHealth = pProperLevel->m_iHealth;
+		}
+	}
+
+	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
+	{
+		if (!pEnemy)
+			return;
+
+		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+
+		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+		{
+			SetEnemyLevel(pEnemy, RandomInt(iMinLevel, iMaxLevel));
+
+			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
+		}
 	}
 
 	static void BuffEnemiesAbsolute(void)
@@ -338,38 +362,12 @@ public:
 			BalanceEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
 	}
 
-	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
+	static void BuffEnemies(void)
 	{
-		if (!pEnemy)
-			return;
-			
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
-		{
-			SetEnemyLevel(pEnemy, RandomInt(iMinLevel, iMaxLevel));
-
-			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
-		}
-	}
-
-	static void SetEnemyLevel(void* pEnemy, int iLevel)
-	{
-		if (!pEnemy)
-			return;
-		
-		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
-		{
-			int* pHealth = MakePtr(int*, pEnemy, 0x858);
-			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);		
-			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
-			*pLevel = pProperLevel->m_iLevel;
-			*pHealth = pProperLevel->m_iHealth;
-			*pMaxHealth = pProperLevel->m_iHealth;
-		}
+		if (Vars.Gameplay.bLevelBuffMode)
+			BuffEnemiesAbsolute();
+		else
+			BuffEnemiesTolerance();
 	}
 
 	static void AddPod(int pod)

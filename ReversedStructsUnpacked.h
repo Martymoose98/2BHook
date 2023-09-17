@@ -570,25 +570,6 @@ struct CEntityInfo
 IS_OFFSET_CORRECT(CEntityInfo, m_pParent, 0x60);
 IS_OFFSET_CORRECT(CEntityInfo, m_hUnk, 0xB8);
 
-struct CEntityListEntry
-{
-	EntityHandle m_hEntity;
-	CEntityInfo* m_pInfo;
-};
-
-/*
-Address = 14160DF88
-*/
-struct CEntityList
-{
-	DWORD m_dwItems;								//0x0000
-	DWORD m_dwSize;									//0x0004
-	DWORD m_dwBase;									//0x0008 | What the indices start at for handles
-	DWORD m_dwShift;								//0x000C
-	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
-	CReadWriteLock m_Lock;							//0x0018
-};
-
 // they might be Vector4's
 struct CAxisAlignedBoundingBox
 {
@@ -2298,6 +2279,42 @@ IS_OFFSET_CORRECT(CCameraGame, m_vViewangles, 0x3F0);
 IS_OFFSET_CORRECT(CCameraGame, m_flUnknown2, 0x884C);
 IS_OFFSET_CORRECT(CCameraGame, m_flUnknown, 0x88F0);
 
+struct CEntityListEntry
+{
+	EntityHandle m_hEntity;
+	CEntityInfo* m_pInfo;
+};
+
+/*
+Address = 14160DF88
+*/
+struct CEntityList
+{
+	DWORD m_dwItems;								//0x0000
+	DWORD m_dwSize;									//0x0004
+	DWORD m_dwBase;									//0x0008 | What the indices start at for handles
+	DWORD m_dwShift;								//0x000C
+	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
+	CReadWriteLock m_Lock;							//0x0018
+};
+
+struct CAnimationListEntry
+{
+	EntityHandle m_hAnimationNode;
+	Animation::Motion::NodePlay* m_pNode; //  Animation::Motion::Node
+};
+
+struct __declspec(align(8)) CAnimationList
+{
+	uint32 m_uSize;
+	uint32 m_uItems;
+	uint32 m_uSlot;
+	uint32 m_uShift;
+	CAnimationListEntry* m_pEntries;
+	CReadWriteLock m_Lock;
+};
+
+
 // Found by Dennis
 // Address = 0x14160EB40
 struct Sun
@@ -2745,16 +2762,6 @@ public:
 	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0088
 };
 IS_OFFSET_CORRECT(CDisplay, m_pWindowedSwapChain, 0x68);
-
-struct CHeapInfo
-{
-	CHeapInstance* m_pHeap;		//0x00
-	CHeapInfo* m_pParentInfo;	//0x08 | parents
-	CHeapInfo* m_pChildInfo;	//0x10 | children
-	CHeapInfo* m_pNext;			//0x18
-	CHeapInfo* m_pPrevious;		//0x20
-	BYTE gap28[8];				//0x28
-};
 
 struct CConstantBufferInfo;
 
@@ -3572,30 +3579,78 @@ struct CreateContext
 	BOOL m_bDataExists;
 };
 
-struct HeapThing
-{
-	void* m_pHeap;
-	BOOL m_bFlag;  // ?????
-};
-
 struct HeapAlloc_t
 {
 	LPVOID Pointer;
 	BOOL Succeeded;
 };
 
+/*
+* Size of struct is 0x40 (64) bytes
+*/
+struct CHeapInfo
+{
+	CHeapInstance* m_pHeap;				//0x0000
+	struct CHeapInfo* m_pParentInfo;	//0x0008
+	struct CHeapInfo* m_pChildInfo;		//0x0010
+	struct CHeapInfo* m_pPrevious;		//0x0018 could be next then prev
+	struct CHeapInfo* m_pNext;			//0x0020
+	QWORD m_uPartitionSize;				//0x0028
+	QWORD m_qwHeapSize;					//0x0030
+	DWORD m_uIndex;						//0x0038
+};
+
+/*
+* Size of struct is 0x40 (64) bytes (+8) maybe?
+*/
 struct CHeapAllocInfo
 {
-	UINT m_uIndex;
-	UINT m_uUnknown;
-	CHeapInstance* m_pParent2; // might be child idk
-	CHeapInstance* m_pParent;
-	CHeapAllocInfo* m_pNext;
-	CHeapAllocInfo* m_pPrevious;
-	CHeapInstance* m_pHeap;
-	SIZE_T m_cbAlignedSize;
-	SIZE_T m_cbSize;
+	UINT m_uIndex;					//0x0000
+	UINT m_uUnknown;				//0x0004
+	CHeapInstance* m_pParent;		//0x0008 might be child idk
+	CHeapInstance* m_pChild;		//0x0010
+	CHeapAllocInfo* m_pNext;		//0x0018
+	CHeapAllocInfo* m_pPrevious;	//0x0020
+	CHeapInfo* m_pHeapInfo;			//0x0028
+	SIZE_T m_cbAlignedSize;			//0x0030
+	SIZE_T m_cbSize;				//0x0038
 	__int64* m_pStruct;
+};
+
+/*
+Size of struct is 0x98 (152) bytes
+*/
+struct CHeapVramInstance
+{
+	enum eAllocFlags
+	{
+		ALLOC_FLAG_PARTITION_INFO = 1,
+		ALLOC_FLAG_NO_ALLOC = 2, // modify the struct pointers but don't allocate???
+		UNK4 = 4
+	};
+
+	virtual void dtor(char a2);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual CHeapInfo* fn2(const void* pMemoryPool);
+	virtual QWORD GetPartitionSize(const void* pMemoryPool);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
+
+	CReadWriteLock m_Lock;					//0x0008
+	CHeapInfo* m_pParentInfo;				//0x0038
+	CHeapInfo* m_pInfo;						//0x0040
+	CHeapAllocInfo* m_pPrevPartition;		//0x0048 | void*
+	CHeapAllocInfo* m_pNextPartition;		//0x0050 | void*
+	QWORD m_qwHeapFlags;					//0x0058
+	void* m_pMemoryPool;					//0x0060
+	CHeapInfo** m_pHeapInfos;				//0x0068
+	CHeapAllocInfo* m_pAllocationInfo;		//0x0070		
+	QWORD m_qwMemoryAlignment;				//0x0078
+	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
+	DWORD dword84;							//0x0084
+	DWORD m_dwReferenceCount;				//0x0088
+	int m_nRootHeaps;						//0x008C
+	int m_nHeaps;							//0x0090
 };
 
 /*
@@ -3605,35 +3660,41 @@ struct CHeapInstance
 {
 	enum eAllocFlags
 	{
-		UNK1 = 1,
+		ALLOC_ALIGN = 1,
 		UNK2 = 2,
 		UNK4 = 4
 	};
 
-	virtual void fn0();
-	virtual BOOL SetChildInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int a4);
-	virtual void fn2();
-	virtual void fn3();
-	virtual CHeapAllocInfo* Alloc(__int64 nBytes, unsigned __int64 align, int flags);
-	virtual void fn5();
+	virtual void dtor(char a2);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual CHeapAllocInfo* fn2(const void* pMemoryPool);
+	virtual QWORD GetPartitionSize(const void* pMemoryPool);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
 
 	CReadWriteLock m_Lock;					//0x0008
 	CHeapInfo* m_pParentInfo;				//0x0038
 	CHeapInfo* m_pInfo;						//0x0040
-	QWORD m_pUnknowns;						//0x0048
-	CHeapInfo* m_pChildren;					//0x0050
-	QWORD m_qword60[2];						//0x0058
-	CHeapInfo* m_pHeapInfos;				//0x0068
+	CHeapAllocInfo* m_pPrevPartition;		//0x0048 | void*
+	CHeapAllocInfo* m_pNextPartition;		//0x0050 | void*
+	QWORD m_qwHeapFlags;					//0x0058
+	void* m_pMemoryPool;					//0x0060
+	CHeapInfo** m_pHeapInfos;				//0x0068
 	CHeapAllocInfo* m_pAllocationInfo;		//0x0070		
 	QWORD m_qwMemoryAlignment;				//0x0078
 	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
-	DWORD dword88;							//0x0084
+	DWORD dword84;							//0x0084
 	DWORD m_dwReferenceCount;				//0x0088
-	DWORD m_nDwords;						//0x008C
-	DWORD m_nHeaps;							//0x0090
+	int m_nRootHeaps;						//0x008C
+	int m_nHeaps;							//0x0090
 };
 IS_SIZE_CORRECT(CHeapInstance, 0x98);
 
+//	Mem pool start
+//  4 * nRootHeaps
+//	8 * nHeaps
+//  Heap
+//
 struct CMemoryDevice
 {
 	virtual __int64 dtor();
@@ -3643,7 +3704,7 @@ struct CMemoryDevice
 
 	CReadWriteLock m_Lock;		//0x08
 	CHeapInstance m_DeviceHeap;	//0x38
-	void* m_pMemory;			//0xC8 start CHeapInfo pretty sure
+	void* m_pMemoryPool;		//0xC8 start CHeapInfo pretty sure
 	CHeapInfo* m_pRootInfo;		//0xD0 | points to end of list (use previous link to traverse)
 	CHeapInfo* m_punk;			//0xD8
 	BOOL m_bHeapAllocated;		//0xE4

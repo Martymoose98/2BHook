@@ -473,6 +473,7 @@ void LogOffsets(void)
 	LOG_OFFSET("GetEntityInfoFromHandle", GetEntityInfoFromHandle);
 	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
 	LOG_OFFSET("GetItemNameById", ItemManager_GetItemNameById);
+	LOG_OFFSET("CalculateLevel", CalculateLevel);
 	LOG_OFFSET("GetItemIdByName", ItemManager_GetItemIdByName);
 	LOG_OFFSET("SetLocalPlayer", SetLocalPlayer);
 	LOG_OFFSET("UnlockAchievement", UnlockAchievement);
@@ -515,8 +516,6 @@ void LogOffsets(void)
 	LOG_OFFSET("CGameCamera", g_pCamera);
 	LOG_OFFSET("CNetworkDevice", g_pNetworkDevice);
 	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
-	LOG_OFFSET("CalculateLevel", CalculateLevel);
-	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
 	LOG_OFFSET("DataDirectory", g_szDataDirectoryPath);
 	LOG_OFFSET("Money", g_piMoney);
 	LOG_OFFSET("Experience", g_piExperience);

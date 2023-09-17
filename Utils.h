@@ -942,14 +942,14 @@ static HRESULT MyPreloadModel(int objectId)
 	ObjectIdConvert* pConvert;
 	ObjReadSystem::Work* pWork;
 	ObjReadSystem::Work::Desc* pDesc;
-	HeapThing lmao;
+	HeapAlloc_t lmao;
 
 	if (ObjectIdToObjectName(szObjectName, ARRAYSIZE(szObjectName), objectId, &pConvert))
 	{
 		QueryHeap(&lmao, objectId, 1);
 		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dtt");
 		pWork = GetWork(objectId);
-		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.m_pHeap, lmao.m_bFlag, pWork);
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
 
 		if (pDesc)
 		{
@@ -959,7 +959,7 @@ static HRESULT MyPreloadModel(int objectId)
 		}
 
 		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dat");
-		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.m_pHeap, lmao.m_bFlag, pWork);
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
 
 		if (pDesc)
 		{

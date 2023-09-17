@@ -124,7 +124,7 @@ typedef __int64(*CreateUIFromIdFn)(int id);
 typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
-typedef HeapThing*(*QueryHeapFn)(HeapThing* pResult, int objectid, int a3); // or void i guess
+typedef HeapAlloc_t*(*QueryHeapFn)(HeapAlloc_t* pResult, int objectid, int a3); // or void i guess
 typedef ObjReadSystem::Work*(*GetWorkFn)(int objectid);
 typedef ObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, ObjReadSystem::Work* pWork);
 typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int objectId);

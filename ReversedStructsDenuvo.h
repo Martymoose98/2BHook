@@ -3132,7 +3132,7 @@ struct CreateContext
 	BOOL m_bDataExists;
 };
 
-struct HeapThing
+struct HeapAlloc_t
 {
 	void* m_pHeap;
 	BOOL m_bFlag;  // ?????
@@ -3171,7 +3171,7 @@ struct CHeapInstance
 	};
 
 	virtual void fn0();
-	virtual BOOL SetChildInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int a4);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int a4);
 	virtual void fn2();
 	virtual void fn3();
 	virtual CHeapAllocInfo* Alloc(__int64 nBytes, unsigned __int64 align, int flags);
@@ -3203,7 +3203,7 @@ struct CMemoryDevice
 
 	CReadWriteLock m_Lock;		//0x08
 	CHeapInstance m_DeviceHeap;	//0x38
-	void* m_pMemory;			//0xC8 start CHeapInfo pretty sure
+	void* m_pMemoryPool;			//0xC8 start CHeapInfo pretty sure
 	CHeapInfo* m_pRootInfo;		//0xD0 | points to end of list (use previous link to traverse)
 	CHeapInfo* m_punk;			//0xD8
 	BOOL m_bHeapAllocated;		//0xE4

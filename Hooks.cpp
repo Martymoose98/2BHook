@@ -810,11 +810,6 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 	return ((OleLoadPictureFn)(g_pOleLoadPictureHook->GetOriginalFunction()))(lpStream, lSize, fRunmode, riid, lplpvObj);
 }
 
-BOOL hkCMemoryDeviceHeapAlloc(CMemoryDevice* pThis, CHeapInstance** ppHeap, SIZE_T nByteSize)
-{
-	return ((BOOL(*)(CMemoryDevice*, CHeapInstance**, SIZE_T))(g_pMemoryDeviceHook->GetHeapHook().GetFunctionAddress(1)))(pThis, ppHeap, nByteSize);
-}
-
 void hkSaveFileIO(CSaveDataDevice* pSavedata)
 {
 	if (!pSavedata)
