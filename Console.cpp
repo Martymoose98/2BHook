@@ -146,10 +146,6 @@ void CConsole::Draw(const char* szTitle)
 		}
 	}
 
-	(g_pCamera) = (CCameraGame*)((uintptr_t)g_pCamera ^ (uintptr_t)g_pCamera);
-
-	CCameraGame* crash = CONTAINING_RECORD(g_pCamera, CCameraGame, m_vPosition);
-
 	ImGui::PopTextWrapPos();
 	ImGui::EndChild();
 
