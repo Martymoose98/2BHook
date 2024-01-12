@@ -1,7 +1,7 @@
 #pragma once
 
 #include <vector>
-#include "VirtualTableHook.h"
+#include <Fluorine\VirtualTableHook.h>
 #include "ReversedStructs.h"
 
 BOOL hkCHeapInstanceSetHeapInfo(CHeapInstance* pThis, CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);

@@ -6,8 +6,8 @@
 #include "cpk.h"
 #include "mot.h"
 #include "Hooks.h"
-#include "VirtualTableHook.h"
-#include "ImportTableHook.h"
+#include <Fluorine\VirtualTableHook.h>
+#include <Fluorine\ImportTableHook.h>
 #include <iostream>
 
 #pragma comment(lib, "d3d11.lib")

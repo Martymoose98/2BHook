@@ -7,8 +7,8 @@
 #include <vector> //should be temp
 
 #include "ReversedStructs.h"
-#include "VirtualTableHook.h"
-#include "ImportTableHook.h"
+#include <Fluorine\VirtualTableHook.h>
+#include <Fluorine\ImportTableHook.h>
 #include "MemoryDeviceHook.h"
 
 #define MAX_LEVELS 99
