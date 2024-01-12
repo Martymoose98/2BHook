@@ -81,8 +81,6 @@ typedef struct Variables_t
 	struct Menu_t
 	{
 		bool bOpened;
-		char szAdapterUtf8[128 * 4];
-		char szOutputUtf8[32 * 4];
 		bool bIgnoreInputWhenOpened;
 
 		struct Input_t
@@ -91,37 +89,11 @@ typedef struct Variables_t
 			XINPUT_STATE emulate;
 			LPDIDATAFORMAT pKeyboardFormat;	// c_dfDIKeyboard
 			LPDIDATAFORMAT pMouseFormat;	// c_dfDIMouse2
-			BOOLEAN KeyboardState[256];
-			BOOLEAN OldKeyboardState[256];
-			DIMOUSESTATE2 MouseState;
-			DIMOUSESTATE2 OldMouseState;
+			
+			
 		} Input;
 
-		struct Config_t
-		{
-			PWIN32_FIND_DATA_LIST pHead;
-			INT iSelectedConfig;
-			TCHAR szName[MAX_PATH];
-		} Config;
 	} Menu;
-
-	struct Keybinds_t
-	{
-		Keybinds_t() {}
-		
-		KeybindToggleable OpenMenu;
-		KeybindToggleable Firstperson;
-		KeybindFunctional<void> ChangePlayer;
-		KeybindFunctional<void> Airstuck;
-		KeybindFunctional<void> DuplicateBuddy;
-		KeybindFunctional<void> PlayAnimation;
-		KeybindFunctional<void, eTransformMatrix, float> TeleportForward;
-		KeybindFunctional<void, eTransformMatrix, float> TeleportBackward;
-		KeybindFunctional<void, eTransformMatrix, float> TeleportLeft;
-		KeybindFunctional<void, eTransformMatrix, float> TeleportRight;
-		KeybindDynamicToggleable ModelGravity;
-		KeybindDynamicIncrement<float> ModelYControl;
-	} Keybinds;
 
 	struct Animation
 	{

@@ -1,13 +1,12 @@
 #pragma once
 #include <dbghelp.h>
 #include <d3dcompiler.h>
+#include <wincodec.h>
 #include <Shlobj.h>
 #include <ntstatus.h>
 
 #include "Globals.h"
 #include "Matrix4x4.h"
-#include "Console.h"
-#include "Configuration.h"
 
 #define STACK_TIMER(Name) StackTimer Name(__FUNCTION__)
 #define CS_LOCK(pCriticalSection) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)(pCriticalSection)
@@ -348,14 +347,18 @@ static NierVersionInfo* QueryNierBinaryVersion(void)
 
 static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
 {
-	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8);
-	EnterCriticalSection((LPCRITICAL_SECTION)(rbx + 0x150));
+	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8); // CONTAINING_RECORD(iface, IDirectInputDeviceImpl, IDirectInputDevice8A_iface);
+	LPCRITICAL_SECTION pCriticalSection = (LPCRITICAL_SECTION)(rbx + 0x150);
+
+	EnterCriticalSection(pCriticalSection);
 }
 
 static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
 {
 	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8);
-	LeaveCriticalSection((LPCRITICAL_SECTION)(rbx + 0x150));
+	LPCRITICAL_SECTION pCriticalSection = (LPCRITICAL_SECTION)(rbx + 0x150);
+
+	LeaveCriticalSection(pCriticalSection);
 }
 
 // https://stackoverflow.com/questions/46182845/field-of-view-aspect-ratio-view-matrix-from-projection-matrix-hmd-ost-calib
@@ -431,7 +434,7 @@ static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const 
 
 // NOTE: You should use these functions two get entity's by their handle from now on.
 // It is the proper way to do it, since it doesn't do any filtering.
-static void* GetEntityByHandle(const CEntityList* pList, const EntityHandle hEntity)
+static CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, const EntityHandle hEntity)
 {
 	int idx = EntityHandleToListIndex(hEntity);
 
@@ -451,7 +454,7 @@ static void* GetEntityByHandle(const CEntityList* pList, const EntityHandle hEnt
 // actual standalone function doesn't exist in the binary no more
 // NOTE: You should use these functions two get entity's by their handle from now on.
 // It is the proper way to do it, since it doesn't do any filtering.
-static void* GetEntityFromHandleGlobal(EntityHandle* phEntity)
+static CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle* phEntity)
 {
 	CEntityInfo* pEntityInfo = GetEntityInfoFromHandle(phEntity);
 	return pEntityInfo ? pEntityInfo->m_pParent : NULL;
@@ -688,7 +691,7 @@ static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 	}
 }
 
-static CMesh2* GetModelMesh(CModelWork* pWork, const char* szMesh)
+static CMeshPart* GetModelMesh(CModelWork* pWork, const char* szMesh)
 {
 	for (int i = 0; i < pWork->m_nMeshes; ++i)
 		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
@@ -697,7 +700,7 @@ static CMesh2* GetModelMesh(CModelWork* pWork, const char* szMesh)
 	return NULL;
 }
 
-static int GetModelMeshIndex(CModelWork* pWork, const char* szMesh)
+static int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh)
 {
 	for (int i = 0; i < pWork->m_nMeshes; ++i)
 		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
@@ -746,12 +749,53 @@ static void SwapTexture(unsigned int srcid, CTexture* pReplace)
 		pRes->m_pTexture = pReplace;
 }
 
-FIXME("This is for sure broken on new version. Adapt to use the game's allocation routines to avoid crashes on freeing resources")
-static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& desc)
+static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
+{
+	IWICImagingFactory* pFactory;
+	IWICFormatConverter* pConverter;
+	IWICBitmapDecoder* pDecoder;
+	IWICBitmapFrameDecode* pFrame;
+	WICPixelFormatGUID Format;
+
+	unsigned int w, h, uFrames, * rgba;
+
+	HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, (void**)&pFactory);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pFactory->CreateDecoderFromFilename(szFile, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pDecoder->GetFrameCount(&uFrames);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pDecoder->GetFrame(0, &pFrame);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pFrame->GetPixelFormat(&Format);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = pFrame->GetSize(&w, &h);
+
+
+	return hr;
+}
+
+// FIXME: This is for sure broken on new version. Adapt to use the game's allocation routines to avoid crashes on freeing resources
+static CTargetTexture* CreateTextureR(const char* szFile, CTextureDescription& Desc)
 {
 	CTargetTexture* pTexture = NULL;
 
-	ZeroMemory(&desc, sizeof(CTextureDescription));
+	ZeroMemory(&Desc, sizeof(CTextureDescription));
 
 	HANDLE hFile = CreateFileA(szFile, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 
@@ -764,9 +808,9 @@ static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& de
 		{
 			TextureFile* pFile = (TextureFile*)MapViewOfFile(hMapping, FILE_MAP_READ, 0, 0, dwFileSize);
 
-			desc.m_pDDS = pFile;
-			desc.m_uTextureSize = dwFileSize;
-			desc.dword18 = 2;
+			Desc.m_pDDS = pFile;
+			Desc.m_uTextureSize = dwFileSize;
+			Desc.dword18 = 2;
 
 			pTexture = (CTargetTexture*)malloc(sizeof(CTargetTexture)); //AllocHeapMemoryFn or ReserveMemory
 
@@ -777,15 +821,13 @@ static CTargetTexture* CreateTexture(const char* szFile, CTextureDescription& de
 				// old: 0x140E9FA38 | base + 0xE9FA38
 				// new sig: 48 89 58 50 48 8D 05 ? ? ? ? 
 				// new: 0x140DB1DE8 | base + 0xDB1DE8
-				//pTexture->m_vtbl = (void*)g_pMemory->FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
-				pTexture->m_vtbl = (void*)0x140E9FA38;
+				pTexture->m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
 
-				// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
 				// old: 0x140934FE0
+				// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
 				// new sig: 48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6
-				static CreateTextureFn CreateTexture = (CreateTextureFn)FindPattern(NULL, "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6");
 
-				if (!((CreateTextureFn)(0x140934FE0))(0, pTexture, &desc))
+				if (!CreateTexture(g_pGraphics, pTexture, &Desc))
 					return NULL;
 			}
 		}
@@ -802,7 +844,7 @@ static void DeleteTexture(CTargetTexture* pTexture, CTextureDescription& desc)
 	UnmapViewOfFile(desc.m_pDDS);
 }
 
-FIXME("this is for sure broken on new version. Probably should also be using nier's memory allocation routines")
+//FIXME("this is for sure broken on new version. Probably should also be using nier's memory allocation routines")
 static void CreateMaterial(
 	const char* szName,
 	const char* szShader,
@@ -828,12 +870,15 @@ static void CreateMaterial(
 	for (int i = 0; i < nTextures; ++i)
 	{
 		TextureIds[i] = HashStringCRC32(szTextureNames[i], strlen(szTextureNames[i]));
-
-		Textures[i].m_vtbl = (void*)0x140E9FA38; // new: 0x140DB1DE8 | base + 0xDB1DE8
+		// old sig: 33 D2 48 8D 05 ? ? ? ? 48 89 51 58
+		// old: 0x140E9FA38 | base + 0xE9FA38
+		// new sig: 48 89 58 50 48 8D 05 ? ? ? ? 
+		// new: 0x140DB1DE8 | base + 0xDB1DE8
+		Textures[i].m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
 
 		// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
 		// new sig: 48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6
-		if (!((CreateTextureFn)(0x140934FE0))(0, &Textures[i], &pDescriptions[i]))
+		if (!CreateTexture(0, &Textures[i], &pDescriptions[i]))
 			return;
 	}
 
@@ -851,7 +896,7 @@ static void CreateMaterial(
 
 	for (int i = 0; i < nTextures; ++i)
 	{
-		int nTexture = g_pModelAnalyzer->FindTextureIndexByName(szTextureNames[i]); //((int(*)(void*, const char*))(0x143F4D0A0))(0, szTextureNames[i]);
+		int nTexture = g_pModelAnalyzer->FindTextureIndexByName(szTextureNames[i]);
 
 		if (nTexture > 15)
 			break;
@@ -1063,12 +1108,17 @@ static BOOL WriteMiniDump(EXCEPTION_POINTERS* pException)
 		return FALSE;
 
 	MINIDUMP_EXCEPTION_INFORMATION ExceptionInfo = { GetCurrentThreadId(), pException, FALSE };
-
-	BOOL status = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), hFile, MINIDUMP_TYPE(MiniDumpWithUnloadedModules | MiniDumpWithIndirectlyReferencedMemory | MiniDumpWithFullMemoryInfo), pException ? &ExceptionInfo : NULL, NULL, NULL);
+	MINIDUMP_TYPE Type = 
+		MINIDUMP_TYPE(MiniDumpWithUnloadedModules |
+			MiniDumpWithIndirectlyReferencedMemory | 
+			MiniDumpWithFullMemoryInfo);
+	
+	BOOL Status = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
+		hFile, Type, pException ? &ExceptionInfo : NULL, NULL, NULL);
 
 	CloseHandle(hFile);
 
-	return status;
+	return Status;
 }
 
 static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeaps)
@@ -1171,30 +1221,28 @@ static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsig
 	if (IsStringVar[0])
 	{
 		if (IsStringVar[0] != TRUE || IsStringVar[1])
-			snprintf((char*)0x14270F500, 512, szFmt, v4, v5);
+			snprintf(g_szCRILogBuffer, 512, szFmt, v4, v5);
 		else
-			snprintf((char*)0x14270F500, 512, szFmt, v4, (unsigned int)v5);
+			snprintf(g_szCRILogBuffer, 512, szFmt, v4, (unsigned int)v5);
 	}
 	else if (IsStringVar[1])
-		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, v5);
+		snprintf(g_szCRILogBuffer, 512, szFmt, (unsigned int)v4, v5);
 	else
-		snprintf((char*)0x14270F500, 512, szFmt, (unsigned int)v4, (unsigned int)v5);
+		snprintf(g_szCRILogBuffer, 512, szFmt, (unsigned int)v4, (unsigned int)v5);
 
-	return (char*)0x14270F500;
+	return g_szCRILogBuffer;
 }
 
-static void CRILogCallbackWinConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+static void CRILogCallbackWinConsole(const char* szFormat, unsigned int callback_arg_ptr_high, 
+	unsigned int callback_arg_ptr_low, void* a4)
 {
 	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
 	QWORD caller_return_address = *(QWORD*)stack_ptr;
 	printf("[%llx]: %s\n", caller_return_address, CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
 
-static void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
-{
-	if (Vars.Misc.bConsoleShowGameErrors)
-		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
-}
+void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high,
+	unsigned int callback_arg_ptr_low, void* a4);
 
 static void CRILogCallbackWinConsoleVerbose(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {

@@ -22,39 +22,61 @@ CreateEntityFn oCreateEntity;
 MRubyLoadScriptFn oMRubyLoadScript;
 CCameraGame_SetViewAnglesFn oCCameraGameSetViewAngles;
 CCameraGame_MoveFn oCCameraGameMove;
+CModelAnalyzer_CreateModelShaderModuleFn oCreateModelShaderModule;
 WNDPROC oWndProc;
 
-static ID3D11RasterizerState* pNorm, * pBias;
-static bool hookupdate = false;
-VirtualTableHook m_ctxhook;
-VirtualTableHook m_shaderhook;
 
+static ID3D11RasterizerState* pNorm, * pBias;
+//static bool hookupdate = false;
+//VirtualTableHook m_ctxhook;
+//VirtualTableHook m_shaderhook[MAX_MATERIAL_TEXTURES];
+
+// WIP
 void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 {
-	char* pModelExtendWork = (char*)pData->m_pWork + 0x188;
+	typedef __int64 (* OriginalFn)(CModelShaderModule*, CModelEntryData*);
+	typedef __int64 (*Original2Fn)(CModelShaderModule*, CModelShader*, CModelExtendWork*);
+	//((OriginalFn)m_shaderhook.GetFunctionAddress(3))(pThis, pData);
+	//pThis->Draw(pData);
 
-	/*if ((!((*(QWORD*)0x141415B10) & 0x800) || *(pModelExtendWork + 0x28) & 0x40) && pThis->m_pSetting && g_pOtManager->m_ptr98)
+	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
+	//pThis->Update(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2, 2);
+	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
+	CModelMatrixTable* pTbl = pData->m_pMatrices[0];
+
+	for (int i = 0; i < pTbl->m_nMatrices; ++i)
 	{
-		CGraphicCommand* pCmd = GetGraphicCommand(32);
 
-		if (pCmd->m_pModelData)
-			pCmd->m_pModelData->m_iVertexOffset = 10;
-	}*/
+		Matrix4x4* pBoneMat = (Matrix4x4*)pData->m_pConstBuffer[i]->m_pResources;
 
-	((void(*)(CModelShaderModule*, CModelEntryData*))m_shaderhook.GetFunctionAddress(3))(pThis, pData);
+		pBoneMat->Transpose();
+
+		Matrix4x4 RotM;
+
+		RotM.InitAxisAngle(pData->m_pWork->m_pModelExtend2->m_pParent->m_matTransform.GetAxis(RIGHT), M_PI_F / 2.0f);
+
+		*pBoneMat = RotM * (*pBoneMat);
+
+		pBoneMat->Transpose();
+	}
+
+	//((Original2Fn)m_shaderhook[0].GetFunctionAddress(2))(pThis, pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pModelExtend2);
+
+	//((OriginalFn)m_shaderhook[0].GetFunctionAddress(3))(pThis, pData);
+	//pThis->Draw(pData);
 
 	// Exception thrown at 0x000000014500537C in NieRAutomata.exe: 
 	// 0xC0000005: Access violation reading location 0xFFFFFFFFFFFFFFFF.
-	if (pData && GetAsyncKeyState(VK_END) & 1)
-	{
-		//14093FF50
-		typedef __int64(*R_DrawModelFn)(CModelDrawContext* a1,
-			CGraphics* pGraphics, CModelMatrixTable* pModelMatrixTable,
-			CModelInstanceParam* pModelInstanceParam, CConstantBufferInfo* a5);
+	//if (pData && GetAsyncKeyState(VK_END) & 1)
+	//{
+	//	//14093FF50
+	//	typedef __int64(*R_DrawModelFn)(CModelDrawContext* a1,
+	//		CGraphics* pGraphics, CModelMatrixTable* pModelMatrixTable,
+	//		CModelInstanceParam* pModelInstanceParam, CConstantBufferInfo* a5);
 
-		((R_DrawModelFn)(0x14093FF50))(*pData->m_pCtx, g_pGraphics, *pData->m_pMatrices,
-			(pData->m_pParams) ? (*pData->m_pParams) : NULL, (CConstantBufferInfo*)&pData->m_iStartIndex);
-	}
+	//	((R_DrawModelFn)(0x14093FF50))(*pData->m_pCtx, g_pGraphics, *pData->m_pMatrices,
+	//		(pData->m_pParams) ? (*pData->m_pParams) : NULL, (CConstantBufferInfo*)&pData->m_iStartIndex);
+	//}
 }
 
 BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
@@ -69,7 +91,7 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 
 	if (g_pCamera && g_pCamera->m_pCamEntity && Vars.Visuals.bChams)
 	{
-		pDrawData = g_pCamera->m_pCamEntity->m_pModelData->m_pDrawData;
+		pDrawData = g_pCamera->m_pCamEntity->m_Work.m_pModelData->m_pDrawData;
 
 		for (int i = 0; i < pDrawData->m_nBatches; ++i)
 		{
@@ -130,7 +152,7 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 
 HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
-	ImGui::GetIO().MouseDrawCursor = Vars.Menu.bOpened;
+	ImGui::GetIO().MouseDrawCursor = g_pMenu->IsOpen();
 
 	//g_pGraphics->m_iTimeStep = 0x100;
 
@@ -143,8 +165,10 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	g_pQueryPerformanceCounterHook->Rehook();
 
-	g_pLocalPlayer = GetEntityFromHandle2(g_pLocalPlayerHandle);
-	Pl0000* pCameraEnt = g_pCamera->m_pCamEntity;//GetEntityFromHandle2(&g_pCamera->m_hEntity);
+	// FIXME: change when other Pl entity's are reversed
+	g_pLocalPlayer = static_cast<Pl0000*>(GetEntityFromHandle2(g_pLocalPlayerHandle));
+
+	Pl0000* pCameraEnt = static_cast<Pl0000*>(g_pCamera->m_pCamEntity);
 
 #if defined(_DEBUG) && defined(DENUVO_STEAM_BUILD)
 
@@ -262,6 +286,19 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (pCameraEnt)
 	{
+		// FIXME: HACK move to HOOK
+		//if (!hookupdate)
+		//{
+		//	hookupdate = true;
+
+		//	for (int i = 0; i < g_pLocalPlayer->m_Work.m_nMaterialShaders; ++i)
+		//	{
+		//		m_shaderhook[i].Initialize((ULONG_PTR**)g_pLocalPlayer->m_Work.m_pModelShaders[i].m_pShader);
+		//		m_shaderhook[i].HookFunction((ULONG_PTR)CModelShaderModule_Draw, 3);
+		//	}		
+		//}
+
+
 		if (Vars.Gameplay.bRainbowHair)
 		{
 			Vars.Gameplay.flModelTintHue += 0.005f;
@@ -281,7 +318,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 		if (Vars.Gameplay.bRainbowPod)
 		{
-			Pl0000* pPod = GetEntityFromHandle(&pCameraEnt->m_hPod);
+			Pl0000* pPod = static_cast<Pl0000*>(GetEntityFromHandle(&pCameraEnt->m_hPod));
 
 			if (pPod)
 			{
@@ -325,51 +362,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	g_pOverlay->Render(true);
 
-	if (Vars.Menu.bOpened)
-	{
-		ImGui::SetNextWindowSize(ImVec2(875, 600), ImGuiCond_FirstUseEver);
+	g_pMenu->Draw(ImVec2(875, 600));
 
-		if (ImGui::Begin("2B Hook! ~ 2B Owns Me and All :^)", &Vars.Menu.bOpened, ImGuiWindowFlags_NoResize))
-		{
-			ImGui::Text("%s (%s)\tAverage %.3f ms / frame(%.1f FPS)", Vars.Menu.szAdapterUtf8, Vars.Menu.szOutputUtf8, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-			if (ImGui::BeginTabBar("MainTabs"))
-			{
-				if (ImGui::BeginTabItem("Gameplay"))
-				{
-					GameplayTab(pCameraEnt);
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Visuals"))
-				{
-					VisualsTab(pCameraEnt);
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Miscellaneous"))
-				{
-					MiscTab();
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Config"))
-				{
-					ConfigTab();
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Console"))
-				{
-					g_pConsole->Draw("Console");
-					ImGui::EndTabItem();
-				}
-
-				ImGui::EndTabBar();
-			}
-		}
-		ImGui::End();
-	}
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -507,24 +501,7 @@ HRESULT hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVO
 
 	g_pKeyboardHook->Rehook();
 
-	memcpy(&Vars.Menu.Input.OldKeyboardState, &Vars.Menu.Input.KeyboardState, cbData);
-	memcpy(&Vars.Menu.Input.KeyboardState, lpvData, cbData);
-
-	for (IKeybind* pKeybind : g_pConfig->GetKeybinds())
-	{
-		if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
-		{
-			if (KEYPRESSED(Vars.Menu.Input.KeyboardState, Vars.Menu.Input.OldKeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
-		}
-		else if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYDOWN)
-		{
-			if (KEYDOWN(Vars.Menu.Input.KeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
-		}
-	}
-
-	return (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened) ? DIERR_INPUTLOST : hr;
+	return g_pMenu->KeyboardHandler(hr, lpvData, cbData);
 }
 
 ULONG hkMouseRelease(IDirectInputDevice8A* pThis)
@@ -551,16 +528,22 @@ HRESULT hkMouseAcquire(IDirectInputDevice8A* pThis)
 
 HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
 {
-	if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
+	//if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
+	//	return DIERR_INPUTLOST;
+
+	if (g_pMenu->MouseHandler(lpvData, cbData) == DIERR_INPUTLOST)
+	{
 		return DIERR_INPUTLOST;
+	}
 
 	g_pMouseHook->Unhook();
 
 	HRESULT hr = oMouseGetDeviceState(pThis, cbData, lpvData);
 
 	g_pMouseHook->Rehook();
+	
 
-	memcpy(&Vars.Menu.Input.MouseState, lpvData, cbData);
+	//memcpy(&Vars.Menu.Input.MouseState, lpvData, cbData);
 
 	return hr;
 }
@@ -626,12 +609,13 @@ return TRUE;*/
 		Features::Firstperson(pThis->m_pCamEntity);
 		Math::AngleVectors(pThis->m_vViewangles, &vForward);
 
-		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD);
+		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_Work.m_pModelData, BONE_HEAD);
 
-		pThis->m_vSource = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition
-			+ pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
+		Vector3Aligned& vHeadPos = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition;
 
-		pThis->m_vTarget = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition + vForward * 4.f;
+		pThis->m_vSource = vHeadPos + pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
+
+		pThis->m_vTarget = vHeadPos + vForward * 4.f;
 
 		Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
 
@@ -650,6 +634,31 @@ return TRUE;*/
 void* hkCCameraGameMove(CCameraGame* pThis)
 {
 	return oCCameraGameMove(pThis);
+}
+
+CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4)
+{
+	// Changes the shader vvv causes artifacts
+	//pShader->m_pMaterial->m_szShaderName = "CLT00_XXXXX";
+	CTextureDescription Desc;
+
+#if 0
+	static CTargetTexture* pTex = CreateTextureR("C:\\Users\\marty\\source\\repos\\2B Hook\\2B Hook\\Kim Jong Un Flood.dds", Desc);
+	int nTexture = pThis->FindTextureIndexByName("g_AlbedoMap");
+
+	uint32 crc = pShader->m_pMaterial->m_TextureIds[0];//HashStringCRC32("g_AlbedoMap", strlen("g_AlbedoMap"));
+	pShader->m_pMaterial->m_TextureIds[0] = pShader->m_pMaterial->m_TextureIds[1];
+	pShader->m_pMaterial->m_TextureIds[1] = crc;
+
+	CModelShaderModule* pModelShader = oCreateModelShaderModule(pThis, pShader, a3, a4);
+
+	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created Shader:\n\t Material: %s\n\t Shader: %s\n\t Technique: %s\n",
+		pShader->m_pMaterial->m_szName, pShader->m_pMaterial->m_szShaderName, pShader->m_pMaterial->m_szTechniqueName);
+
+#else
+	CModelShaderModule* pModelShader = oCreateModelShaderModule(pThis, pShader, a3, a4);
+#endif
+	return pModelShader;
 }
 
 // TODO: new hook doesn't need last param and shadow space in thunk
@@ -859,19 +868,19 @@ BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
 
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter)
 {
-	if (lpTopLevelExceptionFilter != UnhandledExceptionHandler)
+	if (lpTopLevelExceptionFilter != &UnhandledExceptionHandler)
 	{
 		auto& it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
 
 		if (it == g_pExceptionHandlers.cend())
 			g_pExceptionHandlers.push_back(lpTopLevelExceptionFilter);
 	}
-	return UnhandledExceptionHandler;
+	return &UnhandledExceptionHandler;
 }
 
 BOOL hkSetCursorPos(int X, int Y)
 {
-	if (Vars.Menu.bOpened)
+	if (g_pMenu->IsOpen())
 		return FALSE;
 
 	return oSetCursorPos(X, Y);

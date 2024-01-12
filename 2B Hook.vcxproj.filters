@@ -22,23 +22,26 @@
     <Filter Include="Source Files\ImGui">
       <UniqueIdentifier>{122f911a-5b7e-4332-ac8f-1342e457d8c8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\Hooks">
-      <UniqueIdentifier>{74f88468-cfc4-4a7e-8933-cd95c69775d9}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\ImGui">
       <UniqueIdentifier>{1c577a53-e8e0-4512-9cf3-2e06c4dadc14}</UniqueIdentifier>
     </Filter>
     <Filter Include="Assembly Files">
       <UniqueIdentifier>{fe73b19c-e86a-4d8f-a0ef-a4432c878917}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\SDK">
+      <UniqueIdentifier>{9e2862be-e02f-4b71-9b56-39dde97ae10b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\SDK\Sound">
+      <UniqueIdentifier>{4c8121aa-27cd-4a4d-9be0-27baafbdcd73}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\SDK\Graphics">
+      <UniqueIdentifier>{7ee3d661-c5e7-49a1-a2d1-507b98e851ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\SDK\Entity">
+      <UniqueIdentifier>{c6ed01ec-9579-4da5-9128-78c87186504b}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Memory.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ReversedStructs.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Log.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -102,25 +105,7 @@
     <ClInclude Include="MemoryDeviceHook.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="VirtualTableHook.h">
-      <Filter>Header Files\Hooks</Filter>
-    </ClInclude>
-    <ClInclude Include="ImportTableHook.h">
-      <Filter>Header Files\Hooks</Filter>
-    </ClInclude>
-    <ClInclude Include="ExportTableHook.h">
-      <Filter>Header Files\Hooks</Filter>
-    </ClInclude>
-    <ClInclude Include="ReversedStructsUnpacked.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ReversedStructsDenuvo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="ImGui\imgui.h">
-      <Filter>Header Files\ImGui</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGui\imgui_impl_dx11.h">
       <Filter>Header Files\ImGui</Filter>
     </ClInclude>
     <ClInclude Include="ImGui\imgui_internal.h">
@@ -144,15 +129,51 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="ReversedStructs.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="ReversedStructsDenuvo.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="ReversedStructsUnpacked.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Graphics.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Common.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\CObj.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\CModel.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Graphics\CMaterial.h">
+      <Filter>Header Files\SDK\Graphics</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\CBehavior.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\FileSystem\dat.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\Pl0000.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\Pl0013.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\Entity\Pl1010.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Log.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="VirtualTableHook.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Hooks.cpp">
@@ -208,6 +229,9 @@
     </ClCompile>
     <ClCompile Include="ImGui\imgui_tables.cpp">
       <Filter>Source Files\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="Menu.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

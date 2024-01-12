@@ -92,7 +92,6 @@ namespace ImGuiEx
 
 struct OverlayDrawList : public ImDrawList
 {
-	OverlayDrawList(const ImDrawListSharedData* pShared) : ImDrawList(pShared) { }
 	OverlayDrawList(const ImDrawList& list) : ImDrawList(list._Data) { }
 	OverlayDrawList(const ImDrawList* pList) : ImDrawList(pList->_Data) { }
 
@@ -277,13 +276,18 @@ struct OverlayDrawList : public ImDrawList
 class Overlay
 {
 public:
-	Overlay() : m_pList(NULL) {}
+	Overlay() : m_pList(NULL) 
+	{
+	}
+	
 	~Overlay() { if (m_pList) IM_DELETE(m_pList); }
 
 	OverlayDrawList* m_pList;
 
 	OverlayDrawList* CreateDrawList(void)
 	{
+		// ImGui::GetMainViewportGetViewportBgFgDrawList()
+
 		m_pList = IM_NEW(OverlayDrawList)(ImGui::GetDrawListSharedData());
 		m_pList->_OwnerName = "2B Hook Overlay";
 		/*m_pList = (OverlayDrawList*)malloc(sizeof(OverlayDrawList));
@@ -327,6 +331,9 @@ public:
 
 	void Render(bool bUseBuiltInOverlay)
 	{
+
+		//ImGui::GetDrawData()->AddDrawList(m_pList);
+
 		if (bUseBuiltInOverlay)
 		{
 			Render((OverlayDrawList*)ImGui::GetForegroundDrawList());
@@ -334,7 +341,9 @@ public:
 		else
 		{
 			Render(m_pList);
-			ImGuiEx::AddDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], m_pList);
+			ImGui::GetDrawData()->AddDrawList(m_pList);
+
+			//ImGuiEx::AddDrawListToDrawData(ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], m_pList);
 		}
 	}
 
@@ -349,7 +358,7 @@ public:
 			return;
 
 		Render(m_pList);
-		ImGuiEx::InsertDrawListToDrawData(&ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
+		ImGuiEx::InsertDrawListToDrawData(ImGui::GetCurrentContext()->Viewports[0]->DrawDataBuilder.Layers[0], pWnd->DrawList, m_pList);
 	}
 
 	void Render(OverlayDrawList* pList)
@@ -364,11 +373,12 @@ public:
 
 		if (g_pCamera)
 		{
-			Pl0000* pCameraEntity = g_pCamera->m_pCamEntity; //GetEntityFromHandle(&g_pCamera->m_hEntity);// this func doesn't work for 
+			CBehaviorAppBase* pCameraEntity = g_pCamera->m_pCamEntity; //GetEntityFromHandle(&g_pCamera->m_hEntity);// this func doesn't work for 
 
 			if (pCameraEntity)
 			{
-				ExCollision* pCollision = &pCameraEntity->m_VerticalCollision;
+				// FIXME: hack until we figure out the other classes
+				ExCollision* pCollision = &((Pl0000*)pCameraEntity)->m_VerticalCollision;
 
 				vMin = pCameraEntity->m_vPosition;
 
@@ -414,7 +424,7 @@ public:
 
 				if (Vars.Visuals.bTraceLine)
 				{
-					vStart = pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_pModelData, BONE_HEAD)].m_vPosition;
+					vStart = pCameraEntity->m_pBones[GetBoneIndex(pCameraEntity->m_Work.m_pModelData, BONE_HEAD)].m_vPosition;
 					vEnd = vStart + (pCameraEntity->m_matTransform.GetAxis(FORWARD) * Vars.Visuals.flTraceLength);
 
 					if (WorldToScreen(vStart, vStart2D) && WorldToScreen(vEnd, vEnd2D))
@@ -445,7 +455,7 @@ public:
 				{
 					for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 					{
-						Pl0000* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+						CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
 						if (pCur && pCur->m_iHealth > 0 && WorldToScreen(pCur->m_vPosition, vMin2D))
 						{
@@ -487,7 +497,7 @@ public:
 		{
 			for (int i = 0; i < g_pNPCManager->m_handles.m_count; ++i)
 			{
-				Pl0000* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
+				CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
 
 				if (pCur && WorldToScreen(pCur->m_vPosition, vMin2D))
 				{
@@ -495,7 +505,7 @@ public:
 				}
 			}
 
-			Pl0000* pEmil = GetEntityFromHandle(g_pEmilHandle);
+			CBehaviorAppBase* pEmil = GetEntityFromHandle(g_pEmilHandle);
 
 			if (pEmil && WorldToScreen(pEmil->m_vPosition, vMin2D))
 			{
@@ -507,7 +517,7 @@ public:
 		{
 			Vector3Aligned vOrigin, vMax, vMin;
 			CEntityInfo* pInfo;
-			Pl0000* pObject;
+			CBehaviorAppBase* pObject;
 			Matrix4x4 mTrans;
 			ImColor Color;
 

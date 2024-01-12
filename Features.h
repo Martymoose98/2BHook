@@ -4,9 +4,9 @@
 #include "Log.h"
 #include "Console.h"
 
-void* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
-void* GetEntityFromHandleGlobal(EntityHandle* phEntity);
-int GetModelMeshIndex(CModelWork* pWork, const char* szMesh);
+CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
+CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle* phEntity);
+int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 
 namespace Features
 {
@@ -83,6 +83,7 @@ namespace Features
 	}
 
 	// exprimential
+	//FIXME: DEFO CRASH
 	static void AddPlayer(int player)
 	{
 		// I don't know what this is. It appears to be related to scene entity system
@@ -139,7 +140,7 @@ namespace Features
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
-	static void Firstperson(Pl0000* pEntity)
+	static void Firstperson(CBehavior* pEntity)
 	{
 		if (pEntity && Vars.Misc.bFirstperson && !Vars.Misc.bFirstpersonOld)
 		{
@@ -162,7 +163,7 @@ namespace Features
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
-	static void Thirdperson(Pl0000* pEntity)
+	static void Thirdperson(CBehavior* pEntity)
 	{
 		if (pEntity && !Vars.Misc.bFirstperson && Vars.Misc.bFirstpersonOld)
 		{
@@ -185,7 +186,7 @@ namespace Features
 	// Maybe for perma wet we can call WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); then, set the wet level manually
 	// then undo it when we want to go back to normal DOESN'T WORK
 	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); after the wet time has elapsed")
-	static int WetEntity(Pl0000* pEntity, byte wetness)
+	static int WetEntity(CBehaviorAppBase* pEntity, byte wetness)
 	{
 		int i = 0;
 
@@ -205,7 +206,7 @@ namespace Features
 
 	static void SetPlayer(EntityHandle hEntity)
 	{
-		Pl0000* pEntity = GetEntityFromHandle(&hEntity);
+		CBehaviorAppBase* pEntity = GetEntityFromHandle(&hEntity);
 
 		if (!pEntity)
 			return;
@@ -217,7 +218,7 @@ namespace Features
 		ResetCamera(g_pCamera);
 	}
 
-	static void ChangePlayerEx(Pl0000* pCameraEnt)
+	static void ChangePlayerEx(CBehaviorAppBase* pCameraEnt)
 	{
 		if (pCameraEnt && g_pLocalPlayer)
 		{
@@ -245,14 +246,14 @@ namespace Features
 
 	static void TeleportEntityToOther(EntityHandle hTeleporter, EntityHandle hTeleportee)
 	{
-		Pl0000* pTeleporter = GetEntityFromHandle(&hTeleporter);
-		Pl0000* pTeleportee = GetEntityFromHandle(&hTeleportee);
+		CBehavior* pTeleporter = GetEntityFromHandle(&hTeleporter);
+		CBehavior* pTeleportee = GetEntityFromHandle(&hTeleportee);
 
 		if (pTeleportee && pTeleporter)
 			pTeleportee->m_vPosition = pTeleporter->m_vPosition + pTeleporter->m_matTransform.GetAxis(FORWARD) * 4.f;
 	}
 
-	static void TeleportScalarEx(Pl0000* pEntity, eTransformMatrix Axis, float flSpeed)
+	static void TeleportScalarEx(CObj* pEntity, eTransformMatrix Axis, float flSpeed)
 	{
 		if (pEntity)
 			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(Axis) * flSpeed;
@@ -277,7 +278,7 @@ namespace Features
 		if (!g_pCamera)
 			return NULL;
 
-		return GetModelGravityEx(g_pCamera->m_pCamEntity);
+		return GetModelGravityEx(static_cast<Pl0000*>(g_pCamera->m_pCamEntity));
 	}
 
 	static float* GetEntityOBBYEx(Pl0000* pEntity)
@@ -293,10 +294,10 @@ namespace Features
 		if (!g_pCamera)
 			return NULL;
 
-		return GetEntityOBBYEx(g_pCamera->m_pCamEntity);
+		return GetEntityOBBYEx(static_cast<Pl0000*>(g_pCamera->m_pCamEntity));
 	}
 
-	static void PlayAnimationEx(Pl0000* pEntity)
+	static void PlayAnimationEx(CBehavior* pEntity)
 	{
 		if (pEntity)
 			pEntity->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
@@ -326,18 +327,20 @@ namespace Features
 		}
 	}
 
-	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
+	static void BalanceEnemyLevel(CBehaviorAppBase* pEnemy, int iMinLevel, int iMaxLevel)
 	{
 		if (!pEnemy)
 			return;
-
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+		
+		int iLevel = pEnemy->GetLevel();
+		//int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+		//if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+		if (iLevel > iMaxLevel || iLevel < iMinLevel)
 		{
-			SetEnemyLevel(pEnemy, RandomInt(iMinLevel, iMaxLevel));
+			pEnemy->SetLevel(_RandomInt(iMinLevel, iMaxLevel));
+			//SetEnemyLevel(pEnemy, _RandomInt(iMinLevel, iMaxLevel));
 
-			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
+			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", iLevel, iMinLevel, iMaxLevel);
 		}
 	}
 
@@ -414,7 +417,7 @@ namespace Features
 	{
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 		{
-			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			CBehavior* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 			pEntity->m_vPosition = vPosition;
 		}
 	}
@@ -431,7 +434,7 @@ namespace Features
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i, rad += step)
 		{
-			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			CBehavior* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
 			vDirection = (vPosition - pEntity->m_vPosition).Normalize();
 

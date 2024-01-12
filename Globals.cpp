@@ -35,6 +35,7 @@ PreloadFileFn PreloadFile;
 ObjReadSystem_RequestEndFn RequestEnd;
 ObjReadSystem_PreloadModelFn PreloadModel; 
 COtManager_GetGraphicCommandFn GetGraphicCommand;
+CreateTextureFn CreateTexture;
 CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
 CreateUIFromIdFn CreateUIFromId;
 ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
@@ -55,6 +56,7 @@ HWND g_hWnd;
 HINSTANCE g_hInstance;
 HANDLE* g_phHeaps;
 LPSTR g_szDataDirectoryPath;
+LPSTR g_szCRILogBuffer;
 std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 std::vector<MrubyImpl*> g_pRubyInstances;
 
@@ -114,6 +116,7 @@ VirtualTableHook* g_pDeviceContextHook;
 VirtualTableHook* g_pKeyboardHook;
 VirtualTableHook* g_pMouseHook;
 VirtualTableHook* g_pCameraHook;
+VirtualTableHook* g_pModelAnalyzerHook;
 MemoryDeviceHook* g_pMemoryDeviceHook;
 std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 

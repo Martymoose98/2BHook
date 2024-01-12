@@ -46,6 +46,8 @@ typedef bool(*MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
 typedef BOOL(*CCameraGame_SetViewAnglesFn)(CCameraGame* pCamera);
 typedef void* (*CCameraGame_MoveFn)(CCameraGame* pCamera);
 
+typedef CModelShaderModule* (*CModelAnalyzer_CreateModelShaderModuleFn)(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4);
+
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern PresentFn oPresent;
@@ -71,6 +73,7 @@ extern LoadWordBlacklistFn oLoadWordBlacklist;
 extern MRubyLoadScriptFn oMRubyLoadScript;
 extern CCameraGame_SetViewAnglesFn oCCameraGameSetViewAngles;
 extern CCameraGame_MoveFn oCCameraGameMove;
+extern CModelAnalyzer_CreateModelShaderModuleFn oCreateModelShaderModule;
 extern WNDPROC oWndProc;
 
 
@@ -98,6 +101,7 @@ extern "C" void* hkCreateEntity(void* pUnknown, CEntityInfo * pInfo, unsigned in
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis);
 void* hkCCameraGameMove(CCameraGame* pThis);
+CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 HRESULT hkOleLoadPicture(LPSTREAM lpstream, LONG lSize, BOOL fRunmode, REFIID riid, LPVOID* lplpvObj);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);

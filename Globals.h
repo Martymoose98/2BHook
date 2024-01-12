@@ -74,7 +74,7 @@ struct CpkEntry;
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef CBehaviorAppBase*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef CEntityInfo*(*GetEntityInfoFromHandleFn)(EntityHandle* pHandle);
 typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
 typedef int(*CItemManager_GetItemIdByNameFn)(CItemManager* pThis, const char* szItemName);			//returns a sItem* maybe?
@@ -82,7 +82,7 @@ typedef const char*(*CItemManager_GetItemNameByIdFn)(CItemManager* pThis, int it
 typedef bool(*CItemManager_AddItemFn)(CItemManager* pThis, int item_id, int iQuantity);
 typedef bool(*CItemManager_UseItemFn)(CItemManager* pThis, const char* szItemName);
 typedef bool(*CItemManager_UseItemByIdFn)(CItemManager* pThis, int item_id);
-typedef void(*ChangePlayerFn)(Pl0000* pEntity);
+typedef void(*ChangePlayerFn)(CBehaviorAppBase* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
 typedef void(*CSaveDataDevice_SaveFileIOFn)(CSaveDataDevice* pSave); // NOTE: not a real function points to CUserManager::SaveFileIO's switch
@@ -95,10 +95,10 @@ typedef void(*CWetObjectManager_SetWetFn)(CWetObjManager* pThis, byte wet_level,
 typedef void(*CWetObjectManager_SetDryFn)(CWetObjManager* pThis, CEntityInfo *pInfo);
 typedef void(*CCameraGame_SetLookAtFn)(CCameraGame* pThis);
 typedef void(*ResetCameraFn)(CCameraGame* pCamera);
-typedef bool(*DestroyBuddyFn)(Pl0000* pBuddy);
-typedef __int64(*NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
-typedef __int64(*NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
-typedef __int64(*EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
+typedef bool(*DestroyBuddyFn)(CBehaviorAppBase* pBuddy);
+typedef __int64(*NPC_ChangeSetTypeFollowFn)(CBehaviorAppBase* pNPC);
+typedef __int64(*NPC_ChangeSetTypeIdleFn)(CBehaviorAppBase* pNPC);
+typedef __int64(*EmitSoundFn)(Sound* pSound, CBehavior** ppSourceEntity); // also second arg is another custom struct
 typedef __int64(*PlaySoundFn)(Sound* pSound);
 typedef unsigned int(*HashStringCRC32Fn)(const char* szName, __int64 length);
 typedef unsigned int(*FNV1HashFn)(const char* szString);
@@ -121,7 +121,7 @@ typedef CGraphicCommand*(*COtManager_GetGraphicCommandFn)(__int64 uIndex);
 
 typedef __int64(*CreateUIFromIdFn)(int id);
 
-typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
+typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CTextureDescription *pDesc);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
 typedef HeapAlloc_t*(*QueryHeapFn)(HeapAlloc_t* pResult, int objectid, int a3); // or void i guess
@@ -200,6 +200,7 @@ extern PreloadFileFn PreloadFile;
 extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;
 extern COtManager_GetGraphicCommandFn GetGraphicCommand;
+extern CreateTextureFn CreateTexture;
 extern CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
 extern CreateUIFromIdFn CreateUIFromId;
 extern CpkMountFn CpkMount;
@@ -221,6 +222,7 @@ extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_phHeaps;
 extern LPSTR g_szDataDirectoryPath;
+extern LPSTR g_szCRILogBuffer;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 extern std::vector<MrubyImpl*> g_pRubyInstances;
 
@@ -281,6 +283,7 @@ extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
 extern VirtualTableHook* g_pCameraHook;
+extern VirtualTableHook* g_pModelAnalyzerHook;
 extern MemoryDeviceHook* g_pMemoryDeviceHook;
 extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 
