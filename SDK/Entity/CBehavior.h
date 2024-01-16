@@ -19,7 +19,7 @@ public:
 	virtual void function4() = 0; // mov al, 1 ret
 	virtual void function5() = 0; // nullsub
 
-	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;	//0x0008
+	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviorExtensions;	//0x0008
 };
 
 class ExCollision : public CBehaviorExtension
@@ -285,7 +285,9 @@ public:
 	int m_iAnimationMode;					//0x00674
 	int m_iAnimationA4;						//0x00678
 	int m_iAnimationA5;						//0x0067C
-	char _0x0680[28];						//0x00680
+	char _0x0680[4];						//0x00680
+	int m_iGroupId[2];						//0x00684
+	char _0x068C[12];						//0x0068C
 	int m_iUnknown69C;
 	void* m_pUnknown6A0; // set to 0 (on creation)
 	void* m_pUnknown6A8; // points to pThis

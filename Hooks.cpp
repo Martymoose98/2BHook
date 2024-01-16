@@ -1,5 +1,6 @@
 #include "Hooks.h"
 
+
 PresentFn oPresent;
 ResizeBuffersFn oResizeBuffers;
 CreateSwapChainFn oCreateSwapChain;
@@ -284,9 +285,11 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	}
 #endif
 
+	//bool bDerived = RTTI::DerivesFrom(pCameraEnt, typeid(Pl0000));
+
 	if (pCameraEnt)
 	{
-		// FIXME: HACK move to HOOK
+		// FIXME: HACK move code to HOOK
 		//if (!hookupdate)
 		//{
 		//	hookupdate = true;
@@ -297,7 +300,6 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		//		m_shaderhook[i].HookFunction((ULONG_PTR)CModelShaderModule_Draw, 3);
 		//	}		
 		//}
-
 
 		if (Vars.Gameplay.bRainbowHair)
 		{

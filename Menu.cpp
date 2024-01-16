@@ -304,7 +304,7 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 		set_info.m_i0x080 = -1;
 		set_info.m_i0x084 = 0;
 		set_info.m_i0x088 = 1;
-		set_info.m_i0x08C = -1;
+		set_info.m_iGroupId = -1;
 		set_info.m_i0x07C = 1; //flags
 		set_info.m_dwSetType = 1;
 		set_info.m_dw0x74 = 0;

@@ -173,18 +173,20 @@ struct CHeapInstance;
 //	DWORD m_dwFlags; // 1u = m_uQWordCount >= 0xFFFF		
 //};
 
-struct ObjReadSystem
+struct CObjReadSystem
 {
 	struct Work
 	{
-		struct Desc
+		//  FileRead::Listener, Hw::cRBTreeNodeTemp<ObjReadSystem::Work>
+		// Size of struct 0xB8
+		struct CObjReadSystem::Work::Desc
 		{
-			DWORD dword0;								//0x00
-			QWORD qword4;								//0x04
-			ObjReadSystem::Work::Desc* m_pPrevious;		//0x0C
-			ObjReadSystem::Work::Desc* m_pNext;			//0x14
-			int int1c;									//0x1C
-			INT m_0x20;									//0x20
+			DWORD dword0;
+			CObjReadSystem::Work::Desc* m_pParent;
+			CObjReadSystem::Work::Desc* m_pRight;
+			CObjReadSystem::Work::Desc* m_pLeft;
+			int m_Crc32;
+			INT m_0x20;
 			int gap2c;
 			DWORD m_dw0x30;
 			DWORD m_dwType;
@@ -198,32 +200,35 @@ struct ObjReadSystem
 			DWORD m_dw0x9C;
 			DWORD m_dw0xA0;
 			DWORD m_dw0xA4;
-			ObjReadSystem::Work* m_pWork;
+			CObjReadSystem::Work* m_pWork;
 			char pad[8];
 		};
 
+		// this this is shit
 		struct Info
 		{
 			BYTE gap0[32];
 			DWORD m_crc32;
-			ObjReadSystem::Work::Desc* m_pDescription;
+			CObjReadSystem::Work::Desc* m_pDescription;
 		};
 
-		void* m_pVtbl;
-		char gap8[16];
-		struct ObjReadSystem::Work* m_pPrev;
-		struct ObjReadSystem::Work* m_pNext;
+		void* m_pVtbl;							//0x0000
+		char gap8[16];							//0x0008
+		struct CObjReadSystem::Work* m_pPrev;	//0x0018
+		struct CObjReadSystem::Work* m_pNext;	//0x0020
 		DWORD m_flags;
-		int m_objectid;
+		int m_ObjectId;
 		int m_objectid2;
 		int m_objectid3;
-		ObjReadSystem::Work::Desc* m_pUnknown;
-		QWORD ptr40;
+		CObjReadSystem::Work::Desc* m_pUnknown;	//0x0038
+		QWORD ptr40;							//0x0040
 		void* m_pDatPtr;
 		void* m_pDatPtr2;
 		void* m_unk1;
 		void* m_unk2;
 	};
+
+
 };
 //
 //enum TextureDimension
@@ -2906,7 +2911,7 @@ struct set_info_t
 	INT m_i0x080;
 	INT m_i0x084;
 	INT m_i0x088;
-	INT m_i0x08C;
+	INT m_iGroupId;
 };
 
 #define CREATE_ENTITY_VFX 0x40000000

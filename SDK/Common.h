@@ -43,9 +43,9 @@
 
 #define IS_SAVE_SLOTDATA(s) ((s) > -1 && (s) < 3)
 
-#define DBGFLGS_UNKNOWN_0		0x20
-#define DBGFLGS_UNKNOWN_1		0x80
-#define DBGFLGS_SELFDESTRUCT	0x400
+#define DBGFLGS_UNKNOWN_0		0x0020
+#define DBGFLGS_UNKNOWN_1		0x0080
+#define DBGFLGS_SELFDESTRUCT	0x0400
 #define DBGFLGS_UNKNOWN_2		0x1000
 #define DBGFLGS_SLOWTIME		0x2000
 #define DBGFLGS_UNKNOWN_3		0x4000
@@ -56,9 +56,15 @@
 #define BIG_ENDIAN
 
 // visual studio says correct offsets are wrong before compalation on interfaces rifk
+#ifndef VALIDATE_OFFSET
 #define VALIDATE_OFFSET(s, m, offset) static_assert(offsetof(s, m) == (offset),#s"::"#m" is not at "#offset)
-#define VALIDATE_SIZE(s, size) static_assert(sizeof(s) == (size), #s" is not of size "#size)
+#endif
 
+#ifndef VALIDATE_SIZE
+#define VALIDATE_SIZE(s, size) static_assert(sizeof(s) == (size), #s" is not of size "#size)
+#endif
+
+// https://archive.org/download/CRI-SDKs
 
 typedef unsigned __int64 QWORD;
 
@@ -144,42 +150,64 @@ public:
 	QWORD m_size;	//0x0018
 };
 
+template<typename T>
+class CRedBlackTreeNode
+{
+	BOOL m_bRoot;
+	CRedBlackTreeNode<T>* m_pParent;
+	CRedBlackTreeNode<T>* m_pRight;
+	CRedBlackTreeNode<T>* m_pLeft;
+	T m_Data;
+};
+
+// Hw::cRBTreeNodeTemp<T>
+template<typename T>
+class CRedBlackTreeNodeTemp
+{
+	BOOL m_bRoot;
+	T* m_pRoot;
+	T* m_pLeft;
+	T* m_pRight;
+	char data20[0x90];
+	T* m_pNext;
+	T* m_pPrevious;
+};
 
 // Size of structiure is 0x30 (48) bytes 
 struct CReadWriteLock
 {
 	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionInitalized;
+	BOOL m_bCriticalSectionInitialized;
 
 	CReadWriteLock()
 	{
 		InitializeCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 	}
 
 	CReadWriteLock(DWORD dwSpinCount)
 	{
 		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 	}
 
 	~CReadWriteLock()
 	{
 		DeleteCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = FALSE;
+		m_bCriticalSectionInitialized = FALSE;
 	}
 
 	bool Lock(void)
 	{
-		if (m_bCriticalSectionInitalized)
+		if (m_bCriticalSectionInitialized)
 			EnterCriticalSection(&m_CriticalSection);
 
-		return m_bCriticalSectionInitalized;
+		return m_bCriticalSectionInitialized;
 	}
 
 	void Unlock(void)
 	{
-		if (m_bCriticalSectionInitalized)
+		if (m_bCriticalSectionInitialized)
 			LeaveCriticalSection(&m_CriticalSection);
 	}
 };

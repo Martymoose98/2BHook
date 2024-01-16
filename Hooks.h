@@ -6,6 +6,7 @@
 #include "ImGui/imgui.h"
 #include "ImGui/backends/imgui_impl_dx11.h"
 #include "ImGui/backends/imgui_impl_win32.h"
+#include <Fluorine\VirtualTableHook.h>
 #include "Console.h"
 #include "Log.h"
 #include "Overlay.h"
@@ -15,6 +16,7 @@
 #include "Globals.h"
 #include "Configuration.h"
 #include "Utils.h"
+
 
 typedef HRESULT(*PresentFn)(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
 typedef HRESULT(*ResizeBuffersFn)(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);

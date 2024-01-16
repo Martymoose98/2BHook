@@ -94,7 +94,7 @@ public:
 	DATHeader* m_pDataFiles[2];				//0x005A0
 	CTextureData* m_pTextureData;			//0x005B0
 	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regular, mech suit, and static -1)
-	unsigned int unk0x005BC;				//0x005BC
+	unsigned int m_SetType;					//0x005BC
 	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
 	BYTE _0x05C4;							//0x005C4 | disable dynamic skirt?
 	BYTE _0x05C5;							//0x005C5
@@ -106,7 +106,7 @@ public:
 	void* _0x600;							//0x00600
 	float fl0x60C;							//0x0060C
 	CEntityInfo* m_pInfo;					//0x00610 
-	CXmlBinary m_xmlBinary;					//0x00618
+	CXmlBinary m_xmlBinary;					//0x00618	
 	char _0x0658[24];						//0x00658
 };
 VALIDATE_OFFSET(CObj, m_pTextureData, 0x5B0);

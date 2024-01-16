@@ -40,12 +40,12 @@ struct StackReadWriteLock
 	{
 		m_pCriticalSection = pCriticalSection;
 		InitializeCriticalSection(m_pCriticalSection);
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 		EnterCriticalSection(m_pCriticalSection);
 	}
 
 	StackReadWriteLock(LPCRITICAL_SECTION pCriticalSection, DWORD dwSpinCount)
-		: m_bCriticalSectionInitalized(FALSE)
+		: m_bCriticalSectionInitialized(FALSE)
 	{
 		m_pCriticalSection = pCriticalSection;
 		/*
@@ -56,17 +56,17 @@ struct StackReadWriteLock
 		if (!InitializeCriticalSectionAndSpinCount(m_pCriticalSection, dwSpinCount))
 			return;
 
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 		EnterCriticalSection(m_pCriticalSection);
 	}
 
 	~StackReadWriteLock()
 	{
-		if (m_bCriticalSectionInitalized)
+		if (m_bCriticalSectionInitialized)
 		{
 			LeaveCriticalSection(m_pCriticalSection);
 			DeleteCriticalSection(m_pCriticalSection);
-			m_bCriticalSectionInitalized = FALSE;
+			m_bCriticalSectionInitialized = FALSE;
 		}
 	}
 
@@ -77,7 +77,7 @@ struct StackReadWriteLock
 
 private:
 	LPCRITICAL_SECTION m_pCriticalSection;
-	BOOL m_bCriticalSectionInitalized;
+	BOOL m_bCriticalSectionInitialized;
 };
 
 enum NierVersion
@@ -87,6 +87,7 @@ enum NierVersion
 	NIERVER_101,
 	NIERVER_102,
 	NIERVER_102_UNPACKED,
+	NIERVER_102_WOLF_EXTENDED_HEAPS,
 	NIERVER_WINSTORE,
 	NIERVER_DEBUG,
 	NIERVER_MAX
@@ -107,6 +108,9 @@ static std::ostream& operator<<(std::ostream& os, const NierVersion& v)
 		break;
 	case NIERVER_102_UNPACKED:
 		os << "NieR:Automata (v1.02 Unpacked)";
+		break;
+	case NIERVER_102_WOLF_EXTENDED_HEAPS:
+		os << "NieR:Automata (v1.02 Extended Heaps)";
 		break;
 	case NIERVER_WINSTORE:
 		os << "NieR:Automata (Winstore)";
@@ -151,6 +155,9 @@ struct NierVersionInfo
 			break;
 		case NIERVER_102_UNPACKED:
 			m_szVersion = TEXT("NieR:Automata (v1.02 Unpacked)");
+			break;
+		case NIERVER_102_WOLF_EXTENDED_HEAPS:
+			m_szVersion = TEXT("NieR:Automata (v1.02 Extended Heaps)");
 			break;
 		case NIERVER_WINSTORE:
 			m_szVersion = TEXT("NieR:Automata (Winstore)");
@@ -317,11 +324,12 @@ static NierVersionInfo* QueryNierBinaryVersion(void)
 {
 	static NierVersionInfo Versions[] =
 	{
-		{ NIERVER_101, "\xa0\x1a\xc5\x13\x2e\x10\x92\x52\xd6\xd9\xa4\xcb\xf9\x74\x61\x4d\xec\xfb\xe3\x23\x71\x3c\x1f\xbf\x5b\xc2\x48\xf0\x12\x61\x77\x3f" },
-		{ NIERVER_102, "\x51\x71\xbe\xd0\x9e\x6f\xec\x7b\x21\xbf\x0e\xa4\x79\xdb\xd2\xe1\xb2\x28\x69\x5c\x67\xd1\xf0\xb4\x78\x54\x9a\x9b\xe2\xf5\x72\x6a" },
-		{ NIERVER_102_UNPACKED, "\x5f\x97\x20\xd8\xc7\x7c\xd5\x97\x8e\xfe\x49\x88\x89\x3a\xf8\xfd\x99\x9f\x90\xa4\x76\xa8\xde\xeb\xb3\x91\x26\x94\xf6\x18\xdc\x43" },
-		{ NIERVER_WINSTORE, "\x3d\xde\x56\x6c\xea\x3e\x3b\xc1\x5e\x45\x92\x66\x02\xfb\x4f\x24\xd4\x8f\x77\xdf\x8a\x7b\xc5\x50\xa5\xb2\xdc\xae\xcc\xcf\x09\x48" },
-		{ NIERVER_DEBUG, "\xe9\xef\x66\x01\xeb\x40\xeb\x0a\x6d\x3f\x30\xa6\x63\x95\x43\xec\x2f\x81\x71\xc2\x6a\x3d\xe8\xb2\xb1\x30\x39\xee\xbe\x3b\xc8\x1c" },
+		{ NIERVER_101, "\xA0\x1A\xC5\x13\x2E\x10\x92\x52\xD6\xD9\xA4\xCB\xF9\x74\x61\x4D\xEC\xFB\xE3\x23\x71\x3C\x1F\xBF\x5B\xC2\x48\xF0\x12\x61\x77\x3F" },
+		{ NIERVER_102, "\x51\x71\xBE\xD0\x9E\x6F\xEC\x7B\x21\xBF\x0E\xA4\x79\xDB\xD2\xE1\xB2\x28\x69\x5C\x67\xD1\xF0\xB4\x78\x54\x9A\x9B\xE2\xF5\x72\x6A" },
+		{ NIERVER_102_UNPACKED, "\x5F\x97\x20\xD8\xC7\x7C\xD5\x97\x8E\xFE\x49\x88\x89\x3A\xF8\xFD\x99\x9F\x90\xA4\x76\xA8\xDE\xEB\xB3\x91\x26\x94\xF6\x18\xDC\x43" },
+		{ NIERVER_102_WOLF_EXTENDED_HEAPS, "\xC9\x90\x4A\x39\xE4\x48\xD6\xCB\x3C\x98\xC2\x8A\x90\x15\x9C\xF9\x31\x47\x53\xB0\xCF\xEA\x5C\xEB\x4E\x76\xA1\x2D\x33\x08\xA3\x55" },
+		{ NIERVER_WINSTORE, "\x3D\xDE\x56\x6C\xEA\x3E\x3B\xC1\x5E\x45\x92\x66\x02\xFB\x4F\x24\xD4\x8F\x77\xDF\x8A\x7B\xC5\x50\xA5\xB2\xDC\xAE\xCC\xCF\x09\x48" },
+		{ NIERVER_DEBUG, "\xE9\xEF\x66\x01\xEB\x40\xEB\x0A\x6D\x3F\x30\xA6\x63\x95\x43\xEC\x2F\x81\x71\xC2\x6A\x3D\xE8\xB2\xB1\x30\x39\xEE\xBE\x3B\xC8\x1C" },
 		{ NIERVER_UNKNOWN }
 	};
 	BYTE* pHash;
@@ -345,20 +353,112 @@ static NierVersionInfo* QueryNierBinaryVersion(void)
 	return pVersion;
 }
 
+struct CCommon : public IUnknown
+{
+	//IUnknownVtbl* m_pVtbl;	//0x0000
+	CCommon* m_pSelf;			//0x0008
+	IID* pGuid;					//0x0010
+};
+
+// Size of struct 0x1A0 from _Common_NewRiid_
+struct CDirectInputDevice8A : public IDirectInputDevice8A
+{
+	//IDirectInputDeviceAVtbl* m_pVtbl;	// 0x0000
+	CDirectInputDevice8A* m_pDerived;	// 0x0008
+	IID* pGuid;							// 0x0010
+	char pad0018[0x12C];				// 0x0018
+	volatile INT m_iReferenceCount;		// 0x0148
+	DWORD m_dwThreadId;					// 0x014C
+	CRITICAL_SECTION m_CriticalSection;	// 0x0150
+	char pad0178[40];					// 0x0178
+};
+VALIDATE_OFFSET(CDirectInputDevice8A, m_pDerived, 0x0008);
+VALIDATE_OFFSET(CDirectInputDevice8A, m_CriticalSection, 0x0150);
+VALIDATE_SIZE(CDirectInputDevice8A, 0x01A0);
+
+// TODO: finish dinput8.dll & gamerendereroverlay64.dll stuff
+// Thanks valve and your gamerendereroverlay64.dll!HookedDirectInput8Create
+#pragma region gamerendereroverlay64
+
+// Size of struct 0x18 (24) bytes
+struct CWrapDirectInput8
+{
+	void* m_pVtbl;						 //0x0000
+	union {
+		IDirectInput8A* m_pDirectInputA; //0x0008
+		IDirectInput8W* m_pDirectInputW; //0x0008
+	};
+	bool m_bWideVersion;				 //0x0010
+	
+};
+VALIDATE_SIZE(CWrapDirectInput8, 0x18);
+
+// imaginary base class 
+struct CWrapDirectInputDevice8
+{
+	void* m_pVtbl;							//0x0000
+	union {
+		IDirectInputDevice8A* m_pDeviceA;	//0x0008
+		IDirectInputDevice8W* m_pDeviceW;	//0x0008
+	};
+};
+
+// Size of struct 0x138 (312) bytes
+struct CWrapKeyboardDevice8 //: public IWrapMouseDevice8
+{
+	void* m_pVtbl;							//0x0000
+	union {
+		IDirectInputDevice8A* m_pDeviceA;	//0x0008
+		IDirectInputDevice8W* m_pDeviceW;	//0x0008
+	};
+	char pad0010[0x128];					//0x0010
+};
+VALIDATE_SIZE(CWrapKeyboardDevice8, 0x138);
+
+// Size of struct 0x48 (72) bytes
+struct CWrapMouseDevice8 //: public IWrapMouseDevice8
+{
+	void* m_pVtbl;							//0x0000
+	union {
+		IDirectInputDevice8A* m_pDeviceA;	//0x0008
+		IDirectInputDevice8W* m_pDeviceW;	//0x0008
+	};
+	char pad0010[56];						//0x0010
+};
+VALIDATE_SIZE(CWrapMouseDevice8, 0x48);
+
+#pragma endregion gamerendereroverlay64
+
 static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
 {
-	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8); // CONTAINING_RECORD(iface, IDirectInputDeviceImpl, IDirectInputDevice8A_iface);
-	LPCRITICAL_SECTION pCriticalSection = (LPCRITICAL_SECTION)(rbx + 0x150);
+	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("dinput8.dll"));
+	HMODULE hOwnerModule = NULL;
 
-	EnterCriticalSection(pCriticalSection);
+	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
+	{
+		//pDevice = CONTAINING_RECORD(pDevice, CWrapDirectInputDevice8, m_pDeviceA);
+		pDevice = ((CWrapDirectInputDevice8*)pDevice)->m_pDeviceA;
+	}
+
+	CDirectInputDevice8A* pImpl = CONTAINING_RECORD(pDevice, CDirectInputDevice8A, m_pDerived);
+
+	EnterCriticalSection(&pImpl->m_CriticalSection);
 }
 
 static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
 {
-	BYTE* rbx = (BYTE*)pDevice - *(int*)(*(BYTE**)pDevice - 8);
-	LPCRITICAL_SECTION pCriticalSection = (LPCRITICAL_SECTION)(rbx + 0x150);
+	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("dinput8.dll"));
+	HMODULE hOwnerModule = NULL;
 
-	LeaveCriticalSection(pCriticalSection);
+	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
+	{
+		//pDevice = CONTAINING_RECORD(pDevice, CWrapDirectInputDevice8, m_pDeviceA);
+		pDevice = ((CWrapDirectInputDevice8*)pDevice)->m_pDeviceA;
+	}
+
+	CDirectInputDevice8A* pImpl = CONTAINING_RECORD(pDevice, CDirectInputDevice8A, m_pDerived);
+
+	LeaveCriticalSection(&pImpl->m_CriticalSection);
 }
 
 // https://stackoverflow.com/questions/46182845/field-of-view-aspect-ratio-view-matrix-from-projection-matrix-hmd-ost-calib
@@ -985,8 +1085,8 @@ static HRESULT MyPreloadModel(int objectId)
 	char szObjectName[16];
 	char szFilename[64];
 	ObjectIdConvert* pConvert;
-	ObjReadSystem::Work* pWork;
-	ObjReadSystem::Work::Desc* pDesc;
+	CObjReadSystem::Work* pWork;
+	CObjReadSystem::Work::Desc* pDesc;
 	HeapAlloc_t lmao;
 
 	if (ObjectIdToObjectName(szObjectName, ARRAYSIZE(szObjectName), objectId, &pConvert))
@@ -1000,7 +1100,7 @@ static HRESULT MyPreloadModel(int objectId)
 		{
 			_InterlockedCompareExchange((volatile LONG*)&pDesc->m_0x20, 1, 0);
 			_InterlockedIncrement((volatile LONG*)&pDesc->m_0x20);
-			pWork->m_objectid = pDesc->m_objectId;
+			pWork->m_ObjectId = pDesc->m_objectId;
 		}
 
 		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dat");
@@ -1010,7 +1110,7 @@ static HRESULT MyPreloadModel(int objectId)
 		{
 			_InterlockedCompareExchange((volatile LONG*)&pDesc->m_0x20, 1, 0);
 			_InterlockedIncrement((volatile LONG*)&pDesc->m_0x20);
-			pWork->m_objectid = pDesc->m_objectId;
+			pWork->m_ObjectId = pDesc->m_objectId;
 		}
 		return S_OK;
 	}

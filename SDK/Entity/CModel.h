@@ -480,11 +480,25 @@ struct CModelInstanceParam
 struct CModelInfo
 {
 	Vector4 m_vTint;			//0x0000
-	CModelData* m_pData;		//0x0008
-	char pad10[96];				//0x0010
+	CModelData* m_pData;		//0x0010
+	char pad18[88];				//0x0018
 	Vector3Aligned m_vPosition; //0x0070
-	UINT m_Flags;				//0x00D0
+	char pad90[0x50];			//0x0090
+	UINT m_Flags;				//0x00D0 | |= 0x10u this happens a lot
 };
+
+struct CModelLOD
+{
+	int int0;
+	DWORD dword4;
+	DWORD dword8;
+	DWORD dwordC;
+	DWORD dword10;
+	DWORD dword14;
+	DWORD dword18;
+	DWORD dword1C;
+};
+
 
 // size of struct 0x1A8 (424) bytes
 struct CModelWork
@@ -508,10 +522,11 @@ struct CModelWork
 	char _0x03C[12];						//0x003C
 	void* m_p0x048;							//0x0048
 	int m_n0x48;							//0x0050
-	char _0x054[140];						//0x0054
+	char _0x054[92];						//0x0054
 	//void*									//0x0060
-	//void* m_pLODS;						//0x0078
-	//int m_nLODS;							//0x007C
+	CModelLOD* m_pLODS;						//0x00A0
+	int m_nLODS;							//0x00A8
+	char _0x0AC[0x24];						//0x00AC
 	CModelMatrixTable** m_pMatrixTables;	//0x00E0
 	CModelInstanceParam** m_pInstanceParams;//0x00E8
 	int m_nModelParams;						//0x00F0
@@ -521,7 +536,7 @@ struct CModelWork
 	CModelExtendWork* m_pModelExtend;		//0x0180
 	CModelExtendWork* m_pModelExtend2;		//0x0188
 	DWORD m_dwRenderFlags;					//0x0190
-	char _0x01AC[4];						//0x018C
+	char _0x018C[4];						//0x018C
 	CModelWork* m_pPrevious;				//0x0198
 	CModelWork* m_pNext;					//0x01A0
 };
@@ -556,7 +571,7 @@ public:
 	QWORD m_qw0x538;						//0x0538
 	CModelInfo* m_pModelInfo;				//0x0540
 	Unknown_t* m_pUnknown0x548;				//0x0548
-	void* m_pWMB_Buffer;					//0x0550
+	CModelData* m_pModelData;				//0x0550
 	void* m_p0x00558;						//0x0558
 	CBone* m_pBones;						//0x0560
 	int m_nBones;							//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)

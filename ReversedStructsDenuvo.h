@@ -249,37 +249,37 @@ struct DATHeader
 struct CReadWriteLock
 {
 	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionInitalized;
+	BOOL m_bCriticalSectionInitialized;
 
 	CReadWriteLock()
 	{
 		InitializeCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 	}
 
 	CReadWriteLock(DWORD dwSpinCount)
 	{
 		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
-		m_bCriticalSectionInitalized = TRUE;
+		m_bCriticalSectionInitialized = TRUE;
 	}
 
 	~CReadWriteLock()
 	{
 		DeleteCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = FALSE;
+		m_bCriticalSectionInitialized = FALSE;
 	}
 
 	bool Lock(void)
 	{
-		if (m_bCriticalSectionInitalized)
+		if (m_bCriticalSectionInitialized)
 			EnterCriticalSection(&m_CriticalSection);
 
-		return m_bCriticalSectionInitalized;
+		return m_bCriticalSectionInitialized;
 	}
 
 	void Unlock(void)
 	{
-		if (m_bCriticalSectionInitalized)
+		if (m_bCriticalSectionInitialized)
 			LeaveCriticalSection(&m_CriticalSection);
 	}
 };
@@ -341,7 +341,7 @@ struct CXMLBinary //: CXML
 	DWORD m_dwFlags; // 1u = m_uQWordCount >= 0xFFFF		
 };
 
-struct ObjReadSystem
+struct CObjReadSystem
 {
 	struct Work
 	{
@@ -349,8 +349,8 @@ struct ObjReadSystem
 		{
 			DWORD dword0;								//0x00
 			QWORD qword4;								//0x04
-			ObjReadSystem::Work::Desc* m_pPrevious;		//0x0C
-			ObjReadSystem::Work::Desc* m_pNext;			//0x14
+			CObjReadSystem::Work::Desc* m_pPrevious;		//0x0C
+			CObjReadSystem::Work::Desc* m_pNext;			//0x14
 			int int1c;									//0x1C
 			INT m_0x20;									//0x20
 			int gap2c;
@@ -366,7 +366,7 @@ struct ObjReadSystem
 			DWORD m_dw0x9C;
 			DWORD m_dw0xA0;
 			DWORD m_dw0xA4;
-			ObjReadSystem::Work* m_pWork;
+			CObjReadSystem::Work* m_pWork;
 			char pad[8];
 		};
 
@@ -374,18 +374,18 @@ struct ObjReadSystem
 		{
 			BYTE gap0[32];
 			DWORD m_crc32;
-			ObjReadSystem::Work::Desc* m_pDescription;
+			CObjReadSystem::Work::Desc* m_pDescription;
 		};
 
 		void* m_pVtbl;
 		char gap8[16];
-		struct ObjReadSystem::Work* m_pPrev;
-		struct ObjReadSystem::Work* m_pNext;
+		struct CObjReadSystem::Work* m_pPrev;
+		struct CObjReadSystem::Work* m_pNext;
 		DWORD m_flags;
 		int m_objectid;
 		int m_objectid2;
 		int m_objectid3;
-		ObjReadSystem::Work::Desc* m_pUnknown;
+		CObjReadSystem::Work::Desc* m_pUnknown;
 		QWORD ptr40;
 		void* m_pDatPtr;
 		void* m_pDatPtr2;
