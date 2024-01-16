@@ -2,13 +2,18 @@
 #include <VersionHelpers.h>
 #include <d3d11.h>
 
-#include "Memory.h"
+#include <iostream>
+
+#include <Fluorine\Memory.h>
+#include <Fluorine\VirtualTableHook.h>
+#include <Fluorine\ImportTableHook.h>
+
 #include "cpk.h"
 #include "mot.h"
 #include "Hooks.h"
-#include <Fluorine\VirtualTableHook.h>
-#include <Fluorine\ImportTableHook.h>
-#include <iostream>
+
+// temp
+NTSTATUS KsDumpModules(/*PEPROCESS pProcess, PKERNEL_MODULE_REQUEST pRequest*/);
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "xinput.lib")
@@ -28,15 +33,6 @@ CONST BYTE JmpFramecap[] = { 0xE9, 0x93, 0x00, 0x00, 0x00, 0x90, 0x90 };
 #define FindOffsets FindSteamOffsets
 #endif
 
-#define JEREMY_DINPUT8_HANDICAP
-
-#if defined(JEREMY_DINPUT8_HANDICAP)
-#define _IDirectInputDevice_Lock
-#define _IDirectInputDevice_Unlock
-#else
-#define _IDirectInputDevice_Lock IDirectInputDevice_Lock
-#define _IDirectInputDevice_Unlock IDirectInputDevice_Unlock
-#endif // defined(JEREMY_DINPUT8_HANDICAP)
 
 void InitHooks(void)
 {
@@ -45,7 +41,7 @@ void InitHooks(void)
 	g_pDeviceContextHook = new VirtualTableHook((ULONG_PTR**)g_pDeviceContext);
 
 	// Take ownership of the internal CDIDev's critical section to stop crashes
-	_IDirectInputDevice_Lock(g_pKeyboard->pDevice);
+	IDirectInputDevice_Lock(g_pKeyboard->pDevice);
 
 	// Initalize a virtual table hook for the keyboard
 	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice);
@@ -53,12 +49,12 @@ void InitHooks(void)
 	g_pKeyboardHook->Unhook();
 
 	// Release ownership of the internal CDIDev's critical section
-	_IDirectInputDevice_Unlock(g_pKeyboard->pDevice);
+	IDirectInputDevice_Unlock(g_pKeyboard->pDevice);
 
 	g_pKeyboardHook->Rehook();
 
 	// Take ownership of the internal CDIDev's critical section to stop crashes
-	_IDirectInputDevice_Lock(g_pMouse->pDevice);
+	IDirectInputDevice_Lock(g_pMouse->pDevice);
 
 	// Initalize a virtual table hook for the mouse
 	g_pMouseHook = new VirtualTableHook((ULONG_PTR**)g_pMouse->pDevice);
@@ -66,7 +62,7 @@ void InitHooks(void)
 	g_pMouseHook->Unhook();
 
 	// Release ownership of the internal CDIDev's critical section
-	_IDirectInputDevice_Unlock(g_pMouse->pDevice);
+	IDirectInputDevice_Unlock(g_pMouse->pDevice);
 
 	g_pMouseHook->Rehook();
 
@@ -137,7 +133,7 @@ void InitHooks(void)
 	HookFunc64((VOID*)0x140606940, hkLoadWordBlacklistThunk, 20, &g_LoadWordBlacklist);//callee
 #else // DENUVO_STEAM_BUILD
 
-	// FIXME: This hook works but is digusting
+	// FIXME: This hook works but is disgusting
 	//	hmm it seems yo do have to pause the threads to do this
 	//	if you get really unlucky you can crash
 	//	or find someway to syncrhronize it
@@ -742,6 +738,7 @@ void FindSteamOffsets(void)
 	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
 }
 
+
 void Setup(void)
 {
 #if defined(_DEBUG) || defined(VERBOSE)
@@ -750,9 +747,23 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
+	// add VEH?
+	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
+	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
+
 	NierVersionInfo* pVersion = QueryNierBinaryVersion();
+	SHA256DigestStr SHA256Hash;
+
+	SHA256_PrintDigest((SHA256Digest*)&pVersion->m_pHash, &SHA256Hash);
+
+
+	LOG("SHA256: %32s", SHA256Hash);
 
 	LOG("Detected %s\n", pVersion->m_szVersion);
+
+#if defined(_DEBUG) || defined(VERBOSE)
+	KsDumpModules();
+#endif
 
 	FindOffsets();
 
@@ -791,10 +802,6 @@ void Setup(void)
 	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, (void*)FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
 
 	InitHooks();
-
-	// add VEH?
-	oSetUnhandledExceptionFilter(UnhandledExceptionHandler);
-	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
 
 	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initialization Complete! GLHF");
 
