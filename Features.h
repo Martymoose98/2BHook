@@ -1,4 +1,7 @@
 #pragma once
+
+#include <Fluorine\Memory.h>
+
 #include "ReversedStructs.h"
 #include "Vector3.h"
 #include "Log.h"

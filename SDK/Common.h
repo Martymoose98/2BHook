@@ -173,6 +173,19 @@ class CRedBlackTreeNodeTemp
 	T* m_pPrevious;
 };
 
+// Hw::cRBTreeNodeTemp<T>
+template<typename T>
+class CRedBlackTreeNodeTemp
+{
+	UINT m_dword0;
+	T* m_pRoot;
+	T* m_pLeft;
+	T* m_pRight;
+	char data20[0x90];
+	T* m_pNext;
+	T* m_pPrevious
+};
+
 // Size of structiure is 0x30 (48) bytes 
 struct CReadWriteLock
 {
