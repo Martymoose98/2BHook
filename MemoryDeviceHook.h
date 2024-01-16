@@ -30,7 +30,7 @@ public:
 	}
 
 	// Hook all of the heaps
-	void Initalize(void)
+	void Initialize(void)
 	{
 		for (CHeapAllocInfo* pAllocInfo = m_pDevice->m_DeviceHeap.m_pAllocationInfo; pAllocInfo; pAllocInfo = pAllocInfo->m_pPrevious)
 			AddHook(pAllocInfo->m_pHeapInfo->m_pHeap);
