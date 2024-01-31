@@ -32,7 +32,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - Model Affine Matrix Manipulation:
 - Model Parts Colour Manipulation:
 - Protagonist Switching: Freely switch between 
-- ☢️ Airstuck: Float in the air.
+- Airstuck: Float in the air.
 - Duplicate Buddy as NPC: Duplicate the current buddy as an NPC.
 - NPC, Yorha and Enemy Entity Handle enumeration
 - No Localplayer Gravity: Removes gravity for the localplayer.
