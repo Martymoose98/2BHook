@@ -47,9 +47,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 
 ## Installation
 
-Provide step-by-step instructions on how to install and set up your project. Include any prerequisites, dependencies, or configuration needed.
-
-Since this mod is a dynamic link library (DLL) it cannot be used on it's own and needs a DLL injector such as extreme injector or xenos etc... 
+Since this mod is a dynamic link library (DLL) it cannot be used on it's own and needs a DLL injector such as Extreme Injector or Xenos etc... 
 Alternatively, a proxy DLL loader will also suffice.
 
 Acquire a DLL injector or proxy DLL loader.
