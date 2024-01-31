@@ -26,7 +26,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - No Fall Damage: No fall damage.
 - No Enemy Damage: No damage from enemies.
 - Level Manipulation: Configures enemy levels and local player level.
-- Buddy Spawning: Spawm in the buddy of your choice.
+- Buddy Spawning: Spawn in the buddy of your choice.
 - Item Spawning: Spawn in items by id or name.
 - Pod Spawning: Spawn in any pod.
 - Model Affine Matrix Manipulation:
