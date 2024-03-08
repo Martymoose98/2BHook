@@ -49,6 +49,7 @@ void Matrix4x4::InitPerspectiveRH(float flAspect, float flFov, float zNear, floa
 	m3 = _mm_setr_ps(0.0f, 0.0f, zFar * zNear / flFarNearDelta, 0.0f);
 }
 
+// ccw
 void Matrix4x4::InitAxisAngle(const Vector3& vAxis, float theta)
 {
 	float sin, cos, c;
@@ -126,6 +127,29 @@ void Matrix4x4::InitTransform(const Vector3& vForward, const Vector3& vRight, co
 	m[POSITION][1] = vPosition.y;
 	m[POSITION][2] = vPosition.z;
 	m[POSITION][3] = 1.0f;
+}
+
+Matrix4x4 Matrix4x4::PointTo(const Vector3Aligned& vPosition, Vector3Aligned& vEye, const Vector3Aligned& vUp) noexcept
+{
+	Vector3Aligned vForward = vEye.Normalize();
+	Vector3Aligned vRight = vUp.Cross(vForward).Normalize();
+	Vector3Aligned vLocalUp = vForward.Cross(vRight);
+
+	Vector3Aligned vNegPosition = -vPosition;
+
+	__m128 PositionX = _mm_set1_ps(vRight.Dot(vNegPosition));	// vbroadcastss xmm0,xmm0 
+	__m128 PositionY = _mm_set1_ps(vLocalUp.Dot(vNegPosition)); // vbroadcastss xmm0,xmm0 
+	__m128 PositionZ = _mm_set1_ps(vForward.Dot(vNegPosition)); // vbroadcastss xmm0,xmm0 
+
+	__m128 R0 = _mm_blend_ps(vRight, PositionX, _MM_BLEND(0, 0, 0, 1));
+	__m128 R1 = _mm_blend_ps(vLocalUp, PositionY, _MM_BLEND(0, 0, 0, 1));
+	__m128 R2 = _mm_blend_ps(vForward, PositionZ, _MM_BLEND(0, 0, 0, 1));
+
+	Matrix4x4 M(R0, R1, R2, _mm_setr_ps(0, 0, 0, 1));
+
+	M.Transpose();
+
+	return M;
 }
 
 inline float Matrix4x4::ThetaOfAxisAngle() const

@@ -1,8 +1,13 @@
 #pragma once
 #include <Windows.h>
+#include <Shlwapi.h>
+//#include <Wsdxml.h>
+#include <xmllite.h>
+#include <tchar.h>
+
 #include <vector>
 #include <functional>
-#include <tchar.h>
+
 #include "Globals.h"
 
 // c++ btw (just a friendly reminder to myself)
@@ -102,56 +107,111 @@ public:
 		KEYBIND_ON_KEYPRESSED = 2
 	};
 
-	IKeybind() : m_szName(NULL), m_keycode(-1), m_mode(KEYBIND_INVALID) {}
+	virtual void OnPressed(void) = 0;
+};
 
-	IKeybind(const char* szName, int keycode, Mode mode)
+
+// TODO: maybe remove and revert to IKeybind only
+class CKeybind : public IKeybind
+{
+public:
+	CKeybind(void) : m_szName(NULL), m_keycode(-1), m_mode(KEYBIND_INVALID) {}
+
+	CKeybind(const char* szName, int keycode, Mode mode)
 		: m_szName(szName), m_keycode(keycode), m_mode(mode)
 	{
 	}
 
-	virtual void OnPressed() = 0;
+	virtual void OnPressed(void) = 0;
 
-	const char* GetName() const { return m_szName; }
-	int GetKeycode() const { return m_keycode; }
+	const char* GetName(void) const { return m_szName; }
+	int GetKeycode(void) const { return m_keycode; }
 	void SetKeycode(int keycode) { m_keycode = keycode; }
-	int GetMode() const { return m_mode; }
+	Mode GetMode(void) const { return m_mode; }
 
 private:
 	const char* m_szName;
 	int m_keycode;
-	int m_mode;
+	Mode m_mode;
 };
 
-class KeybindToggleable : public IKeybind
+class IConfigItem
 {
 public:
-	KeybindToggleable() : IKeybind(), m_pbToggle(NULL) {}
+
+	virtual void Read(const char* szFilename) = 0;
+	virtual void Write(const char* szFilename) = 0;
+
+protected:
+	const char* m_szCategory;
+	const char* m_szName;
+};
+
+class KeybindToggleable : public CKeybind
+{
+public:
+	KeybindToggleable(void) : CKeybind(), m_pbToggle(NULL) {}
 
 	KeybindToggleable(const char* szName, int keycode, bool* pToggle)
-		: IKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pbToggle(pToggle)
+		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pbToggle(pToggle)
 	{
 	}
 
-	virtual void OnPressed() { if (m_pbToggle) *m_pbToggle = !(*m_pbToggle); }
+	virtual void OnPressed(void) { if (m_pbToggle) *m_pbToggle = !(*m_pbToggle); }
 
 private:
 	bool* m_pbToggle;
 };
 
-class KeybindDynamicToggleable : public IKeybind
+template<typename GetterFn>
+class KeybindDynamicToggleable;
+
+//template<typename R, class Base>
+template<class Base>
+class KeybindDynamicToggleable<bool (Base::*)(void) const> : public CKeybind
 {
 public:
-	typedef bool*(*GetterFn)();
+	typedef bool (Base::* GetterFn)(void) const;
 
-	KeybindDynamicToggleable() : IKeybind(), m_pGetter(NULL)
+	constexpr explicit KeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
 	{}
 
-	KeybindDynamicToggleable(const char* szName, int keycode, GetterFn pGetter)
-		: IKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pGetter(pGetter)
+	constexpr explicit KeybindDynamicToggleable(const char* szName, int keycode, Base* pBase, GetterFn pGetter)
+		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pBase(pBase), m_pGetter(pGetter)
 	{
 	}
 
-	virtual void OnPressed()
+	virtual void OnPressed(void)
+	{
+		if (m_pGetter)
+		{
+			bool pbToggle = (m_pBase->*m_pGetter)();
+
+			//if (pbToggle)
+			pbToggle = !(pbToggle);
+		}
+	}
+
+private:
+	Base* m_pBase;
+	GetterFn m_pGetter;
+};
+
+template<>
+class KeybindDynamicToggleable<bool* (*)(void)> : public CKeybind
+{
+public:
+	typedef bool* (*GetterFn)(void);
+
+	explicit KeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
+	{}
+
+	explicit KeybindDynamicToggleable(const char* szName, int keycode, GetterFn pGetter)
+		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pGetter(pGetter)
+	{
+	}
+
+	virtual void OnPressed(void)
 	{
 		if (m_pGetter)
 		{
@@ -167,17 +227,17 @@ private:
 };
 
 template<typename T>
-class KeybindIncremental : public IKeybind
+class KeybindIncremental : public CKeybind
 {
 public:
-	KeybindIncremental() : IKeybind(), m_pIncremental(NULL) {}
+	KeybindIncremental(void) : CKeybind(), m_pIncremental(NULL) {}
 
 	KeybindIncremental(const char* szName, int keycode, Mode mode, T* pIncremental, T step)
-		: IKeybind(szName, keycode, mode), m_pIncremental(pIncremental), m_step(step)
+		: CKeybind(szName, keycode, mode), m_pIncremental(pIncremental), m_step(step)
 	{
 	}
 
-	virtual void OnPressed() { if (m_pIncremental) *m_pIncremental += m_step; }
+	virtual void OnPressed(void) { if (m_pIncremental) *m_pIncremental += m_step; }
 
 private:
 	T m_step;
@@ -185,19 +245,19 @@ private:
 };
 
 template<typename T>
-class KeybindDynamicIncremental : public IKeybind
+class KeybindDynamicIncremental : public CKeybind
 {
 public:
-	typedef T*(*GetterFn)();
+	typedef T* (*GetterFn)(void);
 
-	KeybindDynamicIncremental() : IKeybind(), m_step(), m_pGetter(NULL) {}
+	KeybindDynamicIncremental(void) : CKeybind(), m_step(), m_pGetter(NULL) {}
 
-	KeybindDynamicIncremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
-		: IKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
+	constexpr KeybindDynamicIncremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
+		: CKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
 	{
 	}
 
-	virtual void OnPressed()
+	virtual void OnPressed(void)
 	{
 		if (m_pGetter)
 		{
@@ -215,17 +275,17 @@ private:
 
 
 template<typename T>
-class KeybindDecremental : public IKeybind
+class KeybindDecremental : public CKeybind
 {
 public:
-	KeybindDecremental() : IKeybind(), m_pDecremental(NULL) {}
+	KeybindDecremental(void) : CKeybind(), m_pDecremental(NULL) {}
 
 	KeybindDecremental(const char* szName, int keycode, Mode mode, T* pDecremental, T step)
-		: IKeybind(szName, keycode, mode), m_pDecremental(pDecremental), m_step(step)
+		: CKeybind(szName, keycode, mode), m_pDecremental(pDecremental), m_step(step)
 	{
 	}
 
-	virtual void OnPressed() { if (m_pDecremental) *m_pDecremental -= m_step; }
+	virtual void OnPressed(void) { if (m_pDecremental) *m_pDecremental -= m_step; }
 
 private:
 	T m_step;
@@ -233,19 +293,19 @@ private:
 };
 
 template<typename T>
-class KeybindDynamicDecremental : public IKeybind
+class KeybindDynamicDecremental : public CKeybind
 {
 public:
-	typedef T*(*GetterFn)();
+	typedef T* (*GetterFn)(void);
 
-	KeybindDynamicDecremental() : IKeybind(), m_pGetter(NULL) {}
+	KeybindDynamicDecremental(void) : CKeybind(), m_pGetter(NULL) {}
 
-	KeybindDynamicDecremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
-		: IKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
+	constexpr KeybindDynamicDecremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
+		: CKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
 	{
 	}
 
-	virtual void OnPressed()
+	virtual void OnPressed(void)
 	{
 		if (m_pGetter)
 		{
@@ -267,11 +327,13 @@ class KeybindIncrement
 public:
 	typedef IKeybind::Mode Mode;
 
-	KeybindIncrement() : m_inc(), m_dec() {}
+	KeybindIncrement(void) : m_inc(), m_dec() {}
 
 	KeybindIncrement(const char* szNameInc, const char* szNameDec, int keycodeInc, int keycodeDec, Mode mode, T* pVariable, T step)
 		: m_inc(szNameInc, keycodeInc, mode, pVariable, step), m_dec(szNameDec, keycodeDec, mode, pVariable, step)
 	{}
+
+
 
 	KeybindIncremental<T> m_inc;
 	KeybindDecremental<T> m_dec;
@@ -282,30 +344,31 @@ class KeybindDynamicIncrement
 {
 public:
 	typedef IKeybind::Mode Mode;
-	typedef T*(*GetterFn)();
+	typedef T* (*GetterFn)(void);
 
-	KeybindDynamicIncrement() : m_inc(), m_dec() {}
+	KeybindDynamicIncrement(void) : m_inc(), m_dec() {}
 
-	KeybindDynamicIncrement(const char* szNameInc, const char* szNameDec, int keycodeInc, int keycodeDec, Mode mode, GetterFn pGetter, T step)
+	constexpr KeybindDynamicIncrement(const char* szNameInc, const char* szNameDec, int keycodeInc, int keycodeDec, Mode mode, GetterFn pGetter, T step)
 		: m_inc(szNameInc, keycodeInc, mode, pGetter, step), m_dec(szNameDec, keycodeDec, mode, pGetter, step)
 	{}
+
 
 	KeybindDynamicIncremental<T> m_inc;
 	KeybindDynamicDecremental<T> m_dec;
 };
 
 template<typename Ret, typename... Args>
-class KeybindFunctional : public IKeybind
+class KeybindFunctional : public CKeybind
 {
 public:
-	KeybindFunctional() : IKeybind(), m_callback() {}
+	KeybindFunctional(void) : CKeybind(), m_callback() {}
 
 	KeybindFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(Args...), Args... callback_params)
-		: IKeybind(szName, keycode, mode), m_callback(std::bind(callback, callback_params...))
+		: CKeybind(szName, keycode, mode), m_callback(std::bind(callback, callback_params...))
 	{
 	}
 
-	virtual void OnPressed()
+	virtual void OnPressed(void)
 	{
 		if (m_callback)
 			m_callback();
@@ -316,22 +379,22 @@ private:
 };
 
 template<typename Ret, typename Base, typename... Args>
-class KeybindVirtualFunctional : public IKeybind
+class KeybindVirtualFunctional : public CKeybind
 {
 public:
-	KeybindVirtualFunctional() : IKeybind(), m_callback() {}
+	KeybindVirtualFunctional(void) : CKeybind(), m_callback() {}
 
 	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, size_t index, const Base* pThis, Args... callback_params)
 		: KeybindVirtualFunctional(szName, keycode, mode, GetVirtual(pThis, index), pThis, callback_params...)
 	{
 	}
-	
+
 	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(const Base*, Args...), const Base* pThis, Args... callback_params)
-		: IKeybind(szName, keycode, mode), m_callback(std::bind(callback, pThis, callback_params...))
+		: CKeybind(szName, keycode, mode), m_callback(std::bind(callback, pThis, callback_params...))
 	{
 	}
 
-	virtual void OnPressed()
+	virtual void OnPressed(void)
 	{
 		if (m_callback)
 			m_callback();
@@ -363,18 +426,6 @@ public:
 
 private:
 	std::function<Ret()> m_callback;
-};
-
-class IConfigItem
-{
-public:
-
-	virtual void Read(const char* szFilename) = 0;
-	virtual void Write(const char* szFilename) = 0;	
-
-protected:
-	const char* m_szCategory;
-	const char* m_szName;
 };
 
 class ConfigItemBool : public IConfigItem
@@ -461,6 +512,35 @@ public:
 	unsigned int& m_value;
 };
 
+class ConfigItemColor : public IConfigItem
+{
+public:
+	ConfigItemColor(const char* szCategory, const char* szName, ImColor& value)
+		: m_value(value)
+	{
+		m_szCategory = szCategory;
+		m_szName = szName;
+	}
+
+	virtual void Read(const char* szFilename)
+	{
+		char szBuffer[33];
+
+		GetPrivateProfileString(m_szCategory, m_szName, "0", szBuffer, sizeof(szBuffer), szFilename);
+		m_value = strtoul(szBuffer, NULL, 16);
+	}
+
+	virtual void Write(const char* szFilename)
+	{
+		char szBuffer[33];
+
+		sprintf_s(szBuffer, "%08x", (unsigned int)m_value);
+		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
+	}
+
+	ImColor& m_value;
+};
+
 class ConfigItemFloat : public IConfigItem
 {
 public:
@@ -523,11 +603,11 @@ public:
 class ConfigItemKeybind : public IConfigItem
 {
 public:
-	ConfigItemKeybind(const char* szCategory, IKeybind& key)
-		: m_key(key)
+	ConfigItemKeybind(const char* szCategory, CKeybind& Key)
+		: m_Key(Key)
 	{
 		m_szCategory = szCategory;
-		m_szName = key.GetName();
+		m_szName = Key.GetName();
 	}
 
 	virtual void Read(const char* szFilename)
@@ -535,24 +615,24 @@ public:
 		char szDefaultKeybindKeycode[33];
 		char szKeybindKeycode[33];
 
-		_itoa_s(m_key.GetKeycode(), szDefaultKeybindKeycode, 10);
+		_itoa_s(m_Key.GetKeycode(), szDefaultKeybindKeycode, 10);
 
 		GetPrivateProfileString(m_szCategory, m_szName, szDefaultKeybindKeycode, szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
 
-		m_key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
+		m_Key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
 	}
 
 	virtual void Write(const char* szFilename)
 	{
 		char szKeybindKeycode[33];
 
-		_itoa_s(m_key.GetKeycode(), szKeybindKeycode, 10);
+		_itoa_s(m_Key.GetKeycode(), szKeybindKeycode, 10);
 
 		WritePrivateProfileString(m_szCategory, m_szName, szKeybindKeycode, szFilename);
 	}
 
 private:
-	IKeybind& m_key;
+	CKeybind& m_Key;
 };
 
 //template<typename T>
@@ -658,7 +738,7 @@ struct op_valid_impl
 		void(), std::true_type());
 
 	template<class U, class L, class R>
-	static auto test(...)->std::false_type;
+	static auto test(...) -> std::false_type;
 
 	using type = decltype(test<Op, X, Y>(0));
 
@@ -707,7 +787,7 @@ public:
 		char szBuffer[32];
 		std::stringstream ss_name, ss_val;
 		T type;
-	
+
 		for (size_t i = 0; ; ++i)
 		{
 			ss_name << m_szName << "[" << i << "]";
@@ -745,10 +825,11 @@ private:
 };
 #endif
 
+
 //TODO("implement shifted keys as a second code or bool")
 struct KeyOrdinal { const char* m_szName; USHORT m_uKeyCode; };
 
-static KeyOrdinal s_Keycodes[] =
+static const KeyOrdinal s_Keycodes[] =
 {
 	{ "ESCAPE", DIK_ESCAPE },
 	{ "1", DIK_1 },
@@ -864,14 +945,14 @@ static KeyOrdinal s_Keycodes[] =
 	{ "DELETE", DIK_DELETE }
 };
 
-KeyOrdinal* FindKeyOrdinal(USHORT uKeycode);
+const KeyOrdinal* FindKeyOrdinal(USHORT uKeycode);
 
 typedef struct _WIN32_FIND_DATA_LISTA
 {
 	struct _WIN32_FIND_DATA_LISTA* m_pNext;
 	struct _WIN32_FIND_DATA_LISTA* m_pPrevious;
 	WIN32_FIND_DATAA m_Data;
-} WIN32_FIND_DATA_LISTA, *PWIN32_FIND_DATA_LISTA;
+} WIN32_FIND_DATA_LISTA, * PWIN32_FIND_DATA_LISTA;
 typedef CONST PWIN32_FIND_DATA_LISTA PCWIN32_FIND_DATA_LISTA;
 
 typedef struct _WIN32_FIND_DATA_LISTW
@@ -879,7 +960,7 @@ typedef struct _WIN32_FIND_DATA_LISTW
 	struct _WIN32_FIND_DATA_LISTW* m_pNext;
 	struct _WIN32_FIND_DATA_LISTW* m_pPrevious;
 	WIN32_FIND_DATAW m_Data;
-} WIN32_FIND_DATA_LISTW, *PWIN32_FIND_DATA_LISTW;
+} WIN32_FIND_DATA_LISTW, * PWIN32_FIND_DATA_LISTW;
 typedef CONST PWIN32_FIND_DATA_LISTW PCWIN32_FIND_DATA_LISTW;
 
 #ifdef _UNICODE
@@ -896,39 +977,81 @@ SIZE_T FindDataListCount(PCWIN32_FIND_DATA_LIST pList);
 VOID FindDataListSort(PWIN32_FIND_DATA_LIST pList);
 PWIN32_FIND_DATA_LIST FindDataListNav(PCWIN32_FIND_DATA_LIST pList, INT iIndex);
 
-class CConfig
+class IConfig
 {
 public:
-	CConfig();
-	~CConfig();
 
-	bool CreateConfig(LPTSTR szFilename);
-	void ResetConfig();
+	virtual bool CreateConfig(LPTSTR szFilename) = 0;
+	virtual void ResetConfig(void) = 0;
+	virtual void Load(LPCWSTR szFilename) = 0;
+	virtual void Save(LPCTSTR szFilename) = 0;
+
+	static BOOL FileExists(LPCTSTR szFilename);
+
+	static BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+		OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath);
+
+	static BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+		OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath);
+
+};
+
+class CConfigXml : public IConfig
+{
+	virtual void Load(LPCWSTR szFilename) override;
+
+	void ReadNode(XmlNodeType Type);
+
+	IXmlReader* m_pReader;
+};
+
+class CConfig : public IConfig
+{
+public:
+	CConfig(void);
+	~CConfig(void);
+
+	bool CreateConfig(LPTSTR szFilename) override;
+	void ResetConfig(void);
+	void Load(LPCWSTR szFilename) override;
+	void Save(LPCTSTR szFilename) override;
+
+	// HACK! for compat
 	void Load(LPCTSTR szFilename);
-	void Save(LPCTSTR szFilename);
 
 	BOOL EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const;
 
-	std::vector<IKeybind*>& GetKeybinds() {	return m_keybinds; }
-	LPCTSTR GetConfigPath() const { return m_szFilename; }
+	std::vector<CKeybind*>& GetKeybinds(void) { return m_keybinds; }
+	LPCTSTR GetConfigPath(void) const { return m_szFilename; }
+
+	friend class CMenu;
 
 private:
-	void InitializeConfig();
+	void InitializeConfig(void);
 
-	void PurgeConfig();
-	void LoadDefault();
+	void PurgeConfig(void);
+	void LoadDefault(void);
 
-	void AddKeybind(IKeybind* pKeybind);
+	void AddKeybind(CKeybind* pKeybind);
+
+	template<size_t N>
+	void AddKeybinds(CKeybind* (&& Keybind)[N])
+	{
+		for (auto it : Keybind)
+		{
+			AddKeybind(it);
+		}
+	}
 
 	bool SetFilename(LPCTSTR szFilename);
-	BOOL FileExists(LPTSTR szFilename);
-	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath) const;
-	BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath) const;
 
 	TCHAR m_szFilename[MAX_PATH];
 	std::vector<IConfigItem*> m_items;
-	std::vector<IKeybind*> m_keybinds;
+	std::vector<CKeybind*> m_keybinds;
 };
-extern CConfig* g_pConfig;
+
+
+//extern CConfig* g_pConfig;
+#include "Menu.h"
 #include "Variables.h"
 #include "Features.h"

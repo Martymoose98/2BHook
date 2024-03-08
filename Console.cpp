@@ -1,15 +1,18 @@
 #include "Console.h"
 
-CConsole* g_pConsole = new CConsole;
+CConsole* g_pConsole = new CConsole();
 
-CConsole::CConsole()
-	: m_Items(), m_bShouldScrollToBottom(true), m_History(), m_iHistoryPos(0), m_Commands()
+// FIXME: Console has perf issues when scratch buffer is populated
+// Circular buffer? or LRU cache?
+CConsole::CConsole(void)
+	: m_Items(), m_bFilter(false), m_bScrollToBottom(false), 
+	m_bShouldScrollToBottom(true), m_History(), m_iHistoryPos(0), m_Commands()
 {
 	ZeroMemory(m_szInput, sizeof(m_szInput));
 	ZeroMemory(m_szFilter, sizeof(m_szFilter));
 }
 
-CConsole::~CConsole()
+CConsole::~CConsole(void)
 {
 	Clear();
 }
@@ -168,4 +171,11 @@ void CConsole::Draw(const char* szTitle)
 
 	ImGui::Separator();
 	ImGui::Checkbox("Show Game Errors", &Vars.Misc.bConsoleShowGameErrors);
+
+}
+
+void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+{
+	if (Vars.Misc.bConsoleShowGameErrors)
+		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }

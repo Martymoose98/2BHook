@@ -6,6 +6,7 @@
 #include "ImGui/imgui.h"
 #include "ImGui/backends/imgui_impl_dx11.h"
 #include "ImGui/backends/imgui_impl_win32.h"
+#include <Fluorine\VirtualTableHook.h>
 #include "Console.h"
 #include "Log.h"
 #include "Overlay.h"
@@ -15,6 +16,7 @@
 #include "Globals.h"
 #include "Configuration.h"
 #include "Utils.h"
+
 
 typedef HRESULT(*PresentFn)(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags);
 typedef HRESULT(*ResizeBuffersFn)(IDXGISwapChain* pThis, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
@@ -46,6 +48,8 @@ typedef bool(*MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
 typedef BOOL(*CCameraGame_SetViewAnglesFn)(CCameraGame* pCamera);
 typedef void* (*CCameraGame_MoveFn)(CCameraGame* pCamera);
 
+typedef CModelShaderModule* (*CModelAnalyzer_CreateModelShaderModuleFn)(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4);
+
 extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 extern PresentFn oPresent;
@@ -71,6 +75,7 @@ extern LoadWordBlacklistFn oLoadWordBlacklist;
 extern MRubyLoadScriptFn oMRubyLoadScript;
 extern CCameraGame_SetViewAnglesFn oCCameraGameSetViewAngles;
 extern CCameraGame_MoveFn oCCameraGameMove;
+extern CModelAnalyzer_CreateModelShaderModuleFn oCreateModelShaderModule;
 extern WNDPROC oWndProc;
 
 
@@ -96,8 +101,11 @@ extern "C" void hkUpdateModelParts(Pl0000 * pEntity); //proabably not a pl0000 m
 extern "C" void* hkCreateEntityThunk(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
 extern "C" void* hkCreateEntity(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
+void hkPl0000Destructor(Pl0000* pThis);
+void hkPl0000Update(Pl0000* pThis);
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis);
 void* hkCCameraGameMove(CCameraGame* pThis);
+CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4);
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 HRESULT hkOleLoadPicture(LPSTREAM lpstream, LONG lSize, BOOL fRunmode, REFIID riid, LPVOID* lplpvObj);
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerfomaceCount);

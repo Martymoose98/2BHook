@@ -3,7 +3,8 @@
 
 #include <immintrin.h>
 #include <vector> //tmp
-#include "Memory.h"
+#include <Fluorine\Memory.h>
+
 #include "ReversedStructs.h"
 #include "Vector4.h"
 

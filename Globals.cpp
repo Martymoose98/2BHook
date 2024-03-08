@@ -24,6 +24,7 @@ CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
 CSceneEntitySystem_CreateEntityFn SceneEntitySystem_CreateEntity;
 CSceneStateSystem_SetFn SceneStateSystem_Set;
 CCameraGame_SetLookAtFn CameraGame_SetLookAt;
+CCameraGame_SetLookAtFn CameraGame_SetLookAtNoDistance;
 GetConstructorFn GetConstructionInfo;
 CSceneEntitySystem_FindSceneStateFn SceneEntitySystem_FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
@@ -35,6 +36,7 @@ PreloadFileFn PreloadFile;
 ObjReadSystem_RequestEndFn RequestEnd;
 ObjReadSystem_PreloadModelFn PreloadModel; 
 COtManager_GetGraphicCommandFn GetGraphicCommand;
+CreateTextureFn CreateTexture;
 CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
 CreateUIFromIdFn CreateUIFromId;
 ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
@@ -48,6 +50,10 @@ XInputPowerOffControllerFn XInputPowerOffController;
 XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
+unsigned int* g_pDebugFlags;
+unsigned int* g_pCameraFlags;
+unsigned int* g_pGameFlags;
+
 int* g_piMoney;
 int* g_piExperience;
 
@@ -55,6 +61,7 @@ HWND g_hWnd;
 HINSTANCE g_hInstance;
 HANDLE* g_phHeaps;
 LPSTR g_szDataDirectoryPath;
+LPSTR g_szCRILogBuffer;
 std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 std::vector<MrubyImpl*> g_pRubyInstances;
 
@@ -114,6 +121,7 @@ VirtualTableHook* g_pDeviceContextHook;
 VirtualTableHook* g_pKeyboardHook;
 VirtualTableHook* g_pMouseHook;
 VirtualTableHook* g_pCameraHook;
+VirtualTableHook* g_pModelAnalyzerHook;
 MemoryDeviceHook* g_pMemoryDeviceHook;
 std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 

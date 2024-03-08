@@ -120,6 +120,7 @@ public:
 		*cosine = cos(radians);
 	}
 
+	// NOTE: nier is fucked up and sp = fw->y normally Z
 	static void AngleVectors(const Vector3& angles, Vector3* forward)
 	{
 		float sp, sy, cp, cy;
@@ -201,13 +202,29 @@ public:
 		if (dir.z >= 0.0f)
 			angles.y += M_PI_F;
 	}
+	
+	//static void ClampAngle(Vector3& angles)
+	//{
+	//	if (angles.x < -DEGTORAD(89.0f))
+	//		angles.x = DEGTORAD(89.0f);
+	//	if (angles.x > DEGTORAD(89.0f))
+	//		angles.x = DEGTORAD(89.0f);
+	//	if (angles.y < DEGTORAD(-180.0f))
+	//		angles.y += DEGTORAD(360.0f);
+	//	if (angles.y > DEGTORAD(180.0f))
+	//		angles.y -= DEGTORAD(360.0f);
+	//	if (angles.z != 0.0f)
+	//		angles.z = 0.0f;
+	//}
 
+	// 72 deg max nier pitch
+	// unrestricted yaw which is bad for 1st person
 	static void ClampAngle(Vector3& angles)
 	{
-		if (angles.x < -DEGTORAD(89.0f))
-			angles.x = DEGTORAD(89.0f);
-		if (angles.x > DEGTORAD(89.0f))
-			angles.x = DEGTORAD(89.0f);
+		if (angles.x < DEGTORAD(-72.0f))
+			angles.x = DEGTORAD(-72.0f);
+		if (angles.x > DEGTORAD(72.0f))
+			angles.x = DEGTORAD(72.0f);
 		if (angles.y < DEGTORAD(-180.0f))
 			angles.y += DEGTORAD(360.0f);
 		if (angles.y > DEGTORAD(180.0f))

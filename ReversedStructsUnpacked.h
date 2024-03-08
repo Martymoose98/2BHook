@@ -7,48 +7,16 @@
 #include "SteamApi.h"
 #include "Math.h"
 
-#define PURE = 0
 
-#define SAVE_FLAGS_READ_SLOTS	0x00000001
-#define SAVE_FLAGS_READ			0x00000002
-#define SAVE_FLAGS_WRITE		0x00000003
-#define SAVE_FLAGS_DELETE		0x00000004
+#include "SDK\Common.h"
 
-#define SAVE_SYSTEMDATA -2
-#define SAVE_GAMEDATA -1
-#define SAVE_SLOT0DATA 0
-#define SAVE_SLOT1DATA 1
-#define SAVE_SLOT2DATA 2
+#include "SDK\CCamera.h"
 
-#define FLAGS_FREE 1
+#include "SDK\Entity\CBehavior.h"
+#include "SDK\Entity\Pl0000.h"
+#include "SDK\Entity\Pl0013.h"
+#include "SDK\Entity\Pl1010.h"
 
-#define FILTER_UI_NOISE_MAX 0x20000
-#define FILTER_UI_NOISE_LV3 0x1000000
-#define FILTER_UI_NOISE_LV2 0x2000000
-#define FILTER_UI_NOISE_LV1 0x4000000	
-#define FILTER_UI_NOISE_LV0 0x8000000
-
-#define FILTER_2B_DIE_LV0 FILTER_UI_NOISE_LV0
-#define FILTER_2B_DIE_LV1 FILTER_UI_NOISE_LV1
-#define FILTER_2B_DIE_LV2 (FILTER_UI_NOISE_LV2 | 0x400)
-#define FILTER_2B_DIE_LV3 (FILTER_UI_NOISE_LV3 | 0x400)
-
-#define FILTER_2B_DIE_CLEAR 	// 0xF07DFFFF
-
-#define DBGFLGS_UNKNOWN_0		0x20
-#define DBGFLGS_UNKNOWN_1		0x80
-#define DBGFLGS_SELFDESTRUCT	0x400
-#define DBGFLGS_UNKNOWN_2		0x1000
-#define DBGFLGS_SLOWTIME		0x2000
-#define DBGFLGS_UNKNOWN_3		0x4000
-#define DBGFLGS_UNKNOWN_4		0x8000
-
-#define DBGFLGS_MAX_VALUE (DBGFLGS_UNKNOWN_0 | DBGFLGS_UNKNOWN_1 | DBGFLGS_SELFDESTRUCT | DBGFLGS_UNKNOWN_2 | DBGFLGS_SLOWTIME | DBGFLGS_UNKNOWN_3 |  DBGFLGS_UNKNOWN_4)
-
-#define CAMFLGS_LOCK 0x80000000
-
-#define DATAFILE_DATA	0
-#define DATAFILE_MODEL	1
 
 #define _MM_RSHUFFLE(mask, x, y, z, w) \
      (x) = ((mask & 0xC) >> 2);		   \
@@ -56,115 +24,13 @@
      (z) = ((mask & 0xC0) >> 6);	   \
      (w) = (mask & 0x3)
 
-#define IS_SAVE_SLOTDATA(s) ((s) > -1 && (s) < 3)
-
-// visual studio says correct offsets are wrong before compalation on interfaces rifk
-#define IS_OFFSET_CORRECT(s, m, offset) static_assert(offsetof(s, m) == (offset), "offset of struct member is incorrect")
-#define IS_SIZE_CORRECT(s, size) static_assert(sizeof(s) == (size), "size of struct is incorrect")
-
 #define ALIGN(size, align) (((size) + (align) - 1) & ~(align))
-
-#define ENTITY_REAL_VTABLE
-
-// used inthe update func
-#define MODELSHADERMODULE_DONT_UPDATE 0x00080002
-
-#define MAX_MATERIAL_TEXTURES 16
-
-// defines for bone ids
-#define BONE_ROOT		4094
-#define BONE_ROOT_CHILD	4095
-#define BONE_SPINE0		0
-#define BONE_SPINE1		1
-#define BONE_SPINE2		2
-#define BONE_SPINE3		3
-#define BONE_NECK		4
-#define BONE_HEAD		5
-#define BONE_R_SHOULDER	6
-#define BONE_R_ARM		7
-#define BONE_R_FOREARM	8
-#define BONE_R_WRIST	9
-#define BONE_L_SHOULDER	10
-#define BONE_L_ARM		11
-#define BONE_L_FOREARM	12
-#define BONE_L_WRIST	13
-#define BONE_HIP		14
-#define BONE_R_UPPERLEG	15
-#define BONE_R_LEG		16
-#define BONE_R_ANKLE	17
-#define BONE_R_TOES		18
-#define BONE_L_UPPERLEG	19
-#define BONE_L_LEG		20
-#define BONE_L_ANKLE	21
-#define BONE_L_TOES		22
-
-#define BONE_BOOBS		3136
-
-#define BIG_ENDIAN
 
 typedef ULONGLONG QWORD;
 
-//
-//  EntityHandles are 32 bit values laid out as follows:
-//
-//   RRRRRRRR IIIIIIIIIIIIIIII SSSSSSSS
-//  +--------+----------------+--------+
-//  |        |      Index     | Shift  |
-//  +--------+----------------+--------+
-//
-//  where
-//
-//      S - Shift - 8 bit shift value (unknown use)
-//
-//      I - Index - 16 unsigned value
-//          Index into the CEntiyList::m_pItems
-// 
-//      R - reserved bits of the handle
-//
-typedef unsigned long EntityHandle;
 
-enum TypeId {};
-
-class Pl0000;
-
-/*
-Nier Automata's lib::Array<T>
-*/
-template<typename T>
-class Array
-{
-public:
-	virtual Array<T>* Clear(BYTE flags);
-	virtual QWORD GetSize();
-	virtual bool GetItem(OUT T* pItem);
-	virtual T* Find(IN T* pSearchItem, OUT T* pFound);
-
-	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
-};
-
-/*
-Nier Automata's lib::StaticArray<T, size, element_size>
-*/
-template<typename T, size_t size, size_t element_size = sizeof(T)>
-class StaticArray : public Array<T>
-{
-public:
-	T m_items[size];	//0x0020
-};
-
-/*
-Nier Automata's lib::AllocatedArray<T>
-*/
-template<typename T>
-class AllocatedArray
-{
-public:
-	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
-};
+// nier uses this https://github.com/rmind/tlsf
+// debug build has strings
 
 
 /*
@@ -216,6 +82,8 @@ struct ItemHashEntry
 	DWORD crc;
 };
 
+class Pl0000;
+
 struct SoundEmitter
 {
 	Pl0000* m_pEntity; // this is some lower interface like behaviour
@@ -231,141 +99,40 @@ class CUnknown_t
 	void* pFunction;	//0x0018
 };
 
-struct Unknown_t;
-
-struct DatafileDesc
-{
-	void* pDatafiles[2];	//0x00
-	char pad[8];
-	int m_ObjectId2;
-	int m_ObjectId;
-	char m_szObjectName2[16];
-	char m_szObjectName[16]; //0x30
-};
-
-struct DATHeader
-{
-	union {
-		char Signature[4];	//0x00
-		DWORD dwMagic;		//0x00
-	};
-	DWORD dwFileCount;		//0x04
-	DWORD dwFileTableOffset;//0x08
-	DWORD dwExtensionOffset;//0x0C
-	DWORD dwNameTableOffset;//0x10
-	DWORD dwSizeTableOffset;
-	DWORD dwUnknownOffset;
-	DWORD dwNull;
-};
-
-// Size of structiure is 0x30 (48) bytes 
-struct CReadWriteLock
-{
-	CRITICAL_SECTION m_CriticalSection;
-	BOOL m_bCriticalSectionInitalized;
-
-	CReadWriteLock()
-	{
-		InitializeCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = TRUE;
-	}
-
-	CReadWriteLock(DWORD dwSpinCount)
-	{
-		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
-		m_bCriticalSectionInitalized = TRUE;
-	}
-
-	~CReadWriteLock()
-	{
-		DeleteCriticalSection(&m_CriticalSection);
-		m_bCriticalSectionInitalized = FALSE;
-	}
-
-	bool Lock(void)
-	{
-		if (m_bCriticalSectionInitalized)
-			EnterCriticalSection(&m_CriticalSection);
-
-		return m_bCriticalSectionInitalized;
-	}
-
-	void Unlock(void)
-	{
-		if (m_bCriticalSectionInitalized)
-			LeaveCriticalSection(&m_CriticalSection);
-	}
-};
-
 struct CHeapInstance;
-
-struct BXMHeader
-{
-	union
-	{
-		char m_szSignature[4];
-		UINT m_uMagic;
-	};
-	UINT m_uUnk4;
-	BIG_ENDIAN USHORT m_usNameOrdinalCount;	// this is used times 8 for mem allocation
-	BIG_ENDIAN USHORT m_usNameCount;
-	BIG_ENDIAN UINT m_uEntryCount;
-};
-
-struct BXMEntry
-{
-	BIG_ENDIAN USHORT m_usCatMax;
-	BIG_ENDIAN USHORT m_usCatOffset;
-	BIG_ENDIAN USHORT m_usMax;
-	BIG_ENDIAN USHORT m_usOffset;
-};
-
-struct BXMNameOridinal
-{
-	union
-	{
-		struct
-		{
-			BIG_ENDIAN UINT m_uNameIndex;
-			BIG_ENDIAN UINT m_u04;
-		};
-		struct
-		{
-			BIG_ENDIAN USHORT m_usNameIndex;
-			BIG_ENDIAN USHORT m_us04;
-		};
-	};
-};
 
 /*
 	CXML is a pure virtual interface with all 82 vfuncs pure virtuals
 
 	Size of struct is ?? (??) bytes
 */
-struct CXMLBinary //: CXML
-{
-	void* lpVtbl;
-	QWORD m_pHeap;	// don't exactly know what heap struct this is
-	QWORD* m_pData;
-	void* m_pBXM;
-	BXMEntry* m_pEntries;  // m_pBXM + 16
-	BXMNameOridinal* m_pNameOridinals; // m_dwFlags & 1 ? 8 * nQWords : 4 * nQWords;
-	const char** m_pszNames;
-	DWORD m_dwFlags; // 1u = m_uQWordCount >= 0xFFFF		
-};
+//struct CXmlBinary //: CXML
+//{
+//	void* lpVtbl;
+//	QWORD m_pHeap;	// don't exactly know what heap struct this is
+//	QWORD* m_pData;
+//	void* m_pBXM;
+//	BXMEntry* m_pEntries;  // m_pBXM + 16
+//	BXMNameOridinal* m_pNameOridinals; // m_dwFlags & 1 ? 8 * nQWords : 4 * nQWords;
+//	const char** m_pszNames;
+//	DWORD m_dwFlags; // 1u = m_uQWordCount >= 0xFFFF		
+//};
 
-struct ObjReadSystem
+struct CObjReadSystem
 {
+	// Size of struct  0x58
 	struct Work
 	{
-		struct Desc
+		//  FileRead::Listener, Hw::cRBTreeNodeTemp<ObjReadSystem::Work>
+		// Size of struct 0xB8
+		struct CObjReadSystem::Work::Desc
 		{
-			DWORD dword0;								//0x00
-			QWORD qword4;								//0x04
-			ObjReadSystem::Work::Desc* m_pPrevious;		//0x0C
-			ObjReadSystem::Work::Desc* m_pNext;			//0x14
-			int int1c;									//0x1C
-			INT m_0x20;									//0x20
+			DWORD dword0;
+			CObjReadSystem::Work::Desc* m_pParent;
+			CObjReadSystem::Work::Desc* m_pRight;
+			CObjReadSystem::Work::Desc* m_pLeft;
+			int m_Crc32;
+			INT m_0x20;
 			int gap2c;
 			DWORD m_dw0x30;
 			DWORD m_dwType;
@@ -379,215 +146,43 @@ struct ObjReadSystem
 			DWORD m_dw0x9C;
 			DWORD m_dw0xA0;
 			DWORD m_dw0xA4;
-			ObjReadSystem::Work* m_pWork;
+			CObjReadSystem::Work* m_pWork;
 			char pad[8];
 		};
 
+		// this this is shit
 		struct Info
 		{
 			BYTE gap0[32];
 			DWORD m_crc32;
-			ObjReadSystem::Work::Desc* m_pDescription;
+			CObjReadSystem::Work::Desc* m_pDescription;
 		};
 
-		void* m_pVtbl;
-		char gap8[16];
-		struct ObjReadSystem::Work* m_pPrev;
-		struct ObjReadSystem::Work* m_pNext;
-		DWORD m_flags;
-		int m_objectid;
+		void* m_pVtbl;							//0x0000
+		char gap8[16];							//0x0008
+		struct CObjReadSystem::Work* m_pPrev;	//0x0018
+		struct CObjReadSystem::Work* m_pNext;	//0x0020
+		DWORD m_flags;							//0x0028
+		int m_ObjectId;
 		int m_objectid2;
 		int m_objectid3;
-		ObjReadSystem::Work::Desc* m_pUnknown;
-		QWORD ptr40;
-		void* m_pDatPtr;
-		void* m_pDatPtr2;
-		void* m_unk1;
+		CObjReadSystem::Work::Desc* m_pUnknown;	//0x0038
+		HANDLE m_hSemaphore2;					//0x0040
+		void* m_pDatPtr;						//0x0048
+		void* m_pDatPtr2;						//0x0050
+		void* m_unk1;							//0x0058
 		void* m_unk2;
 	};
+
+	CReadWriteLock m_Lock;
+	CReadWriteLock m_Lock2;
 };
 
-enum TextureDimension
-{
-	TEXTURE_DIMENSION_CUBEMAP = 2
-};
-
-struct CTextureD3D
-{
-	union {
-		ID3D11Texture1D* m_pTexture1D;
-		ID3D11Texture2D* m_pTexture2D;
-		ID3D11Texture3D* m_pTexture3D;
-	};
-	ID3D11ShaderResourceView* m_pDefaultShaderResourceView;
-	QWORD qword10;
-	ID3D11ShaderResourceView* m_pShaderResourceViews[16];
-};
-
-/*
-Size of struct is 0xB0 (176)
-*/
-struct CTexture
-{
-	void* m_vtbl;					//0x00
-	int m_iWidth;					//0x08
-	int m_iHeight;					//0x0C
-	int m_Depth;					//0x10
-	BYTE gap14[8];					//0x14
-	BOOL m_bForceSRGB;				//0x1C
-	UINT m_uMipMapCount;			//0x20
-	DXGI_FORMAT m_Format;			//0x24
-	BYTE gap28[8];					//0x28
-	TextureDimension m_Dimension;	//0x30
-	BYTE gap34[60];					//0x34
-	CTextureD3D* m_pTexture;		//0x70
-	char gap78[56];					//0x78
-};
-IS_OFFSET_CORRECT(CTexture, m_Depth, 0x10);
-IS_OFFSET_CORRECT(CTexture, m_Dimension, 0x30);
-
-struct CTargetTexture
-{
-	void* m_vtbl;
-	CTexture* m_pTexture;
-	BOOL m_bInitalized;
-};
 
 struct CTextureBatch;
 
-// size of struct 96 (0x60) bytes
-struct CTextureData
-{
-	DATHeader* m_pHeaders[2];
-	struct CTextureData* m_pPrevious;
-	struct CTextureData* m_pNext;
-	BYTE gap20[8];
-	void* m_pWTAFile;
-	void* m_pWTPFile;
-	CTextureBatch* m_pTextures;
-	DWORD m_dwTextureCount;
-	BOOL m_bUnk;
-	DWORD dword48;
-	DWORD dword4C;
-	char pad0x50[16];
-};
-IS_SIZE_CORRECT(CTextureData, 96);
-
-struct CTextureBatch
-{
-	CTextureData* m_pData;
-	CTargetTexture m_Texture;
-	BOOL m_bLast;
-	char pad24[4];
-};
-IS_SIZE_CORRECT(CTextureBatch, 40);
-
-struct DDS_PIXELFORMAT
-{
-	uint32_t size;
-	uint32_t flags;
-	uint32_t fourCC;
-	uint32_t RGBBitCount;
-	uint32_t RBitMask;
-	uint32_t GBitMask;
-	uint32_t BBitMask;
-	uint32_t ABitMask;
-};
-
-struct DDS_HEADER
-{
-	uint32_t size;
-	uint32_t flags;
-	uint32_t height;
-	uint32_t width;
-	uint32_t pitchOrLinearSize;
-	uint32_t depth;
-	uint32_t mipMapCount;
-	uint32_t reserved1[11];
-	DDS_PIXELFORMAT ddspf;
-	uint32_t caps;
-	uint32_t caps2;
-	uint32_t caps3;
-	uint32_t caps4;
-	uint32_t reserved2;
-};
-
-/*
-	Size of struct 0x14 (20) bytes
-*/
-struct DDS_HEADER_DXT10
-{
-	DXGI_FORMAT dxgiFormat;			//0x00
-	uint32_t    resourceDimension;	//0x04
-	uint32_t    miscFlag;			//0x08 see D3D11_RESOURCE_MISC_FLAG
-	uint32_t    arraySize;			//0x0C
-	uint32_t    miscFlags2;			//0x10
-};
-
 struct TextureFile;
 
-struct CTextureDescription
-{
-	DDS_HEADER_DXT10* m_pHeaderDX10;
-	TextureFile* m_pDDS;
-	unsigned int m_uTextureSize;	//size of dds file
-	DWORD gap14;					// 0,2
-	DWORD dword18;					// 1-4
-	BOOL m_b1C;
-	BOOL m_b20;
-	DWORD dword24;
-	BOOL m_bHasDX10Header;
-};
-
-struct TextureFile
-{
-	uint32_t magic;
-	DDS_HEADER hdr;
-	CTextureDescription m_Desc;	//might be just DDS_HEADER_DXT10
-};
-
-// Struct at least 0x1A8 bytes
-struct CEntityInfo
-{
-	Unknown_t* m_pUnknown;						//0x0000 | i don't really know what this is (confirmed a struct pointer) maybe a void*
-	char m_szEntityType[32];					//0x0008
-	unsigned int m_ObjectId;					//0x0028
-	BYTE m_Flags;								//0x002C  | An Entity cannot have this flag or'd with 3 game crashes (possibly a destroyed flag)
-	char alignment[3];							//0x002D
-	EntityHandle m_hEntity;						//0x0030
-	char _0x0038[4];							//0x0034
-	CTextureData* m_pTextureData[2];			//0x0038
-	Pl0000* m_pEntity;							//0x0048
-	DatafileDesc* m_pDatDesc;					//0x0050  | m_pWMB
-	DWORD* m_pUnk;								//0x0058  | m_pWTA (debug build) dword array 2 members (0x1415F6B50) CSceneEntitySystem::qword10
-	Pl0000* m_pParent;							//0x0060  | m_pWTP (debug build)
-	BOOL m_bDataExists;							//0x0068
-	UINT m_uEntityId;							//0x006C
-	UINT m_uSetType;							//0x0070
-	char _0x0x0074[68];							//0x0074
-	EntityHandle m_hUnk;						//0x00B8
-};
-IS_OFFSET_CORRECT(CEntityInfo, m_pParent, 0x60);
-IS_OFFSET_CORRECT(CEntityInfo, m_hUnk, 0xB8);
-
-struct CEntityListEntry
-{
-	EntityHandle m_hEntity;
-	CEntityInfo* m_pInfo;
-};
-
-/*
-Address = 14160DF88
-*/
-struct CEntityList
-{
-	DWORD m_dwItems;								//0x0000
-	DWORD m_dwSize;									//0x0004
-	DWORD m_dwBase;									//0x0008 | What the indices start at for handles
-	DWORD m_dwShift;								//0x000C
-	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
-	CReadWriteLock m_Lock;							//0x0018
-};
 
 // they might be Vector4's
 struct CAxisAlignedBoundingBox
@@ -644,13 +239,30 @@ struct CCollisionObjectName
 
 struct CCollisionTreeNode;
 
+// TODO:
+class CCollisionDataObjectBase
+{
+public:
+	virtual __int64 function0(char a1);
+	virtual __int64 function1();
+	virtual __int64 function2();
+	virtual void function3(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckSphere(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void function5(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckBox(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void function7(float* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+	virtual void CheckCapsule(CollisionInfo* a2, __int64 a3, CAxisAlignedBoundingBox* a4);
+
+};
+
 /*
 * CCollisionDataObjectImpl : public CCollisionDataObjectBase
 *
 * Size of struct is 0x120 (288) bytes
 */
-struct CCollisionDataObject
+class CCollisionDataObject
 {
+public:
 	virtual __int64 function0(char a1);
 	virtual __int64 function1();
 	virtual __int64 function2();
@@ -689,11 +301,11 @@ struct CCollisionDataObject
 	CCollisionTreeNode* m_pCollisionTree;
 	int m_nCollisionTreeNodes;
 };
-IS_OFFSET_CORRECT(CCollisionDataObject, m_AABB, 0x10);
-IS_OFFSET_CORRECT(CCollisionDataObject, m_uScenePropIndex, 0x34);
-IS_OFFSET_CORRECT(CCollisionDataObject, m_pSegments, 0x98);
-IS_OFFSET_CORRECT(CCollisionDataObject, m_pCollisionTree, 0x110);
-IS_SIZE_CORRECT(CCollisionDataObject, 0x120);
+VALIDATE_OFFSET(CCollisionDataObject, m_AABB, 0x10);
+VALIDATE_OFFSET(CCollisionDataObject, m_uScenePropIndex, 0x34);
+VALIDATE_OFFSET(CCollisionDataObject, m_pSegments, 0x98);
+VALIDATE_OFFSET(CCollisionDataObject, m_pCollisionTree, 0x110);
+VALIDATE_SIZE(CCollisionDataObject, 0x120);
 
 struct CCollisionDataEntry
 {
@@ -757,7 +369,7 @@ struct CCollisionContext
 {
 	unsigned int m_uReferenceCount;
 	char** m_pNames;
-	DWORD m_uNameCount;
+	int m_nNameCount;
 	CCollisionMesh* m_pMeshes;
 	int m_iMeshCount;
 	QWORD m_pBoneMap;
@@ -793,6 +405,7 @@ struct COLHdr
 	int colTreeNodesCount;
 };
 
+// CRedBlackTreeNode<T>*
 struct CCollisionContextNode
 {
 	DWORD dword0;
@@ -829,96 +442,6 @@ struct CCollisionDataObjectManager
 	DWORD dwordBC;
 };
 
-struct CModelShader;
-
-struct MaterialShaderInfo
-{
-	int m_iShader;
-	CModelShader* m_pShader;
-};
-
-struct WMBBone;
-
-/*
-* Could be called CModelPart
-Mesh struct used by the engine
-size = 0x70 (112) bytes
-*/
-struct CMesh2
-{
-	Vector4 m_vColor;					//0x0000
-	Vector4 m_vColorReadOnly;			//0x0010
-	Vector3Aligned m_vMax;				//0x0020
-	Vector3Aligned m_vMin;				//0x0030
-	const char* m_szMeshName;			//0x0040 
-	MaterialShaderInfo* m_pShaderInfo;	//0x0048 | important pointer 
-	int m_nShaderInfo;					//0x0050
-	WMBBone* m_pBones;					//0x0058
-	int m_nBones;						//0x0060
-	BOOL m_bShow;						//0x0064 | ? need to be synced with the other modifing threads
-	BOOL m_bUpdate;						//0x0068 | ? fucks with color vec
-	float m_flUnknown6C;				//0x006C
-};
-
-class CBehaviorExtension
-{
-public:
-	virtual void function0(char a1);
-	virtual void function1() = 0; // no return? wtf
-	virtual void function2() = 0; // xor al, al	 ret
-	virtual void function3() = 0; // mov al, 1 ret
-	virtual void function4() = 0; // mov al, 1 ret
-	virtual void function5() = 0; // nullsub
-
-	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;	//0x0008
-};
-IS_SIZE_CORRECT(CBehaviorExtension, 0x10);
-
-class ExWaypoint : public CBehaviorExtension
-{
-
-};
-
-class ExBaseInfo : public CBehaviorExtension
-{
-public:
-	virtual void function0(char a1);
-	virtual void function1();
-	virtual void function2();
-	virtual void function3();
-	virtual void function4();
-	virtual void function5();
-};
-
-/*
-Level structure used for level and when you level up
-size = 28 bytes
-*/
-struct Level_t
-{
-	int m_iMinimumExperience;		//0x0000 
-	int m_iHealth;					//0x0004 new max health 
-	int m_iBaseAttack;				//0x0008 idk about this one for sure
-	int m_iDefense;					//0x000C
-	int m_iLevel;					//0x0010 new level
-	int unk0x14;					//0x0014
-	int unk0x18;					//0x0018
-};
-
-/*
-Size of struct (0xAF8) 2808 bytes
-*/
-struct ExExpInfo
-{
-	void* m_vtable;			//0x0000
-	void** unk;				//0x0008
-	QWORD unk0x10;			//0x0010
-	QWORD unk0x18;			//0x0018
-	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
-	int m_nLevels;			//0x0AF4
-};
-IS_SIZE_CORRECT(ExExpInfo, 0xAF8);
-
 struct __declspec(align(16)) CollisionInfo
 {
 	Vector4 m_vPosition;
@@ -928,93 +451,7 @@ struct __declspec(align(16)) CollisionInfo
 	float m_flLength_v20;
 };
 
-class ExCollision : public CBehaviorExtension
-{
-	enum Type : DWORD
-	{
-		COLLISION_TYPE_INVALID,
-		COLLISION_TYPE_SPHERE,
-		COLLISION_TYPE_BOX,
-		COLLISION_TYPE_CAPSULE
-	};
 
-public:
-	virtual void function0(char a1);
-	virtual void function1();
-	virtual void function2();
-	virtual void function3();
-	virtual void function4();
-	virtual void function5();
-
-	EntityHandle m_hOwner;										//0x0010
-	BOOL m_bEnabled;											//0x0014
-	BOOL m_bCollison;											//0x0018
-	BOOL dword1C;												//0x001C
-	Vector4 m_vPosition;										//0x0020 | CollisionInfo starts here	
-	float m_boundingbox[6];										//0x0030
-	BYTE gap48[60];												//0x0048
-	DWORD dwCollisionType;										//0x0084
-	DWORD dword88;												//0x0088
-	int m_iBoneId;
-	int m_iBoneId2;
-	DWORD dword94;
-	DWORD dword98;
-	DWORD dword9C;
-	Vector4 m_vExtents;
-	Vector4 v0xB0;
-	Vector4 v0xC0;
-	Vector4 m_vSphereRadius;
-	Vector3Aligned m_vMin;	// vector pos of collision
-	void* unk[2];
-	Vector3Aligned m_vMax;
-	DWORD dword110;
-	DWORD dword114;
-	DWORD dword118;
-	DWORD dword11C;
-	Vector4 vec120;
-};
-IS_SIZE_CORRECT(ExCollision, 0x130);
-IS_OFFSET_CORRECT(ExCollision, m_iBoneId, 0x8C);
-IS_OFFSET_CORRECT(ExCollision, m_iBoneId2, 0x90);
-IS_OFFSET_CORRECT(ExCollision, m_vExtents, 0xA0);
-
-class ExLockOn : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-	void* m_pEntity;		//0x0008 
-};
-
-class ExCatch : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-};
-
-class ExAttack : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-};
-
-class ExDamage : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-};
-
-class ExAttackCombo : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-};
-
-class ExActionState : public CBehaviorExtension
-{
-	void* m_vtable;			//0x0000
-};
-
-class CXmlBinary
-{
-	void* m_vTable;
-	void* m_pUnknown[6];	//0x0008
-	int m_iUnknown;			//0x0038
-};
 
 typedef struct WTBHeader
 {
@@ -1031,325 +468,6 @@ typedef struct WTBHeader
 	unsigned int		texInfoOffset;
 } WTBHeader, WTBHdr, WTAHeader, WTAHdr;
 
-enum TextureFlags
-{
-	USE_ID_ZERO = 0x20,	// SINGLE TEXTURE IN BATCH???
-	LAST_TEXTURE = 0x40,	// 1<<6
-	HAS_DX10_HEADER = (1 << 25),
-	FORCE_SRGB = (1 << 26),
-	TEXTURE3D = (1 << 27),
-	TEXTURE2D = (1 << 28),
-	TEXTUREBUFFER = (1 << 29),
-};
-
-/*
-Size of struct 0x88 (136) bytes
-
-dummy.wmb is just this header structure
-*/
-typedef struct WMBHeader
-{
-	union {
-		char			id[4];			// 0x00
-		unsigned int	magic;
-	};
-	unsigned int		version;			// 4
-	int					unknown8;			// 8
-	short				unknownC;			// C Seems related to vertex index size
-	short				unknownE;			// E
-	float				boundingBox[6];		//10
-	unsigned int		ofsBones;			//28
-	int					numBones;			//2C
-	unsigned int		ofsBoneIndexTT;		//30
-	int					sizeBoneIndexTT;	//34
-	unsigned int		ofsVertexGroups;	//38
-	int					numVertexGroups;	//3C
-	unsigned int		ofsBatches;			//40
-	int					numBatches;			//44
-	unsigned int		ofsLods;			//48
-	int					numLods;			//4C
-	unsigned int		ofsHitboxes;		//50
-	int					numHitboxes;		//54
-	unsigned int		ofsBoneMap;			//58
-	int					sizeBoneMap;		//5C
-	unsigned int		ofsBoneSets;		//60
-	int					numBoneSets;		//64
-	unsigned int		ofsMaterials;		//68
-	int					numMaterials;		//6C
-	unsigned int		ofsMeshes;			//70
-	int					numMeshes;			//74
-	unsigned int		ofsMeshMaterial;	//78
-	int					numMeshMaterial;	//7C
-	unsigned int		ofsUnknownF;		//80
-	int					numUnknownG;		//84
-} WMBHeader, WMBHdr;
-
-// Size of struct 0x58 (88) bytes
-typedef struct WMBBone
-{
-	short	m_sId;				//0x00
-	short	m_sParentIndex;		//0x02 | parent id
-	Vector3	m_vLocalPosition;	//0x04
-	Vector3	m_vLocalRotation;	//0x10
-	Vector3	m_vLocalScale;		//0x1C
-	Vector3	m_vPosition;		//0x28
-	Vector3	m_vRotation;		//0x34
-	Vector3	m_vScale;			//0x40
-	Vector3	m_vTPosition;		//0x4C
-} WMBBone;
-
-// Size of struct 0xB0 (176) bytes
-typedef struct CBone
-{
-	Vector3Aligned	m_vLocalPosition;	//0x00
-	Vector3Aligned	m_vLocalRotation;	//0x10
-	Vector3Aligned	m_vLocalScale;		//0x20
-	Vector3Aligned	m_vPosition;		//0x30
-	Vector3Aligned	m_vRotation;		//0x40
-	Vector3Aligned	m_vScale;			//0x50
-	Vector3Aligned	m_vTPosition;		//0x60 
-	Vector3Aligned	m_vUnk;				//0x70 | maybe min, max?
-	Vector3Aligned	m_vScaledRotation;	//0x80 | definetly some rotation vector (pitch, yaw, roll)
-	CBone* m_pUnk;						//0x90
-	int m_iFlags;						//0x98 | bones in head and feathers are m_iFlags > 512 (0x200) { 0x208 (origin bone), 0x220 }
-	char _0x8C[4];						//0x9C
-	CBone* m_pParent;					//0xA0
-	short m_Id;							//0xA8
-	char _0x9A[6];						//0xAA
-} Bone;
-IS_SIZE_CORRECT(CBone, 0xB0);
-
-struct CBoneSets
-{
-	short* m_pSets;
-	int m_nSets;
-};
-
-struct WMBHitbox
-{
-	Vector3 m_vMax;
-	Vector3 m_vMin;
-	int m_iBone1;
-	int m_iBone2;
-};
-
-struct CHitbox
-{
-	Vector3Aligned m_vMax;
-	Vector3Aligned m_vMin;
-	int m_iBone1;
-	int m_iBone2;
-};
-
-struct WMBSamplerParameterGroup
-{
-	int m_iIndex;						//0x00
-	unsigned int m_uParametersOffset;	//0x04 float*
-	int m_nParameters;					//0x08
-};
-
-struct WMBVariable
-{
-	unsigned int m_uNameOffset;		//0x00
-	float m_flValue;				//0x04
-};
-
-struct CConstantBufferContext
-{
-	int m_iConstantBufferGroup;
-	int m_iSize;					//0x04 idk not sure  set to 40 in COtManager::DrawModel
-	int m_iConstantBufferIndex;
-	BYTE gapC[8];
-};
-
-/*
- Cannot have size of zero
- Must be 16 byte aligned
- Size cannot exceed 0x10000 (65536) bytes
-*/
-class CConstantBuffer
-{
-	void* m_vtbl;
-	BYTE gap8[8];
-	volatile signed __int32 volatile10;
-	BYTE gap14[20];
-	void* m_pResources;
-	SIZE_T m_size;	//aligned to 16 bytes
-	SIZE_T m_size2; //aligned to 16 bytes
-	__int64 m_aligned_size;
-	BYTE gap48[16];
-	signed int m_index;
-	BYTE gap5C[12];
-	ID3D11Buffer** m_ppBuffer;
-};
-
-typedef struct CSamplerParam
-{
-	CConstantBuffer* m_pBuffer;
-	BOOL m_bInitalized;
-} CModelMatrix;
-
-struct CSamplerParameterGroup
-{
-	CSamplerParam* m_pParameters;
-	int m_nParameters;
-	int m_iIndex;
-};
-
-struct WMBMaterial
-{
-	short m_sVersion[4];					//0x00
-	unsigned int m_uNameOffset;				//0x08
-	unsigned int m_uShaderNameOffset;		//0x0C
-	unsigned int m_uTechniqueOffset;		//0x10
-	int m_nShaderParameters;				//0x14			
-	unsigned int m_uTexturesOffset;			//0x18
-	int m_nTextures;						//0x1C
-	unsigned int m_uParameterGroupsOffset;	//0x20
-	int m_nParameterGroups;					//0x24
-	unsigned int m_uVariablesOffset;		//0x28
-	int m_nVariables;						//0x2C
-};
-IS_SIZE_CORRECT(WMBMaterial, 0x30);
-
-// Size of struct is 120 (0x78) bytes
-struct CMaterial
-{
-	void* m_pHeap;
-	const char* m_szName;
-	const char* m_szShaderName;
-	const char* m_szTechniqueName;
-	unsigned int m_TextureIds[16];
-	CSamplerParameterGroup* m_pParameterGroups;
-	int m_nParameterGroups;
-	int m_nShaderParameters;
-	CSamplerParam* m_pParameters;
-};
-IS_SIZE_CORRECT(CMaterial, 0x78);
-
-struct CBatchInfo
-{
-	int m_iVertexGroupIndex;
-	int m_iMeshIndex;
-	int m_iMaterialIndex;
-	int m_iUnk;
-	int m_iMeshMaterialIndex;
-	int m_iUnk2;
-};
-
-struct CDrawGroupInfo
-{
-	DWORD dword0;
-	int m_iLODLevel;
-	DWORD m_uBatchStart;
-	BYTE gapC[4];
-	CBatchInfo* m_pBatchInfos;
-	unsigned int m_nBatchInfos;
-};
-
-struct WMBMesh
-{
-	unsigned int m_uNameOffset;
-	Vector3 m_vMax;
-	Vector3 m_vMin;
-	unsigned int m_uMaterialsOffset;
-	int m_nMaterials;
-	unsigned int m_uBonesOffset;
-	int m_nBones;
-};
-IS_SIZE_CORRECT(WMBMesh, 0x2C);
-
-struct CMesh
-{
-	Vector3Aligned m_vMax;		//0x00
-	Vector3Aligned m_vMin;		//0x10
-	const char* m_szName;		//0x20
-	WMBMaterial* m_pMaterials;	//0x28
-	int m_nMaterials;			//0x30
-	WMBBone* m_pBones;			//0x38
-	int m_nBones;				//0x40
-	int m_iLodLevel;			//0x44
-};
-IS_SIZE_CORRECT(CMesh, 0x50);
-
-struct WMBTexture
-{
-	unsigned int m_uNameOffset;
-	int m_TextureId;
-};
-
-struct WMBBatch
-{
-	int m_iVertexGroupIndex;	//0x00
-	int m_nPrimitives;			//0x04
-	int m_nIndices;				//0x08
-	int m_nVertices;			//0x0C
-	int m_iIndexStart;			//0x10
-	int m_iVertexStart;			//0x14
-	int m_iBoneSetIndex;		//0x18
-};
-
-struct CBatch
-{
-	int m_iVertexGroupIndex;
-	int m_iBoneSetIndex;
-	int m_iVertexStart;
-	int m_iIndexStart;
-	int m_nVertices;
-	int m_nIndices;
-	int m_nPrimitives;
-};
-IS_SIZE_CORRECT(CBatch, 28);
-
-struct WMBVertexGroup
-{
-	unsigned int m_uVertexOffset;		//0x00
-	unsigned int m_uVertexExOffset;		//0x04
-	int pad8[2];						//0x08
-	unsigned int m_uVertexSize;			//0x10
-	unsigned int m_uVertexExSize;		//0x14
-	int pad18[2];						//0x18
-	int m_nVertices;					//0x20
-	int m_uVertexExFlags;				//0x24
-	unsigned int m_uIndexBufferOffset;	//0x28
-	int m_nIndices;						//0x2C
-};
-IS_SIZE_CORRECT(WMBVertexGroup, 0x30);
-
-struct CVertexGroupEx
-{
-	void* m_pVertexData;	//0x00
-	void* m_pVertexData2;	//0x08
-	BYTE gap10[40];			//0x10
-	void* m_pIndexData;		//0x38
-	UINT m_uVertexSize;		//0x40
-	UINT m_nIndices;		//0x44
-	UINT m_uIndiceSize;		//0x48
-};
-
-struct CVertexGroup
-{
-	struct CVertexBuffer* m_pVertexBuffer;	//0x00
-	struct CVertexBuffer* m_pVertexBuffer2;	//0x08
-	struct CIndexBuffer* m_pIndexBuffer;	//0x10
-};
-IS_SIZE_CORRECT(CVertexGroup, 24);
-
-struct CModelDrawData
-{
-	CVertexGroup* m_pVertexGroups;
-	int m_nVertexGroups;
-	CBatch* m_pBatches;
-	int m_nBatches;
-	int m_nPrimitiveVertices;
-};
-
-struct CMaterialDescription
-{
-	CMaterial* m_pMaterial;
-	BOOL m_bUnknownsExist;
-	BOOL m_bUnkGreZero;
-};
 
 struct CModelAnalyzer;
 
@@ -1359,70 +477,9 @@ struct CMaterialInfo
 	CMaterialDescription m_Desc;
 };
 
-struct CShaderSetting
-{
-	void* m_pVtbl;
-	BYTE gap0[12];
-	DWORD dword14;
-	DWORD dword18;
-	BYTE gap1C[28];
-	DWORD dword38;
-	BYTE gap3C[16];
-	DWORD dword4C;
-	DWORD dword50;
-	DWORD dword54;
-	DWORD dword58;
-	DWORD dword5C;
-	DWORD dword60;
-	DWORD dword64;
-	QWORD dword68;
-};
 
 struct CModelEntryData; //forward def maybe temp
-
-/*
-Size of struct 0x90 (144) bytes
-*/
-struct CModelShaderModule
-{
-	//virtual __int64 function0(char flags) PURE;
-	//virtual void Update(CModelShader* pShader, CModelExtendWork* pWork, char flags) PURE; // flags & 2 DONT_UPDATE 1 = idk
-	//virtual __int64 ApplyExternalForces() PURE;
-	//virtual __int64 Draw(CModelEntryData* pData) PURE; // Submits a job to the render queue (param could be wrong) maybe void
-
-	void* m_pVtbl;
-	CShaderSetting* m_pSetting;			//0x0008
-	QWORD qword10;						//0x0010
-	CConstantBuffer* m_pConstantBuffer;	//0x0018
-	DWORD dword20;						//0x0020
-	char _0x0024[4];					//0x0024
-	QWORD qword28;						//0x0028
-	DWORD dword30;						//0x0030
-	char _0x0034[4];					//0x0034
-	QWORD qword38;						//0x0038
-	DWORD dword40;						//0x0040
-	char _0x0044[4];					//0x0044
-	QWORD qword48;						//0x0048
-	DWORD dword50;						//0x0050
-	DWORD dword54;						//0x0054
-	DWORD dword58;
-	DWORD dword5C;
-	__m128 oword60;
-	__m128 oword70;
-	int int80;
-	float m_flWetness;
-};
-IS_SIZE_CORRECT(CModelShaderModule, 0x90);
-IS_OFFSET_CORRECT(CModelShaderModule, m_flWetness, 0x84);
-
-struct CTextureResource
-{
-	void* m_punk;	//cTexture::vtble
-	CTexture* m_pTexture;
-	char pad10[8];
-	unsigned int m_TextureId;
-	char pad1C[4];
-};
+class CModelExtendWork;
 
 struct CTextureResourceManager
 {
@@ -1436,158 +493,9 @@ struct CTextureResourceManager
 	QWORD qword80;
 };
 
-/*
-Size of struct 0x318 (792) bytes
-*/
-struct CModelShader
-{
-	CMaterial* m_pMaterial;
-	CModelShaderModule* m_pShader;
-	CTextureResource m_Resources[MAX_MATERIAL_TEXTURES];
-	char pad210[0x104];
-	int m_fFlags;	// should be 3?
-};
-IS_SIZE_CORRECT(CModelShader, 0x318);
-
-struct CModelAnalyzer
-{
-	virtual void function0(char a2);
-	virtual void LOD_sub_143F4B620(__int64 a2);
-	virtual int FindTextureIndexByName(const char*);
-	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, __int64 pModelWorkExtend, __int64 ppHeaps);
-	virtual void function4();
-	virtual void function5();
-};
-
-// Size of struct 0x140 (320) bytes
-struct CModelData
-{
-	union {
-		byte* m_pWMB;						//0x0000
-		WMBHdr* m_pHdr;						//0x0000
-	};
-	short* m_pBoneIndexTranslationTable;	//0x0008
-	Vector3Aligned m_vMax;					//0x0010
-	Vector3Aligned m_vMin;					//0x0020
-	int m_iReferenceCount;					//0x0030
-	int m_iUnk;								//0x0034
-	CModelDrawData* m_pDrawData;			//0x0038
-	int* m_piVertexExFlags;					//0x0040 
-	int m_nVertexGroups;					//0x0048
-	char pad4C[4];							//0x004C
-	CBone* m_pBones;						//0x0050
-	void* m_pBoneMaps;						//0x0058
-	int m_nBones;							//0x0060
-	BOOL m_bVisible;						//0x0064
-	short* m_pBoneIndexTranslationTable2;	//0x0068
-	CHitbox* m_pHitboxes;					//0x0070
-	int m_nHitboxes;						//0x0078
-	char pad78[4];							//0x007C
-	void* m_pBoneMap;						//0x0080
-	int m_nBoneMapEntries;					//0x0088
-	char pad8C[4];							//0x008C
-	short** m_pBoneSets;					//0x0090
-	int m_nBoneSets;						//0x0098
-	char pad9C[4];							//0x009C
-	void* m_pLODS;							//0x00A0
-	int m_nLODS;							//0x00A8
-	char padAC[12];							//0x00AC
-	CMesh* m_pMeshes;						//0x00B8
-	int m_nMeshes;							//0x00C0
-	char padC4[4];							//0x00C4
-	CMaterial* m_pMaterials;				//0x00C8
-	int m_nMaterials;						//0x00CC
-	char padCC[4];							//0x00D0
-	void* m_pUnks2;							//0x00D4
-	int m_nUnks2;							//0x00DC
-	int padE0;								//0x00E0
-	BYTE gapE4[8];							//0x00E4
-	DWORD m_WMB0xE;							//0x00EC
-	BYTE gapF0[4];							//0x00F0
-	DWORD m_dwIndex;						//0x00F4
-	BYTE gapF8[48];
-	struct CModelData* m_pNext;
-	char pad9[8];
-};
-IS_OFFSET_CORRECT(CModelData, m_pBones, 0x50);
-IS_OFFSET_CORRECT(CModelData, m_pLODS, 0xA0);
-IS_OFFSET_CORRECT(CModelData, m_pMeshes, 0xB8);
-IS_SIZE_CORRECT(CModelData, 0x140);
-
-struct CModelDataList
-{
-	CModelData* m_pModelData;
-	QWORD m_ptr;
-	int m_iIndex;
-	int m_iCapacity;
-	QWORD qword18;
-	CModelData* m_pLast;
-	DWORD m_iSize;
-	BYTE gap2C[12];
-	void(__fastcall* pfunc38)(__int64);
-};
-
-struct CCameraDevice
-{
-	char p[32];
-};
 
 struct CModelWork;
 struct CVertexLayout;
-
-struct __declspec(align(16)) CVertexLayoutEntry
-{
-	CVertexLayout* m_pVertex;
-	BOOL m_bInitalized;
-};
-
-//size of struct is 0x110 (272) bytes
-struct CModelManager
-{
-	QWORD qword00;						//0x00 | g_pModelResource
-	QWORD qword08;						//0x08 | these are like heaps
-	QWORD qword10;						//0x10
-	CReadWriteLock m_Lock;				//0x18
-	CModelAnalyzer* m_pModelAnalyzer;	//0x48
-	CSamplerParam m_Param;				//0x50
-	CCameraDevice* m_pCameraDevices;	//0x60
-	INT m_nCameraDevices;				//0x68
-	BYTE gap6C[4];						//0x6C
-	QWORD qword70;						//0x70
-	DWORD m_nOfQword70;					//0x78
-	BYTE gap7C[4];						//0x7C
-	CModelWork* m_pModelWorks;			//0x80
-	CModelWork* m_pCurrentModelWork;	//0x88
-	DWORD dword90;						//0x90
-	DWORD dword94;
-	DWORD dword98;
-	DWORD dword9C;
-	DWORD dwordA0;
-	DWORD dwordA4;
-	CVertexLayoutEntry* m_pVertexLayouts;
-	QWORD qwordB0;
-	CModelDataList m_ModelDataList;		//0xB8
-	BYTE gapF8[24];						//0xF8
-};
-IS_SIZE_CORRECT(CModelManager, 0x110);
-
-// name not official
-struct CModelDataManager
-{
-	BYTE gap0[24];
-	CReadWriteLock m_Lock;
-	BYTE gap44[116];
-	CModelDataList m_ModelDataList;
-};
-
-struct CModelInfo
-{
-	Vector4 m_vTint;			//0x0000
-	CModelData* m_pData;		//0x0008
-	char pad10[96];				//0x0010
-	Vector3Aligned m_vPosition; //0x0070
-	UINT m_Flags;				//0x00D0
-};
 
 class CObjHit
 {
@@ -1597,706 +505,24 @@ class CObjHit
 
 };
 
-/*
-Size of struct 0xA8 (168) bytes
-*/
-struct CModelMatrixTable
+struct CSamplerState;
+
+struct CAnimationListEntry
 {
-	void* m_pVtbl;					//0x00
-	char pad08[16];					//0x08
-	CBoneSets* m_pSets;				//0x10
-	char pad20[64];
-	CModelMatrix* m_pMatrices;
-	CModelMatrix* m_pMatrices2;
-	INT m_nMatrices;
-	INT m_nMatrices2;
+	EntityHandle m_hAnimationNode;
+	Animation::Motion::NodePlay* m_pNode; //  Animation::Motion::Node
 };
 
-/*
-Size of struct 0x38 (56) bytes
-*/
-struct CModelInstanceParam
+struct __declspec(align(8)) CAnimationList
 {
-	void* m_pVtbl;				//0x00
-	DWORD m_dw0x08;				//0x08
-	char padC[0x1C];			//0x0C
-	CConstantBuffer* m_pBuffer;	//0x28
-	DWORD m_dw0x30;				//0x30
+	uint32 m_uSize;
+	uint32 m_uItems;
+	uint32 m_uSlot;
+	uint32 m_uShift;
+	CAnimationListEntry* m_pEntries;
+	CReadWriteLock m_Lock;
 };
 
-/*
-	Size of struct 0xB0 (176) bytes
-
-	m_wFlags - 0x00 - NORMAL, 0x01 - ?, 0x02 - NO_ROTATION_Y, 0x04 - FLOAT_UP, 0x08 - ?, 0x10 - ? (wont set), 0x20 - ? (wont set)
-	0x40 - ?, 0x80 - ?, 0x100 - ?, 0x200 - ?, 0x400 - ?, 0x800 - ?, 0x1000 - ?, 0x2000 - ?, 0x4000 - NO_ROTATION_Y, 0x8000 - ?
-*/
-class CParts
-{
-public:
-	Matrix4x4 m_matTransform;		//0x0000
-	Vector3Aligned m_vPosition;		//0x0040
-	Matrix4x4 m_matModelToWorld;	//0x0050 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
-	void* m_pUnk0x0090;				//0x0090 | set to 0 on construction
-	short m_wFlags;					//0x0098 | set to 0 on construction
-	void* m_pUnk0x00A0;				//0x00A0 | set to 0 on construction
-	short m_wUnk0x00A8;				//0x00A8 | set to -1 on construction
-};
-IS_SIZE_CORRECT(CParts, 0xB0);
-
-// had to define virtuals not right tho!
-class CModelExtendWorkBase
-{
-public:
-	virtual void function0() {};
-	virtual void function1() {};
-};
-
-// had to define virtuals not right tho!
-class CModelExtendWork : public CModelExtendWorkBase
-{
-public:
-	virtual void function2() {};
-	virtual void function3() {};
-
-	float flUnk;				//0x0008
-	DWORD _0x0010;				//0x000C
-	unsigned int m_ObjectId;	//0x0010
-	char _0x0018[12];			//0x0014
-	Pl0000* m_pParent;			//0x0020	
-};
-
-// size of struct 0x1A8 (424) bytes
-struct CModelWork
-{
-	CModelManager* m_pModelManager;			//0x0000
-	CModelData* m_pModelData;				//0x0008
-	CMesh2* m_pMeshes;						//0x0010
-	int m_nMeshes;							//0x0018
-	char pad1C[4];							//0x001C	
-	CModelShader* m_pModelShaders;			//0x0020 | model shaders +0x20
-	int m_nMaterials;						//0x0028 | (also is number of shaders)
-	char pad2C[4];							//0x002C
-	void* m_p0x030;							//0x0030
-	int m_n0x038;							//0x0038
-	char _0x03C[12];						//0x003C
-	void* m_p0x048;							//0x0048
-	int m_n0x48;							//0x0050
-	char _0x054[140];						//0x0054
-	//void*									//0x0060
-	//void* m_pLODS;						//0x0078
-	//int m_nLODS;							//0x007C
-	CModelMatrixTable** m_pMatrices;		//0x00E0
-	CModelInstanceParam* m_pModelParams;	//0x00E8
-	int m_nModelParams;						//0x00F0
-	char _0x0F4[140];						//0x00F4
-	//CHitbox* m_pHitboxes;					//0x0110
-	//int m_nHitboxes;						//0x0118
-	CModelExtendWork* m_pModelExtend;		//0x0180
-	DWORD m_dwRenderFlags;					//0x0188
-	char _0x01AC[12];						//0x018C
-	CModelWork* m_pPrevious;				//0x0198
-	CModelWork* m_pNext;					//0x01A0
-};
-IS_SIZE_CORRECT(CModelWork, 0x1A8);
-
-/*
-*
-* Size of struct 0x584 (1412) bytes
-* could be 0x590 bytes
-*
-* apprently supposed to inherit cparts??
-*/
-class CModel : public CParts
-{
-public:
-
-	virtual void function0();
-	virtual void function1(void);
-	virtual void function2(void);
-
-	Matrix4x4 m_matB0;						//0x00B0 | set to indentity matrix on construction
-	Matrix4x4 m_matF0;						//0x00F0 | set to indentity matrix on construction
-	CModelExtendWork m_ExtendWork;			//0x0140
-	char _0x0168[336];						//0x0168
-	BYTE m_bWetness;						//0x02B8
-	char _0x02B9[215];						//0x02B9
-	CModelWork m_Work;						//0x0390
-	QWORD m_qw0x538;						//0x0538
-	CModelInfo* m_pModelInfo;				//0x0540
-	Unknown_t* m_pUnknown0x548;				//0x0548
-	void* m_pWMB_Buffer;					//0x0550
-	void* m_p0x00558;						//0x0558
-	CBone* m_pBones;						//0x0560
-	int m_nBones;							//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
-	char _0x056C[20];						//0x056C
-	DWORD dwFinal;							//0x0580
-	char _0x0584[28];						//0x0584
-};
-IS_OFFSET_CORRECT(CModel, m_matTransform, 0x10);
-IS_OFFSET_CORRECT(CModel, m_ExtendWork, 0x140);
-IS_OFFSET_CORRECT(CModel, m_pModelInfo, 0x540);
-IS_OFFSET_CORRECT(CModel, m_nBones, 0x568);
-IS_OFFSET_CORRECT(CModel, dwFinal, 0x580);
-IS_SIZE_CORRECT(CModel, 0x5A0);
-
-/*
-* Size of struct 0x670 (1648) bytes
-*
-* Alignment: 32 bytes??
-*/
-class CObj : public CModel
-{
-public:
-
-	virtual void function0();
-	virtual void function1(void); // from CModel
-	virtual void function2(void); // CModel stub function
-	virtual void* function3(void);
-	virtual float function4(void); // return 1.0f;
-
-	DATHeader* m_pDataFiles[2];				//0x005A0
-	CTextureData* m_pTextureData;			//0x005B0
-	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regular, mech suit, and static -1)
-	unsigned int unk0x005BC;				//0x005BC
-	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
-	BYTE _0x05C4;							//0x005C4 | disable dynamic skirt?
-	BYTE _0x05C5;							//0x005C5
-	char _0x05C6[2];						//0x005C6
-	DWORD dw0x5C8;							//0x005C8
-	float fl0x5CC[7];						//0x005CC
-	Vector3 m_vInnerBrightness;				//0x005E8 (x = brightness [paired with z, not modifyable], y = unknown, z = brightness [paired with z, modifyable])
-	void* _0x5F4;							//0x005F4
-	void* _0x600;							//0x00600
-	float fl0x60C;							//0x0060C
-	CEntityInfo* m_pInfo;					//0x00610 
-	CXmlBinary m_xmlBinary;					//0x00618
-	char _0x0658[24];						//0x00658
-};
-IS_OFFSET_CORRECT(CObj, m_pTextureData, 0x5B0);
-IS_OFFSET_CORRECT(CObj, m_ObjectId, 0x5B8);
-IS_SIZE_CORRECT(CObj, 0x670);
-
-/*
-* Size of struct 0x830 () bytes
-* Approx.
-*
-* Alignment: 32 bytes??
-*/
-class CBehaviour : public CObj
-{
-public:
-
-	virtual void function0(char a1);
-	virtual void function1(void); // from CModel
-	virtual void function2(void); // CModel stub function
-	virtual void* function3(void);
-	virtual float function4(void); // return 1.0f;
-	virtual void function5() PURE;
-	virtual void function6() PURE;
-	virtual void function7() PURE;
-	virtual void function8() PURE;
-	virtual void function9() PURE;
-	virtual void function10() PURE;
-	virtual void function11() PURE;
-	virtual void function12() PURE;
-	virtual void function13() PURE;
-	virtual void function14() PURE;
-	virtual void function15() PURE;
-	virtual void function16() PURE;
-	virtual void function17() PURE;
-	virtual void Animate(unsigned int id, int mode, int a4, int a5) PURE;
-
-	int m_iAnimationId;						//0x00670
-	int m_iAnimationMode;					//0x00674
-	int m_iAnimationA4;						//0x00678
-	int m_iAnimationA5;						//0x0067C
-	char _0x0680[28];						//0x00680
-	int m_iUnknown69C;
-	void* m_pUnknown6A0; // set to 0 (on creation)
-	void* m_pUnknown6A8; // points to pThis
-	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16> m_BehaviourExtensions; // 0x06B0
-	char _0x07D0[96];
-};
-IS_OFFSET_CORRECT(CBehaviour, m_iAnimationId, 0x670);
-IS_OFFSET_CORRECT(CBehaviour, m_iAnimationMode, 0x674);
-IS_OFFSET_CORRECT(CBehaviour, m_BehaviourExtensions, 0x6B0);
-IS_SIZE_CORRECT(CBehaviour, 0x830);
-
-
-class Animation
-{
-public:
-	class Motion
-	{
-	public:
-		class NodeParallel
-		{
-		};
-
-		class NodePlay
-		{
-		public:
-			void* m_pVtbl;
-			Animation::Motion::NodeParallel* m_pParallel;
-		};
-
-		class Unit
-		{
-		public:
-			class NodeHandler
-			{
-			public:
-				Animation::Motion::NodePlay* m_pNodes;
-			};
-		};
-	};
-};
-
-//  0xC2C
-// size of  0xC50
-class CBehaviorAppBase : public CBehaviour
-{
-public:
-	typedef DWORD TimeLimitedFlag;
-
-	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
-	int m_iHealth;							//0x00858
-	int m_iMaxHealth;						//0x0085C
-	char _0x0860[36];						//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
-	BYTE m_flags;							//0x00884 | 0x40 = no collision
-	char _0x0885[91];						//0x00885
-	void* m_waypointVtbl;					//0x008E0
-	char _0x08E8[168];						//0x008E8
-	int m_iOldAnimationId;					//0x00990
-	int m_iOldAnimationMode;				//0x00994
-	int m_iOldAnimationA4;					//0x00998
-	int m_iOldAnimationA5;					//0x0099C
-	char _0x0998[16];						//0x00998
-	StaticArray<CBehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
-	char _0x09D8[2788];						//0x009D8
-	//ExNpc m_npc;							//0x00A98
-	//BOOL m_bTalkDisable;					//0x00BCC
-	//EntityHandle m_hUnk;					//0x00C50
-};
-
-/*
-NieR:Automata's Entity class idk if it's the right name (actual Pl0000). Just started to
-reverse this and this structure is fucking huge!
-
-Offsets are -0x50 from the debug build
-
-Size of struct 0x178F0 (96496) bytes old version (denuvo)
-Size of struct 0x17920 (96544) bytes new version
-
-CBehaviourAppBase, CBehaviour, CObj, CModel, CParts
-*/
-class Pl0000 // : CBehaviourAppBase
-{
-public:
-	typedef int PassiveSkill;
-
-#ifdef ENTITY_REAL_VTABLE
-	virtual void function0() PURE;
-	virtual void function1() PURE;
-	virtual void function2() PURE;
-	virtual void function3() PURE;
-	virtual void function4() PURE;
-	virtual void function5() PURE;
-	virtual void function6() PURE;
-	virtual void function7() PURE;
-	virtual void function8() PURE;
-	virtual void function9() PURE;
-	virtual void function10() PURE;
-	virtual void function11() PURE;
-	virtual void function12() PURE;
-	virtual void function13() PURE;
-	virtual void function14() PURE;
-	virtual void function15() PURE;
-	virtual void function16() PURE;
-	virtual void function17() PURE;
-	virtual void Animate(unsigned int id, int mode, int a4, int a5) PURE;
-	virtual void function19() PURE;
-	virtual void function20() PURE;
-	virtual void function21() PURE;
-	virtual void function22() PURE;
-	virtual void function23() PURE;
-	virtual void function24() PURE;
-	virtual void function25() PURE;
-	virtual void function26() PURE;
-	virtual void function27() PURE;
-	virtual CEntityInfo* function28(__int64 a1, unsigned int objectId) PURE;
-	virtual bool IsAliveAndEntityInfoFlag() PURE;
-	virtual int GetMaxHealth() PURE; //index: 30
-	virtual int GetHealth() PURE;
-	virtual void function32() PURE;
-	virtual bool IsDead() PURE;
-	virtual void function34() PURE;
-	virtual void function35() PURE;
-	virtual void function36() PURE;
-	virtual void CollisionOff() PURE;
-	virtual void CollisionOn() PURE;
-	virtual void function39() PURE;
-	virtual __int64 EmitSound(const char* szName, Pl0000* pSourceEntity, __int64 boneId, __int64 flags, unsigned int a6) PURE;
-	virtual void function41() PURE;
-	virtual void function42() PURE;
-	virtual void function43() PURE;
-	virtual void function44() PURE;
-	virtual void function45() PURE;
-	virtual void function46() PURE;
-	virtual void function47() PURE;
-	virtual void function48() PURE;
-	virtual void function49() PURE;
-	virtual void function50() PURE;
-	virtual void function51() PURE;
-	virtual void function52() PURE;
-	virtual void function53() PURE;
-	virtual void function54() PURE;
-	virtual void function55() PURE;
-	virtual void function56() PURE;
-	virtual void function57() PURE;
-	virtual void function58() PURE;
-	virtual void function59() PURE;
-	virtual void function60() PURE;
-	virtual void function61() PURE;
-	virtual void function62() PURE;
-	virtual void function63() PURE;
-	virtual void function64() PURE;
-	virtual void function65() PURE;
-	virtual void function66() PURE;
-	virtual void function67() PURE;
-	virtual void function68() PURE;
-	virtual void function69() PURE;
-	virtual void function70() PURE;
-	virtual void function71() PURE;
-	virtual void function72() PURE;
-	virtual void function73() PURE;
-	virtual void function74() PURE;
-	virtual void function75() PURE;
-	virtual void function76() PURE;
-	virtual void function77() PURE;
-	virtual void function78() PURE;
-	virtual void function79() PURE;
-	virtual void function80() PURE;
-	virtual void function81() PURE;
-	virtual void function82() PURE;
-	virtual void function83() PURE;
-	virtual void Hurt(int iDamage, BOOL bKeepAlive) PURE;
-	virtual void Heal(int iHealAmount) PURE;
-	virtual int GetLevel() PURE;
-	virtual bool IsValid() PURE;
-	virtual void function88() PURE;
-	virtual void function89() PURE;
-	virtual void function90() PURE;
-	virtual void function91() PURE;
-	virtual void function92() PURE;
-	virtual void function93() PURE;
-	virtual void function94() PURE;
-	virtual void function95() PURE;
-	virtual void function96() PURE;
-	virtual void function97() PURE;
-	virtual void function98() PURE;
-	virtual void function99() PURE;
-	virtual void function100() PURE;
-	virtual void function101() PURE;
-	virtual void function102() PURE;
-	virtual void function103() PURE;
-	virtual void SetLevel(int iLevel) PURE;
-	virtual void function105() PURE;
-	virtual void function106() PURE;
-
-#else
-	void* m_pVtable;						//0x00000	 
-#endif // ENTITY_REAL_VTABLE
-	Matrix4x4 m_matTransform;				//0x00010 | Affine transformation matrix
-	Vector3Aligned m_vPosition;				//0x00050
-	Matrix4x4 m_matModelToWorld;			//0x00060 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r) (probably not a mat4x4 now that i think about it lmao)
-	void* m_pUnk0x00A0;						//0x000A0
-	short m_wBitFlags;						//0x000A8 | 0x00 - NORMAL, 0x01 - ?, 0x02 - NO_ROTATION_Y, 0x04 - FLOAT_UP, 0x08 - ?, 0x10 - ? (wont set), 0x20 - ? (wont set)
-	//			0x40 - ?, 0x80 - ?, 0x100 - ?, 0x200 - ?, 0x400 - ?, 0x800 - ?, 0x1000 - ?, 0x2000 - ?, 0x4000 - NO_ROTATION_Y, 0x8000 - ?
-	char  m_pad0x000AA[6];					//0x000AA
-	void* m_pUnk0x00B0;						//0x000B0
-	short m_wUnk0x00B8;						//0x000B8 | set to -1 on construction
-	char  m_pad0x000BA[6];					//0x000BA
-	Matrix4x4 m_matCol;						//0x000C0
-	Matrix4x4 m_identity;					//0x00100 | end ? CEnt ?
-	CModelExtendWork m_ModelExtendWork;		//0x00140
-	char _0x0168[336];						//0x00168
-	BYTE m_Wetness;							//0x002B8
-	char _0x02B9[215];						//0x002B9
-	CModelWork m_Work;						//0x00390
-	QWORD m_qw0x538;						//0x00538
-	CModelInfo* m_pModelInfo;				//0x00540
-	Unknown_t* m_pUnknown0x548;				//0x00548
-	CModelData* m_pModelData;				//0x00550
-	short** m_pBoneSets;					//0x00558
-	CBone* m_pBones;						//0x00560
-	int m_nBones;							//0x00568
-	char _0x056C[8];						//0x0056C
-	BOOL m_bHasMeshes;						//0x00574
-	float m_fl0x578;						//0x00578
-	float m_fl0x57C;						//0x0057C
-	char _0x0580[4];						//0x00580
-	BOOL m_bExtraDetail;					//0x00584
-	BOOL m_bUnknown;						//0x00588
-	char _0x058C[4];						//0x0058C
-	DWORD dw0x590;							//0x00590
-	DWORD _0x594;							//0x00594
-	DWORD m_Flags;							//0x00598
-	DWORD dw0x0059C;						//0x0059C
-	DATHeader* m_pDataFiles[2];				//0x005A0
-	CTextureData* m_pTextureData;			//0x005B0
-	int m_ObjectId;							//0x005B8 | 10000 = 2B | 10200 = 9S | 10203 = A2? (2B only accepts regular, mech suit, and static -1)
-	unsigned int unk0x005BC;				//0x005BC
-	unsigned int flag0x005C0;				//0x005C0 | one-way invisible 2B
-	BYTE unk0x05C4;							//0x005C4 | disable dynamic skirt?
-	BYTE _0x05C5;							//0x005C5
-	char _0x05C6[2];						//0x005C6
-	DWORD dw0x5C8;							//0x005C8
-	float fl0x5CC[7];						//0x005CC
-	Vector3 m_vInnerBrightness;				//0x005E8 (x = brightness [paired with z, not modifyable], y = unknown, z = brightness [paired with z, modifyable])
-	void* _0x5F4;							//0x005F4
-	void* _0x600;							//0x00600
-	float fl0x60C;							//0x0060C
-	CEntityInfo* m_pInfo;					//0x00610 
-	CXmlBinary m_xmlBinary;					//0x00618
-	char _0x0658[24];						//0x00658	
-	int m_iAnimationId;						//0x00670
-	int m_iAnimationMode;					//0x00674
-	int m_iAnimationA4;						//0x00678
-	int m_iAnimationA5;						//0x0067C
-	char _0x0680[32];						//0x00680
-	void* m_pUnk0x6A0;						//0x006A0
-	void* m_pUnk0x6A8;						//0x006A8
-	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8> m_BehaviourExtensions;//0x006B0 | lib::StaticArray<std::pair<enum  lib::TypeId,BehaviorExtension *>,16,8>  BehaviorExtension is an interface
-	char _0x07D0[136];						//0x007D0
-	//2b skirt								//0x00800
-	//ExActionState							//0x00830  ExActionState (a BehaviorExtension)
-	int m_iHealth;							//0x00858
-	int m_iMaxHealth;						//0x0085C
-	Animation::Motion::Unit::NodeHandler m_Handler;//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
-	char _0x0868[28];						//0x00868 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
-	BYTE m_flags;							//0x00884 | 0x40 = no collision
-	char _0x0885[91];						//0x00885
-	void* m_waypointVtbl;					//0x008E0
-	char _0x08E8[168];						//0x008E8
-	int m_iAnimationId2;					//0x00990
-	int m_iAnimationMode2;					//0x00994 | not 100%
-	char _0x0998[16];						//0x00998
-	StaticArray<CBehaviorAppBase::TimeLimitedFlag, 4> m_LimitedTimeFlags;//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
-	char _0x09D8[2788];						//0x009D8
-	//ExNpc m_npc;							//0x00A98
-	//BOOL m_bTalkDisable;					//0x00BCC
-	//EntityHandle m_hUnk;					//0x00C50
-
-	//CRITICAL_SECTION m_CriticalSection;		//0x00C60
-
-	//EntityHandle m_hUnk;					//0x00C80
-	//EntityHandle m_hUnk;					//0x00DA0
-
-	int m_iLevel;							//0x014BC
-	BOOL m_bLevelUp;						//0x014C0 | pretty sure
-	char _0x14C4[44];						//0x014C4
-	void* m_pCObjHitVtable;					//0x014F0 | start cObjHit
-	char _0x014F8[664];						//0x014F8
-	ExCollision m_VerticalCollision;		//0x01790
-	ExCollision m_HorizontalCollision;		//0x018C0
-	char _0x019F0[160];						//0x018F0
-	float m_flSprintSpeed;					//0x01A90
-	char _0x01A94[1500];					//0x01A94
-	float fl0x02070;						//0x02070
-	char _0x02074[4];						//0x02074
-	ExExpInfo m_LevelsContainer;			//0x02078
-
-	//	EntityHandle m_hCaughtFish;				//0x03ED8 | on the pod
-
-	char _0x02B70[56056];					//0x02B70
-	int m_iHealth2;							//0x10668									
-	char _0x1066C[420];						//0x1066C
-	EntityHandle m_hPod;					//0x10810
-	EntityHandle m_hUnk;					//0x10814
-	char _0x10818[9896];					//0x10818
-	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
-	char _0x130E0[10880];					//0x130E0
-	BOOL m_bFlightSuit;						//0x15B50
-	EntityHandle m_hFlightSuit;				//0x15B54 now 0x15B64
-	char _0x15B58[880];						//0x15B58
-	StaticArray<EntityHandle, 64> m_Handles;//0x15EC8
-	char _0x15FE8[1156];					//0x15FE8
-	EntityHandle m_hBuddy;					//0x1646C now 0x1647C | Localplayer = 0x1000C00, Buddy = 0x1020400
-	EntityHandle m_hPascal;					//0x16470
-	char _0x16474[268];						//0x16474
-	StaticArray<EntityHandle, 4> m_Handles2;//0x16580
-	char _0x165B0[72];						//0x165B0 | const hap::hap_action::PuidMixin
-	StaticArray<Pl0000::PassiveSkill, 100> m_PassiveSkills;	//0x165F8
-	char _0x167A8[1320];					//0x167A8
-	BOOL b0x16CD0;							//0x16CD0
-	BOOL m_bRenderSkirt;					//0x16CD4
-	BOOL b0x16CD8;							//0x16CD8
-	BOOL m_bRenderEyemask;					//0x16CDC
-	BOOL b0x16CE0;							//0x16CE0
-	BOOL m_bNotRenderFeather;				//0x16CE4
-	BOOL b0x16CE8;							//0x16CE8
-	EntityHandle m_hUnknown2;				//0x16CEC
-	char _0x16CF0[868];						//0x16CF0
-	EntityHandle m_hWig;					//0x17054
-	char _0x17058[52];						//0x17058
-	DWORD m_dwAccessory;					//0x1708C
-	int unk0x17090;							//0x17090
-	int m_iBodyType;						//0x17094
-	char _0x17090[980];						//0x17098
-	EntityHandle m_hUnknown3;				//0x1746C
-	char _0x17470[896];						//0x17470
-	Vector3Aligned m_vDestinationTarget;	//0x177F0
-	BOOL m_bWalkToTarget;					//0x17800
-	BOOL m_bRunToTarget;					//0x17804
-	char _0x17808[256];						//0x17808
-};
-typedef Pl0000 Entity2B;
-IS_SIZE_CORRECT(Pl0000, 0x17920);
-IS_OFFSET_CORRECT(Pl0000, m_vPosition, 0x50);
-IS_OFFSET_CORRECT(Pl0000, m_ModelExtendWork, 0x140);
-IS_OFFSET_CORRECT(Pl0000, m_Wetness, 0x2B8);
-IS_OFFSET_CORRECT(Pl0000, m_Work, 0x390);
-IS_OFFSET_CORRECT(Pl0000, m_pModelInfo, 0x540);
-IS_OFFSET_CORRECT(Pl0000, m_Flags, 0x598);
-IS_OFFSET_CORRECT(Pl0000, m_ObjectId, 0x5B8);
-IS_OFFSET_CORRECT(Pl0000, m_pInfo, 0x610);
-IS_OFFSET_CORRECT(Pl0000, m_iAnimationId, 0x670);
-IS_OFFSET_CORRECT(Pl0000, m_iAnimationMode, 0x674);
-IS_OFFSET_CORRECT(Pl0000, m_BehaviourExtensions, 0x6B0);
-IS_OFFSET_CORRECT(Pl0000, m_iHealth, 0x858);
-IS_OFFSET_CORRECT(Pl0000, m_pCObjHitVtable, 0x14F0);
-IS_OFFSET_CORRECT(Pl0000, m_LevelsContainer, 0x2078);
-IS_OFFSET_CORRECT(Pl0000, m_VerticalCollision, 0x1790);
-IS_OFFSET_CORRECT(Pl0000, m_HorizontalCollision, 0x18C0);
-IS_OFFSET_CORRECT(Pl0000, m_pObjects, 0x12EC0);
-IS_OFFSET_CORRECT(Pl0000, m_hFlightSuit, 0x15B64);
-IS_OFFSET_CORRECT(Pl0000, m_hBuddy, 0x1647C);
-IS_OFFSET_CORRECT(Pl0000, m_hUnknown2, 0x16CFC);
-IS_OFFSET_CORRECT(Pl0000, m_dwAccessory, 0x1709C);
-IS_OFFSET_CORRECT(Pl0000, m_hUnknown3, 0x1747C);
-
-struct CCameraInstance
-{
-	Matrix4x4 m_CurrentViewProjection;	//0x0000 | probably inverted or smth
-	Matrix4x4 m_Projection;				//0x0040
-	Matrix4x4 m_ViewProjection;			//0x0080
-	Matrix4x4 m_View;					//0x00C0
-	char pad0xC0[256];					//0x0100
-	Matrix4x4 m_OldViewProjection;		//0x0200 | save
-	void* m_ptr240;						//0x0240
-	char pad0x248[64];					//0x0248
-	void* m_ptr288;						//0x0288
-};
-
-struct __declspec(align(16)) CCameraTransform
-{
-	virtual ~CCameraTransform();
-	//virtual QWORD* CCameraTransform::sub_140184180(char a2);
-
-	//void* m_vtable;				//0x0000
-	//char alignment8[8];			//0x0008 | align 16 padding tbh
-	Vector3Aligned m_vSource;		//0x0010
-	Vector3Aligned m_vTarget;		//0x0020
-	Vector3Aligned m_vUp;			//0x0030
-	Vector3Aligned m_vViewangles;	//0x0040
-	float m_flDistance;				//0x0050 | __m128 most likely
-	//char alignment54[12];			//0x0054
-};
-IS_OFFSET_CORRECT(CCameraTransform, m_vSource, 0x10);
-
-struct __declspec(align(16)) CCameraBase : public CCameraTransform
-{
-	virtual ~CCameraBase();
-	//void* m_vtable;				//0x0000
-	//char alignment8[8];			//0x0008 | align 16 padding tbh
-	//CCameraTransform m_Transform; //0x0010
-	CCameraInstance* m_pInstance;	//0x0060
-};
-IS_OFFSET_CORRECT(CCameraBase, m_pInstance, 0x60);
-
-/*
-
-141020870
-
-This struct is 16 byte aligned
-*/
-class __declspec(align(16)) CCameraGame : public CCameraBase
-{
-public:
-	typedef float NormalCameraFloatOffset;
-
-	virtual void* function0(char a1) PURE;
-	virtual BOOL SetViewAngles() PURE;
-	virtual void* Move() PURE;
-
-	//void* m_vtable;									//0x0000
-	//char align8[8];									//0x0008 | align 16 padding tbh
-	//CCameraBase m_Base;								//0x0010
-	//char align68[8];									//0x0068 | probably part of CCameraBase alignment
-	Vector3Aligned m_v0x70;								//0x0070
-	Vector3Aligned m_v0x80;								//0x0080
-	Vector3Aligned m_v0x90;								//0x0090
-	float m_fl0xA0;										//0x00A0
-	float m_fl0xA4;										//0x00A4
-	Pl0000* m_pLocalPlayer;								//0x00A8 | probs wrong
-	DWORD dwUnk;										//0x00B0
-	char _0x00B4[28];									//0x00B4
-	EntityHandle m_hEntity;								//0x00D0
-	DWORD alignment;									//0x00D4
-	Pl0000* m_pEntity;									//0x00D8
-	Pl0000* m_pEntity2;									//0x00E0
-	QWORD align;										//0x00E8
-	Vector3Aligned m_vPosition;							//0x00F0
-	Vector3Aligned m_vTarget;							//0x0100
-	Vector3Aligned m_vUnk2;								//0x0110
-	Vector3Aligned m_vUp;								//0x0120
-	float m_flRotationZ;								//0x0130
-	float m_flDistance;									//0x0134
-	float m_flFov;										//0x0138
-	char _0x13C[4];										//0x013C
-	Vector3Aligned m_vPositionOffset;					//0x0140
-	Vector3Aligned m_vTargetOffset;						//0x0150
-	Vector3Aligned m_vUnk3;								//0x0160
-	Vector3Aligned m_vGlobalUp;							//0x0170
-	float m_flRotationZ2;								//0x0180
-	float m_flDistance2;								//0x0184
-	float m_flFov2;										//0x0188
-	float m_flUnk;										//0x018C
-	BOOL m_bCameraShake;								//0x0190
-	char _0x0194[12];									//0x0194
-	Vector3Aligned m_vShake;							//0x01A0
-	Vector3Aligned m_vShake2;							//0x01B0
-	char _0x01C0[128];									//0x01C0
-	//0x0200 | world to screen matrix??
-	void* m_pUnk;										//0x0240
-	char _0x0240[296];									//0x0248
-	//float m_flFovy;									//0x02BC
-	Pl0000* m_pCamEntity;								//0x0370
-	char _0x0378[24];									//0x0378
-	unsigned int _0x390;								//0x0390
-	char _0x0394[92];									//0x0394
-	Vector3 m_vViewangles;								//0x03F0 | radians (p, y, r)
-	char pad3FC[44];									//0x03FC
-	StaticArray<NormalCameraFloatOffset, 2> m_Offsets;	//0x0428 | lib::StaticArray<NormalCameraFloatOffset,2,4>::`vftable'
-	char pad450[33788];									//0x0450
-	//0x04AC | affects viewangle pitch
-	//0x04B0 | affects viewangle yaw
-	float m_flUnknown2;									//0x884C
-	char pad8850[160];									//0x8850
-	float m_flUnknown;									//0x88F0
-	char pad88F4[92];									//0x88F4
-	Vector3Aligned m_vUnknown[2];						//0x8950
-};
-IS_OFFSET_CORRECT(CCameraGame, m_pLocalPlayer, 0xA8);
-IS_OFFSET_CORRECT(CCameraGame, m_hEntity, 0xD0);
-IS_OFFSET_CORRECT(CCameraGame, m_vPosition, 0xF0);
-IS_OFFSET_CORRECT(CCameraGame, m_bCameraShake, 0x190);
-IS_OFFSET_CORRECT(CCameraGame, m_vShake, 0x1A0);
-IS_OFFSET_CORRECT(CCameraGame, _0x390, 0x390);
-IS_OFFSET_CORRECT(CCameraGame, m_vViewangles, 0x3F0);
-IS_OFFSET_CORRECT(CCameraGame, m_flUnknown2, 0x884C);
-IS_OFFSET_CORRECT(CCameraGame, m_flUnknown, 0x88F0);
 
 // Found by Dennis
 // Address = 0x14160EB40
@@ -2418,395 +644,36 @@ struct controller_input_state
 	DWORD m_dwButtons;			//0x001C | eConrollerButtons
 };
 
-struct CSurface
+// left and right mouse can be swapped
+enum eMouseButtons
 {
-	ID3D11Texture2D* m_pTexture;
-	ID3D11DepthStencilView* m_pDepthStencilView;
+	MOUSE_BUTTON0 = 1,
+	MOUSE_BUTTON1 = 2,
+	MOUSE_MIDDLE = 4
 };
 
-//implement these when possible
-struct CDepthSurface
+struct CMouseInputContext
 {
-	void* vtbl;
-	int m_iWidth;
-	int m_iHeight;
-	char unk[56];
-	struct CSurface* m_pSurface;
-};
-
-// Size of struct 104 (0x68) bytes
-struct CRenderTarget
-{
-	void* vtbl;
-	int m_iWidth;	// could be uint
-	int m_iHeight;
-	char pad[80];
-	CTexture* m_pTexture;
-	//const Hw::cRenderTargetImpl::`vftable'{for `Hw::cGraphicObjectBase' }
-};
-
-struct CBufferInfo
-{
-	ID3D11Buffer* m_pBuffer;
-	DXGI_FORMAT m_Format;
-	ID3D11ShaderResourceView* m_pShaderResourceView;
-	ID3D11UnorderedAccessView* m_pUnorderedAccessView;
-};
-IS_SIZE_CORRECT(CBufferInfo, 0x20);
-
-// Size of struct is 56 (0x38) bytes
-struct CVertexBuffer
-{
-	void* m_pVtbl;
-	QWORD qword8;						//0x08
-	BOOL m_bInitalized;					//0x10
-	UINT m_uVertexSize;					//0x14
-	INT m_nVertices;					//0x18
-	char pad1c[12];						//0x1C
-	CBufferInfo* m_pInfo;				//0x28
-	DWORD dword30;
-};
-IS_SIZE_CORRECT(CVertexBuffer, 0x38);
-
-// Size of struct is 48 (0x30) bytes
-struct CIndexBuffer
-{
-	void* m_pVtbl;						//0x00
-	BOOL m_bInitalized;					//0x0C
-	UINT m_uIndiceSize;					//0x08	
-	INT m_nIndices;						//0x10
-	char pad14[12];						//0x14
-	CBufferInfo* m_pInfo;				//0x20
-	DWORD dword28;
-};
-IS_SIZE_CORRECT(CIndexBuffer, 0x30);
-
-struct CDepthStencilStateInfo;
-
-struct CDepthStencilState
-{
-	void* m_pVtbl;
-	BOOL m_bDepthEnable;
-	D3D11_DEPTH_WRITE_MASK m_DepthWriteMask;
-	D3D11_COMPARISON_FUNC m_DepthFunc;
-	DWORD dword14;
-	BOOL m_bStencilEnable;
-	UINT m_uStencilRef;
-	DWORD dword20;
-	DWORD dword24;
-	DWORD dword28;
-	DWORD dword2C;
-	DWORD dword30;
-	DWORD dword34;
-	DWORD dword38;
-	DWORD dword3C;
-	BYTE gap40[8];
-	ID3D11DepthStencilState** m_ppDepthStencilState;
-};
-
-
-// CVertexLayoutImpl is 320 bytes in size
-struct CVertexLayout
-{
-	void* m_vtbl;
-	BYTE gap0[304];
-	ID3D11InputLayout** m_ppInputlayout;
-};
-IS_SIZE_CORRECT(CVertexLayout, 320);
-
-struct CConstantBuffers
-{
-	BOOL m_bSetBuffers;
-	ID3D11Buffer* m_pBuffers[14];
-};
-
-enum Topology
-{
-	TOPOLOGY_POINTLIST,
-	TOPOLOGY_LINELIST,
-	TOPOLOGY_LINESTRIP,
-	TOPOLOGY_TRIANGLELIST,
-	TOPOLOGY_TRIANGLESTRIP,
-	TOPOLOGY_UNDEFINED
-};
-
-struct RenderInfo
-{
-	Topology m_Topology;
-	INT m_iBaseVertexLocation;
-	UINT m_uPrimitives; //???
-	UINT m_uVertexCount;
-	UINT m_uIndexCountPerInstance;
-};
-
-struct CGraphicObjectFactoryDx11
-{
-	ID3D11Device* m_pDevice;			//0x0000
-	IDXGIFactory* m_pFactory;			//0x0008
-};
-
-struct CShaderMemorizeVS
-{
-	void* vtbl;
-	char m_szName[48];
-};
-
-struct CShaderMemorizePS
-{
-	void* vtbl;
-	char m_szName[48];
-};
-
-struct CShaderMemorizeCS
-{
-	void* vtbl;
-	char m_szName[48];
-};
-
-struct ShaderDescVS
-{
-	BYTE gap0[8];					//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-	CShaderMemorizeVS* m_pShader;	//0x18
-	BOOL m_b0x18[2];				//0x20
-	char m_szName[48];				//0x28
-};
-
-struct ShaderDescPS
-{
-	BYTE gap0[8];					//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-	CShaderMemorizePS* m_pShader;	//0x18
-	BOOL m_b0x18[2];				//0x20
-	char m_szName[48];				//0x28
-};
-
-struct ShaderDescCS
-{
-	BYTE gap0[8];					//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-	CShaderMemorizeCS* m_pShader;	//0x18
-	BOOL m_b0x18[2];				//0x20
-	char m_szName[48];				//0x28
-};
-
-struct PixelShaderInfo
-{
-	ID3D11PixelShader* m_pShader;	//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-};
-
-struct VertexShaderInfo
-{
-	ID3D11VertexShader* m_pShader;	//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-};
-
-struct ComputeShaderInfo
-{
-	ID3D11ComputeShader* m_pShader;	//0x00
-	const void* m_pShaderBinary;	//0x08
-	SIZE_T m_ShaderSize;			//0x10
-};
-
-struct PixelShaderContext
-{
-	BYTE gap0[16];
-	struct PixelShaderInfo* m_pInfo;
-};
-
-struct VertexShaderContext
-{
-	BYTE gap0[16];
-	struct VertexShaderInfo* m_pInfo;
-};
-
-struct ComputeShaderContext
-{
-	BYTE gap0[16];
-	struct ComputeShaderInfo* m_pInfo;
-};
-
-struct COcclusionQuery
-{
-	BYTE gap0[40];
-	ID3D11Query** m_ppQuery;
-};
-
-// size of struct 0xF0 (240) bytes
-struct TextureGroup
-{
-	BOOL m_bUpdateTextures;
-	ID3D11ShaderResourceView* m_pTextures[32];
-};
-
-/*
-Size of struct 264 (0x108) bytes
-*/
-struct TextureContainer
-{
-	struct TextureGroup m_Textures;
-	char padF0[24];
-};
-
-struct CSamplerState
-{
-	BOOL m_bSetSamplers;
-	ID3D11SamplerState* m_pSamplerStates[16];
-};
-
-/*
-Size of struct 504 (0x1F8) bytes //wrong
-*/
-struct CGraphicRenderContext
-{
-	VertexShaderInfo* m_pVertexShader;			//0x000
-	PixelShaderInfo* m_pPixelShader;			//0x008
-	BOOL m_bSetShaders;							//0x010
-	BYTE gap14[4];								//0x014
-	BOOL m_bSetVertexBuffer;					//0x018
-	BYTE gap1C[4];								//0x01C
-	ID3D11Buffer* const m_pVertexBuffers[8];	//0x020
-	UINT m_uOffsets[8];							//0x060
-	UINT m_uStrides[8];							//0x080
-	ID3D11InputLayout** m_ppInputLayout;		//0x0A0 | probs a struct w/ the ID3D11InputLayout* at offset 0
-	CIndexBuffer* m_pIndexBuffer;				//0x0A8
-	DWORD m_dw0xB0;								//0x0B0
-	BOOL m_bSetInputLayout;						//0x0B4
-	BOOL m_bSetIndexBuffer;						//0x0B8
-	UINT m_uTopologyIndex;						//0x0BC
-	CConstantBuffers m_ConstantBuffers[2];		//0x0C0
-	TextureContainer m_TextureContainer;		//0x1B0
-};
-IS_OFFSET_CORRECT(CGraphicRenderContext, m_TextureContainer, 0x1B0);
-
-struct CSwapChainInfo
-{
-	unsigned int m_uWidth;
-	unsigned int m_uHeight;
-	float m_flRefreshRate;
-	BOOL m_b0;
-	BOOL m_bFullscreen;
-	BOOL m_b2;
-};
-
-/*
-* This struct changed across versions (size increase)
-*
-* Size of struct 0xC8 (200) bytes
-*/
-struct CSwapChain
-{
-	void* pUnknown0x00;				//0x00
-	ID3D11DeviceContext* m_pContext;//0x08
-	ID3D11Device* m_pDevice;		//0x10
-	IDXGISwapChain* m_pSwapChain;	//0x18
-	CRenderTarget m_Target;			//0x20
-	char pad2[48];					//0x68
-	HWND m_hWindow;					//0xB8
-	BOOL m_bSyncInterval;			//0xC0
-};
-IS_OFFSET_CORRECT(CSwapChain, m_bSyncInterval, 0xC0);
-IS_SIZE_CORRECT(CSwapChain, 200);
-
-struct CGraphicOutputDx11
-{
-	DXGI_OUTPUT_DESC m_Desc;
-	char extra[184];
+	DWORD dword0; //possibly bool
+	DWORD m_bShowCursorOld;
+	DWORD dword8;
+	LONG m_lWidth;
+	LONG m_lHeight;
+	float m_flDeltaX;
+	float m_flDeltaY;
+	float m_flDeltaZ;	
+	DWORD m_fButtons; //  eMouseButtons
 };
 
 class CGraphicContextDx11;
 class CGraphicDeviceDx11;
 
-/*
-*	This struct changed across versions (size increase)
-*	CGraphics +0x30
-*/
-class CDisplay
-{
-public:
-	void* m_pVtble;							//0x0000
-	DWORD dwUnk0x0008;						//0x0008
-	int m_iWidth;							//0x000C
-	int m_iHeight;							//0x0010
-	DWORD dwUnk0x0014;						//0x0014
-	void* m_pConstantBuffer[2];				//0x0018
-	char _0x0030[64];						//0x0028
-	CSwapChain* m_pWindowedSwapChain;		//0x0068
-	char _0x0070[8];						//0x0070
-	CSwapChain* m_pSwapChain;				//0x0078
-	int m_iUnk;								//0x0080
-	char _0x006C[4];						//0x0084
-	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0088
-};
-IS_OFFSET_CORRECT(CDisplay, m_pWindowedSwapChain, 0x68);
-
-struct CHeapInfo
-{
-	CHeapInstance* m_pHeap;		//0x00
-	CHeapInfo* m_pParentInfo;	//0x08 | parents
-	CHeapInfo* m_pChildInfo;	//0x10 | children
-	CHeapInfo* m_pNext;			//0x18
-	CHeapInfo* m_pPrevious;		//0x20
-	BYTE gap28[8];				//0x28
-};
-
 struct CConstantBufferInfo;
-
-struct __declspec(align(8)) CModelDrawContext
-{
-	CVertexGroup* m_pVertexGroups;
-	BYTE gap8[8];
-	CConstantBufferInfo* m_pContexts;
-	BYTE gap18[4];
-	Topology m_Topology;
-};
-
-struct __declspec(align(8)) CConstantBufferInfo
-{
-	DWORD m_iStartIndex;				//0x00
-	DWORD m_iCount;
-	DWORD m_nInstances;
-	DWORD dwordC;
-	BYTE gap10[8];
-	CModelInstanceParam* m_pParams;
-	CConstantBufferContext* m_pContext;
-};
-
-struct CModelEntryData
-{
-	QWORD qword0;						//0x00
-	CModelWork* m_pWork;				//0x08
-	CModelDrawContext** m_pCtx;			//0x10
-	DWORD m_iVertexOffset;				//0x18
-	BYTE gap1C[4];						//0x1C
-	CModelMatrixTable** m_pMatrices;	//0x20
-	CModelInstanceParam** m_pParams;	//0x28
-	QWORD* pqword30;					//0x30
-	BYTE gap38[44];						//0x38
-	DWORD m_iStartIndex;				//0x64 | CConstantBufferInfo
-	DWORD m_iCount;						//0x68
-	DWORD m_nInstances;					//0x6C
-	DWORD dword70;						//0x70
-	DWORD dword74;						//0x74
-};
-IS_OFFSET_CORRECT(CModelEntryData, m_pParams, 0x28);
-
-struct CModelEntry
-{
-	CModelEntryData* m_pData;
-	struct CModelEntry* m_pNext;
-};
 
 struct CGraphicCommand
 {
 	CModelEntryData* m_pModelData;	//0x00
-	BYTE gap8[8];					//0x08
+	void* m_p0x008;					//0x08
 	void* m_pCallback;				//0x10
 	CShaderSetting* m_pSetting;		//0x18
 	BYTE gap18[16];					//0x20
@@ -2818,14 +685,14 @@ struct CGraphicCommand
 	BYTE gap99[23];					//0x99
 	CModelEntry* m_pModelEntry;		//0xB0
 	BYTE gapB8[8];					//0xB8
-	DWORD m_iVertexIndex;			//0xC0
-	BYTE gapC4[8];					//0xC4
+	int m_iVertexIndex;				//0xC0
+	int m_iInputLayout;				//0xC4
 	unsigned int unsignedCC;		//0xCC
 };
-IS_OFFSET_CORRECT(CGraphicCommand, qword30, 0x30);
-IS_OFFSET_CORRECT(CGraphicCommand, m_SamplerIndex, 0x90);
-IS_OFFSET_CORRECT(CGraphicCommand, m_pModelEntry, 0xB0);
-IS_OFFSET_CORRECT(CGraphicCommand, m_iVertexIndex, 0xC0);
+VALIDATE_OFFSET(CGraphicCommand, qword30, 0x30);
+VALIDATE_OFFSET(CGraphicCommand, m_SamplerIndex, 0x90);
+VALIDATE_OFFSET(CGraphicCommand, m_pModelEntry, 0xB0);
+VALIDATE_OFFSET(CGraphicCommand, m_iVertexIndex, 0xC0);
 
 class CGraphics;
 
@@ -2839,7 +706,7 @@ struct CGraphicCommandList
 	INT m_iCommandIndex;
 	CHAR pad28[8];
 };
-IS_SIZE_CORRECT(CGraphicCommandList, 0x30);
+VALIDATE_SIZE(CGraphicCommandList, 0x30);
 
 struct COtManagerPtr98
 {
@@ -2877,325 +744,9 @@ struct COtManager
 	BYTE gapA0[4];							//0xA0
 	BOOL m_bGraphicListInitalized;			//0xA4
 };
-IS_OFFSET_CORRECT(COtManager, m_bGraphicListInitalized, 0xA4);
-IS_SIZE_CORRECT(COtManager, 0xA8);
+VALIDATE_OFFSET(COtManager, m_bGraphicListInitalized, 0xA4);
+VALIDATE_SIZE(COtManager, 0xA8);
 
-/*
-* Size of struct 0x0F0 (240) bytes	old version (denuvo)
-* Size of struct 0x320 (800) bytes	new version
-*/
-class CGraphics
-{
-public:
-	BOOL m_b0x00;						//0x0000
-	char unk0x04[4];					//0x0004
-	void* m_pStruct;					//0x0008
-	UINT m_uUAVStartSlot;				//0x0010
-	char unk0x0C[4];					//0x0014
-	void* m_pSamplerState;				//0x0018
-	DWORD dw0x18;						//0x0020
-	char unk0x1C[4];					//0x0024
-	CGraphicContextDx11* m_pContext;	//0x0028
-	CDisplay m_Display;					//0x0030
-	char _0x00C0[504];					//0x00C0
-	CGraphicDeviceDx11* m_pGraphicalDevice;	//0x02B8
-	CHeapInfo* m_pHeapInfo;				//0x02C0 
-	CReadWriteLock m_Lock;				//0x02C8
-	char padCC[12];						//0x02F8
-	int m_iTimeStep;					//0x00DC |  g_flDeltaTime * 3000.0 
-	char padE0[20];						//0x00E0
-};
-IS_OFFSET_CORRECT(CGraphics, m_pContext, 0x28);
-IS_OFFSET_CORRECT(CGraphics, m_Display, 0x30);
-IS_OFFSET_CORRECT(CGraphics, m_pGraphicalDevice, 0x2B8);
-IS_OFFSET_CORRECT(CGraphics, m_Lock, 0x2C8);
-IS_SIZE_CORRECT(CGraphics, 0x320);
-
-/*
-*
-*   Size of struct 0xB8 (184) bytes  old version (denuvo)
-*	Size of struct 0xB8 (184) bytes  new version
-*/
-struct COutput
-{
-	wchar_t m_szDeviceName[32];
-	BYTE gap0[64];
-	QWORD qword80;
-	QWORD qword88;
-	DWORD dword90;
-	BYTE gap94[4];
-	QWORD qword98;
-	DWORD dwordA0;
-	DWORD dwordA4;
-	DWORD dwordA8;
-	DWORD dwordAC;
-	DWORD dwordB0;
-	DWORD dwordB4;
-};
-
-/*
-*
-*   Size of struct 0x118 (280) bytes  old version (denuvo)
-*	Size of struct 0x118 (280) bytes  new version
-*/
-struct CAdapter
-{
-	wchar_t m_szDescription[128];
-	IDXGIAdapter* m_pAdapter;
-	COutput* m_pOutputs;
-	UINT m_uOutputs;
-};
-
-/*
-this structure is used to create d3d and is used in many of NieR: Automata's
-direct3d functions. It might have more to it that I haven't explored so, this is just
-the basic layout of the stucture. Strangley enough, it has device pointers and factory
-pointers but not a swapchain pointer nor an adapter pointer. Perhaps, I just have not
-disovered them. In addition I haven't found a global pointer that directly points to
-this structure. This is a virtual class after further investigation. Correctly
-renamed the class to it's proper name. It seems there might be a nested struct too.
-
- Size of struct 0x110 (272) bytes  old version (denuvo)
- Size of struct 0x140 (320) bytes  new version
- */
-class CGraphicDeviceDx11
-{
-public:
-	virtual CGraphicDeviceDx11* function0();
-	virtual BOOL Create(CGraphicContextDx11** ppContext, CDisplay* pDisplay, HWND hWnd, void* pInfo);
-	virtual BOOL function2();
-	virtual BOOL function3();
-	virtual BOOL function4();
-	virtual BOOL function5();
-	virtual BOOL Render(CGraphics* pGraphics, DWORD* a2, CDisplay* pDisplay);
-	virtual BOOL function7();
-	virtual BOOL CreateComputeContext(__int64 a1, __int64 a2);
-	virtual BOOL function9();
-	virtual BOOL function10();
-	virtual void function11();
-	virtual BOOL function12();
-	virtual BOOL function13();
-	virtual BOOL function14();
-	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile); // index: 11 now according to ida
-	virtual BOOL CreateIndexBuffer(CVertexBuffer* pBuffer, __int64* a2);
-	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int* pcbVertexSizes, int index, int iElement);
-	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, unsigned int uByteWidth);
-	virtual BOOL CreateIndexBuffer(CIndexBuffer* pBuffer, __int64* a2);
-	virtual BOOL CreateImmutableIndexBuffer(CIndexBuffer* pBuffer, const void* pData, int cbIndexSize, int nIndices);
-	virtual BOOL CreateDynamicIndexBuffer(CIndexBuffer* pBuffer, int iElements, int cbElementSize);
-	virtual BOOL CreateInputLayout(__int64 a2, const void* pDescriptions, unsigned int nDescs, VertexShaderContext* pCtx);
-	virtual BOOL CreateVertexShader(VertexShaderContext* pCtx, ShaderDescVS* pDesc);
-	virtual BOOL CreatePixelShader(PixelShaderContext* pCtx, ShaderDescPS* pDesc);
-	virtual BOOL CreateComputeShader(ComputeShaderContext* pCtx, ShaderDescCS* pDesc);
-	virtual BOOL function26();
-	virtual BOOL function27();
-	virtual void function28();
-	virtual BOOL function29();
-	virtual BOOL function30();
-	virtual BOOL function31();
-	virtual BOOL function32();
-	virtual BOOL function33();
-	virtual BOOL CreateDepthStencilState(CDepthStencilState* pState, CDepthStencilStateInfo* pInfo);
-	virtual BOOL CreateSamplerState();
-	virtual BOOL CreateOcclusionQuery(COcclusionQuery* pQuery);
-
-public:
-	//void* pVtable;						//0x0000
-	int m_iScreenWidth;						//0x0008 
-	int m_iScreenHeight;					//0x000C 
-	float flScreenHz;						//0x0010 / fps / 60hz capped
-	BOOL m_bFullscreen;						//0x0014 | UINT
-	BOOL m_bUnk0x018;						//0x0018
-	BOOL m_bUnk0x01C;						//0x001C
-	BOOL m_bAcquiredFullscreen;				//0x0020
-	BOOL m_bUnk0x024;						//0x0024
-	BOOL m_bUnk0x028;						//0x0028
-	BOOL m_bUnk0x02C;						//0x002C
-	BOOL m_bFullscreen2;					//0x0030
-	BOOL m_bUnk0x034;						//0x0034
-	IDXGIOutput* m_pOutput;					//0x0038
-	UINT m_uFullscreenTimer;				//0x0040
-	char _0x0024[4];						//0x0044
-	ID3D11Device* m_pDevice;				//0x0048
-	IDXGIFactory* m_pFactory;				//0x0050 | IDXGIFactory2*
-	HWND m_hWindow;							//0x0058
-	CVertexBuffer* m_pVertexBuffer;			//0x0060 | Hw::cVertexBufferImpl
-	ID3D11Device* m_pID3D11Device2;			//0x0068
-	IDXGIFactory2* m_pFactory2;				//0x0070		
-	CVertexLayout* m_pVertexLayout;			//0x0078 | Hw::cVertexLayoutImpl
-	CConstantBuffer* m_pConstantBuffer;		//0x0080 | Hw::cConstantBufferImpl
-	char _0x0048[8];						//0x0088
-	CGraphicObjectFactoryDx11 m_Factory;	//0x0090
-	char _0x0080[12];						//0x00A0
-	DXGI_SAMPLE_DESC m_SampleDescs[5];		//0x00A4
-	char _0x00A4[52];						//0x00B4
-
-	//void* pd3dunk;						//0x00A0 
-
-	BOOL m_bWindowed;						//0x0108 | UINT
-	float m_flFrameRate;					//0x00E4
-	int m_iWidth;							//0x0120
-	int m_iHeight;							//0x0124
-	D3D11_QUERY_DESC m_OccusionDesc;		//0x00F0
-	//D3D11_QUERY_DESC m_TimestampDesc;		//0x00F8
-	int m_iAdapter;							//0x0120
-	int m_iOutput;							//0x0124
-	CAdapter* m_pAdapters;					//0x0128
-	UINT m_uAdapters;						//0x0130
-	BOOL m_b0x0134;							//0x0134
-	void* m_pUnk0x0138;						//0x0138
-};
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pOutput, 0x38);
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_bWindowed, 0x108);
-IS_OFFSET_CORRECT(CGraphicDeviceDx11, m_pAdapters, 0x128);
-IS_SIZE_CORRECT(CGraphicDeviceDx11, 320);
-
-/*
-This struct is the same size on both versions
-
-Size of struct 0x580 (1408) bytes	old version (denuvo)
-Size of struct 0x580 (1408) bytes	new version
-*/
-class CGraphicContextDx11
-{
-public:
-	enum Topology
-	{
-		TOPOLOGY_UNDEFINED,
-		TOPOLOGY_1_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_2_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_3_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_4_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_5_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_6_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_7_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_8_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_9_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_10_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_11_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_12_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_13_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_14_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_15_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_16_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_17_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_18_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_19_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_20_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_21_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_22_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_23_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_24_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_25_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_26_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_27_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_28_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_29_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_30_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_31_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_32_CONTROL_POINT_PATCHLIST,
-		TOPOLOGY_UNDEFINED2
-	};
-
-	struct Clear_t
-	{
-		enum ClearFlags
-		{
-			NONE,
-			CLEAR_RENDERTARGETVIEW = 1,
-			CLEAR_DEPTH = 2,
-			CLEAR_STENCIL = 4
-		};
-
-		DWORD m_dwColor; //argb format
-		FLOAT m_flDepth;
-		BYTE m_Stencil;
-		ClearFlags m_Flags;
-	};
-
-	struct TextureContext
-	{
-		int m_iGroup;
-		int m_iIndex; //valid range 0 - 31 (clamped)
-	};
-
-	virtual void function0() PURE;
-	virtual unsigned int GetUINT0x4(__int64 a2) PURE; // func = return *(uint*)(a2+4);
-	virtual BOOL SetRenderTarget(CDisplay* pDisplay, CDepthSurface* pSurface) PURE;
-	virtual BOOL function3() PURE; // returns 1
-	virtual BOOL MapResource3ReadOnly(__int64 pResource) PURE;
-	virtual BOOL MapResource3(__int64 pResource) PURE;
-	virtual BOOL UnmapResource3(__int64 pResource) PURE;
-	virtual BOOL MapResource2(void** ppMappedData, __int64 pResource) PURE;
-	virtual BOOL UnmapResource2(__int64 pResource) PURE;
-	virtual BOOL MapResource(void** ppMappedData, __int64 pResource) PURE;
-	virtual BOOL UnmapResource(__int64 pResource) PURE;
-	virtual BOOL Clear(Clear_t* pClearArgs) PURE;
-	virtual BOOL function12() PURE; // returns 1
-	virtual BOOL SetScissorRect(int x, int y, int width, int height) PURE;
-	virtual BOOL SetViewport(int x, int y, int width, int height, float min_depth, float max_depth) PURE;
-	virtual BOOL function15() PURE; // returns 1
-	virtual BOOL function16() PURE;
-	virtual BOOL function17() PURE;
-	virtual BOOL Resolve(CRenderTarget* pTarget, unsigned int a3, RECT* pRect) PURE; // used when changing resolutions?
-	virtual BOOL CopyDepthSurface(CDepthSurface* pDst) PURE;
-	virtual BOOL function20() PURE; // returns 0
-	virtual BOOL SetInputLayout(CVertexLayout* pVertexLayout) PURE; //SetVertexLayout
-	virtual BOOL SetVertexBuffer(UINT index, CVertexBuffer* pVertexBuffer) PURE;
-	virtual BOOL InvalidateVertexBuffer(UINT index) PURE;
-	virtual BOOL SetIndexBuffer(void* pIndexBuffer) PURE;
-	virtual BOOL InvalidateIndexBuffer() PURE;
-	virtual BOOL SetVertexShader(VertexShaderContext* pCtx) PURE;
-	virtual BOOL SetPixelShader(PixelShaderContext* pCtx) PURE;
-	virtual BOOL SetConstantBuffer(CConstantBufferContext* pCtx, CConstantBuffer* pBuffer) PURE; //model params & matrices etc
-	virtual BOOL function29() PURE;
-	virtual BOOL function30() PURE;
-	virtual BOOL function31() PURE;
-	virtual BOOL function32() PURE;
-	virtual BOOL function33() PURE;
-	virtual BOOL ClearUnorderedAccessViewUint(__int64 a2, const UINT a3) PURE;
-	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int iShaderResourceView) PURE;
-	virtual BOOL UnsetTexture(CTexture* pTexture) PURE;
-	virtual BOOL SetSamplerState() PURE;
-	virtual BOOL SetBlendState(__int64 p) PURE;
-	virtual BOOL SetRasterizerState(__int64 p) PURE;
-	virtual BOOL SetDepthStencilState(CDepthStencilState* pState) PURE;
-	virtual BOOL SetBlendFactor(UINT color) PURE;
-	virtual BOOL SetTopology(Topology topology) PURE;
-	virtual BOOL BeginOcclusionQuery(COcclusionQuery* pQuery) PURE;
-	virtual BOOL EndOcclusionQuery(COcclusionQuery* pQuery) PURE;
-	virtual BOOL DrawPrimitive(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawIndexedPrimitive(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawPrimitiveInstanced(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawIndexedPrimitiveInstanced(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawPrimitiveInstancedIndirect(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawIndexedPrimitiveInstancedIndirect(RenderInfo* pInfo, __int64 a3, unsigned int AlignedByteOffsetForArgs) PURE;
-	virtual void Flush() PURE;
-	virtual int GetRenderWidth() PURE;
-	virtual int GetRenderHeight() PURE;
-
-	//void* m_pVtbl;								//0x0000
-	ID3D11DeviceContext* m_pContext;				//0x0008
-	Vector4 m_vBlendFactor;							//0x0010
-	CRenderTarget* m_pRenderTarget;					//0x0020
-	void* ptrs[4];									//0x0028
-	CDepthSurface* m_pDepthSurface;					//0x0048
-	CVertexBuffer* m_pVertexBuffer;					//0x0050
-	ID3D11VertexShader* m_pVertexShader;			//0x0058
-	ID3D11RenderTargetView* m_pRenderTargetView[4];	//0x0060
-	ID3D11DepthStencilView* m_pDepthStencilView;	//0x0080
-	CDepthSurface* m_pDepthSurface2;				//0x0088
-	CVertexBuffer* m_pVertexBuffer2;				//0x0090
-	CGraphicRenderContext m_RenderContext;			//0x0098
-	char pad368[512];								//0x0368
-	int m_iRenderWidth;								//0x0568
-	int m_iRenderHeight;							//0x056C
-	char pad570[8];									//0x0570
-	ID3D11Device* m_pDevice;						//0x0578
-};
-IS_SIZE_CORRECT(CGraphicContextDx11, 1408);
-IS_OFFSET_CORRECT(CGraphicContextDx11, m_RenderContext, 0x98);
-IS_OFFSET_CORRECT(CGraphicContextDx11, m_iRenderWidth, 0x568);
 
 class COsMainWindow
 {
@@ -3255,7 +806,7 @@ struct CSaveDataDevice
 	QWORD qwGameDataBufferSize;		//0x0088
 	void* pSystemDataBuffer;		//0x0090 | includes screen dimensions
 	QWORD qwSystemDataBufferSize;	//0x0098
-	void* pBuffer;					//0x00A0
+	void* pBuffer;					
 	QWORD nBytesIO_SystemData;		//0x00A8
 	QWORD nBytesIO_GameData;		//0x00B0
 	QWORD nBytesIO_SaveData;		//0x00B8
@@ -3415,13 +966,6 @@ enum DialogUIBlackType
 	DialogUIBlackType_Persistent
 };
 
-struct CEntityInfoList
-{
-	CEntityInfo* m_pInfo;
-	struct CEntityInfoList* m_pNext;
-	struct CEntityInfoList* m_pPrevious;
-};
-
 
 /*
 	Event::Work maybe??? probs
@@ -3448,16 +992,16 @@ struct CPhaseManager
 // Red-Black tree
 struct PuidMixin
 {
-	struct PuidMixin* m_pHead;
-	struct PuidMixin* m_pRight;
-	struct PuidMixin* m_pLeft;
-	char _0x0018;
-	bool m_bLast;
-	char _0x0020[6];
-	unsigned int m_uDescriptionHash;
-	char alignment[4];
-	char* m_szDescription;
-	UINT64 m_uReferenceCount;
+	struct PuidMixin* m_pHead;			// 0x0000
+	struct PuidMixin* m_pRight;			// 0x0008
+	struct PuidMixin* m_pLeft;			// 0x0010
+	char _0x0018;						// 0x0018
+	bool m_bLast;						// 0x0019
+	char _0x0020[6];					// 0x0020
+	unsigned int m_uDescriptionHash;	// 0x0026  FIXME: ???? this might be wrong
+	char alignment[4];					// 0x0030
+	char* m_szDescription;				// 0x0038
+	UINT64 m_uReferenceCount;			// 0x0040
 };
 
 /*
@@ -3486,6 +1030,18 @@ struct SceneState
 	size_t m_ReferenceCount;	//not sure
 };
 
+struct CStateObject
+{
+	void* m_pVtbl;
+	DWORD dword8;
+	QWORD qword10;
+	DWORD dword18;
+	char* m_szName;
+	QWORD qword28;
+	UINT m_uHash;
+	QWORD qword38;
+};
+
 class CScenePosSystem
 {
 	void* m_vtbl;							//0x0000
@@ -3506,15 +1062,16 @@ public:
 	char _0x00[16];							//0x0080
 	Array<SceneState> m_States;				//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 };
-IS_OFFSET_CORRECT(CSceneStateSystem, m_States, 0x90);
+VALIDATE_OFFSET(CSceneStateSystem, m_States, 0x90);
 
 struct CSceneEntitySystem
 {
 	int m_nInfoLists;
 	int m_nMaxInfoLists;
-	QWORD qword8;
-	BYTE gap10[8];
-	QWORD qword20;
+	void* qword8;
+	void* qword10;
+	BOOL dword18;
+	BOOL dword1C;
 	BOOL m_bDataExists;
 	CReadWriteLock m_Lock;
 	CEntityInfoList* m_pInfoList2;
@@ -3530,7 +1087,7 @@ struct CSceneEntitySystem
 //max size 0xC0
 struct set_info_t
 {
-	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initalized to an indenity 4x4 matrix
+	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initalized to an identity 4x4 matrix
 	Matrix4x4 m_mat;
 	Vector3Aligned m_vPosition;
 	Vector3Aligned m_vRotation;
@@ -3542,7 +1099,7 @@ struct set_info_t
 	INT m_i0x080;
 	INT m_i0x084;
 	INT m_i0x088;
-	INT m_i0x08C;
+	INT m_iGroupId;
 };
 
 #define CREATE_ENTITY_VFX 0x40000000
@@ -3566,16 +1123,10 @@ struct Create_t
 
 struct CreateContext
 {
-	CSceneEntitySystem* m_pSceneEntitySystem;
-	void* ptr8;
-	Create_t* m_pCreate;
-	BOOL m_bDataExists;
-};
-
-struct HeapThing
-{
-	void* m_pHeap;
-	BOOL m_bFlag;  // ?????
+	CSceneEntitySystem* m_pSceneEntitySystem;	// 0x0000
+	void* ptr8;									// 0x0008
+	Create_t* m_pCreate;						// 0x0010
+	BOOL m_bDataExists;							// 0x0018 |  m_pSceneEntitySystem->qword18
 };
 
 struct HeapAlloc_t
@@ -3584,18 +1135,72 @@ struct HeapAlloc_t
 	BOOL Succeeded;
 };
 
+/*
+* Size of struct is 0x40 (64) bytes
+*/
+struct CHeapInfo
+{
+	CHeapInstance* m_pHeap;				//0x0000
+	struct CHeapInfo* m_pParentInfo;	//0x0008
+	struct CHeapInfo* m_pChildInfo;		//0x0010
+	struct CHeapInfo* m_pPrevious;		//0x0018 could be next then prev
+	struct CHeapInfo* m_pNext;			//0x0020
+	QWORD m_uPartitionSize;				//0x0028
+	QWORD m_qwHeapSize;					//0x0030
+	DWORD m_uIndex;						//0x0038
+};
+
+/*
+* Size of struct is 0x40 (64) bytes (+8) maybe?
+*/
 struct CHeapAllocInfo
 {
-	UINT m_uIndex;
-	UINT m_uUnknown;
-	CHeapInstance* m_pParent2; // might be child idk
-	CHeapInstance* m_pParent;
-	CHeapAllocInfo* m_pNext;
-	CHeapAllocInfo* m_pPrevious;
-	CHeapInstance* m_pHeap;
-	SIZE_T m_cbAlignedSize;
-	SIZE_T m_cbSize;
+	UINT m_uIndex;					//0x0000
+	UINT m_uUnknown;				//0x0004
+	CHeapInstance* m_pParent;		//0x0008 might be child idk
+	CHeapInstance* m_pChild;		//0x0010
+	CHeapAllocInfo* m_pNext;		//0x0018
+	CHeapAllocInfo* m_pPrevious;	//0x0020
+	CHeapInfo* m_pHeapInfo;			//0x0028
+	SIZE_T m_cbAlignedSize;			//0x0030
+	SIZE_T m_cbSize;				//0x0038
 	__int64* m_pStruct;
+};
+
+/*
+Size of struct is 0x98 (152) bytes
+*/
+struct CHeapVramInstance
+{
+	enum eAllocFlags
+	{
+		ALLOC_FLAG_PARTITION_INFO = 1,
+		ALLOC_FLAG_NO_ALLOC = 2, // modify the struct pointers but don't allocate???
+		UNK4 = 4
+	};
+
+	virtual void dtor(char a2);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual CHeapInfo* fn2(const void* pMemoryPool);
+	virtual QWORD GetPartitionSize(const void* pMemoryPool);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
+
+	CReadWriteLock m_Lock;					//0x0008
+	CHeapInfo* m_pParentInfo;				//0x0038
+	CHeapInfo* m_pInfo;						//0x0040
+	CHeapAllocInfo* m_pPrevPartition;		//0x0048 | void*
+	CHeapAllocInfo* m_pNextPartition;		//0x0050 | void*
+	QWORD m_qwHeapFlags;					//0x0058
+	void* m_pMemoryPool;					//0x0060
+	CHeapInfo** m_pHeapInfos;				//0x0068
+	CHeapAllocInfo* m_pAllocationInfo;		//0x0070		
+	QWORD m_qwMemoryAlignment;				//0x0078
+	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
+	DWORD dword84;							//0x0084
+	DWORD m_dwReferenceCount;				//0x0088
+	int m_nRootHeaps;						//0x008C
+	int m_nHeaps;							//0x0090
 };
 
 /*
@@ -3605,35 +1210,41 @@ struct CHeapInstance
 {
 	enum eAllocFlags
 	{
-		UNK1 = 1,
+		ALLOC_ALIGN = 1,
 		UNK2 = 2,
 		UNK4 = 4
 	};
 
-	virtual void fn0();
-	virtual BOOL SetChildInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int a4);
-	virtual void fn2();
-	virtual void fn3();
-	virtual CHeapAllocInfo* Alloc(__int64 nBytes, unsigned __int64 align, int flags);
-	virtual void fn5();
+	virtual void dtor(char a2);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual CHeapAllocInfo* fn2(const void* pMemoryPool);
+	virtual QWORD GetPartitionSize(const void* pMemoryPool);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
 
 	CReadWriteLock m_Lock;					//0x0008
 	CHeapInfo* m_pParentInfo;				//0x0038
 	CHeapInfo* m_pInfo;						//0x0040
-	QWORD m_pUnknowns;						//0x0048
-	CHeapInfo* m_pChildren;					//0x0050
-	QWORD m_qword60[2];						//0x0058
-	CHeapInfo* m_pHeapInfos;				//0x0068
+	CHeapAllocInfo* m_pPrevPartition;		//0x0048 | void*
+	CHeapAllocInfo* m_pNextPartition;		//0x0050 | void*
+	QWORD m_qwHeapFlags;					//0x0058
+	void* m_pMemoryPool;					//0x0060
+	CHeapInfo** m_pHeapInfos;				//0x0068
 	CHeapAllocInfo* m_pAllocationInfo;		//0x0070		
 	QWORD m_qwMemoryAlignment;				//0x0078
 	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
-	DWORD dword88;							//0x0084
+	DWORD dword84;							//0x0084
 	DWORD m_dwReferenceCount;				//0x0088
-	DWORD m_nDwords;						//0x008C
-	DWORD m_nHeaps;							//0x0090
+	int m_nRootHeaps;						//0x008C
+	int m_nHeaps;							//0x0090
 };
-IS_SIZE_CORRECT(CHeapInstance, 0x98);
+VALIDATE_SIZE(CHeapInstance, 0x98);
 
+//	Mem pool start
+//  4 * nRootHeaps
+//	8 * nHeaps
+//  Heap
+//
 struct CMemoryDevice
 {
 	virtual __int64 dtor();
@@ -3643,7 +1254,7 @@ struct CMemoryDevice
 
 	CReadWriteLock m_Lock;		//0x08
 	CHeapInstance m_DeviceHeap;	//0x38
-	void* m_pMemory;			//0xC8 start CHeapInfo pretty sure
+	void* m_pMemoryPool;		//0xC8 start CHeapInfo pretty sure
 	CHeapInfo* m_pRootInfo;		//0xD0 | points to end of list (use previous link to traverse)
 	CHeapInfo* m_punk;			//0xD8
 	BOOL m_bHeapAllocated;		//0xE4
@@ -3681,7 +1292,7 @@ public:
 	DWORD m_uItems;															//0x0030
 	BOOL m_bInitalized;														//0x0034
 };
-IS_SIZE_CORRECT(CGameContentDeviceSteam, 56);
+VALIDATE_SIZE(CGameContentDeviceSteam, 56);
 
 /*
 Size of is 0x48 (72) bytes
@@ -3700,7 +1311,7 @@ public:
 	CGameContentDeviceSteam* m_pSteamContent;						//0x0038
 	DWORD unk0x40;													//0x0040
 };
-IS_SIZE_CORRECT(CGameContentDevice, 72);
+VALIDATE_SIZE(CGameContentDevice, 72);
 
 /*
 Size of is 0x20 (32) bytes
@@ -3723,7 +1334,7 @@ class CAchievementDeviceSteam
 	ISteamUserStats011* m_pUserStats;	//0x10
 	void* m_pUnknown;					//0x18 | DWORD
 };
-IS_SIZE_CORRECT(CAchievementDeviceSteam, 32);
+VALIDATE_SIZE(CAchievementDeviceSteam, 32);
 
 /*
 Size of is 0x68 (104) bytes
@@ -3741,7 +1352,7 @@ public:
 	CAchievementDeviceSteam* m_pAchievementDeviceSteam;
 	UINT m_uMaxAchievement;
 };
-IS_SIZE_CORRECT(CAchievementDevice, 104);
+VALIDATE_SIZE(CAchievementDevice, 104);
 
 struct CNetworkDevice;
 
@@ -3830,7 +1441,7 @@ struct CRankingWriteWork
 	volatile int32 m_ShareStatus;
 	volatile int32 m_UGCSetStatus;
 };
-IS_SIZE_CORRECT(CRankingWriteWork, 0x288);
+VALIDATE_SIZE(CRankingWriteWork, 0x288);
 
 /*
 Size of is 0x38 (56) bytes
@@ -3872,7 +1483,7 @@ class CRankingDevice
 	DWORD dwLeaderboardCount;			//0x70 | statically set to 32
 	DWORD dword74;
 };
-IS_SIZE_CORRECT(CRankingDevice, 120);
+VALIDATE_SIZE(CRankingDevice, 120);
 
 /*
 Size of is 0x?? (?) bytes
@@ -3923,7 +1534,7 @@ public:
 	BOOL m_bOverlayActive;	//0x38
 	char pad3[4];			//0x3C
 };
-IS_SIZE_CORRECT(COsSystemDeviceSteam, 64);
+VALIDATE_SIZE(COsSystemDeviceSteam, 64);
 
 /*
 Size of is 0x20 (32) bytes
@@ -3935,7 +1546,7 @@ public:
 	void* pUnk0x08;			//0x08
 	char unknown[16];		//0x10
 };
-IS_SIZE_CORRECT(CUserSignInProcess, 32);
+VALIDATE_SIZE(CUserSignInProcess, 32);
 
 /*
 This struct is an oddball and is quite fucked
@@ -3951,7 +1562,7 @@ public:
 	DWORD dword10;
 	DWORD dword14;
 };
-IS_SIZE_CORRECT(CGameBootProcess, 24);
+VALIDATE_SIZE(CGameBootProcess, 24);
 
 
 struct Task;
@@ -4044,6 +1655,16 @@ public:
 	Array<EntityHandle> m_handles;	//0x0008
 };
 
+class CAnimalManager
+{
+	CReadWriteLock m_Lock;
+  __declspec(align(8)) DWORD dword30;
+  BYTE gap34[84];
+  QWORD qword88;
+  QWORD qword90;
+  QWORD qword98;
+  QWORD qwordA0;
+};
 
 // Size of struct 0x1520 (5408) bytes
 class CEmBaseManager
@@ -4107,13 +1728,13 @@ public:
 	EntityHandle m_hEnt[7];						//0x14C0
 	CReadWriteLock m_Lock;						//0x14DC
 };
-IS_OFFSET_CORRECT(CEmBaseManager, m_handles, 0x8);
-IS_OFFSET_CORRECT(CEmBaseManager, m_handles2, 0x428);
-IS_OFFSET_CORRECT(CEmBaseManager, m_handles3, 0x858);
-IS_OFFSET_CORRECT(CEmBaseManager, m_handles4, 0xC78);
-IS_OFFSET_CORRECT(CEmBaseManager, m_handles5, 0x1098);
-IS_OFFSET_CORRECT(CEmBaseManager, m_hEntity, 0x14BC);
-//IS_OFFSET_CORRECT(EmBaseManager, m_Lock, 0x14D8); // wtf is going on
+VALIDATE_OFFSET(CEmBaseManager, m_handles, 0x8);
+VALIDATE_OFFSET(CEmBaseManager, m_handles2, 0x428);
+VALIDATE_OFFSET(CEmBaseManager, m_handles3, 0x858);
+VALIDATE_OFFSET(CEmBaseManager, m_handles4, 0xC78);
+VALIDATE_OFFSET(CEmBaseManager, m_handles5, 0x1098);
+VALIDATE_OFFSET(CEmBaseManager, m_hEntity, 0x14BC);
+//VALIDATE_OFFSET(EmBaseManager, m_Lock, 0x14D8); // wtf is going on
 
 // TODO: reverse engineer this class/struct
 class CItemManager;
@@ -4179,12 +1800,15 @@ public:
 	CAchievementDevice* m_pAchivementDevice;	//0x00F8
 	DWORD _0x100;								//0x0100
 };
-IS_SIZE_CORRECT(CUserManager, 264);
-IS_OFFSET_CORRECT(CUserManager, m_UsersInfo, 0x38);
-IS_OFFSET_CORRECT(CUserManager, m_iActiveUser, 0xB8);
-IS_OFFSET_CORRECT(CUserManager, m_iUserIndices, 0xBC);
-IS_OFFSET_CORRECT(CUserManager, m_pBootProcess, 0xD8);
-IS_OFFSET_CORRECT(CUserManager, m_pSaveDataDevice, 0xF0);
+VALIDATE_SIZE(CUserManager, 264);
+VALIDATE_OFFSET(CUserManager, m_UsersInfo, 0x38);
+VALIDATE_OFFSET(CUserManager, m_iActiveUser, 0xB8);
+VALIDATE_OFFSET(CUserManager, m_iUserIndices, 0xBC);
+VALIDATE_OFFSET(CUserManager, m_pBootProcess, 0xD8);
+VALIDATE_OFFSET(CUserManager, m_pSaveDataDevice, 0xF0);
+
+#define MRB_FUNCALL_ARGC_MAX 16
+#define MRB_CALL_LEVEL_MAX 128 // could be 512 too
 
 typedef uint32_t mrb_sym;
 typedef uint8_t mrb_bool;
@@ -4510,7 +2134,7 @@ struct MrubyImpl
 
 	void* m_vtbl;													//0x0000 | if vtbl is zero vtbl is [this - 32]
 	struct mrb_state* m_pRubyVM;									//0x0008
-	QWORD qw10;														//0x0010 | mrb_value
+	QWORD m_pGarbageCollector;										//0x0010 | mrb_value
 	StaticArray<EventEntry, 256> m_events;							//0x0018
 	StaticArray<EventEntry, 256> m_events2;
 	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_Fibers;
@@ -4521,9 +2145,9 @@ struct MrubyImpl
 	BYTE gap11A0[4112];
 	struct MrubyImpl* m_pNext;
 };
-IS_OFFSET_CORRECT(MrubyImpl, m_Fibers, 0x1058);
-IS_OFFSET_CORRECT(MrubyImpl, m_pNext, 0x21A8);
-IS_SIZE_CORRECT(MrubyImpl, 8624);
+VALIDATE_OFFSET(MrubyImpl, m_Fibers, 0x1058);
+VALIDATE_OFFSET(MrubyImpl, m_pNext, 0x21A8);
+VALIDATE_SIZE(MrubyImpl, 8624);
 
 
 struct CUILayerString

@@ -1,5 +1,6 @@
 #include "mot.h"
 
+
 void ReadMot(void* pMot, std::vector<MotInterpListEntry>& Interps)
 {
 	MotHeader* pHdr = (MotHeader*)pMot;

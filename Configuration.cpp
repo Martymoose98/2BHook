@@ -1,7 +1,61 @@
 #include "Configuration.h"
 
+#pragma comment(lib, "xmllite.lib")
+#pragma comment(lib, "shlwapi.lib")
+
 Variables Vars;
-CConfig* g_pConfig = new CConfig;
+
+//CConfig* g_pConfig = new CConfig;
+
+// MSXML vs XmlLite
+
+// https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ms752822(v=vs.85)
+// https://learn.microsoft.com/en-us/windows/win32/stg/stgm-constants
+// https://learn.microsoft.com/en-us/previous-versions/windows/desktop/ms752878(v=vs.85)
+
+// pWriter->SetProperty(XmlWriterProperty_Indent, TRUE)
+
+void CConfigXml::Load(LPCWSTR szFilename)
+{
+	IStream* pStream;
+	IXmlReaderInput* pInput;
+
+	XmlNodeType NodeType;
+
+	SHCreateStreamOnFileEx(szFilename, STGM_READWRITE, FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &pStream);
+
+	//CreateXmlReaderInputWithEncodingName()
+
+	//CreateXmlReaderInputWithEncodingCodePage()
+
+	HRESULT hr = CreateXmlReader(IID_IXmlReader, (void**) & m_pReader, NULL);
+
+	m_pReader->SetProperty(XmlReaderProperty_DtdProcessing, DtdProcessing_Prohibit);
+
+	m_pReader->SetInput(pStream);
+
+	while (!m_pReader->IsEOF())
+	{
+		m_pReader->Read(&NodeType);
+
+
+
+	}
+
+
+}
+
+void CConfigXml::ReadNode(XmlNodeType Type)
+{
+	switch (Type)
+	{
+	case XmlNodeType_XmlDeclaration:
+		//pReader->
+		break;
+	case XmlNodeType_Element:
+		break;
+	}
+}
 
 CConfig::CConfig()
 {
@@ -13,11 +67,6 @@ CConfig::CConfig()
 CConfig::~CConfig()
 {
 	PurgeConfig();
-}
-
-BOOL CConfig::FileExists(LPTSTR szFilename)
-{
-	return GetFileAttributes(szFilename) != INVALID_FILE_ATTRIBUTES;
 }
 
 bool CConfig::CreateConfig(LPTSTR szFilename)
@@ -40,11 +89,22 @@ void CConfig::Load(LPCTSTR szFilename)
 	if (!SetFilename(szFilename))
 		return;
 
-	if (FileExists(m_szFilename))
-	{
-		for (auto& it : m_items)
-			it->Read(m_szFilename);
-	}
+	if (!FileExists(m_szFilename))
+		return;
+
+	for (auto& it : m_items)
+		it->Read(m_szFilename);
+}
+
+void CConfig::Load(LPCWSTR szFilename)
+{
+	size_t cchConverted = 0;
+
+	char szBuf[MAX_PATH];
+
+	wcstombs_s(&cchConverted, szBuf, szFilename, _TRUNCATE);
+
+	Load(szBuf);
 }
 
 void CConfig::Save(LPCTSTR szFilename)
@@ -132,28 +192,23 @@ void CConfig::InitializeConfig()
 #pragma endregion
 
 #pragma region keybinds
-	Vars.Keybinds.OpenMenu = KeybindToggleable("kb_open_menu", DIK_INSERT, &Vars.Menu.bOpened);
-	Vars.Keybinds.Firstperson = KeybindToggleable("kb_firstperson_camera", DIK_F1, &Vars.Misc.bFirstperson);
-	Vars.Keybinds.ChangePlayer = KeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer);
-	Vars.Keybinds.Airstuck = KeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck);
-	Vars.Keybinds.DuplicateBuddy = KeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC);
-	Vars.Keybinds.TeleportForward = KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, 0.5f);
-	Vars.Keybinds.TeleportBackward = KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_backward", DIK_F11, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, -0.5f);
-	Vars.Keybinds.PlayAnimation = KeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation);
-	Vars.Keybinds.ModelGravity = KeybindDynamicToggleable("kb_model_gravity", DIK_F9, Features::GetModelGravity);
-	Vars.Keybinds.ModelYControl = KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYDOWN, Features::GetEntityOBBY, 0.3f);
+	
+	//AddKeybind(KeybindDynamicToggleable<decltype(&CMenu::IsOpen)>("kb_open_menu", DIK_INSERT, g_pMenu, &CMenu::IsOpen));
+	AddKeybind(new KeybindToggleable("kb_firstperson_camera", DIK_F1, &Vars.Misc.bFirstperson));
+	AddKeybind(new KeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer));
+	AddKeybind(new KeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck));
+	AddKeybind(new KeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC));
+	AddKeybind(new KeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation));
+	AddKeybind(new KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, 0.5f));
+	AddKeybind(new KeybindFunctional<void, eTransformMatrix, float>("kb_teleport_backward", DIK_F11, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, -0.5f));
+	AddKeybind(new KeybindDynamicToggleable<decltype(&Features::GetModelGravity)>("kb_model_gravity", DIK_F9, &Features::GetModelGravity));
+	
+	AddKeybind(new KeybindDynamicIncremental<float>("kb_model_ycontrol_inc", DIK_UP, IKeybind::KEYBIND_ON_KEYDOWN, Features::GetEntityOBBY, 0.3f));
+	AddKeybind(new KeybindDynamicDecremental<float>("kb_model_ycontrol_dec", DIK_DOWN, IKeybind::KEYBIND_ON_KEYDOWN, Features::GetEntityOBBY, 0.3f));
 
-	AddKeybind(&Vars.Keybinds.OpenMenu);
-	AddKeybind(&Vars.Keybinds.Firstperson);
-	AddKeybind(&Vars.Keybinds.ChangePlayer);
-	AddKeybind(&Vars.Keybinds.Airstuck);
-	AddKeybind(&Vars.Keybinds.DuplicateBuddy);
-	AddKeybind(&Vars.Keybinds.TeleportForward);
-	AddKeybind(&Vars.Keybinds.TeleportBackward);
-	AddKeybind(&Vars.Keybinds.ModelGravity);
-	AddKeybind(&Vars.Keybinds.PlayAnimation);
-	AddKeybind(&Vars.Keybinds.ModelYControl.m_inc);
-	AddKeybind(&Vars.Keybinds.ModelYControl.m_dec);
+	// FIXME: can't get this dogshit to work
+	//AddKeybinds(KeybindDynamicIncrement<float>("kb_model_ycontrol_inc", "kb_model_ycontrol_dec", DIK_UP, DIK_DOWN, IKeybind::KEYBIND_ON_KEYDOWN, Features::GetEntityOBBY, 0.3f));
+
 #pragma endregion
 
 #pragma region misc
@@ -164,7 +219,8 @@ void CConfig::InitializeConfig()
 #pragma endregion
 
 #pragma region menu
-	m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", Vars.Menu.bIgnoreInputWhenOpened));
+	//m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", Vars.Menu.bIgnoreInputWhenOpened));
+	//m_items.emplace_back(new ConfigItemInt(CATEGORY_MENU, "i_theme_fg", g_pMenu->
 #pragma endregion
 }
 
@@ -179,13 +235,13 @@ void CConfig::LoadDefault()
 	InitializeConfig();
 }
 
-void CConfig::AddKeybind(IKeybind* pKeybind)
+void CConfig::AddKeybind(CKeybind* pKeybind)
 {
-	if (pKeybind)
-	{
-		m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, *pKeybind));
-		m_keybinds.emplace_back(pKeybind);
-	}
+	if (!pKeybind)
+		return;
+
+	m_items.emplace_back(new ConfigItemKeybind(CATEGORY_KEYBINDS, *pKeybind));
+	m_keybinds.emplace_back(pKeybind);
 }
 
 BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const
@@ -286,10 +342,16 @@ bool CConfig::SetFilename(LPCTSTR szFilename)
 	return true;
 }
 
-BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath) const
+BOOL IConfig::FileExists(LPCTSTR szFilename)
+{
+	return GetFileAttributes(szFilename) != INVALID_FILE_ATTRIBUTES;
+}
+
+BOOL IConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+	OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath)
 {
 	LPTSTR szToken;
-	LPTSTR szNextToken;
+	LPTSTR szNextToken = NULL;
 
 	LPTSTR szTemporary = NULL;
 	LPTSTR szDirPath = (LPTSTR)LocalAlloc(LPTR, (cchOriginalPath + 1) * sizeof(TCHAR));
@@ -334,10 +396,11 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 /// <param name="pszSanitizedPath"></param>
 /// <param name="pcchSanitizedPath">The value in this SIZE_T is added to the sanitized file path length</param>
 /// <returns></returns>
-BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath, OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath) const
+BOOL IConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+	OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath)
 {
 	LPTSTR szToken;
-	LPTSTR szNextToken;
+	LPTSTR szNextToken = NULL;
 
 	BOOL Status = ERROR_DIRECTORY;
 
@@ -382,15 +445,15 @@ BOOL CConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 	return Status;
 }
 
-KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
+const KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
 {
 	int iLeft = 0;
-	int iRight = ARRAYSIZE(s_Keycodes);
+	int iRight = ARRAYSIZE(s_Keycodes) - 1;
 
 	while (iLeft <= iRight)
 	{
 		int iMiddle = (iLeft + iRight) >> 1;
-		KeyOrdinal* pMiddle = &s_Keycodes[iMiddle];
+		const KeyOrdinal* pMiddle = &s_Keycodes[iMiddle];
 
 		if (pMiddle->m_uKeyCode == uKeycode)
 			return pMiddle;
