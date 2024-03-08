@@ -1,3 +1,8 @@
 [submodule "imgui"]
 	path = imgui
 	url = https://github.com/ocornut/imgui
+	branch = master
+[submodule "Fluorine"]
+	path = Fluorine
+	url = https://github.com/Martymoose98/Fluorine.git
+	branch = master

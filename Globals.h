@@ -7,8 +7,8 @@
 #include <vector> //should be temp
 
 #include "ReversedStructs.h"
-#include "VirtualTableHook.h"
-#include "ImportTableHook.h"
+#include <Fluorine\VirtualTableHook.h>
+#include <Fluorine\ImportTableHook.h>
 #include "MemoryDeviceHook.h"
 
 #define MAX_LEVELS 99
@@ -74,7 +74,7 @@ struct CpkEntry;
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef Pl0000*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
+typedef CBehaviorAppBase*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
 typedef CEntityInfo*(*GetEntityInfoFromHandleFn)(EntityHandle* pHandle);
 typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
 typedef int(*CItemManager_GetItemIdByNameFn)(CItemManager* pThis, const char* szItemName);			//returns a sItem* maybe?
@@ -82,7 +82,7 @@ typedef const char*(*CItemManager_GetItemNameByIdFn)(CItemManager* pThis, int it
 typedef bool(*CItemManager_AddItemFn)(CItemManager* pThis, int item_id, int iQuantity);
 typedef bool(*CItemManager_UseItemFn)(CItemManager* pThis, const char* szItemName);
 typedef bool(*CItemManager_UseItemByIdFn)(CItemManager* pThis, int item_id);
-typedef void(*ChangePlayerFn)(Pl0000* pEntity);
+typedef void(*ChangePlayerFn)(CBehaviorAppBase* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
 typedef void(*CSaveDataDevice_SaveFileIOFn)(CSaveDataDevice* pSave); // NOTE: not a real function points to CUserManager::SaveFileIO's switch
@@ -95,10 +95,10 @@ typedef void(*CWetObjectManager_SetWetFn)(CWetObjManager* pThis, byte wet_level,
 typedef void(*CWetObjectManager_SetDryFn)(CWetObjManager* pThis, CEntityInfo *pInfo);
 typedef void(*CCameraGame_SetLookAtFn)(CCameraGame* pThis);
 typedef void(*ResetCameraFn)(CCameraGame* pCamera);
-typedef bool(*DestroyBuddyFn)(Pl0000* pBuddy);
-typedef __int64(*NPC_ChangeSetTypeFollowFn)(Pl0000* pNPC);
-typedef __int64(*NPC_ChangeSetTypeIdleFn)(Pl0000* pNPC);
-typedef __int64(*EmitSoundFn)(Sound* pSound, Pl0000** ppSourceEntity); // also second arg is another custom struct
+typedef bool(*DestroyBuddyFn)(CBehaviorAppBase* pBuddy);
+typedef __int64(*NPC_ChangeSetTypeFollowFn)(CBehaviorAppBase* pNPC);
+typedef __int64(*NPC_ChangeSetTypeIdleFn)(CBehaviorAppBase* pNPC);
+typedef __int64(*EmitSoundFn)(Sound* pSound, CBehavior** ppSourceEntity); // also second arg is another custom struct
 typedef __int64(*PlaySoundFn)(Sound* pSound);
 typedef unsigned int(*HashStringCRC32Fn)(const char* szName, __int64 length);
 typedef unsigned int(*FNV1HashFn)(const char* szString);
@@ -121,14 +121,14 @@ typedef CGraphicCommand*(*COtManager_GetGraphicCommandFn)(__int64 uIndex);
 
 typedef __int64(*CreateUIFromIdFn)(int id);
 
-typedef BOOL(*CreateTextureFn)(__int64 rcx, CTargetTexture *, CTextureDescription *);
+typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CTextureDescription *pDesc);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
-typedef HeapThing*(*QueryHeapFn)(HeapThing* pResult, int objectid, int a3); // or void i guess
-typedef ObjReadSystem::Work*(*GetWorkFn)(int objectid);
-typedef ObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, ObjReadSystem::Work* pWork);
+typedef HeapAlloc_t*(*QueryHeapFn)(HeapAlloc_t* pResult, int objectid, int a3); // or void i guess
+typedef CObjReadSystem::Work*(*GetWorkFn)(int objectid);
+typedef CObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, CObjReadSystem::Work* pWork);
 typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int objectId);
-typedef BOOL(*ObjReadSystem_PreloadModelFn)(ObjReadSystem::Work* pWork);
+typedef BOOL(*ObjReadSystem_PreloadModelFn)(CObjReadSystem::Work* pWork);
 typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
@@ -187,6 +187,7 @@ extern CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
 extern CSceneEntitySystem_CreateEntityFn SceneEntitySystem_CreateEntity;
 extern CSceneStateSystem_SetFn SceneStateSystem_Set;
 extern CCameraGame_SetLookAtFn CameraGame_SetLookAt;
+extern CCameraGame_SetLookAtFn CameraGame_SetLookAtNoDistance;
 extern ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
@@ -200,6 +201,7 @@ extern PreloadFileFn PreloadFile;
 extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;
 extern COtManager_GetGraphicCommandFn GetGraphicCommand;
+extern CreateTextureFn CreateTexture;
 extern CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
 extern CreateUIFromIdFn CreateUIFromId;
 extern CpkMountFn CpkMount;
@@ -214,6 +216,10 @@ extern XInputPowerOffControllerFn XInputPowerOffController;
 extern XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 extern XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
+extern unsigned int* g_pDebugFlags;
+extern unsigned int* g_pCameraFlags;
+extern unsigned int* g_pGameFlags;
+
 extern int* g_piMoney;
 extern int* g_piExperience;
 
@@ -221,6 +227,7 @@ extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_phHeaps;
 extern LPSTR g_szDataDirectoryPath;
+extern LPSTR g_szCRILogBuffer;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 extern std::vector<MrubyImpl*> g_pRubyInstances;
 
@@ -281,6 +288,7 @@ extern VirtualTableHook* g_pDeviceContextHook;
 extern VirtualTableHook* g_pMouseHook;
 extern VirtualTableHook* g_pKeyboardHook;
 extern VirtualTableHook* g_pCameraHook;
+extern VirtualTableHook* g_pModelAnalyzerHook;
 extern MemoryDeviceHook* g_pMemoryDeviceHook;
 extern std::vector<VirtualTableHook*> g_pRubyInstancesHooks;
 

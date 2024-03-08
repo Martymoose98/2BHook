@@ -1,7 +1,11 @@
 #pragma once
+
+#include <Windows.h>
 #include <vector>
 #include <stdio.h>
 #include "ImGui/imgui.h"
+
+#include "Utils.h"
 
 class CConsole
 {
@@ -23,9 +27,9 @@ class CConsole
 
 public:
 
-	CConsole();
+	CConsole(void);
 
-	~CConsole();
+	~CConsole(void);
 
 	void Clear(void);
 
@@ -52,4 +56,5 @@ extern CConsole* g_pConsole;
 #define CCONSOLE_DEBUG_WARN(color, szFormat, ...)
 #define CCONSOLE_DEBUG_ERROR(color, szFormat, ...)
 #endif
+
 #include "Configuration.h"

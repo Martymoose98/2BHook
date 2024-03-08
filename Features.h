@@ -1,17 +1,18 @@
 #pragma once
+
+#include <Fluorine\Memory.h>
+
 #include "ReversedStructs.h"
 #include "Vector3.h"
 #include "Log.h"
 #include "Console.h"
 
-void* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
-void* GetEntityFromHandleGlobal(EntityHandle* phEntity);
-int GetModelMeshIndex(CModelWork* pWork, const char* szMesh);
+CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
+CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle* phEntity);
+int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 
-class Features
+namespace Features
 {
-public:
-
 	static void ApplyHealthMods(void)
 	{
 		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
@@ -85,6 +86,7 @@ public:
 	}
 
 	// exprimential
+	//FIXME: DEFO CRASH
 	static void AddPlayer(int player)
 	{
 		// I don't know what this is. It appears to be related to scene entity system
@@ -141,22 +143,40 @@ public:
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
-	static void Firstperson(Pl0000* pEntity)
+	// NOTE: rainbow hair is not compatible with this feature
+	static void Firstperson(CBehavior* pEntity)
 	{
-		if (pEntity && Vars.Misc.bFirstperson && !Vars.Misc.bFirstpersonOld)
+		if (pEntity &&
+			(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			!(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
-			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
-			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
-			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
+			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
+			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
+			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
 
-			if (iFace != -1 && iMask != -1 && iHair != -1)
+			if (pFaceNorm)
 			{
-				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+				pFaceNorm->m_vColor.w = 0.0f;
+				pFaceNorm->m_bUpdate = TRUE;
+			}
+
+			if (pFaceSerious)
+			{
+				pFaceSerious->m_vColor.w = 0.0f;
+				pFaceSerious->m_bUpdate = TRUE;
+			}
+
+			if (pMask)
+			{
+				pMask->m_vColor.w = 0.0f;
+				pMask->m_bUpdate = TRUE;
+			}
+
+			if (pHair)
+			{			
+				pHair->m_vColor.w = 0.0f;
+				pHair->m_bUpdate = TRUE;
 			}
 		}
 	}
@@ -164,22 +184,39 @@ public:
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
-	static void Thirdperson(Pl0000* pEntity)
+	static void Thirdperson(CBehavior* pEntity)
 	{
-		if (pEntity && !Vars.Misc.bFirstperson && Vars.Misc.bFirstpersonOld)
+		if (pEntity && 
+			!(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
-			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
-			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
-			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
+			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
+			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
+			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
 
-			if (iFace != -1 && iMask != -1 && iHair != -1)
+			if (pFaceNorm)
 			{
-				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+				pFaceNorm->m_vColor.w = 1.0f;
+				pFaceNorm->m_bUpdate = TRUE;
+			}
+
+			if (pFaceSerious)
+			{
+				pFaceSerious->m_vColor.w = 0.0f;
+				pFaceSerious->m_bUpdate = TRUE;
+			}
+
+			if (pMask)
+			{
+				pMask->m_vColor.w = 1.0f;
+				pMask->m_bUpdate = TRUE;
+			}
+
+			if (pHair)
+			{
+				pHair->m_vColor.w = 1.0f;
+				pHair->m_bUpdate = TRUE;
 			}
 		}
 	}
@@ -187,7 +224,7 @@ public:
 	// Maybe for perma wet we can call WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); then, set the wet level manually
 	// then undo it when we want to go back to normal DOESN'T WORK
 	TODO("We need to remove the handle from the wetobjmanager with WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); after the wet time has elapsed")
-	static int WetEntity(Pl0000* pEntity, byte wetness)
+	static int WetEntity(CBehaviorAppBase* pEntity, byte wetness)
 	{
 		int i = 0;
 
@@ -207,7 +244,7 @@ public:
 
 	static void SetPlayer(EntityHandle hEntity)
 	{
-		Pl0000* pEntity = GetEntityFromHandle(&hEntity);
+		CBehaviorAppBase* pEntity = GetEntityFromHandle(&hEntity);
 
 		if (!pEntity)
 			return;
@@ -219,7 +256,7 @@ public:
 		ResetCamera(g_pCamera);
 	}
 
-	static void ChangePlayerEx(Pl0000* pCameraEnt)
+	static void ChangePlayerEx(CBehaviorAppBase* pCameraEnt)
 	{
 		if (pCameraEnt && g_pLocalPlayer)
 		{
@@ -239,22 +276,28 @@ public:
 			g_pLocalPlayer->m_hBuddy = 0;
 	}
 
-	static void Airstuck()
+	// xref Pl0000.setBedStandup 48 83 EC 38 48 8B 01 45 33 C9 C7 44 24 20 00 00 00 00 41 8D 51 6D
+	static void AirstuckEx(CBehavior* pEntity)
 	{
-		if (g_pLocalPlayer)
-			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer); // TODO: fix or scrap
+		if (pEntity)
+			pEntity->Animate(109, 2, 0, 0); // CBehavior:: vindex: 18 / old denuvo 0x1401F08A0
+	}
+
+	static void Airstuck(void)
+	{
+		AirstuckEx(g_pLocalPlayer);
 	}
 
 	static void TeleportEntityToOther(EntityHandle hTeleporter, EntityHandle hTeleportee)
 	{
-		Pl0000* pTeleporter = GetEntityFromHandle(&hTeleporter);
-		Pl0000* pTeleportee = GetEntityFromHandle(&hTeleportee);
+		CBehavior* pTeleporter = GetEntityFromHandle(&hTeleporter);
+		CBehavior* pTeleportee = GetEntityFromHandle(&hTeleportee);
 
 		if (pTeleportee && pTeleporter)
 			pTeleportee->m_vPosition = pTeleporter->m_vPosition + pTeleporter->m_matTransform.GetAxis(FORWARD) * 4.f;
 	}
 
-	static void TeleportScalarEx(Pl0000* pEntity, eTransformMatrix Axis, float flSpeed)
+	static void TeleportScalarEx(CObj* pEntity, eTransformMatrix Axis, float flSpeed)
 	{
 		if (pEntity)
 			pEntity->m_vPosition += pEntity->m_matTransform.GetAxis(Axis) * flSpeed;
@@ -279,7 +322,7 @@ public:
 		if (!g_pCamera)
 			return NULL;
 
-		return GetModelGravityEx(g_pCamera->m_pCamEntity);
+		return GetModelGravityEx(static_cast<Pl0000*>(g_pCamera->m_pCamEntity));
 	}
 
 	static float* GetEntityOBBYEx(Pl0000* pEntity)
@@ -295,10 +338,10 @@ public:
 		if (!g_pCamera)
 			return NULL;
 
-		return GetEntityOBBYEx(g_pCamera->m_pCamEntity);
+		return GetEntityOBBYEx(static_cast<Pl0000*>(g_pCamera->m_pCamEntity));
 	}
 
-	static void PlayAnimationEx(Pl0000* pEntity)
+	static void PlayAnimationEx(CBehavior* pEntity)
 	{
 		if (pEntity)
 			pEntity->Animate(Vars.Gameplay.iSelectedAnimation, 0, 0, 0);
@@ -309,12 +352,40 @@ public:
 		PlayAnimationEx(g_pCamera->m_pCamEntity);
 	}
 
-	static void BuffEnemies(void)
+	static void SetEnemyLevel(void* pEnemy, int iLevel)
 	{
-		if (Vars.Gameplay.bLevelBuffMode)
-			BuffEnemiesAbsolute();
-		else
-			BuffEnemiesTolerance();
+		if (!pEnemy)
+			return;
+
+		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
+		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+
+		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
+		{
+			int* pHealth = MakePtr(int*, pEnemy, 0x858);
+			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
+			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
+			*pLevel = pProperLevel->m_iLevel;
+			*pHealth = pProperLevel->m_iHealth;
+			*pMaxHealth = pProperLevel->m_iHealth;
+		}
+	}
+
+	static void BalanceEnemyLevel(CBehaviorAppBase* pEnemy, int iMinLevel, int iMaxLevel)
+	{
+		if (!pEnemy)
+			return;
+		
+		int iLevel = pEnemy->GetLevel();
+		//int* pLevel = MakePtr(int*, pEnemy, 0x28030);
+		//if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+		if (iLevel > iMaxLevel || iLevel < iMinLevel)
+		{
+			pEnemy->SetLevel(_RandomInt(iMinLevel, iMaxLevel));
+			//SetEnemyLevel(pEnemy, _RandomInt(iMinLevel, iMaxLevel));
+
+			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", iLevel, iMinLevel, iMaxLevel);
+		}
 	}
 
 	static void BuffEnemiesAbsolute(void)
@@ -338,38 +409,12 @@ public:
 			BalanceEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), iMinLevel, iMaxLevel);
 	}
 
-	static void BalanceEnemyLevel(void* pEnemy, int iMinLevel, int iMaxLevel)
+	static void BuffEnemies(void)
 	{
-		if (!pEnemy)
-			return;
-			
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
-		{
-			SetEnemyLevel(pEnemy, RandomInt(iMinLevel, iMaxLevel));
-
-			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", *pLevel, iMinLevel, iMaxLevel);
-		}
-	}
-
-	static void SetEnemyLevel(void* pEnemy, int iLevel)
-	{
-		if (!pEnemy)
-			return;
-		
-		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
-		{
-			int* pHealth = MakePtr(int*, pEnemy, 0x858);
-			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);		
-			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
-			*pLevel = pProperLevel->m_iLevel;
-			*pHealth = pProperLevel->m_iHealth;
-			*pMaxHealth = pProperLevel->m_iHealth;
-		}
+		if (Vars.Gameplay.bLevelBuffMode)
+			BuffEnemiesAbsolute();
+		else
+			BuffEnemiesTolerance();
 	}
 
 	static void AddPod(int pod)
@@ -416,7 +461,7 @@ public:
 	{
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
 		{
-			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			CBehavior* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 			pEntity->m_vPosition = vPosition;
 		}
 	}
@@ -433,7 +478,7 @@ public:
 
 		for (QWORD i = 0; i < g_pEnemyManager->m_handles.m_count; ++i, rad += step)
 		{
-			Pl0000* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+			CBehavior* pEntity = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
 			vDirection = (vPosition - pEntity->m_vPosition).Normalize();
 
@@ -449,11 +494,11 @@ public:
 	//doesn't work tbh
 	static void ModelSwap(Pl0000* pEntA, Pl0000* pEntB)
 	{
-		CModel tmp;
+		//CModel tmp;
 
-		memcpy(&tmp, pEntB, sizeof(CModel));
-		tmp.m_vPosition = pEntA->m_vPosition;
-		memcpy(pEntA, &tmp, sizeof(CModel));
+		//memcpy(&tmp, pEntB, sizeof(CModel));
+		//tmp.m_vPosition = pEntA->m_vPosition;
+		//memcpy(pEntA, &tmp, sizeof(CModel));
 	}
 
 	static void MoveSun()
@@ -474,6 +519,9 @@ public:
 		c.m_iGenerateMode = 1;
 		c.m_pSetInfo = pSetInfo;
 
+		if (pSetInfo)
+			c.m_iGenerateMode = pSetInfo->m_i0x088;
+		
 		return SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &c);
 	}
 

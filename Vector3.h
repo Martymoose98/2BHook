@@ -19,6 +19,8 @@ public:
 	Vector3(const float* v);
 	Vector3(const __m128 v);
 
+	inline operator float* (void);
+
 	inline Vector3& operator=(const Vector3& v);
 	inline Vector3& operator=(const float* v);
 

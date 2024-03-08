@@ -1,5 +1,6 @@
 #include "Hooks.h"
 
+
 PresentFn oPresent;
 ResizeBuffersFn oResizeBuffers;
 CreateSwapChainFn oCreateSwapChain;
@@ -22,39 +23,111 @@ CreateEntityFn oCreateEntity;
 MRubyLoadScriptFn oMRubyLoadScript;
 CCameraGame_SetViewAnglesFn oCCameraGameSetViewAngles;
 CCameraGame_MoveFn oCCameraGameMove;
+CModelAnalyzer_CreateModelShaderModuleFn oCreateModelShaderModule;
 WNDPROC oWndProc;
 
-static ID3D11RasterizerState* pNorm, * pBias;
-static bool hookupdate = false;
-VirtualTableHook m_ctxhook;
-VirtualTableHook m_shaderhook;
 
+static ID3D11RasterizerState* pNorm, * pBias;
+//static bool hookupdate = false;
+//VirtualTableHook m_ctxhook;
+//VirtualTableHook m_shaderhook[MAX_MATERIAL_TEXTURES];
+
+class CPl0000Hook
+{
+public:
+	CPl0000Hook(CObj* pEntity)
+		: m_Hook((ULONG_PTR**)pEntity)
+	{
+		if (pEntity->m_pModelInfo)
+			m_vTint = pEntity->m_pModelInfo->m_vTint;
+
+		for (int i = 0; i < pEntity->m_Work.m_nMeshes - 1; ++i)
+		{
+			m_bMeshShow[i] = pEntity->m_Work.m_pMeshes[i].m_bShow;
+		}
+
+		//m_pShaderHooks = new VirtualTableHook()
+
+		//for (int i = 0; i < pEntity->m_Work.m_nMaterialShaders; ++i)
+		//{
+		//	m_pShaderHooks.push_back(new VirtualTableHook((ULONG_PTR**)pEntity->m_Work.m_pModelShaders->m_pShader));
+		//	m_pShaderHooks[i]->HookFunction((ULONG_PTR)&CModelShaderModule_Draw, 3);
+		//}
+
+		m_Hook.HookFunction((ULONG_PTR)&hkPl0000Destructor, 0);
+		m_Hook.HookFunction((ULONG_PTR)&hkPl0000Update, 8);
+	}
+
+	~CPl0000Hook(void)
+	{
+	}
+
+	VirtualTableHook m_Hook;
+	VirtualTableHook* m_pShaderHooks[MAX_MATERIAL_TEXTURES];
+	Vector4 m_vTint;
+	bool m_bMeshShow[32];
+
+};
+
+std::unordered_map<void*, CPl0000Hook*> g_pHookedEntities;
+
+// WIP
 void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 {
-	char* pModelExtendWork = (char*)pData->m_pWork + 0x188;
+	typedef __int64 (*OriginalFn)(CModelShaderModule*, CModelEntryData*);
+	typedef __int64 (*Original2Fn)(CModelShaderModule*, CModelShader*, CModelExtendWork*);
+	//((OriginalFn)m_shaderhook.GetFunctionAddress(3))(pThis, pData);
+	//pThis->Draw(pData);
 
-	/*if ((!((*(QWORD*)0x141415B10) & 0x800) || *(pModelExtendWork + 0x28) & 0x40) && pThis->m_pSetting && g_pOtManager->m_ptr98)
+	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
+	//pThis->Update(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2, 2);
+	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
+
+	/*CModelMatrixTable* pTbl = pData->m_pMatrices[0];
+
+	for (int i = 0; i < pTbl->m_nMatrices2; ++i)
 	{
-		CGraphicCommand* pCmd = GetGraphicCommand(32);
 
-		if (pCmd->m_pModelData)
-			pCmd->m_pModelData->m_iVertexOffset = 10;
+		Matrix4x4* pBoneMat = (Matrix4x4*)pData->m_pConstBuffer[i]->m_pResources;
+
+		pBoneMat->Transpose();
+
+		Matrix4x4 RotM;
+
+		RotM.InitAxisAngle(pData->m_pWork->m_pModelExtend2->m_pParent->m_matTransform.GetAxis(RIGHT), M_PI_F / 2.0f);
+
+		*pBoneMat = RotM * (*pBoneMat);
+
+		pBoneMat->Transpose();
 	}*/
 
-	((void(*)(CModelShaderModule*, CModelEntryData*))m_shaderhook.GetFunctionAddress(3))(pThis, pData);
+	CPl0000Hook* pEntityHook = g_pHookedEntities[CONTAINING_RECORD(pData->m_pWork, CObj, m_Work)];
+
+	if (pEntityHook)
+	{
+		// Always Render
+		pData->m_pWork->m_dwRenderFlags &= (~CModelWork::RF_DONT_RENDER);
+
+		pEntityHook->m_pShaderHooks[0]->Call<void, CModelShaderModule, CModelEntryData*>(3, pData);
+	}
+
+	//((Original2Fn)m_shaderhook[0].GetFunctionAddress(2))(pThis, pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pModelExtend2);
+
+	//((OriginalFn)m_shaderhook[0].GetFunctionAddress(3))(pThis, pData);
+	//pThis->Draw(pData);
 
 	// Exception thrown at 0x000000014500537C in NieRAutomata.exe: 
 	// 0xC0000005: Access violation reading location 0xFFFFFFFFFFFFFFFF.
-	if (pData && GetAsyncKeyState(VK_END) & 1)
-	{
-		//14093FF50
-		typedef __int64(*R_DrawModelFn)(CModelDrawContext* a1,
-			CGraphics* pGraphics, CModelMatrixTable* pModelMatrixTable,
-			CModelInstanceParam* pModelInstanceParam, CConstantBufferInfo* a5);
+	//if (pData && GetAsyncKeyState(VK_END) & 1)
+	//{
+	//	//14093FF50
+	//	typedef __int64(*R_DrawModelFn)(CModelDrawContext* a1,
+	//		CGraphics* pGraphics, CModelMatrixTable* pModelMatrixTable,
+	//		CModelInstanceParam* pModelInstanceParam, CConstantBufferInfo* a5);
 
-		((R_DrawModelFn)(0x14093FF50))(*pData->m_pCtx, g_pGraphics, *pData->m_pMatrices,
-			(pData->m_pParams) ? (*pData->m_pParams) : NULL, (CConstantBufferInfo*)&pData->m_iStartIndex);
-	}
+	//	((R_DrawModelFn)(0x14093FF50))(*pData->m_pCtx, g_pGraphics, *pData->m_pMatrices,
+	//		(pData->m_pParams) ? (*pData->m_pParams) : NULL, (CConstantBufferInfo*)&pData->m_iStartIndex);
+	//}
 }
 
 BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
@@ -69,7 +142,7 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 
 	if (g_pCamera && g_pCamera->m_pCamEntity && Vars.Visuals.bChams)
 	{
-		pDrawData = g_pCamera->m_pCamEntity->m_pModelData->m_pDrawData;
+		pDrawData = g_pCamera->m_pCamEntity->m_Work.m_pModelData->m_pDrawData;
 
 		for (int i = 0; i < pDrawData->m_nBatches; ++i)
 		{
@@ -130,7 +203,7 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 
 HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 {
-	ImGui::GetIO().MouseDrawCursor = Vars.Menu.bOpened;
+	ImGui::GetIO().MouseDrawCursor = g_pMenu->IsOpen();
 
 	//g_pGraphics->m_iTimeStep = 0x100;
 
@@ -143,8 +216,10 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	g_pQueryPerformanceCounterHook->Rehook();
 
-	g_pLocalPlayer = GetEntityFromHandle2(g_pLocalPlayerHandle);
-	Pl0000* pCameraEnt = g_pCamera->m_pCamEntity;//GetEntityFromHandle2(&g_pCamera->m_hEntity);
+	// FIXME: change when other Pl entity's are reversed
+	g_pLocalPlayer = static_cast<Pl0000*>(GetEntityFromHandle2(g_pLocalPlayerHandle));
+
+	Pl0000* pCameraEnt = static_cast<Pl0000*>(g_pCamera->m_pCamEntity);
 
 #if defined(_DEBUG) && defined(DENUVO_STEAM_BUILD)
 
@@ -260,28 +335,30 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	}
 #endif
 
+	//bool bDerived = RTTI::DerivesFrom(pCameraEnt, typeid(Pl0000));
+	if (GetAsyncKeyState(VK_HOME) & 0x1)
+		Vars.Misc.nSlot++;
+
+	if (GetAsyncKeyState(VK_END) & 0x1)
+		Vars.Misc.nSlot--;
+
 	if (pCameraEnt)
 	{
-		if (Vars.Gameplay.bRainbowHair)
-		{
-			Vars.Gameplay.flModelTintHue += 0.005f;
+		// FIXME: HACK move code to HOOK
+		//if (!hookupdate)
+		//{
+		//	hookupdate = true;
 
-			if (Vars.Gameplay.flModelTintHue > 1.f)
-				Vars.Gameplay.flModelTintHue = 0.0f;
-
-			int idx = GetModelMeshIndex(&pCameraEnt->m_Work, "Hair");
-
-			if (idx != -1)
-			{
-				pCameraEnt->m_Work.m_pMeshes[idx].m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
-				pCameraEnt->m_Work.m_pMeshes[idx].m_bUpdate = TRUE;
-				pCameraEnt->m_Work.m_pMeshes[idx].m_bShow = TRUE;
-			}
-		}
+		//	for (int i = 0; i < g_pLocalPlayer->m_Work.m_nMaterialShaders; ++i)
+		//	{
+		//		m_shaderhook[i].Initialize((ULONG_PTR**)g_pLocalPlayer->m_Work.m_pModelShaders[i].m_pShader);
+		//		m_shaderhook[i].HookFunction((ULONG_PTR)CModelShaderModule_Draw, 3);
+		//	}		
+		//}
 
 		if (Vars.Gameplay.bRainbowPod)
 		{
-			Pl0000* pPod = GetEntityFromHandle(&pCameraEnt->m_hPod);
+			Pl0000* pPod = static_cast<Pl0000*>(GetEntityFromHandle(&pCameraEnt->m_hPod));
 
 			if (pPod)
 			{
@@ -325,51 +402,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	g_pOverlay->Render(true);
 
-	if (Vars.Menu.bOpened)
-	{
-		ImGui::SetNextWindowSize(ImVec2(875, 600), ImGuiCond_FirstUseEver);
+	g_pMenu->Draw(ImVec2(875, 600));
 
-		if (ImGui::Begin("2B Hook! ~ 2B Owns Me and All :^)", &Vars.Menu.bOpened, ImGuiWindowFlags_NoResize))
-		{
-			ImGui::Text("%s (%s)\tAverage %.3f ms / frame(%.1f FPS)", Vars.Menu.szAdapterUtf8, Vars.Menu.szOutputUtf8, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-
-			if (ImGui::BeginTabBar("MainTabs"))
-			{
-				if (ImGui::BeginTabItem("Gameplay"))
-				{
-					GameplayTab(pCameraEnt);
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Visuals"))
-				{
-					VisualsTab(pCameraEnt);
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Miscellaneous"))
-				{
-					MiscTab();
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Config"))
-				{
-					ConfigTab();
-					ImGui::EndTabItem();
-				}
-
-				if (ImGui::BeginTabItem("Console"))
-				{
-					g_pConsole->Draw("Console");
-					ImGui::EndTabItem();
-				}
-
-				ImGui::EndTabBar();
-			}
-		}
-		ImGui::End();
-	}
 	ImGui::Render();
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
@@ -507,24 +541,7 @@ HRESULT hkKeyboardGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVO
 
 	g_pKeyboardHook->Rehook();
 
-	memcpy(&Vars.Menu.Input.OldKeyboardState, &Vars.Menu.Input.KeyboardState, cbData);
-	memcpy(&Vars.Menu.Input.KeyboardState, lpvData, cbData);
-
-	for (IKeybind* pKeybind : g_pConfig->GetKeybinds())
-	{
-		if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
-		{
-			if (KEYPRESSED(Vars.Menu.Input.KeyboardState, Vars.Menu.Input.OldKeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
-		}
-		else if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYDOWN)
-		{
-			if (KEYDOWN(Vars.Menu.Input.KeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
-		}
-	}
-
-	return (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened) ? DIERR_INPUTLOST : hr;
+	return g_pMenu->KeyboardHandler(hr, lpvData, cbData);
 }
 
 ULONG hkMouseRelease(IDirectInputDevice8A* pThis)
@@ -551,16 +568,26 @@ HRESULT hkMouseAcquire(IDirectInputDevice8A* pThis)
 
 HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData)
 {
-	if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
+	//if (Vars.Menu.bOpened && Vars.Menu.bIgnoreInputWhenOpened)
+	//	return DIERR_INPUTLOST;
+
+	if (g_pMenu->MouseHandler(lpvData, cbData) == DIERR_INPUTLOST)
+	{
 		return DIERR_INPUTLOST;
+	}
 
 	g_pMouseHook->Unhook();
 
 	HRESULT hr = oMouseGetDeviceState(pThis, cbData, lpvData);
 
+	LPDIMOUSESTATE2 pState = (LPDIMOUSESTATE2)lpvData;
+
+	Vars.Misc.flDeltaX = pState->lX;
+	Vars.Misc.flDeltaY = pState->lY;
+
 	g_pMouseHook->Rehook();
 
-	memcpy(&Vars.Menu.Input.MouseState, lpvData, cbData);
+	//memcpy(&Vars.Menu.Input.MouseState, lpvData, cbData);
 
 	return hr;
 }
@@ -582,6 +609,8 @@ bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 // ORIG FUNCTION SIG: 40 53 48 81 EC ? ? ? ? F6 05
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis)
 {
+	Vector3Aligned vForward, vRight, vUp, vRotX, vRotY;
+
 	/* failed aimbot code
 
 	int iTarget = -1;
@@ -619,38 +648,241 @@ return TRUE;*/
 
 	pThis->m_flFov = DEGTORAD(Vars.Visuals.flFov);
 
-	if (pThis->m_pCamEntity && Vars.Misc.bFirstperson)
+	// TODO: CLAMP ANGLES
+	if (pThis->m_pCamEntity && (Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 	{
-		Vector3 vForward;
-
 		Features::Firstperson(pThis->m_pCamEntity);
+
 		Math::AngleVectors(pThis->m_vViewangles, &vForward);
 
-		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_pModelData, BONE_HEAD);
+		float theta = Math::GetFov(vForward, pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD),
+			pThis->m_pCamEntity->m_matTransform.GetAxis(RIGHT));
+		
+		if (fabsf(theta) > 90.0f)
+		{
+			pThis->m_vViewangles.y += 90.0f - theta;
+		}
 
-		pThis->m_vSource = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition
-			+ pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * .095f;
+		if (fabsf(theta) < 0.0f)
+		{
+			pThis->m_vViewangles.y += 90.0f - theta;
+		}
 
-		pThis->m_vTarget = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition + vForward * 4.f;
+		Math::AngleVectors(pThis->m_vViewangles, &vForward);
 
-		Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
+		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_Work.m_pModelData, BONE_HEAD);
+
+		Vector3Aligned& vHeadPos = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition;
+		
+		pThis->m_vSource = vHeadPos + pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * 0.05f;
+		pThis->m_vTarget = vHeadPos + vForward * 4.f;
 
 		CameraGame_SetLookAt(pThis);
-		return TRUE;
+	}
+	else if ((Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+	{
+		Math::AngleVectors(pThis->m_vViewangles, &vForward, &vRight, &vUp);
+
+		// probs can do it this way too
+/*		Matrix4x4 RotationX, RotationY, RotationXY;
+
+		RotationX.InitAxisAngle(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaY * 0.004f);
+		RotationY.InitAxisAngle(pThis->m_vUp, Vars.Misc.flDeltaX * 0.004f);
+
+		RotationXY = RotationX * RotationY;
+
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);
+
+		vRight.Normalize();
+		vUp.Normalize();
+		vForward.Normalize()*/;
+
+		//pThis->m_pInstance->m_World.GetAxis(RIGHT) = vRight.Normalize();
+		//pThis->m_pInstance->m_World.GetAxis(UP) = vUp.Normalize();
+		//pThis->m_pInstance->m_World.GetAxis(FORWARD) = vForward.Normalize();
+
+		/*RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);*/
+
+		//pThis->m_pInstance->m_World = pThis->m_pInstance->m_World * RotationX * RotationY;
+		//pThis->m_pInstance->m_World.GetAxis(POSITION) = pThis->m_vSource;
+		//pThis->m_pInstance->m_World.Rotate(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaX, vRotX);
+
+		//pThis->m_pInstance->m_World.Rotate(pThis->m_vUp, Vars.Misc.flDeltaY, vRotY);
+
+		//pThis->m_pCamEntity->m_bUnkCam800 &= ~CAMERA_FLAGS_LOCK;
+
+		pThis->m_vTarget = pThis->m_vSource + vForward * 4.0f;
+		//pThis->m_vTarget2 = vForward;
+
+		CameraGame_SetLookAt(pThis);
+
+		//pThis->m_pInstance->m_View = Matrix4x4::PointTo(pThis->m_vSource, vForward, vUp);
+		//pThis->m_pInstance->m_ViewProjection = pThis->m_pInstance->m_View * pThis->m_pInstance->m_Projection;
+		// NOTE: set vTarget2 and return false
+	}
+	else
+	{
+		Features::Thirdperson(pThis->m_pCamEntity);
 	}
 
-	Features::Thirdperson(pThis->m_pCamEntity);
+	Vars.Misc.bCameraFlagsOld = Vars.Misc.bCameraFlags;
 
-	Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
-
-	return oCCameraGameSetViewAngles(pThis);
+	return (Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_ALT_MASK) ?
+		TRUE : oCCameraGameSetViewAngles(pThis);
 }
 
 // ORIG FUNCTION SIG: 40 53 57 48 83 EC 68 48 8B D9
+// move happens before setviewangles it seems
 void* hkCCameraGameMove(CCameraGame* pThis)
 {
+	static void (*CCameraGame_FREECAM_sub_14073AAE0)(CCameraGame * pThis, int edx0, int a3) =
+		(decltype(CCameraGame_FREECAM_sub_14073AAE0))FindPattern(NULL,
+			"48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 83 EC 60 83");
+
+	if ((Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+	{
+		Vector3Aligned vDir;
+		Vector3Aligned vForward, vRight, vUp, vRotX, vRotY;
+
+		Matrix4x4 RotationX, RotationY, RotationXY;
+
+		if (GetAsyncKeyState('W') & 0x8000)
+		{
+			vDir += pThis->m_pInstance->m_World.GetAxis(FORWARD);
+		}
+
+		if (GetAsyncKeyState('A') & 0x8000)
+		{
+			vDir -= pThis->m_pInstance->m_World.GetAxis(RIGHT);
+		}
+
+		if (GetAsyncKeyState('S') & 0x8000)
+		{
+			vDir -= pThis->m_pInstance->m_World.GetAxis(FORWARD);
+		}
+
+		if (GetAsyncKeyState('D') & 0x8000)
+		{
+			vDir += pThis->m_pInstance->m_World.GetAxis(RIGHT);
+		}
+
+		pThis->m_vSource += vDir * 1.5f; // accel
+
+		RotationX.InitAxisAngle(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaY * 0.004f);
+		RotationY.InitAxisAngle(pThis->m_vUp, Vars.Misc.flDeltaX * -0.004f);
+
+		RotationXY = RotationX * RotationY;
+
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
+		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);
+
+		pThis->m_pInstance->m_World.GetAxis(RIGHT) = vRight.Normalize();
+		pThis->m_pInstance->m_World.GetAxis(UP) = vUp.Normalize();
+		pThis->m_pInstance->m_World.GetAxis(FORWARD) = vForward.Normalize();
+
+		CCameraGame_FREECAM_sub_14073AAE0(pThis, 2, 0);
+	}
+
+	//pThis->m_CamType = (CameraType)Vars.Misc.nSlot;
+
 	return oCCameraGameMove(pThis);
 }
+
+CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4)
+{
+	// Changes the shader vvv causes artifacts
+	//pShader->m_pMaterial->m_szShaderName = "CLT00_XXXXX";
+	CTextureDescription Desc;
+
+#if 0
+	static CTargetTexture* pTex = CreateTextureR("C:\\Users\\marty\\source\\repos\\2B Hook\\2B Hook\\Kim Jong Un Flood.dds", Desc);
+	int nTexture = pThis->FindTextureIndexByName("g_AlbedoMap");
+
+	uint32 crc = pShader->m_pMaterial->m_TextureIds[0];//HashStringCRC32("g_AlbedoMap", strlen("g_AlbedoMap"));
+	pShader->m_pMaterial->m_TextureIds[0] = pShader->m_pMaterial->m_TextureIds[1];
+	pShader->m_pMaterial->m_TextureIds[1] = crc;
+
+	CModelShaderModule* pModelShader = oCreateModelShaderModule(pThis, pShader, a3, a4);
+
+	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created Shader:\n\t Material: %s\n\t Shader: %s\n\t Technique: %s\n",
+		pShader->m_pMaterial->m_szName, pShader->m_pMaterial->m_szShaderName, pShader->m_pMaterial->m_szTechniqueName);
+
+#else
+	CModelShaderModule* pModelShader = oCreateModelShaderModule(pThis, pShader, a3, a4);
+#endif
+	return pModelShader;
+}
+
+void hkPl0000Destructor(Pl0000* pThis)
+{
+	CPl0000Hook* pHook = g_pHookedEntities[pThis];
+
+	pHook->m_Hook.Call<void, Pl0000>(0);
+	g_pHookedEntities.erase(pThis);
+}
+
+static bool bInit = false;
+void hkPl0000Update(Pl0000* pThis)
+{
+	CPl0000Hook* pHook = g_pHookedEntities[pThis];
+
+	pHook->m_Hook.Call<void, Pl0000>(8);
+
+	if (g_pCamera->m_pCamEntity != pThis)
+		return;
+
+	if (!bInit)
+	{
+		bInit = true;
+		for (int i = 0; i < pThis->m_Work.m_nMaterialShaders; ++i)
+		{
+			pHook->m_pShaderHooks[i] = new VirtualTableHook((ULONG_PTR**)pThis->m_Work.m_pModelShaders[i].m_pShader);
+			pHook->m_pShaderHooks[i]->HookFunction((ULONG_PTR)&CModelShaderModule_Draw, 3);
+		}
+
+		for (int i = 0; i < pThis->m_Work.m_nMeshes - 1; ++i)
+		{
+			pHook->m_bMeshShow[i] = pThis->m_Work.m_pMeshes[i].m_bShow;
+		}
+	}
+
+	pHook->m_bMeshShow[Vars.Gameplay.iSelectedModelMesh] = Vars.Gameplay.bSelectedMeshEnable;
+	//CGraphicCommand* pCmd = GetGraphicCommand(176);
+	//pThis->m_Work.m_pModelShaders->m_pShader->Draw(pThis->m_Work.m_pModelData->m_pDrawData);
+
+	// kind of gloss glow
+	//pThis->m_pModelInfo->m_vTint = Vars.Gameplay.vModelTint;
+
+	for (int i = 0; i < pThis->m_Work.m_nMeshes - 1; ++i)
+	{
+		pThis->m_Work.m_pMeshes[i].m_bShow = pHook->m_bMeshShow[i];
+		pThis->m_Work.m_pMeshes[i].m_bUpdate = TRUE;
+	}
+
+	if (Vars.Gameplay.bRainbowHair)
+	{
+		Vars.Gameplay.flModelTintHue += 0.005f;
+
+		if (Vars.Gameplay.flModelTintHue > 1.f)
+			Vars.Gameplay.flModelTintHue = 0.0f;
+
+		CMeshPart* pHair = GetModelMesh(&pThis->m_Work, "Hair");
+
+		if (pHair)
+		{
+			pHair->m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
+			pHair->m_bUpdate = TRUE;
+			pHair->m_bShow = TRUE;
+		}
+	}
+}
+
+
 
 // TODO: new hook doesn't need last param and shadow space in thunk
 // FIXME: entities that are not loaded in before creation will crash the game still!
@@ -666,7 +898,17 @@ void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId,
 	if (!pEntity)
 		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->m_szName, uObjectId, pInfo->m_uSetType);
 	else
+	{
+#if defined(_DEBUG) && defined(EXP_ENT_HOOK)
+		if (uObjectId == OBJECTID_2B || uObjectId == OBJECTID_A2 || uObjectId == OBJECTID_9S)
+		{
+			g_pHookedEntities.insert(std::make_pair(pEntity, new CPl0000Hook(static_cast<CObj*>(pEntity))));
+		}
+#endif
+
 		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->m_szName, uObjectId, pInfo->m_uSetType, pEntity);
+	}
+
 
 	return pEntity;
 }
@@ -810,11 +1052,6 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 	return ((OleLoadPictureFn)(g_pOleLoadPictureHook->GetOriginalFunction()))(lpStream, lSize, fRunmode, riid, lplpvObj);
 }
 
-BOOL hkCMemoryDeviceHeapAlloc(CMemoryDevice* pThis, CHeapInstance** ppHeap, SIZE_T nByteSize)
-{
-	return ((BOOL(*)(CMemoryDevice*, CHeapInstance**, SIZE_T))(g_pMemoryDeviceHook->GetHeapHook().GetFunctionAddress(1)))(pThis, ppHeap, nByteSize);
-}
-
 void hkSaveFileIO(CSaveDataDevice* pSavedata)
 {
 	if (!pSavedata)
@@ -864,19 +1101,19 @@ BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
 
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter)
 {
-	if (lpTopLevelExceptionFilter != UnhandledExceptionHandler)
+	if (lpTopLevelExceptionFilter != &UnhandledExceptionHandler)
 	{
 		auto& it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
 
 		if (it == g_pExceptionHandlers.cend())
 			g_pExceptionHandlers.push_back(lpTopLevelExceptionFilter);
 	}
-	return UnhandledExceptionHandler;
+	return &UnhandledExceptionHandler;
 }
 
 BOOL hkSetCursorPos(int X, int Y)
 {
-	if (Vars.Menu.bOpened)
+	if (g_pMenu->IsOpen())
 		return FALSE;
 
 	return oSetCursorPos(X, Y);
