@@ -183,6 +183,7 @@
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />
+    <ClInclude Include="SDK\CCamera.h" />
     <ClInclude Include="SDK\Common.h" />
     <ClInclude Include="SDK\Entity\CBehavior.h" />
     <ClInclude Include="SDK\Entity\CModel.h" />
@@ -193,6 +194,7 @@
     <ClInclude Include="SDK\FileSystem\dat.h" />
     <ClInclude Include="SDK\Graphics.h" />
     <ClInclude Include="SDK\Graphics\CMaterial.h" />
+    <ClInclude Include="SDK\wmb.h" />
     <ClInclude Include="SteamApi.h" />
     <ClInclude Include="Utils.h" />
     <ClInclude Include="Variables.h" />

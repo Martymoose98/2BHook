@@ -25,8 +25,6 @@
 
 #define FILTER_2B_DIE_CLEAR 	// 0xF07DFFFF
 
-#define CAMFLGS_LOCK 0x80000000
-
 #define DATAFILE_DATA	0
 #define DATAFILE_MODEL	1
 
@@ -51,6 +49,10 @@
 #define DBGFLGS_UNKNOWN_3		0x4000
 #define DBGFLGS_UNKNOWN_4		0x8000
 
+#define GAMEFLGS_UNK_2 0x200
+#define GAMEFLGS_DRAWMODELS_GLOBAL 0x800 // not sure
+#define GAMEFLGS_DRAWMODELS_0 0x8000
+
 #define DBGFLGS_MAX_VALUE (DBGFLGS_UNKNOWN_0 | DBGFLGS_UNKNOWN_1 | DBGFLGS_SELFDESTRUCT | DBGFLGS_UNKNOWN_2 | DBGFLGS_SLOWTIME | DBGFLGS_UNKNOWN_3 |  DBGFLGS_UNKNOWN_4)
 
 #define BIG_ENDIAN
@@ -68,45 +70,6 @@
 
 typedef unsigned __int64 QWORD;
 
-//
-//  EntityHandles are 32 bit values laid out as follows:
-//
-//   RRRRRRRR IIIIIIIIIIIIIIII SSSSSSSS
-//  +--------+----------------+--------+
-//  |        |      Index     | Shift  |
-//  +--------+----------------+--------+
-//
-//  where
-//
-//      S - Shift - 8 bit shift value (unknown use)
-//
-//      I - Index - 16 unsigned value
-//          Index into the CEntityList::m_pItems
-// 
-//      R - reserved bits of the handle
-//
-typedef unsigned long EntityHandle;
-
-#define EHANDLE_INDEX(ehandle) ((ehandle) >> 8) & 0xFFFF)
-#define EHANDLE_SHIFT(ehandle) ((ehandle) & 0xFF)
-
-typedef struct EntityHandle_t
-{
-	union {
-		struct {
-			UINT m_uShift : 8;
-			UINT m_uIndex : 16;
-			UINT m_uReserved : 8;
-		} m_Parts;
-
-		UINT m_uValue;
-	};
-	
-	operator EntityHandle (void) { return m_uValue; }
-
-	UINT GetIndex(void) { return m_Parts.m_uIndex; }
-	UINT GetShift(void) { return m_Parts.m_uShift; }
-};
 
 // Filler for unknown type ptrs
 struct Unknown_t;
@@ -150,6 +113,15 @@ public:
 	QWORD m_size;	//0x0018
 };
 
+/*
+Nier Automata's lib::DynamicArray<T, A> : lib::Array<T>
+*/
+template<typename T, typename A>
+class DynamicArray 
+{
+
+};
+
 template<typename T>
 class CRedBlackTreeNode
 {
@@ -173,17 +145,10 @@ class CRedBlackTreeNodeTemp
 	T* m_pPrevious;
 };
 
-// Hw::cRBTreeNodeTemp<T>
 template<typename T>
-class CRedBlackTreeNodeTemp
+class CRedBlackTree
 {
-	UINT m_dword0;
-	T* m_pRoot;
-	T* m_pLeft;
-	T* m_pRight;
-	char data20[0x90];
-	T* m_pNext;
-	T* m_pPrevious
+
 };
 
 // Size of structiure is 0x30 (48) bytes 

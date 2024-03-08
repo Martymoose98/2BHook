@@ -12,6 +12,51 @@
 
 class CConfig;
 
+struct ImColorScheme : public ImColor
+{
+	//constexpr ImColorScheme(ImColor& Color, float flAlpha)
+	//{
+	//	this->Value = Color.Value;
+	//	this->Value.w = flAlpha;
+	//}
+
+	// Slightly Skewed for alpha blending
+	static void Analogous(ImColor& Color, ImColor& Secondary, ImColor& Tertiary, float flVariance)
+	{
+		WORD H, L, S;
+
+		//WORD Alpha = 0xFF;
+		WORD Alpha = (WORD)((1.0f - sinf(M_PI_F * flVariance)) * 255.f);
+
+		ColorRGBToHLS(Color, &H, &L, &S);
+		Secondary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 255, flVariance), L, S);
+		Tertiary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 0, -flVariance), L, S);
+	}
+
+	static ImColor AlphaModulate(ImColor& Color, float flAlpha)
+	{
+		ImColor ColorOut = Color;
+
+		ColorOut.Value.w *= flAlpha;
+
+		return ColorOut;
+	}
+
+	static ImColor Secondary(ImColor& Color)
+	{
+		float h = 0.0f, s = 0.0f, v = 0.0f;
+		float r = 0.0f, g = 0.0f, b = 0.0f;
+
+
+		ImGui::ColorConvertRGBtoHSV(Color.Value.x, Color.Value.y, Color.Value.z, h, s, v);
+		ImGui::ColorConvertHSVtoRGB(h, s, v * 0.60f, r, g, b);
+
+		return ImColor(r, g, b, Color.Value.w * (1.0f - v));
+	}
+
+	//static constexpr ImColor ()
+};
+
 class CMenu
 {
 public:
@@ -30,6 +75,9 @@ public:
 
 	ImGuiStyle* ApplyStyle(ImColor& Primary = ImColor(7, 74, 25, 255),
 		ImColor& PrimaryBg = ImColor(7, 17, 74, 220));
+
+	void LoadConfig(LPCTSTR szConfig);
+	void SaveConfig(LPCTSTR szConfig);
 
 private:
 	void GameplayTab(Pl0000* pCameraEnt);

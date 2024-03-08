@@ -15,6 +15,7 @@ typedef struct Variables_t
 		bool bEnemyInfo;
 		bool bNPCInfo;
 		bool bCollisionObjectInfo;
+		bool bCollisionObjectInfo2;
 		bool bCollisionDebugObjectInfo;
 		bool bSkeleton;
 		bool bDebugLocalPlayerSkeleton;
@@ -42,6 +43,8 @@ typedef struct Variables_t
 		bool bRainbowHair;
 		float flModelTintHue;
 		int iSelectedModelMesh;
+		bool bSelectedMeshEnable;
+		Vector4 vModelTint;
 		char szModelTextureName[MAX_PATH];
 		bool bRainbowPod;
 		bool bHidePod;
@@ -64,10 +67,23 @@ typedef struct Variables_t
 
 	struct Misc_t
 	{
+		enum CameraFlg : unsigned int
+		{
+			CAMERA_THIRDPERSON = 0,
+			CAMERA_FIRSTPERSON = 1,
+			CAMERA_FREE = 2,
+
+			CAMERA_ALT_MASK = CAMERA_FIRSTPERSON | CAMERA_FREE,
+		};
+
 		char szCpkName[32];
 		bool bCpkLoaded;
 		bool bFirstperson;
 		bool bFirstpersonOld;
+		unsigned int bCameraFlags;
+		unsigned int bCameraFlagsOld;
+		float flDeltaX;
+		float flDeltaY;
 		char szSoundName[128];
 		bool bWireframe;
 		bool bAntiVSync;
@@ -89,7 +105,6 @@ typedef struct Variables_t
 			XINPUT_STATE emulate;
 			LPDIDATAFORMAT pKeyboardFormat;	// c_dfDIKeyboard
 			LPDIDATAFORMAT pMouseFormat;	// c_dfDIMouse2
-			
 			
 		} Input;
 

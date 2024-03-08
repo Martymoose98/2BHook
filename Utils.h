@@ -3,7 +3,6 @@
 #include <d3dcompiler.h>
 #include <wincodec.h>
 #include <Shlobj.h>
-#include <ntstatus.h>
 
 #include "Globals.h"
 #include "Matrix4x4.h"

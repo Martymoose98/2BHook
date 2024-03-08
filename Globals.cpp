@@ -24,6 +24,7 @@ CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
 CSceneEntitySystem_CreateEntityFn SceneEntitySystem_CreateEntity;
 CSceneStateSystem_SetFn SceneStateSystem_Set;
 CCameraGame_SetLookAtFn CameraGame_SetLookAt;
+CCameraGame_SetLookAtFn CameraGame_SetLookAtNoDistance;
 GetConstructorFn GetConstructionInfo;
 CSceneEntitySystem_FindSceneStateFn SceneEntitySystem_FindSceneState;
 HashStringCRC32Fn HashStringCRC32;
@@ -48,6 +49,10 @@ XInputCancelGuideButtonWaitFn XInputCancelGuideButtonWait;
 XInputPowerOffControllerFn XInputPowerOffController;
 XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
+
+unsigned int* g_pDebugFlags;
+unsigned int* g_pCameraFlags;
+unsigned int* g_pGameFlags;
 
 int* g_piMoney;
 int* g_piExperience;

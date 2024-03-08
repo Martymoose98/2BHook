@@ -168,6 +168,12 @@
     <ClInclude Include="SDK\Entity\Pl1010.h">
       <Filter>Header Files\SDK\Entity</Filter>
     </ClInclude>
+    <ClInclude Include="SDK\wmb.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
+    <ClInclude Include="SDK\CCamera.h">
+      <Filter>Header Files\SDK</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">

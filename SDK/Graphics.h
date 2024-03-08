@@ -694,9 +694,9 @@ public:
 	virtual BOOL DrawIndexedPrimitiveInstanced(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawPrimitiveInstancedIndirect(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawIndexedPrimitiveInstancedIndirect(RenderInfo* pInfo, __int64 a3, unsigned int AlignedByteOffsetForArgs) PURE;
-	virtual void Flush() PURE;
-	virtual int GetRenderWidth() PURE;
-	virtual int GetRenderHeight() PURE;
+	virtual void Flush(void) PURE;
+	virtual int GetRenderWidth(void) PURE;
+	virtual int GetRenderHeight(void) PURE;
 
 	//void* m_pVtbl;								//0x0000
 	ID3D11DeviceContext* m_pContext;				//0x0008
@@ -823,6 +823,34 @@ VALIDATE_OFFSET(CGraphicDeviceDx11, m_bWindowed, 0x108);
 VALIDATE_OFFSET(CGraphicDeviceDx11, m_pAdapters, 0x128);
 VALIDATE_SIZE(CGraphicDeviceDx11, 320);
 
+/*
+* Struct is used to contruct CGraphics!
+* Stack var size of struct is guessed!
+* 
+*/
+struct CGraphicCreateContext
+{
+	int m_ScreenType;		//0x0000 | windowed, fullscreen, borderless ????
+	int m_Width;			//0x0004
+	int m_Height;			//0x0008
+	char pad0C[4];			//0x000C
+	CHeapInfo* m_pHeapInfo;	//0x0010
+	QWORD* m_Ptr18;			//0x0018
+	QWORD* m_Ptr20;			//0x0020
+	QWORD* m_Ptr28;			//0x0028
+	int m_Unk30;			//0x0030 | ida only says 3
+	BOOL m_bUnk34;			//0x0034
+	int m_UnkFlag38;		//0x0038
+	char pad3C[4];			//0x003C
+	__int64 m_Unk40;		//0x0040
+	Vector4* m_pvUnk48;		//0x0048
+	int m_Unk50;			//0x0050
+	int m_Unk54[9];			//0x0054
+	bool m_bUnk;			//0x0078
+	char pad79[3];			//0x0079
+	int m_Unk7C[4];			//0x007C
+};
+
 
 /*
 * Size of struct 0x0F0 (240) bytes	old version (denuvo)
@@ -833,7 +861,7 @@ class CGraphics
 public:
 	BOOL m_b0x00;							//0x0000
 	char unk0x04[4];						//0x0004
-	void* m_pStruct;						//0x0008
+	void* m_pComputeCtx;					//0x0008 | gets passed to CreateComputeContext
 	UINT m_uUAVStartSlot;					//0x0010
 	char unk0x0C[4];						//0x0014
 	void* m_pSamplerState;					//0x0018

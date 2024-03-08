@@ -219,7 +219,7 @@ void CConfig::InitializeConfig()
 #pragma endregion
 
 #pragma region menu
-	m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", Vars.Menu.bIgnoreInputWhenOpened));
+	//m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", Vars.Menu.bIgnoreInputWhenOpened));
 	//m_items.emplace_back(new ConfigItemInt(CATEGORY_MENU, "i_theme_fg", g_pMenu->
 #pragma endregion
 }
@@ -445,15 +445,15 @@ BOOL IConfig::SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN 
 	return Status;
 }
 
-KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
+const KeyOrdinal* FindKeyOrdinal(USHORT uKeycode)
 {
 	int iLeft = 0;
-	int iRight = ARRAYSIZE(s_Keycodes);
+	int iRight = ARRAYSIZE(s_Keycodes) - 1;
 
 	while (iLeft <= iRight)
 	{
 		int iMiddle = (iLeft + iRight) >> 1;
-		KeyOrdinal* pMiddle = &s_Keycodes[iMiddle];
+		const KeyOrdinal* pMiddle = &s_Keycodes[iMiddle];
 
 		if (pMiddle->m_uKeyCode == uKeycode)
 			return pMiddle;

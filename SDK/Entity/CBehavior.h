@@ -22,7 +22,7 @@ public:
 	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviorExtensions;	//0x0008
 };
 
-class ExCollision : public CBehaviorExtension
+class ExCollision : public CBehaviorExtension // lib::Noncopyable
 {
 	enum Type : DWORD
 	{
@@ -203,6 +203,22 @@ public:
 	};
 };
 
+// sound type name prefix
+enum SoundType
+{
+	SOUND_TYPE_PLAYER = 0, // "_pl"
+	SOUND_TYPE_NPC, // "_npc"
+	SOUND_TYPE_OT, // "_ot"
+};
+
+// TODO:
+// 
+// lib::tr::Mixin
+// lib::message_slot::StaticListenerRequest
+// lib::tr::Function
+// hap::detail::PuidClassCall
+// hap::detail::PuidClassCall2
+// hap::script_export::FunctionExporterF
 
 /*
 * CBehavior - Fuck the UK bellends
@@ -215,22 +231,23 @@ class CBehavior : public CObj
 {
 public:
 
-	virtual void function0(char a1);
-	virtual void function1(void); // from CModel
-	virtual void function2(void); // CModel stub function
-	virtual void* function3(void);
-	virtual float function4(void); // return 1.0f;
+	//virtual void function0(char a1) = 0;
+	virtual void function0(void) = 0;
+	virtual void UpdateModelPhysics(Vector4* v1, Vector4* v2, Vector4* v3) = 0; // from CModel
+	virtual void function2(void) = 0; // CModel stub function
+	virtual void* GetTypeInfo(void) = 0;
+	virtual float function4(void) = 0; // return 1.0f;
 	virtual void function5() = 0;
 	virtual void function6() = 0;
-	virtual void function7() = 0;
-	virtual void function8() = 0;
+	virtual void PreUpdate(void) = 0;
+	virtual void Update(void) = 0;
 	virtual void function9() = 0;
 	virtual void function10() = 0;
 	virtual void function11() = 0;
 	virtual void function12() = 0;
 	virtual void function13() = 0;
 	virtual void function14() = 0;
-	virtual void function15() = 0;
+	virtual void function15(Matrix4x4* pModel) = 0;
 	virtual void function16() = 0;
 	virtual void function17() = 0;
 	virtual void Animate(unsigned int id, int mode, int a4, int a5) = 0;
@@ -243,21 +260,21 @@ public:
 	virtual void function25() = 0;
 	virtual void function26() = 0;
 	virtual void function27() = 0;
-	virtual CEntityInfo* function28(__int64 a1, unsigned int objectId) = 0;
-	virtual bool IsAliveAndEntityInfoFlag() = 0;
-	virtual int GetMaxHealth() = 0; //index: 30
-	virtual int GetHealth() = 0;
+	virtual CEntityInfo* function28(__int64 a1, unsigned int uObjectId) = 0;
+	virtual bool IsValid(void) = 0; //  return m_pInfo && (m_pInfo->m_Flags & 3) == 0 && this->GetMaxHealth() > 0;
+	virtual int GetMaxHealth(void) = 0; //index: 30
+	virtual int GetHealth(void) = 0;
 	virtual void function32() = 0;
-	virtual bool IsDead() = 0;
+	virtual bool IsDead(void) = 0;
 	virtual void function34() = 0;
 	virtual void function35() = 0;
 	virtual void function36() = 0;
-	virtual void CollisionOff() = 0;
-	virtual void CollisionOn() = 0;
-	virtual void function39() = 0;
+	virtual void CollisionOff(void) = 0;
+	virtual void CollisionOn(void) = 0;
+	virtual void function39() = 0; // nullsub_2
 	virtual __int64 EmitSound(const char* szName, CBehavior* pSourceEntity, __int64 boneId, __int64 flags, unsigned int a6) = 0;
-	virtual void function41() = 0;
-	virtual void function42() = 0;
+	virtual void function41(const char* szName, Matrix4x4* pModelMatrix, void* pUnk, int, int, int) = 0;
+	virtual void function42(const char* szName, int a2, SoundType Type) = 0; // EmitSound
 	virtual void function43() = 0;
 	virtual void function44() = 0;
 	virtual void function45() = 0;
@@ -292,11 +309,14 @@ public:
 	void* m_pUnknown6A0; // set to 0 (on creation)
 	void* m_pUnknown6A8; // points to pThis
 	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16> m_BehaviourExtensions; // 0x06B0
-	char _0x07D0[96];
+	char _0x07D0[48];						//0x07D0
+	BOOL m_bUnkCam800;						//0x0800
+	char _0x0804[44];						//0x0804
 };
 VALIDATE_OFFSET(CBehavior, m_iAnimationId, 0x670);
 VALIDATE_OFFSET(CBehavior, m_iAnimationMode, 0x674);
 VALIDATE_OFFSET(CBehavior, m_BehaviourExtensions, 0x6B0);
+VALIDATE_OFFSET(CBehavior, m_bUnkCam800, 0x800);
 VALIDATE_SIZE(CBehavior, 0x830);
 
 // Size of struct 0xC50

@@ -13,7 +13,7 @@
 #include "Hooks.h"
 
 // temp
-NTSTATUS KsDumpModules(/*PEPROCESS pProcess, PKERNEL_MODULE_REQUEST pRequest*/);
+NTSTATUS DumpModules(/*PEPROCESS pProcess, PKERNEL_MODULE_REQUEST pRequest*/);
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "xinput.lib")
@@ -148,10 +148,13 @@ void InitHooks(void)
 	HookFunc64((LPVOID)(qwCallerFunc + 0x237 - 0x16), hkCreateEntityThunk, 27, &g_CreateEntityHook);
 #endif // !OLD_DENUVO_STEAM_BUILD
 
-	// FIXME: should move to more appropriate location, as it isn't a hook. 
 	// Also, forget what this does but it's not critical for the dll's operation.
 	// If I do keep I need to resig the new version
+#ifdef DENUVO_STEAM_BUILD
 	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
+#else
+	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ?? ?? ?? ?? 44 89 6B 68"), 9);
+#endif
 	NopMemory(&nop_HairColor);
 }
 
@@ -506,11 +509,17 @@ void LogOffsets(void)
 	LOG_OFFSET("CreateTexture", CreateTexture);
 	LOG_OFFSET("CTextureResourceManager::FindResource", TextureResourceManager_FindResource);
 	LOG_OFFSET("CCameraGame::SetLookAt", CameraGame_SetLookAt);
+	LOG_OFFSET("CCameraGame::SetLookAtNoDistance", CameraGame_SetLookAtNoDistance);
 	LOG_OFFSET("DestroyBuddy", DestroyBuddy);
 	LOG_OFFSET("FNV1Hash", FNV1Hash);
 	LOG_OFFSET("HashStringCRC32", HashStringCRC32);
 	LOG_OFFSET("GetConstructionInfo", GetConstructionInfo);
 	LOG_OFFSET("ExCollision::GetOBBMax", ExCollision_GetOBBMax);
+
+	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Flag Pointers]");
+	LOG_OFFSET("DebugFlags", g_pDebugFlags);
+	LOG_OFFSET("CameraFlags", g_pCameraFlags);
+	LOG_OFFSET("GameFlags", g_pGameFlags);
 
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Structure Pointers]");
 	LOG_OFFSET("CEntityList", g_pEntityList);
@@ -655,7 +664,7 @@ void FindSteamOffsets(void)
 	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
 	CRILogCallback = CRILogCallbackConsole; //CRILogCallbackWinConsole
 
-	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10");
+	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10", 1);
 	GetConstructionInfo = (GetConstructorFn)FindPattern(NULL, "33 D2 48 8D 05 ? ? ? ? 44 8B C2");
 	GetEntityInfoFromHandle = (GetEntityInfoFromHandleFn)FindPattern(NULL, "8B 11 85 D2 74 ?? 8B C2"); // gets CEntityInfo for everything
 	GetEntityFromHandle = (GetEntityFromHandleFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 85 C0 75 5C", 1); // for enemies
@@ -691,6 +700,7 @@ void FindSteamOffsets(void)
 	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
 	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF", 1);
 	CameraGame_SetLookAt = (CCameraGame_SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 33 C9 4C 89 67 18", 1);
+	CameraGame_SetLookAtNoDistance = (CCameraGame_SetLookAtFn)FindPattern(NULL, "40 53 48 81 EC 80 00 00 00 0F 29 74 24 70 0F 57");
 	DestroyBuddy = (DestroyBuddyFn)FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	ExCollision_GetOBBMax = (ExCollision_GetOBBMaxFn)FindPattern(NULL, "48 89 5C 24 ? 56 48 83 EC ? 48 83 79 08 00");
 
@@ -700,6 +710,10 @@ void FindSteamOffsets(void)
 
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0A");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0C");
+	
+	g_pDebugFlags = (unsigned int*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
+	g_pCameraFlags = (unsigned int*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
+	g_pGameFlags = (unsigned int*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
 
 	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24", 3);
 	g_pLocalPlayerHandle = (EntityHandle*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
@@ -737,7 +751,7 @@ void FindSteamOffsets(void)
 
 	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
 }
-
+#define VERBOSE
 
 void Setup(void)
 {
@@ -747,22 +761,28 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
+	{
+		STACK_TIMER(AVX_timer);
+
+		HashStringCRC32 = (HashStringCRC32Fn)FindPatternAVXEx(GetModuleHandleA(NULL),
+			"\x48\x85\xC9\x0F\x85????\x33\xC0\xC3\xCC\xCC\xCC\xCC\x48\x89\x5C\x24");
+	}
 	// add VEH?
-	SetUnhandledExceptionFilter(UnhandledExceptionHandler);
-	g_pExceptionHandlers.push_back(UnhandledExceptionHandlerChild);
+	SetUnhandledExceptionFilter(&UnhandledExceptionHandler);
+	g_pExceptionHandlers.push_back(&UnhandledExceptionHandlerChild);
 
 	NierVersionInfo* pVersion = QueryNierBinaryVersion();
 	SHA256DigestStr SHA256Hash;
 
-	SHA256_PrintDigest((SHA256Digest*)&pVersion->m_pHash, &SHA256Hash);
+	SHA256_PrintDigest((SHA256Digest*)pVersion->m_pHash, &SHA256Hash);
 
 
-	LOG("SHA256: %32s", SHA256Hash);
+	LOG("SHA256: %32s\n", SHA256Hash);
 
 	LOG("Detected %s\n", pVersion->m_szVersion);
 
 #if defined(_DEBUG) || defined(VERBOSE)
-	KsDumpModules();
+	DumpModules();
 #endif
 
 	FindOffsets();

@@ -1,6 +1,8 @@
-#pragma once
+#ifndef __CMODEL_H__
+#define __CMODEL_H__
 
 #include "..\Common.h"
+#include "..\wmb.h"
 #include "..\Graphics\CMaterial.h"
 
 // defines for bone ids
@@ -38,7 +40,9 @@
 #define MODELSHADERMODULE_DONT_UPDATE 0x00080002
 
 // Forward Definitions
+class CModelShader;
 class CModelWork;
+class CModelData;
 class CModel;
 
 /*
@@ -62,29 +66,6 @@ public:
 VALIDATE_OFFSET(CParts, m_flTickBase, 0x9C);
 VALIDATE_SIZE(CParts, 0xB0);
 
-// had to define virtuals not right tho!
-class CModelExtendWorkBase
-{
-public:
-	virtual void function0() {};
-	virtual void function1() {};
-};
-
-// had to define virtuals not right tho!
-class CModelExtendWork : public CModelExtendWorkBase
-{
-public:
-	virtual void function2() {};
-	virtual void function3() {};
-
-	float flUnk;				//0x0008
-	DWORD _0x0010;				//0x000C
-	unsigned int m_ObjectId;	//0x0010
-	char _0x0018[12];			//0x0014
-	CModel* m_pParent;			//0x0020 | maybe? might need CObj or CBehavior
-};
-
-
 struct CShaderSetting
 {
 	void* m_pVtbl;
@@ -104,17 +85,204 @@ struct CShaderSetting
 	QWORD dword68;
 };
 
+struct CBoneSets
+{
+	short* m_pSets;
+	int m_nSets;
+};
+
+struct CBatchInfo
+{
+	int m_iVertexGroupIndex;
+	int m_iMeshIndex;
+	int m_iMaterialIndex;
+	int m_iUnk;
+	int m_iMeshMaterialIndex;
+	int m_iUnk2;
+};
+
+struct CDrawGroupInfo
+{
+	DWORD dword0;
+	int m_iLODLevel;
+	DWORD m_uBatchStart;
+	BYTE gapC[4];
+	CBatchInfo* m_pBatchInfos;
+	unsigned int m_nBatchInfos;
+};
+
+/*
+Size of struct 0x38 (56) bytes
+*/
+struct CModelInstanceParam
+{
+	void* m_pVtbl;				//0x00
+	DWORD m_dw0x08;				//0x08
+	char padC[0x1C];			//0x0C
+	CConstantBuffer* m_pBuffer;	//0x28
+	DWORD m_dw0x30;				//0x30
+};
+
+struct __declspec(align(8)) CConstantBufferInfo
+{
+	INT m_iStartIndex;				//0x00
+	DWORD m_iCount;
+	DWORD m_nInstances;
+	DWORD dwordC;
+	BYTE gap10[8];
+	CModelInstanceParam* m_pParams;
+	CConstantBufferContext* m_pContext;
+};
+
+// had to define virtuals not right tho!
+class CModelExtendWorkBase
+{
+public:
+	virtual void function0() {};
+	virtual void function1() {};
+};
+
+/*
+Size of struct 0xA8 (168) bytes
+*/
+struct CModelMatrixTable
+{
+	void* m_pVtbl;					//0x0000
+	char pad08[8];					//0x0008
+	CSamplerState* m_pSampler;		//0x0010
+	CBoneSets* m_pSets;				//0x0018
+	int m_nMatrixCount;				//0x001C
+	char pad20[12];					//0x0020
+	int m_nBoneSets;
+	CConstantBufferContext m_ConstBufferCtx;
+	char pad30[12];
+	CModelMatrix* m_pMatrices;
+	CModelMatrix* m_pMatrices2;
+	INT m_nMatrices;
+	INT m_nMatrices2;
+};
+
+class CModelExtendWork : public CModelExtendWorkBase
+{
+public:
+
+	float flUnk;				//0x0008
+	DWORD _0x0010;				//0x000C
+	unsigned int m_ObjectId;	//0x0010
+	char _0x0014[12];			//0x0014
+	CModel* m_pParent;			//0x0020 | maybe? might need CObj or CBehavior
+	DWORD m_dw28;
+	QWORD qword30;
+	DWORD dword38;
+	QWORD qword40;
+	QWORD qword48;
+	QWORD qword50;
+	QWORD qword58;
+	QWORD qword60;
+	QWORD qword68;
+	QWORD qword70;
+	BYTE gap78[56];
+	QWORD qwordB0;
+	BYTE gapB8[28];
+	DWORD dwordD4;
+	BYTE gapD8[24];
+	Vector3Aligned m_vF0;
+	DWORD dword100;
+	float dword104;
+	BYTE gap108[12 +32];
+	/*__unaligned __declspec(align(1)) QWORD qword114;
+	__unaligned __declspec(align(1)) QWORD qword11C;
+	__unaligned __declspec(align(1)) QWORD qword124;
+	__unaligned __declspec(align(1)) QWORD qword12C;*/
+	DWORD dword134;
+	QWORD qword138;
+	QWORD qword140;
+	QWORD qword148;
+	QWORD qword150;
+	QWORD qword158;
+	QWORD qword160;
+	QWORD qword168;
+	QWORD qword170;
+	BYTE m_Wetness;		// 0x0178
+	DWORD dword17C;
+	BYTE gap180[80];
+	CConstantBuffer** qword1D0;
+	QWORD qword1D8;
+	QWORD qword1E0;
+	QWORD qword1E8;
+	QWORD qword1F0;
+	BYTE gap1F8[72];
+	DWORD dword240;
+	DWORD dword244;
+	CModelData* m_pModelData;
+};
+VALIDATE_OFFSET(CModelExtendWork, m_ObjectId, 0x010);
+VALIDATE_OFFSET(CModelExtendWork, m_pParent, 0x020);
+VALIDATE_OFFSET(CModelExtendWork, m_vF0, 0x0F0);
+VALIDATE_OFFSET(CModelExtendWork, dword134, 0x134);
+VALIDATE_OFFSET(CModelExtendWork, m_Wetness, 0x178);
+
+
+struct CVertexGroup
+{
+	struct CVertexBuffer* m_pVertexBuffer;	//0x00
+	struct CVertexBuffer* m_pVertexBuffer2;	//0x08
+	struct CIndexBuffer* m_pIndexBuffer;	//0x10
+};
+VALIDATE_SIZE(CVertexGroup, 24);
+
+struct __declspec(align(8)) CModelDrawContext
+{
+	CVertexGroup* m_pVertexGroups;		// 0x0000
+	BYTE gap8[8];						// 0x0008
+	CConstantBufferInfo* m_pContexts;	// 0x0010
+	BYTE gap18[4];						// 0x0018
+	Topology m_Topology;				// 0x001C
+};
+
+struct CModelEntryData
+{
+	QWORD qword0;						//0x00
+	CModelWork* m_pWork;				//0x08
+	CModelDrawContext** m_pCtx;			//0x10
+	DWORD m_iVertexOffset;				//0x18
+	BYTE gap1C[4];						//0x1C
+	CModelMatrixTable** m_pMatrices;	//0x20
+	CModelInstanceParam** m_pParams;	//0x28
+	CConstantBuffer** m_pConstBuffer;	//0x30
+	BYTE gap38[44];						//0x38
+	DWORD m_iStartIndex;				//0x64 | CConstantBufferInfo
+	DWORD m_iCount;						//0x68
+	DWORD m_nInstances;					//0x6C
+	DWORD dword70;						//0x70
+	DWORD dword74;						//0x74
+};
+VALIDATE_OFFSET(CModelEntryData, m_pParams, 0x28);
+
+struct CModelEntry
+{
+	CModelEntryData* m_pData;
+	struct CModelEntry* m_pNext;
+};
+
+class CModelShaderModuleBase
+{
+public:
+	virtual __int64 function0(char flags) = 0;
+	virtual void Update(CModelShader* pShader, CModelExtendWork* pWork, char flags) = 0; // flags & 2 UPDATE 1 = idk
+	virtual __int64 ApplyExternalForces(CModelShader* pShader, CModelExtendWork* pWork) = 0;
+	virtual __int64 Draw(CModelEntryData* pData) = 0; // Submits a job to the render queue (param could be wrong) maybe void
+
+};
+
 /*
 Size of struct 0x90 (144) bytes
 */
-struct CModelShaderModule
+class CModelShaderModule : public CModelShaderModuleBase
 {
-	//virtual __int64 function0(char flags) PURE;
-	//virtual void Update(CModelShader* pShader, CModelExtendWork* pWork, char flags) PURE; // flags & 2 UPDATE 1 = idk
-	//virtual __int64 ApplyExternalForces(CModelShader* pShader, CModelExtendWork* pWork) PURE;
-	//virtual __int64 Draw(CModelEntryData* pData) PURE; // Submits a job to the render queue (param could be wrong) maybe void
+public:
 
-	void* m_pVtbl;						//0x0000
+	//void* m_pVtbl;					//0x0000
 	CShaderSetting* m_pSetting;			//0x0008
 	QWORD qword10;						//0x0010
 	CConstantBuffer* m_pConstantBuffer;	//0x0018
@@ -129,16 +297,16 @@ struct CModelShaderModule
 	CConstantBuffer* qword48;			//0x0048 | CConstantBuffer*
 	int m_nQword48;						//0x0050
 	DWORD dword54;						//0x0054
-	DWORD dword58;						//0x0058
-	DWORD dword5C;						//0x005C
-	__m128 oword60;						//0x0060
-	Vector3Aligned oword70;				//0x0070
+	QWORD qword58;						//0x0058
+	Vector4 oword60;					//0x0060
+	Vector4 oword70;					//0x0070
 	int int80;							//0x0080
 	float m_flWetness;					//0x0084
 	char pad[4];
 };
-VALIDATE_SIZE(CModelShaderModule, 0x90);
+VALIDATE_OFFSET(CModelShaderModule, m_pSetting, 0x8);
 VALIDATE_OFFSET(CModelShaderModule, m_flWetness, 0x84);
+VALIDATE_SIZE(CModelShaderModule, 0x90);
 
 /*
 Size of struct 0x318 (792) bytes
@@ -157,7 +325,7 @@ struct CModelAnalyzer
 {
 	virtual void function0(char a2);
 	virtual void LOD_sub_143F4B620(__int64 a2);
-	virtual int FindTextureIndexByName(const char*);
+	virtual int FindTextureIndexByName(const char* szName);
 	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, __int64 pModelWorkExtend, __int64 ppHeaps);
 	virtual void function4();
 	virtual void function5();
@@ -168,63 +336,6 @@ struct MaterialShaderInfo
 	int m_iShader;
 	CModelShader* m_pShader;
 };
-
-// FIXME: MOVE WMB and probs bone stuff
-/*
-Size of struct 0x88 (136) bytes
-
-dummy.wmb is just this header structure
-*/
-typedef struct WMBHeader
-{
-	union {
-		char			id[4];			// 0x00
-		unsigned int	magic;
-	};
-	unsigned int		version;			// 4
-	int					unknown8;			// 8
-	short				unknownC;			// C Seems related to vertex index size
-	short				unknownE;			// E
-	float				boundingBox[6];		//10
-	unsigned int		ofsBones;			//28
-	int					numBones;			//2C
-	unsigned int		ofsBoneIndexTT;		//30
-	int					sizeBoneIndexTT;	//34
-	unsigned int		ofsVertexGroups;	//38
-	int					numVertexGroups;	//3C
-	unsigned int		ofsBatches;			//40
-	int					numBatches;			//44
-	unsigned int		ofsLods;			//48
-	int					numLods;			//4C
-	unsigned int		ofsHitboxes;		//50
-	int					numHitboxes;		//54
-	unsigned int		ofsBoneMap;			//58
-	int					sizeBoneMap;		//5C
-	unsigned int		ofsBoneSets;		//60
-	int					numBoneSets;		//64
-	unsigned int		ofsMaterials;		//68
-	int					numMaterials;		//6C
-	unsigned int		ofsMeshes;			//70
-	int					numMeshes;			//74
-	unsigned int		ofsMeshMaterial;	//78
-	int					numMeshMaterial;	//7C
-	unsigned int		ofsUnknownF;		//80
-	int					numUnknownG;		//84
-} WMBHeader, WMBHdr;
-
-// Size of struct 0x58 (88) bytes
-typedef struct WMBBone
-{
-	short	m_sId;				//0x00
-	short	m_sParentIndex;		//0x02 | parent id
-	Vector3	m_vLocalPosition;	//0x04
-	Vector3	m_vLocalRotation;	//0x10
-	Vector3	m_vLocalScale;		//0x1C
-	Vector3	m_vPosition;		//0x28
-	Vector3	m_vRotation;		//0x34
-	Vector3	m_vScale;			//0x40
-	Vector3	m_vTPosition;		//0x4C
-} WMBBone;
 
 // Size of struct 0xB0 (176) bytes
 typedef struct CBone
@@ -247,11 +358,6 @@ typedef struct CBone
 } Bone;
 VALIDATE_SIZE(CBone, 0xB0);
 
-struct CBoneSets
-{
-	short* m_pSets;
-	int m_nSets;
-};
 
 struct CHitbox
 {
@@ -282,13 +388,16 @@ struct CMeshPart
 	float m_flUnknown6C;				//0x006C
 };
 
-struct CVertexGroup
+struct CVertexGroupEx
 {
-	struct CVertexBuffer* m_pVertexBuffer;	//0x00
-	struct CVertexBuffer* m_pVertexBuffer2;	//0x08
-	struct CIndexBuffer* m_pIndexBuffer;	//0x10
+	void* m_pVertexData;	//0x00
+	void* m_pVertexData2;	//0x08
+	BYTE gap10[40];			//0x10
+	void* m_pIndexData;		//0x38
+	UINT m_uVertexSize;		//0x40
+	UINT m_nIndices;		//0x44
+	UINT m_uIndiceSize;		//0x48
 };
-VALIDATE_SIZE(CVertexGroup, 24);
 
 struct CBatch
 {
@@ -333,8 +442,8 @@ struct CModelData
 		WMBHdr* m_pHdr;						//0x0000
 	};
 	short* m_pBoneIndexTranslationTable;	//0x0008
-	Vector3Aligned m_vMax;					//0x0010
-	Vector3Aligned m_vMin;					//0x0020
+	Vector3Aligned m_vMin;					//0x0010
+	Vector3Aligned m_vMax;					//0x0020
 	int m_iReferenceCount;					//0x0030
 	int m_iUnk;								//0x0034
 	CModelDrawData* m_pDrawData;			//0x0038
@@ -445,38 +554,6 @@ struct CModelDataManager
 	CModelDataList m_ModelDataList;
 };
 
-/*
-Size of struct 0xA8 (168) bytes
-*/
-struct CModelMatrixTable
-{
-	void* m_pVtbl;					//0x0000
-	char pad08[8];					//0x0008
-	CSamplerState* m_pSampler;		//0x0010
-	CBoneSets* m_pSets;				//0x0018
-	int m_nMatrixCount;				//0x001C
-	char pad20[12];					//0x0020
-	int m_nBoneSets;
-	CConstantBufferContext m_ConstBufferCtx;
-	char pad30[12];
-	CModelMatrix* m_pMatrices;
-	CModelMatrix* m_pMatrices2;
-	INT m_nMatrices;
-	INT m_nMatrices2;
-};
-
-/*
-Size of struct 0x38 (56) bytes
-*/
-struct CModelInstanceParam
-{
-	void* m_pVtbl;				//0x00
-	DWORD m_dw0x08;				//0x08
-	char padC[0x1C];			//0x0C
-	CConstantBuffer* m_pBuffer;	//0x28
-	DWORD m_dw0x30;				//0x30
-};
-
 struct CModelInfo
 {
 	Vector4 m_vTint;			//0x0000
@@ -490,8 +567,8 @@ struct CModelInfo
 struct CModelLOD
 {
 	int int0;
-	DWORD dword4;
-	DWORD dword8;
+	UINT m_uModelIndex;
+	UINT m_uShadowModelIndex;
 	DWORD dwordC;
 	DWORD dword10;
 	DWORD dword14;
@@ -557,16 +634,13 @@ class CModel : public CParts
 {
 public:
 
-	virtual void function0();
-	virtual void function1(void);
-	virtual void function2(void);
+	virtual void function0(void) = 0;
+	virtual void UpdateModelPhysics(Vector4* v1, Vector4* v2, Vector4* v3) = 0;
+	virtual void function2(void) = 0;
 
 	Matrix4x4 m_matB0;						//0x00B0 | set to indentity matrix on construction
 	Matrix4x4 m_matF0;						//0x00F0 | set to indentity matrix on construction
 	CModelExtendWork m_ExtendWork;			//0x0140
-	char _0x0168[336];						//0x0168
-	BYTE m_bWetness;						//0x02B8
-	char _0x02B9[215];						//0x02B9
 	CModelWork m_Work;						//0x0390
 	QWORD m_qw0x538;						//0x0538
 	CModelInfo* m_pModelInfo;				//0x0540
@@ -575,13 +649,18 @@ public:
 	void* m_p0x00558;						//0x0558
 	CBone* m_pBones;						//0x0560
 	int m_nBones;							//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
-	char _0x056C[20];						//0x056C
+	void* m_p0x00570;						//0x0570
+	float m_fl00578;						//0x0578
+	float m_fl0057C;						//0x057C
 	DWORD dwFinal;							//0x0580
 	char _0x0584[28];						//0x0584
 };
 VALIDATE_OFFSET(CModel, m_matTransform, 0x10);
 VALIDATE_OFFSET(CModel, m_ExtendWork, 0x140);
+VALIDATE_OFFSET(CModel, m_Work, 0x390);
 VALIDATE_OFFSET(CModel, m_pModelInfo, 0x540);
 VALIDATE_OFFSET(CModel, m_nBones, 0x568);
 VALIDATE_OFFSET(CModel, dwFinal, 0x580);
 VALIDATE_SIZE(CModel, 0x5A0);
+
+#endif // !__CMODEL_H__

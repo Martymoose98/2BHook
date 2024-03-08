@@ -21,13 +21,12 @@ public:
 	typedef int PassiveSkill;
 
 	virtual void function150() = 0;
-	virtual void function151() = 0;
+	virtual void CalculateDamage(int a2, __int64 a3, float a4, int a5) = 0;
 	virtual void function152() = 0;
 	virtual void function153() = 0;
 	virtual void function154() = 0;
 	virtual void function155() = 0;
 	virtual void function156() = 0;
-
 
 	EntityHandle m_hUnk;					//0x00C50
 	char _0x0C58[8];						//0x00C58
@@ -35,6 +34,7 @@ public:
 	//EntityHandle m_hUnk;					//0x00C80
 	char _0x0C90[0x82C];					//0x00C90
 	//EntityHandle m_hUnk;					//0x00DA0
+	//float m_flTickBase;						//0x01470
 	int m_iLevel;							//0x014BC
 	BOOL m_bLevelUp;						//0x014C0 | pretty sure
 	char _0x14C4[44];						//0x014C4
@@ -54,7 +54,9 @@ public:
 	char _0x1066C[420];						//0x1066C
 	EntityHandle m_hPod;					//0x10810
 	EntityHandle m_hUnk2;					//0x10814
-	char _0x10818[9896];					//0x10818
+	char _0x10818[844];						//0x10818
+	BOOL m_bUnkCamera;						//0x10B64 | Camera boolean
+	char _0x10B68[9048];					//0x10B68
 	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
 	char _0x130E0[10880];					//0x130E0
 	BOOL m_bFlightSuit;						//0x15B50
@@ -94,7 +96,6 @@ public:
 typedef Pl0000 Entity2B;
 VALIDATE_OFFSET(Pl0000, m_vPosition, 0x50);
 VALIDATE_OFFSET(Pl0000, m_ExtendWork, 0x140);
-VALIDATE_OFFSET(Pl0000, m_bWetness, 0x2B8);
 VALIDATE_OFFSET(Pl0000, m_Work, 0x390);
 VALIDATE_OFFSET(Pl0000, m_pModelInfo, 0x540);
 VALIDATE_OFFSET(Pl0000, m_ObjectId, 0x5B8);
@@ -109,6 +110,7 @@ VALIDATE_OFFSET(Pl0000, m_pCObjHitVtable, 0x14F0);
 VALIDATE_OFFSET(Pl0000, m_LevelsContainer, 0x2078);
 VALIDATE_OFFSET(Pl0000, m_VerticalCollision, 0x1790);
 VALIDATE_OFFSET(Pl0000, m_HorizontalCollision, 0x18C0);
+VALIDATE_OFFSET(Pl0000, m_bUnkCamera, 0x10B64);
 VALIDATE_OFFSET(Pl0000, m_pObjects, 0x12EC0);
 VALIDATE_OFFSET(Pl0000, m_hFlightSuit, 0x15B64);
 VALIDATE_OFFSET(Pl0000, m_hBuddy, 0x1647C);

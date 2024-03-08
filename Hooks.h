@@ -101,6 +101,8 @@ extern "C" void hkUpdateModelParts(Pl0000 * pEntity); //proabably not a pl0000 m
 extern "C" void* hkCreateEntityThunk(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
 extern "C" void* hkCreateEntity(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
+void hkPl0000Destructor(Pl0000* pThis);
+void hkPl0000Update(Pl0000* pThis);
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis);
 void* hkCCameraGameMove(CCameraGame* pThis);
 CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShader* pShader, DWORD* a3, CHeapInfo* a4);

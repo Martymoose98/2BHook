@@ -143,22 +143,40 @@ namespace Features
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
+	// NOTE: rainbow hair is not compatible with this feature
 	static void Firstperson(CBehavior* pEntity)
 	{
-		if (pEntity && Vars.Misc.bFirstperson && !Vars.Misc.bFirstpersonOld)
+		if (pEntity &&
+			(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			!(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
-			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
-			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
-			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
+			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
+			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
+			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
 
-			if (iFace != -1 && iMask != -1 && iHair != -1)
+			if (pFaceNorm)
 			{
-				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 0.0f;
-				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+				pFaceNorm->m_vColor.w = 0.0f;
+				pFaceNorm->m_bUpdate = TRUE;
+			}
+
+			if (pFaceSerious)
+			{
+				pFaceSerious->m_vColor.w = 0.0f;
+				pFaceSerious->m_bUpdate = TRUE;
+			}
+
+			if (pMask)
+			{
+				pMask->m_vColor.w = 0.0f;
+				pMask->m_bUpdate = TRUE;
+			}
+
+			if (pHair)
+			{			
+				pHair->m_vColor.w = 0.0f;
+				pHair->m_bUpdate = TRUE;
 			}
 		}
 	}
@@ -168,20 +186,37 @@ namespace Features
 	// also camera should rotate with bone
 	static void Thirdperson(CBehavior* pEntity)
 	{
-		if (pEntity && !Vars.Misc.bFirstperson && Vars.Misc.bFirstpersonOld)
+		if (pEntity && 
+			!(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
-			int iFace = GetModelMeshIndex(&pEntity->m_Work, "facial_normal");
-			int iMask = GetModelMeshIndex(&pEntity->m_Work, "Eyemask");
-			int iHair = GetModelMeshIndex(&pEntity->m_Work, "Hair");
+			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
+			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
+			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
+			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
 
-			if (iFace != -1 && iMask != -1 && iHair != -1)
+			if (pFaceNorm)
 			{
-				pEntity->m_Work.m_pMeshes[iFace].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iFace].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iMask].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iMask].m_bUpdate = TRUE;
-				pEntity->m_Work.m_pMeshes[iHair].m_vColor.w = 1.0f;
-				pEntity->m_Work.m_pMeshes[iHair].m_bUpdate = TRUE;
+				pFaceNorm->m_vColor.w = 1.0f;
+				pFaceNorm->m_bUpdate = TRUE;
+			}
+
+			if (pFaceSerious)
+			{
+				pFaceSerious->m_vColor.w = 0.0f;
+				pFaceSerious->m_bUpdate = TRUE;
+			}
+
+			if (pMask)
+			{
+				pMask->m_vColor.w = 1.0f;
+				pMask->m_bUpdate = TRUE;
+			}
+
+			if (pHair)
+			{
+				pHair->m_vColor.w = 1.0f;
+				pHair->m_bUpdate = TRUE;
 			}
 		}
 	}
@@ -241,10 +276,16 @@ namespace Features
 			g_pLocalPlayer->m_hBuddy = 0;
 	}
 
-	static void Airstuck()
+	// xref Pl0000.setBedStandup 48 83 EC 38 48 8B 01 45 33 C9 C7 44 24 20 00 00 00 00 41 8D 51 6D
+	static void AirstuckEx(CBehavior* pEntity)
 	{
-		if (g_pLocalPlayer)
-			(*(__int64(*)(void*))(0x1401F08A0))(g_pLocalPlayer); // TODO: fix or scrap
+		if (pEntity)
+			pEntity->Animate(109, 2, 0, 0); // CBehavior:: vindex: 18 / old denuvo 0x1401F08A0
+	}
+
+	static void Airstuck(void)
+	{
+		AirstuckEx(g_pLocalPlayer);
 	}
 
 	static void TeleportEntityToOther(EntityHandle hTeleporter, EntityHandle hTeleportee)
@@ -453,11 +494,11 @@ namespace Features
 	//doesn't work tbh
 	static void ModelSwap(Pl0000* pEntA, Pl0000* pEntB)
 	{
-		CModel tmp;
+		//CModel tmp;
 
-		memcpy(&tmp, pEntB, sizeof(CModel));
-		tmp.m_vPosition = pEntA->m_vPosition;
-		memcpy(pEntA, &tmp, sizeof(CModel));
+		//memcpy(&tmp, pEntB, sizeof(CModel));
+		//tmp.m_vPosition = pEntA->m_vPosition;
+		//memcpy(pEntA, &tmp, sizeof(CModel));
 	}
 
 	static void MoveSun()
@@ -478,6 +519,9 @@ namespace Features
 		c.m_iGenerateMode = 1;
 		c.m_pSetInfo = pSetInfo;
 
+		if (pSetInfo)
+			c.m_iGenerateMode = pSetInfo->m_i0x088;
+		
 		return SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &c);
 	}
 

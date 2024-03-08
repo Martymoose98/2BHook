@@ -3,19 +3,28 @@
 CMenu* g_pMenu;
 
 CMenu::CMenu(const CAdapter* pAdapter)
-	: m_bOpened(false), m_pConfig(new CConfig())
+	: m_bOpened(false), m_bIgnoreInputWhenOpened(true), m_pConfig(new CConfig())
 {
-	ApplyStyle();
-
 	COutput* pOutput = &pAdapter->m_pOutputs[g_pGraphicDevice->m_iOutput];
 
 	ImTextStrToUtf8(m_szAdapterUtf8, sizeof(m_szAdapterUtf8), (const ImWchar*)pAdapter->m_szDescription, NULL);
 	ImTextStrToUtf8(m_szOutputUtf8, sizeof(m_szOutputUtf8), (const ImWchar*)pOutput->m_szDeviceName, NULL);
 
 	m_pConfig->AddKeybind(new KeybindToggleable("kb_open_menu", DIK_INSERT, &m_bOpened));
+	m_pConfig->m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", m_bIgnoreInputWhenOpened));
+	m_pConfig->m_items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_fg", m_Primary));
+	m_pConfig->m_items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_bg", m_PrimaryBg));
 
 	m_pConfig->CreateConfig(NULL);
 	m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
+
+	// Set selected config to head.
+	Config.iSelectedConfig = 0;
+
+	// filename copy.
+	_tcscpy_s(Config.szName, Config.pHead->m_Data.cFileName);
+
+	ApplyStyle(m_Primary, m_PrimaryBg);
 }
 
 CMenu::~CMenu(void)
@@ -216,6 +225,7 @@ bool CMenu::IsOpen(void) const
 	return m_bOpened;
 }
 
+// 40 53 48 83 EC 20 48 8B 91 80 72 - pl0000::SetStateMosaic
 void CMenu::GameplayTab(Pl0000* pCameraEnt)
 {
 	ImGui::Checkbox("Godmode", &Vars.Gameplay.bGodmode);
@@ -223,6 +233,8 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 	ImGui::Checkbox("No Fall Damage", &Vars.Gameplay.bNoWorldDamage);
 	ImGui::SameLine();
 	ImGui::Checkbox("No Enemy Damage", &Vars.Gameplay.bNoEnemyDamage);
+	ImGui::SliderFloat("Tick Base", &pCameraEnt->m_pInfo->m_pUnknown->m_flTickBase, 0.0f, 32.0f);
+
 
 	ImGui::Columns(2);
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
@@ -250,7 +262,7 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 	ImGui::NextColumn();
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
 
-	ImGui::InputInt((Vars.Gameplay.bLevelBuffMode) ? "Enemy Level (1-99):" : "Enemy Level Tolerance (+/-):", 
+	ImGui::InputInt((Vars.Gameplay.bLevelBuffMode) ? "Enemy Level (1-99):" : "Enemy Level Tolerance (+/-):",
 		(Vars.Gameplay.bLevelBuffMode) ? &Vars.Gameplay.iEnemyLevel : &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
 
 	ImGui::Checkbox("Balance Enemy Levels", &Vars.Gameplay.bBalanceEnemyLevels);
@@ -326,7 +338,7 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 			{
 			case OBJECTID_2B:
 				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				SetSceneEntity("buddy_2B", pInfo);
+				SetSceneEntity("buddy_2B", pInfo); // FIXME: !!!
 				SetSceneEntity("buddy", pInfo);
 				break;
 			case OBJECTID_A2:
@@ -450,10 +462,12 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 
 	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
 
-	ImGui::SameLine();
+	ImGui::Separator();
 
 	ImGui::Checkbox("Display Collision Object Info", &Vars.Visuals.bCollisionObjectInfo);
+	ImGui::Checkbox("Display Collision Object Info 2", &Vars.Visuals.bCollisionObjectInfo2);
 	ImGui::Checkbox("Display Collision Debug Object Info", &Vars.Visuals.bCollisionDebugObjectInfo);
+
 
 	ImGui::Separator();
 
@@ -560,8 +574,9 @@ void CMenu::MiscTab(void)
 	}
 
 	// new test shit
-	ImGui::InputInt("Debug Flags", (int*)((ULONG_PTR)GetModuleHandle(NULL) + 0x1029844), 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
-	ImGui::InputInt("Camera Flags", (int*)((ULONG_PTR)GetModuleHandle(NULL) + 0x1029840), 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Camera Flags", (int*)g_pCameraFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Game Flags", (int*)g_pGameFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 }
 
 void CMenu::ConfigTab(void)
@@ -572,7 +587,7 @@ void CMenu::ConfigTab(void)
 
 	for (auto& it : m_pConfig->GetKeybinds())
 	{
-		KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
+		const KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
 
 		if (pKey)
 		{
@@ -589,10 +604,10 @@ void CMenu::ConfigTab(void)
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	ImGui::ColorPicker4("ThemePrimary", (float*)&m_Primary.Value, ImGuiColorEditFlags_PickerHueWheel);
+	ImGui::ColorPicker4("ThemePrimary", (float*)&m_Primary.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
 	ImGui::SameLine();
-	ImGui::ColorPicker4("ThemePrimaryBg", (float*)&m_PrimaryBg.Value, ImGuiColorEditFlags_PickerHueWheel);
-	
+	ImGui::ColorPicker4("ThemePrimaryBg", (float*)&m_PrimaryBg.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
+
 	ImGui::PopItemWidth();
 
 	if (ImGui::Button("Apply Theme"))
@@ -614,59 +629,15 @@ void CMenu::ConfigTab(void)
 	}
 
 	if (ImGui::Button("Load"))
-		m_pConfig->Load(szConfig);
+		LoadConfig(szConfig);
 
 	ImGui::SameLine();
 
 	if (ImGui::Button("Save"))
-		m_pConfig->Save(szConfig);
+		SaveConfig(szConfig);
 }
 
-struct ImColorScheme : public ImColor
-{
-	//constexpr ImColorScheme(ImColor& Color, float flAlpha)
-	//{
-	//	this->Value = Color.Value;
-	//	this->Value.w = flAlpha;
-	//}
-
-	// Slightly Skewed for alpha blending
-	static void Analogous(ImColor& Color, ImColor& Secondary, ImColor& Tertiary, float flVariance)
-	{
-		WORD H, L, S;
-		
-		//WORD Alpha = 0xFF;
-		WORD Alpha = (WORD)((1.0f - sinf(M_PI_F * flVariance)) * 255.f);
-
-		ColorRGBToHLS(Color, &H, &L, &S);
-		Secondary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 255, flVariance), L, S);
-		Tertiary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 0, -flVariance), L, S);
-	}
-
-	static ImColor AlphaModulate(ImColor& Color, float flAlpha)
-	{
-		ImColor ColorOut = Color;
-
-		ColorOut.Value.w *= flAlpha;
-
-		return ColorOut;
-	}
-
-	static ImColor Secondary(ImColor& Color)
-	{
-		float h = 0.0f, s = 0.0f, v = 0.0f;
-		float r = 0.0f, g = 0.0f, b = 0.0f;
-		
-		
-		ImGui::ColorConvertRGBtoHSV(Color.Value.x, Color.Value.y, Color.Value.z, h, s, v);
-		ImGui::ColorConvertHSVtoRGB(h, s, v * 0.60f, r, g, b);
-
-		return ImColor(r, g, b, Color.Value.w * (1.0f - v));
-	}
-
-	//static constexpr ImColor ()
-};
-
+// https://www.htmlcsscolor.com/hex/B3C4D8
 ImGuiStyle* CMenu::ApplyStyle(ImColor& Primary, ImColor& PrimaryBg)
 {
 	ImGuiStyle* pStyle = &ImGui::GetStyle(); // IM_NEW(ImGuiStyle)();
@@ -675,7 +646,7 @@ ImGuiStyle* CMenu::ApplyStyle(ImColor& Primary, ImColor& PrimaryBg)
 	pStyle->ChildRounding = 3.0f;
 
 	ImVec4* colors = pStyle->Colors;
-	
+
 	// Greeen
 	//ImColor Primary = ImColor(7, 74, 25, 255);		// ImColor(0.26f, 0.59f, 0.98f);
 	//ImColor PrimaryBg = ImColor(7, 17, 74, 255);	// ImColor(0.16f, 0.29f, 0.48f);
@@ -749,6 +720,19 @@ ImGuiStyle* CMenu::ApplyStyle(ImColor& Primary, ImColor& PrimaryBg)
 	return pStyle;
 }
 
+void CMenu::LoadConfig(LPCTSTR szConfig)
+{
+	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Loading config. (%s)", szConfig);
+	m_pConfig->Load(szConfig);
+	ApplyStyle(m_Primary, m_PrimaryBg);
+}
+
+void CMenu::SaveConfig(LPCTSTR szConfig)
+{
+	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving config. (%s)", szConfig);
+	m_pConfig->Save(szConfig);
+}
+
 void ApplyPodMods(Pl0000* pOwner)
 {
 	if (!pOwner)
@@ -786,6 +770,8 @@ void ApplyPodMods(Pl0000* pOwner)
 
 void ApplyModelMods(Pl0000* pEntity)
 {
+	char szModelPart[64];
+
 	if (!pEntity)
 		return;
 
@@ -794,7 +780,13 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::SameLine();
 
-	ImGui::Checkbox("Firstperson", &Vars.Misc.bFirstperson);
+	ImGui::CheckboxFlagsT("Firstperson", &Vars.Misc.bCameraFlags,
+		(uint32_t)Variables::Misc_t::CameraFlg::CAMERA_FIRSTPERSON);
+
+	ImGui::SameLine();
+
+	ImGui::CheckboxFlagsT("Freecamera", &Vars.Misc.bCameraFlags,
+		(uint32_t)Variables::Misc_t::CameraFlg::CAMERA_FREE);
 
 	ImGui::SameLine();
 
@@ -822,20 +814,22 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::Checkbox("Rainbow Hair", &Vars.Gameplay.bRainbowHair);
 
-	if (Vars.Gameplay.iSelectedModelMesh > pEntity->m_Work.m_nMeshes)
-		Vars.Gameplay.iSelectedModelMesh = pEntity->m_Work.m_nMeshes;
+	//Vars.Gameplay.iSelectedModelMesh &= (pEntity->m_Work.m_nMeshes - 1);
 
 	CMeshPart* pSelectedMesh = &pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
 
-	char szModelPart[64];
-	sprintf_s(szModelPart, "Mesh: %s", pSelectedMesh->m_szMeshName);
-	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1);
+	if (pSelectedMesh)
+	{
+		sprintf_s(szModelPart, "Mesh: %s", pSelectedMesh->m_szMeshName);
+		ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1);
 
-	sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
+		sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
+	}
 
-	if (ImGui::Checkbox("Enabled", (bool*)&pSelectedMesh->m_bShow))
-		pSelectedMesh->m_bUpdate = TRUE;
 
+	ImGui::Checkbox("Enabled", &Vars.Gameplay.bSelectedMeshEnable);
+
+#if defined(_DEBUG)
 	ImGui::InputText("Custom Texture (DDS)", Vars.Gameplay.szModelTextureName, MAX_PATH);
 	ImGui::SameLine();
 
@@ -861,29 +855,19 @@ void ApplyModelMods(Pl0000* pEntity)
 			}
 		}
 	}
+#endif
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	if (!strcmp(pSelectedMesh->m_szMeshName, "Hair"))
-	{
-		if (!Vars.Gameplay.bRainbowHair)
-		{
-			ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
-			pSelectedMesh->m_bUpdate = TRUE;
-			pSelectedMesh->m_bShow = TRUE;
-		}
-	}
-	else
-	{
-		ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
-		pSelectedMesh->m_bUpdate = TRUE;
-		pSelectedMesh->m_bShow = TRUE;
-	}
+	ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
+	pSelectedMesh->m_bUpdate = TRUE;
 
 	ImGui::SameLine();
 
 	if (!Vars.Gameplay.bRainbowModel)
-		ImGui::ColorPicker4("Model Tint Color", (float*)&pEntity->m_pModelInfo->m_vTint);
+	{
+		ImGui::ColorPicker4("Model Tint Color", (float*)&Vars.Gameplay.vModelTint);
+	}
 
 	ImGui::PopItemWidth();
 

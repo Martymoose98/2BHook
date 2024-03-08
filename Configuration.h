@@ -512,6 +512,35 @@ public:
 	unsigned int& m_value;
 };
 
+class ConfigItemColor : public IConfigItem
+{
+public:
+	ConfigItemColor(const char* szCategory, const char* szName, ImColor& value)
+		: m_value(value)
+	{
+		m_szCategory = szCategory;
+		m_szName = szName;
+	}
+
+	virtual void Read(const char* szFilename)
+	{
+		char szBuffer[33];
+
+		GetPrivateProfileString(m_szCategory, m_szName, "0", szBuffer, sizeof(szBuffer), szFilename);
+		m_value = strtoul(szBuffer, NULL, 16);
+	}
+
+	virtual void Write(const char* szFilename)
+	{
+		char szBuffer[33];
+
+		sprintf_s(szBuffer, "%08x", (unsigned int)m_value);
+		WritePrivateProfileString(m_szCategory, m_szName, szBuffer, szFilename);
+	}
+
+	ImColor& m_value;
+};
+
 class ConfigItemFloat : public IConfigItem
 {
 public:
@@ -800,7 +829,7 @@ private:
 //TODO("implement shifted keys as a second code or bool")
 struct KeyOrdinal { const char* m_szName; USHORT m_uKeyCode; };
 
-static KeyOrdinal s_Keycodes[] =
+static const KeyOrdinal s_Keycodes[] =
 {
 	{ "ESCAPE", DIK_ESCAPE },
 	{ "1", DIK_1 },
@@ -916,7 +945,7 @@ static KeyOrdinal s_Keycodes[] =
 	{ "DELETE", DIK_DELETE }
 };
 
-KeyOrdinal* FindKeyOrdinal(USHORT uKeycode);
+const KeyOrdinal* FindKeyOrdinal(USHORT uKeycode);
 
 typedef struct _WIN32_FIND_DATA_LISTA
 {

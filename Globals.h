@@ -187,6 +187,7 @@ extern CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
 extern CSceneEntitySystem_CreateEntityFn SceneEntitySystem_CreateEntity;
 extern CSceneStateSystem_SetFn SceneStateSystem_Set;
 extern CCameraGame_SetLookAtFn CameraGame_SetLookAt;
+extern CCameraGame_SetLookAtFn CameraGame_SetLookAtNoDistance;
 extern ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
@@ -214,6 +215,10 @@ extern XInputCancelGuideButtonWaitFn XInputCancelGuideButtonWait;
 extern XInputPowerOffControllerFn XInputPowerOffController;
 extern XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 extern XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
+
+extern unsigned int* g_pDebugFlags;
+extern unsigned int* g_pCameraFlags;
+extern unsigned int* g_pGameFlags;
 
 extern int* g_piMoney;
 extern int* g_piExperience;
