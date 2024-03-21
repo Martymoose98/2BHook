@@ -198,6 +198,8 @@ typedef struct Variables_t
 		{ "Grun", "Em4000Core", 0x31700 },
 		{ "Eve", "em5000", 0x42000 },
 		{ "Missle", "missile", 0x35000 },
+		{ "Missle1", "missile", 0x35001 },
+		{ "Missle2", "missile", 0x30810 },
 		{ "Flight Suit", "flightUnit", 0x10010 },
 		{ "Director", "et0009", 0x40009 },
 		{ "Corpse1", "Corpse", 0x21080 },
@@ -213,7 +215,7 @@ typedef struct Variables_t
 		{ "Door6", "BehaviorDoor", 0xF5503 },
 		{ "Door7", "BehaviorDoor", 0xF1600 },
 		{ "Door8", "BehaviorDoor", 0xF1610 },
-		{ "Terminal", "BehaviorTransporter", 0xC1002 }
+		{ "Terminal", "BehaviorTransporter", 0xC1002 },
 		//{ "Protagonist", "Player", 0x10000 }
 		//0xA2180 c, 0x21060 c, 0x20030,  0x40006, 0xF2014, 0x20030, 0x30610, 0x30240, 0x30450, 0x30050, 0x30260, 0x30261, 0x30240, 0x30070, 0x30071, 0x30080, 0x30610, 0x30450, 0x30240, 0x30050, 0x31000, 0x40006, 0x40002,  0x31000
 		//{ "Director2", "Et0024", 0x40012 }, CRASHES
@@ -222,42 +224,6 @@ typedef struct Variables_t
 		//{ "Enemy2", "Em2101", 0xA21C1 }, CRASHES
 		//{ "Kago", "kago", 0xF0431 }, CRASHES
 		//{ "Baketsu", "baketsu", 0xF0113 } CRASHES
-	};
-
-	constexpr static const char* EntityTypeList[] =
-	{
-		"2B",
-		"A2",
-		"9S",
-		"Emil",
-		"Moose",
-		"White Moose",
-		"Boar",
-		"White Boar",
-		"Grun",
-		"Eve",
-		"Missle",
-		"Flight Suit (Dummy)",
-		"Director",
-		"Corpse1 (Invisible)",
-		"Corpse2 (Invisible)",
-		"Enemy Drop",
-		"Enemy Drop 2",
-		"MapInst",
-		"Door",
-		"Door2",
-		"Door3",
-		"Door4",
-		"Door5",
-		"Door6",
-		"Door7",
-		"Door8",
-		"Terminal"
-		//"BG", CRASHES
-		//"Enemy1",CRASHES
-		//"Enemy2", CRASHES
-		//"Kago", CRASHES
-		//"Baketsu" CRASHES
 	};
 
 	constexpr static const char* AnimationListBoxList[58] =

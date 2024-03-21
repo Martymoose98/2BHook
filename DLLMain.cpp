@@ -168,7 +168,7 @@ HRESULT CreateRenderTarget(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to get swapchain description");
+		LERROR("Failed to get swapchain description");
 		return hr;
 	}
 
@@ -185,7 +185,7 @@ HRESULT CreateRenderTarget(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to get backbuffer from swapchain");
+		LERROR("Failed to get backbuffer from swapchain");
 		return hr;
 	}
 
@@ -196,7 +196,7 @@ HRESULT CreateRenderTarget(void)
 		if (SUCCEEDED(hr))
 			g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 		else
-			ERROR("Failed to CreateRenderTargetView for backbuffer");
+			LERROR("Failed to CreateRenderTargetView for backbuffer");
 
 		pBackBuffer->Release();
 	}
@@ -228,7 +228,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateDepthStencilState for enabled state");
+		LERROR("Failed to CreateDepthStencilState for enabled state");
 		return hr;
 	}
 
@@ -238,7 +238,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateDepthStencilState for disabled state");
+		LERROR("Failed to CreateDepthStencilState for disabled state");
 		return hr;
 	}
 
@@ -251,7 +251,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateDepthStencilState for noreadnowrite state");
+		LERROR("Failed to CreateDepthStencilState for noreadnowrite state");
 		return hr;
 	}
 
@@ -275,7 +275,7 @@ HRESULT CreateStencilDescription(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateDepthStencilState for readnowrite state");
+		LERROR("Failed to CreateDepthStencilState for readnowrite state");
 		return hr;
 	}
 
@@ -297,7 +297,7 @@ HRESULT CreateRasterizerStates(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateRasterizerState for wireframe");
+		LERROR("Failed to CreateRasterizerState for wireframe");
 		return hr;
 	}
 
@@ -312,7 +312,7 @@ HRESULT CreateRasterizerStates(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateRasterizerState for solid");
+		LERROR("Failed to CreateRasterizerState for solid");
 		return hr;
 	}
 	return hr;
@@ -325,7 +325,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
+		LERROR("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -333,7 +333,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
+		LERROR("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -343,13 +343,13 @@ HRESULT InitD3D11(void)
 
 	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext) || !ImGui_ImplWin32_Init(g_hWnd))
 	{
-		ERROR("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
+		LERROR("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
 		return S_FALSE;
 	}
 
 	if (!ImGui_ImplDX11_CreateDeviceObjects())
 	{
-		ERROR("2B Hook Failed Initalization!\nCould not create device objects!\n");
+		LERROR("2B Hook Failed Initalization!\nCould not create device objects!\n");
 		return S_FALSE;
 	}
 
@@ -383,7 +383,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateSamplerState");
+		LERROR("Failed to CreateSamplerState");
 		return hr;
 	}
 
@@ -402,7 +402,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateTexture2D for green texture");
+		LERROR("Failed to CreateTexture2D for green texture");
 		return hr;
 	}
 
@@ -420,7 +420,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateTexture2D for red texture");
+		LERROR("Failed to CreateTexture2D for red texture");
 		return hr;
 	}
 
@@ -436,7 +436,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		ERROR("Failed to CreateShaderResourceView for green texture");
+		LERROR("Failed to CreateShaderResourceView for green texture");
 		return hr;
 	}
 
@@ -451,7 +451,7 @@ HRESULT InitD3D11(void)
 	g_pTexRed->Release();
 
 	if (FAILED(hr)) {
-		ERROR("Failed to CreateShaderResourceView for red texture");
+		LERROR("Failed to CreateShaderResourceView for red texture");
 		return hr;
 	}
 
@@ -601,7 +601,8 @@ void FindDenuvoSteamOffsets(void)
 	ExCollision_GetOBBMax = (ExCollision_GetOBBMaxFn)FindPattern(NULL, "48 8B C4 48 89 68 18 56");
 
 	QueryHeap = (QueryHeapFn)FindPattern(NULL, "48 83 EC 28 4C 8B D9 C7 41");
-	GetWork = (GetWorkFn)FindPattern(NULL, "40 57 48 83 EC 20 8B F9");
+	CreateWork = 0; // find low proirity!
+	FindObjectWork = (CObjReadSystem_FindObjectWorkFn)FindPattern(NULL, "40 57 48 83 EC 20 8B F9");
 	PreloadFile = (PreloadFileFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8D 5F 01", 1);
 	RequestEnd = (ObjReadSystem_RequestEndFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 8D 46 FF", 1);
 	PreloadModel = (ObjReadSystem_PreloadModelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 33 FF 45 33 C0", 1);
@@ -666,6 +667,9 @@ void FindSteamOffsets(void)
 
 	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10", 1);
 	GetConstructionInfo = (GetConstructorFn)FindPattern(NULL, "33 D2 48 8D 05 ? ? ? ? 44 8B C2");
+	CreateWork = (CreateWorkFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 8B F9 E8 ? ? ? ? 48 8B D8 48 85 C0 0F");
+	FindObjectWork = (CObjReadSystem_FindObjectWorkFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 8B F9 48 8B 0D");
+
 	GetEntityInfoFromHandle = (GetEntityInfoFromHandleFn)FindPattern(NULL, "8B 11 85 D2 74 ?? 8B C2"); // gets CEntityInfo for everything
 	GetEntityFromHandle = (GetEntityFromHandleFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 85 C0 75 5C", 1); // for enemies
 	GetEntityFromHandle2 = (GetEntityFromHandleFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B EE 48 85 C0", 1); // for localplayer, cam entity etc...
@@ -808,7 +812,7 @@ void Setup(void)
 
 	if (!oWndProc)
 	{
-		ERROR("2B Hook Failed Initialization!\nCould not get old wndproc function pointer!\n");
+		LERROR("2B Hook Failed Initialization!\nCould not get old wndproc function pointer!\n");
 		return;
 	}
 

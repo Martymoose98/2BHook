@@ -185,6 +185,7 @@
     <ClInclude Include="ReversedStructsUnpacked.h" />
     <ClInclude Include="SDK\CCamera.h" />
     <ClInclude Include="SDK\Common.h" />
+    <ClInclude Include="SDK\CSaveDataDevice.h" />
     <ClInclude Include="SDK\Entity\CBehavior.h" />
     <ClInclude Include="SDK\Entity\CModel.h" />
     <ClInclude Include="SDK\Entity\CObj.h" />

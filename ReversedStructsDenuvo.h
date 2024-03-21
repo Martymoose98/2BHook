@@ -172,7 +172,7 @@ class BannedWordChecker
 public:
 	struct BannedWordBinaryHeader
 	{
-		DWORD dwWordCount;
+		DWORD uWordCount;
 	};
 
 	struct WordEntry
@@ -186,7 +186,7 @@ public:
 	void* m_pBuffer;
 	QWORD m_qwBufferSize;
 	WordEntry* m_pEntries;
-	DWORD m_dwWordCount;
+	DWORD m_uWordCount;
 };
 
 struct Sound
@@ -198,9 +198,9 @@ struct Sound
 
 struct ItemHashEntry
 {
-	int groupID;
-	int idx;
-	DWORD crc;
+	int GroupID;
+	int Idx;
+	DWORD Crc32;
 };
 
 struct SoundEmitter
@@ -568,10 +568,10 @@ Address = 14160DF88
 */
 struct CEntityList
 {
-	DWORD m_dwItems;								//0x0000
-	DWORD m_dwSize;									//0x0004
-	DWORD m_dwBase;									//0x0008
-	DWORD m_dwShift;								//0x000C
+	DWORD m_uItems;								//0x0000
+	DWORD m_uSize;									//0x0004
+	DWORD m_uBase;									//0x0008
+	DWORD m_uShift;								//0x000C
 	std::pair<EntityHandle, CEntityInfo*>* m_pItems;//0x0010
 	CReadWriteLock m_Lock;							//0x0018
 };
@@ -598,7 +598,7 @@ struct CCollisionDataObjectManager
 	CCollisionDataObject** m_ppData; // [6] maybe?
 };
 
-struct CModelShader;
+class CModelShader;
 
 struct MaterialShaderInfo
 {
@@ -762,12 +762,12 @@ typedef struct WTBHeader
 		unsigned int	magic;
 	};
 	int					unknown;
-	int					numTex;
+	int					uTexCount;
 	unsigned int		ofsTexOfs;
 	unsigned int		ofsTexSizes;
 	unsigned int		ofsTexFlags;
-	unsigned int		texIdxOffset;
-	unsigned int		texInfoOffset;
+	unsigned int		uTexIdxOffset;
+	unsigned int		uTexInfoOffset;
 } WTBHeader, WTBHdr, WTAHeader, WTAHdr;
 
 enum TextureFlags
@@ -1121,8 +1121,9 @@ struct CModelEntryData; //forward def maybe temp
 /*
 Size of struct 0x90 (144) bytes
 */
-struct CModelShaderModule
+class CModelShaderModule
 {
+public:
 	//virtual __int64 function0(char flags) PURE;
 	//virtual void Update(CModelShader* pShader, CModelExtendWork* pWork, char flags) PURE; // flags & 2 DONT_UPDATE 1 = idk
 	//virtual __int64 ApplyExternalForces() PURE;
@@ -1177,8 +1178,9 @@ struct CTextureResourceManager
 /*
 Size of struct 0x318 (792) bytes
 */
-struct CModelShader
+class CModelShader
 {
+public:
 	CMaterial* m_pMaterial;
 	CModelShaderModule* m_pShader;
 	CTextureResource m_Resources[MAX_MATERIAL_TEXTURES];
@@ -1187,8 +1189,9 @@ struct CModelShader
 };
 VALIDATE_SIZE(CModelShader, 0x318);
 
-struct CModelAnalyzer
+class CModelAnalyzer
 {
+public:
 	virtual void function0(char a2);
 	virtual void LOD_sub_143F4B620(__int64 a2);
 	virtual int FindTextureIndexByName(const char*);
@@ -1198,8 +1201,9 @@ struct CModelAnalyzer
 };
 
 // Size of struct 0x140 (320) bytes
-struct CModelData
+class CModelData
 {
+public:
 	union {
 		byte* m_pWMB;						//0x0000
 		WMBHdr* m_pHdr;						//0x0000
@@ -1244,7 +1248,7 @@ struct CModelData
 	BYTE gapF0[4];							//0x00F0
 	DWORD m_dwIndex;						//0x00F4
 	BYTE gapF8[48];
-	struct CModelData* m_pNext;
+	CModelData* m_pNext;
 	char pad9[8];
 };
 VALIDATE_OFFSET(CModelData, m_pBones, 0x50);
@@ -1252,8 +1256,9 @@ VALIDATE_OFFSET(CModelData, m_pLODS, 0xA0);
 VALIDATE_OFFSET(CModelData, m_pMeshes, 0xB8);
 VALIDATE_SIZE(CModelData, 0x140);
 
-struct CModelDataList
+class CModelDataList
 {
+public:
 	CModelData* m_pModelData;
 	QWORD m_ptr;
 	int m_iIndex;
@@ -1270,7 +1275,7 @@ struct CCameraDevice
 	char p[32];
 };
 
-struct CModelWork;
+class CModelWork;
 
 //size of struct is 0x110 (272) bytes
 struct CModelManager
@@ -1377,7 +1382,7 @@ struct CModelInstanceParam
 };
 
 // size of struct 0x1A8 (424) bytes
-struct CModelWork
+class CModelWork
 {
 	CModelManager* m_pModelManager;			//0x0000
 	CModelData* m_pModelData;				//0x0008
@@ -2491,7 +2496,7 @@ struct CGraphicCommandList
 	CGraphicCommand* m_pCommand;
 	struct CGraphicCommandList* m_pPrevious;
 	struct CGraphicCommandList* m_pNext;
-	DWORD m_dwFlags;
+	DWORD m_uFlags;
 	INT m_iCommandIndex;
 	CHAR pad28[8];
 };
@@ -2843,8 +2848,8 @@ public:
 
 struct CSaveSlot
 {
-	DWORD dwAccountId;
-	BOOL bInUse;
+	DWORD m_uAccountId;
+	BOOL m_bInUse;
 };
 
 /*
@@ -2855,9 +2860,9 @@ struct CSaveDataDevice
 	void* m_pVtable;				//0x0000
 	DWORD dwUnk0x08;				//0x0008
 	char _0x000C[4];				//0x000C
-	CSaveSlot* pSaveSlots;			//0x0010
-	int nMaxSlot;					//0x0018
-	DWORD dwError;					//0x001C
+	CSaveSlot* m_pSaveSlots;			//0x0010
+	int m_nMaxSlot;					//0x0018
+	DWORD m_dwError;					//0x001C
 	QWORD qw0x0020;					//0x0020
 	int i0x0028;					//0x0028
 	char _0x002C[4];				//0x002C
@@ -2866,17 +2871,17 @@ struct CSaveDataDevice
 		QWORD qwFlags;				//0x0030
 		struct
 		{
-			DWORD dwFlags;			//0x0030
-			DWORD dwStatus;			//0x0034
+			DWORD m_fFlags;			//0x0030
+			DWORD m_Status;			//0x0034
 		};
 	};
-	int nSlot;						//0x0038
+	int m_nSlot;						//0x0038
 	char unk0x003C[4];				//0x003C | Aligment maybe
-	HANDLE hFile;					//0x0040
-	OVERLAPPED overlapped;			//0x0048
-	DWORD nBytesToIO;				//0x0068 | maybe nBytesToIO and nBytesIO are a struct
-	DWORD nBytesIO;					//0x006C
-	void* pSlotDataBuffer;			//0x0070
+	HANDLE m_hFile;					//0x0040
+	OVERLAPPED m_Overlapped;			//0x0048
+	DWORD m_uBytesToIO;				//0x0068 | maybe nBytesToIO and nBytesIO are a struct
+	DWORD m_uBytesIO;					//0x006C
+	void* m_pSlotDataBuffer;			//0x0070
 	QWORD qwSlotDataBufferSize;		//0x0078
 	void* pGameDataBuffer;			//0x0080
 	QWORD qwGameDataBufferSize;		//0x0088
@@ -2906,18 +2911,18 @@ struct CpkMountInfo
 
 struct CpkLoader
 {
-	DWORD dwCpkCount;											//0x00
+	DWORD m_uCpkCount;											//0x00
 	char alignment[4];											//0x04
 	void(*LoadCpks)(unsigned int index, const char* szCpkName); //0x08
 	void(*UnloadCpks)(unsigned int index);						//0x10
 	QWORD qw0x18;												//0x18
-	DWORD dwMaxCpkCount;
+	DWORD m_uMaxCpkCount;
 	QWORD qwMaxCpkCount;
 };
 
 struct CpkLoad_t
 {
-	signed int status;
+	signed int m_Status;
 	BYTE gap4[4];
 	QWORD ptr8;
 	void* gap10;
@@ -3000,7 +3005,7 @@ struct CpkEntry
 	DWORD dw2;
 	CpkBinderHandle* m_pBinderHandle;
 	DWORD m_binderid;
-	DWORD m_status;
+	DWORD m_Status;
 	int m_iLoadOrder;
 	DWORD dw7;
 };
@@ -3010,7 +3015,7 @@ struct CHeapInstance;
 template<typename T>
 struct CConstructionInfo
 {
-	int m_iObjectId;						//0x0000
+	int m_uObjectId;						//0x0000
 	char alignment[4];						//0x0004
 	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0008 
 	QWORD m_GroupId;						//0x0010

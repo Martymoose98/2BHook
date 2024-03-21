@@ -16,9 +16,9 @@ struct CHeapInfo; // temp move to actual file
 
 struct CConstantBufferContext
 {
-	int m_iConstantBufferGroup;
-	int m_iSize;					//0x04 idk not sure  set to 40 in COtManager::DrawModel
-	int m_iConstantBufferIndex;
+	int32_t m_iConstantBufferGroup;
+	int32_t m_iSize;					//0x04 idk not sure  set to 40 in COtManager::DrawModel
+	int32_t m_iConstantBufferIndex;
 	BYTE gapC[8];
 };
 
@@ -32,14 +32,14 @@ class CConstantBuffer
 public:
 	void* m_vtbl;
 	BYTE gap8[8];
-	volatile signed __int32 volatile10;
+	volatile int32_t volatile10;
 	BYTE gap14[20];
 	void* m_pResources;
 	SIZE_T m_size;	//aligned to 16 bytes
 	SIZE_T m_size2; //aligned to 16 bytes
 	__int64 m_aligned_size;
 	BYTE gap48[16];
-	signed int m_index;
+	int32_t m_index;
 	BYTE gap5C[12];
 	ID3D11Buffer** m_ppBuffer;
 };
@@ -114,9 +114,9 @@ Size of struct is 0xB0 (176)
 struct CTexture
 {
 	void* m_vtbl;					//0x00
-	int m_iWidth;					//0x08
-	int m_iHeight;					//0x0C
-	int m_Depth;					//0x10
+	int32_t m_iWidth;				//0x08
+	int32_t m_iHeight;				//0x0C
+	int32_t m_Depth;				//0x10
 	BYTE gap14[8];					//0x14
 	BOOL m_bForceSRGB;				//0x1C
 	UINT m_uMipMapCount;			//0x20
@@ -142,7 +142,7 @@ struct CTextureResource
 	void* m_punk;	//cTexture::vtble
 	CTexture* m_pTexture;
 	char pad10[8];
-	unsigned int m_TextureId;
+	uint32_t m_TextureId;
 	char pad1C[4];
 };
 
@@ -433,8 +433,8 @@ struct CSurface
 struct CDepthSurface
 {
 	void* vtbl;
-	int m_iWidth;
-	int m_iHeight;
+	int32_t m_iWidth;
+	int32_t m_iHeight;
 	char unk[56];
 	struct CSurface* m_pSurface;
 };
@@ -443,8 +443,8 @@ struct CDepthSurface
 struct CRenderTarget
 {
 	void* vtbl;
-	int m_iWidth;	// could be uint
-	int m_iHeight;
+	int32_t m_iWidth;	// could be uint
+	int32_t m_iHeight;
 	char pad[80];
 	CTexture* m_pTexture;
 	//const Hw::cRenderTargetImpl::`vftable'{for `Hw::cGraphicObjectBase' }
@@ -478,8 +478,8 @@ VALIDATE_OFFSET(CGraphicRenderContext, m_TextureContainer, 0x1B0);
 
 struct CSwapChainInfo
 {
-	unsigned int m_uWidth;
-	unsigned int m_uHeight;
+	uint32_t m_uWidth;
+	uint32_t m_uHeight;
 	float m_flRefreshRate;
 	BOOL m_b0;
 	BOOL m_bFullscreen;
@@ -524,7 +524,7 @@ struct COutput
 	BYTE gap0[64];
 	IDXGIOutput* m_pOutput;
 	DXGI_MODE_DESC* m_pDisplayModes;
-	int m_nDisplayModes;
+	int32_t m_nDisplayModes;
 	BYTE gap94[4];
 	QWORD qword98;
 	DWORD dwordA0;
@@ -560,15 +560,15 @@ class CDisplay
 public:
 	void* m_pVtble;							//0x0000
 	DWORD dwUnk0x0008;						//0x0008
-	int m_iWidth;							//0x000C
-	int m_iHeight;							//0x0010
+	int32_t m_iWidth;						//0x000C
+	int32_t m_iHeight;						//0x0010
 	DWORD dwUnk0x0014;						//0x0014
 	void* m_pConstantBuffer[2];				//0x0018
 	char _0x0030[64];						//0x0028
 	CSwapChain* m_pWindowedSwapChain;		//0x0068
 	char _0x0070[8];						//0x0070
 	CSwapChain* m_pSwapChain;				//0x0078
-	int m_iUnk;								//0x0080
+	int32_t m_iUnk;							//0x0080
 	char _0x006C[4];						//0x0084
 	CGraphicDeviceDx11* m_pGraphicDevice;   //0x0088
 };
@@ -639,12 +639,12 @@ public:
 
 	struct TextureContext
 	{
-		int m_iGroup;
-		int m_iIndex; //valid range 0 - 31 (clamped)
+		int32_t m_iGroup;
+		int32_t m_iIndex; //valid range 0 - 31 (clamped)
 	};
 
 	virtual void function0() PURE;
-	virtual unsigned int GetUINT0x4(__int64 a2) PURE; // func = return *(uint*)(a2+4);
+	virtual uint32_t GetUINT0x4(__int64 a2) PURE; // func = return *(uint*)(a2+4);
 	virtual BOOL SetRenderTarget(CDisplay* pDisplay, CDepthSurface* pSurface) PURE;
 	virtual BOOL function3() PURE; // returns 1
 	virtual BOOL MapResource3ReadOnly(__int64 pResource) PURE;
@@ -656,19 +656,19 @@ public:
 	virtual BOOL UnmapResource(__int64 pResource) PURE;
 	virtual BOOL Clear(Clear_t* pClearArgs) PURE;
 	virtual BOOL function12() PURE; // returns 1
-	virtual BOOL SetScissorRect(int x, int y, int width, int height) PURE;
-	virtual BOOL SetViewport(int x, int y, int width, int height, float min_depth, float max_depth) PURE;
+	virtual BOOL SetScissorRect(int32_t x, int32_t y, int32_t width, int32_t height) PURE;
+	virtual BOOL SetViewport(int32_t x, int32_t y, int32_t width, int32_t height, float min_depth, float max_depth) PURE;
 	virtual BOOL function15() PURE; // returns 1
 	virtual BOOL function16() PURE;
 	virtual BOOL function17() PURE;
-	virtual BOOL Resolve(CRenderTarget* pTarget, unsigned int a3, RECT* pRect) PURE; // used when changing resolutions?
+	virtual BOOL Resolve(CRenderTarget* pTarget, uint32_t a3, RECT* pRect) PURE; // used when changing resolutions?
 	virtual BOOL CopyDepthSurface(CDepthSurface* pDst) PURE;
 	virtual BOOL function20() PURE; // returns 0
 	virtual BOOL SetInputLayout(CVertexLayout* pVertexLayout) PURE; //SetVertexLayout
-	virtual BOOL SetVertexBuffer(UINT index, CVertexBuffer* pVertexBuffer) PURE;
-	virtual BOOL InvalidateVertexBuffer(UINT index) PURE;
+	virtual BOOL SetVertexBuffer(uint32_t uIndex, CVertexBuffer* pVertexBuffer) PURE;
+	virtual BOOL InvalidateVertexBuffer(uint32_t uIndex) PURE;
 	virtual BOOL SetIndexBuffer(void* pIndexBuffer) PURE;
-	virtual BOOL InvalidateIndexBuffer() PURE;
+	virtual BOOL InvalidateIndexBuffer(void) PURE;
 	virtual BOOL SetVertexShader(VertexShaderContext* pCtx) PURE;
 	virtual BOOL SetPixelShader(PixelShaderContext* pCtx) PURE;
 	virtual BOOL SetConstantBuffer(CConstantBufferContext* pCtx, CConstantBuffer* pBuffer) PURE; //model params & matrices etc
@@ -677,8 +677,8 @@ public:
 	virtual BOOL function31() PURE;
 	virtual BOOL function32() PURE;
 	virtual BOOL function33() PURE;
-	virtual BOOL ClearUnorderedAccessViewUint(__int64 a2, const UINT a3) PURE;
-	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int iShaderResourceView) PURE;
+	virtual BOOL ClearUnorderedAccessViewUint(__int64 a2, const uint32_t a3) PURE;
+	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int32_t iShaderResourceView) PURE;
 	virtual BOOL UnsetTexture(CTexture* pTexture) PURE;
 	virtual BOOL SetSamplerState() PURE;
 	virtual BOOL SetBlendState(__int64 p) PURE;
@@ -693,10 +693,10 @@ public:
 	virtual BOOL DrawPrimitiveInstanced(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawIndexedPrimitiveInstanced(RenderInfo* pInfo) PURE;
 	virtual BOOL DrawPrimitiveInstancedIndirect(RenderInfo* pInfo) PURE;
-	virtual BOOL DrawIndexedPrimitiveInstancedIndirect(RenderInfo* pInfo, __int64 a3, unsigned int AlignedByteOffsetForArgs) PURE;
+	virtual BOOL DrawIndexedPrimitiveInstancedIndirect(RenderInfo* pInfo, __int64 a3, uint32_t uAlignedByteOffsetForArgs) PURE;
 	virtual void Flush(void) PURE;
-	virtual int GetRenderWidth(void) PURE;
-	virtual int GetRenderHeight(void) PURE;
+	virtual int32_t GetRenderWidth(void) PURE;
+	virtual int32_t GetRenderHeight(void) PURE;
 
 	//void* m_pVtbl;								//0x0000
 	ID3D11DeviceContext* m_pContext;				//0x0008
@@ -712,8 +712,8 @@ public:
 	CVertexBuffer* m_pVertexBuffer2;				//0x0090
 	CGraphicRenderContext m_RenderContext;			//0x0098
 	char pad368[512];								//0x0368
-	int m_iRenderWidth;								//0x0568
-	int m_iRenderHeight;							//0x056C
+	int32_t m_iRenderWidth;							//0x0568
+	int32_t m_iRenderHeight;						//0x056C
 	char pad570[8];									//0x0570
 	ID3D11Device* m_pDevice;						//0x0578
 };
@@ -753,12 +753,12 @@ public:
 	virtual BOOL function14();
 	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile); // index: 11 now according to ida
 	virtual BOOL CreateIndexBuffer(CVertexBuffer* pBuffer, __int64* a2);
-	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int* pcbVertexSizes, int index, int iElement);
-	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, unsigned int uByteWidth);
+	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int32_t* pcbVertexSizes, int32_t Index, int32_t iElement);
+	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, uint32_t uByteWidth);
 	virtual BOOL CreateIndexBuffer(CIndexBuffer* pBuffer, __int64* a2);
-	virtual BOOL CreateImmutableIndexBuffer(CIndexBuffer* pBuffer, const void* pData, int cbIndexSize, int nIndices);
-	virtual BOOL CreateDynamicIndexBuffer(CIndexBuffer* pBuffer, int iElements, int cbElementSize);
-	virtual BOOL CreateInputLayout(__int64 a2, const void* pDescriptions, unsigned int nDescs, VertexShaderContext* pCtx);
+	virtual BOOL CreateImmutableIndexBuffer(CIndexBuffer* pBuffer, const void* pData, int32_t cbIndexSize, int32_t nIndices);
+	virtual BOOL CreateDynamicIndexBuffer(CIndexBuffer* pBuffer, int32_t iElements, int32_t cbElementSize);
+	virtual BOOL CreateInputLayout(__int64 a2, const void* pDescriptions, uint32_t nDescs, VertexShaderContext* pCtx);
 	virtual BOOL CreateVertexShader(VertexShaderContext* pCtx, ShaderDescVS* pDesc);
 	virtual BOOL CreatePixelShader(PixelShaderContext* pCtx, ShaderDescPS* pDesc);
 	virtual BOOL CreateComputeShader(ComputeShaderContext* pCtx, ShaderDescCS* pDesc);
@@ -776,8 +776,8 @@ public:
 
 public:
 	//void* pVtable;						//0x0000
-	int m_iScreenWidth;						//0x0008 
-	int m_iScreenHeight;					//0x000C 
+	int32_t m_iScreenWidth;					//0x0008 
+	int32_t m_iScreenHeight;				//0x000C 
 	float flScreenHz;						//0x0010 / fps / 60hz capped
 	BOOL m_bFullscreen;						//0x0014 | UINT
 	BOOL m_bUnk0x018;						//0x0018
@@ -807,12 +807,12 @@ public:
 
 	BOOL m_bWindowed;						//0x0108 | UINT
 	float m_flFrameRate;					//0x00E4
-	int m_iWidth;							//0x0120
-	int m_iHeight;							//0x0124
+	int32_t m_iWidth;						//0x0120
+	int32_t m_iHeight;						//0x0124
 	D3D11_QUERY_DESC m_OccusionDesc;		//0x00F0
 	//D3D11_QUERY_DESC m_TimestampDesc;		//0x00F8
-	int m_iAdapter;							//0x0120
-	int m_iOutput;							//0x0124
+	int32_t m_iAdapter;						//0x0120
+	int32_t m_iOutput;						//0x0124
 	CAdapter* m_pAdapters;					//0x0128
 	UINT m_uAdapters;						//0x0130
 	BOOL m_b0x0134;							//0x0134
@@ -830,25 +830,25 @@ VALIDATE_SIZE(CGraphicDeviceDx11, 320);
 */
 struct CGraphicCreateContext
 {
-	int m_ScreenType;		//0x0000 | windowed, fullscreen, borderless ????
-	int m_Width;			//0x0004
-	int m_Height;			//0x0008
+	int32_t m_ScreenType;	//0x0000 | windowed, fullscreen, borderless ????
+	int32_t m_Width;		//0x0004
+	int32_t m_Height;		//0x0008
 	char pad0C[4];			//0x000C
 	CHeapInfo* m_pHeapInfo;	//0x0010
 	QWORD* m_Ptr18;			//0x0018
 	QWORD* m_Ptr20;			//0x0020
 	QWORD* m_Ptr28;			//0x0028
-	int m_Unk30;			//0x0030 | ida only says 3
+	int32_t m_Unk30;		//0x0030 | ida only says 3
 	BOOL m_bUnk34;			//0x0034
-	int m_UnkFlag38;		//0x0038
+	int32_t m_UnkFlag38;	//0x0038
 	char pad3C[4];			//0x003C
 	__int64 m_Unk40;		//0x0040
 	Vector4* m_pvUnk48;		//0x0048
-	int m_Unk50;			//0x0050
-	int m_Unk54[9];			//0x0054
+	int32_t m_Unk50;		//0x0050
+	int32_t m_Unk54[9];		//0x0054
 	bool m_bUnk;			//0x0078
 	char pad79[3];			//0x0079
-	int m_Unk7C[4];			//0x007C
+	int32_t m_Unk7C[4];		//0x007C
 };
 
 
@@ -874,7 +874,7 @@ public:
 	CHeapInfo* m_pHeapInfo;					//0x02C0 
 	CReadWriteLock m_Lock;					//0x02C8
 	char padCC[12];							//0x02F8
-	int m_iTimeStep;						//0x00DC |  g_flDeltaTime * 3000.0 
+	int32_t m_iTimeStep;					//0x00DC |  g_flDeltaTime * 3000.0 
 	char padE0[20];							//0x00E0
 };
 VALIDATE_OFFSET(CGraphics, m_pContext, 0x28);

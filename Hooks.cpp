@@ -891,6 +891,8 @@ void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId,
 	CConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
 	void* pEntity = NULL;
 
+	CObjReadSystem::Work* pWork = FindObjectWork(uObjectId);
+
 	// pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId, pHeapInfo); //0x1401A2B40 old denuvo
 	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->m_szName) == Vars.Gameplay.SpawnBlacklist.cend())
 		pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId);
@@ -1057,7 +1059,7 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 	if (!pSavedata)
 		return;
 
-	switch (pSavedata->dwFlags)
+	switch (pSavedata->m_fFlags)
 	{
 	case SAVE_FLAGS_READ_SLOTS:
 		ReadSaveSlots(pSavedata);
@@ -1065,7 +1067,7 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 	case SAVE_FLAGS_READ:
 		Vars.Misc.bLoading = true;
 		ReadSaveData(pSavedata);
-		Vars.Misc.nSlot = pSavedata->nSlot;
+		Vars.Misc.nSlot = pSavedata->m_nSlot;
 		return;
 	case SAVE_FLAGS_WRITE:
 		WriteSaveData(pSavedata);

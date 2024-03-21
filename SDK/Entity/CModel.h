@@ -58,10 +58,10 @@ public:
 	Vector3Aligned m_vPosition;		//0x0040
 	Matrix4x4 m_matModelToWorld;	//0x0050 | 1st row: ? 2nd row: scale(x,y,z) 3rd: none: 4th rotation(p,y,r)
 	void* m_pUnk0x0090;				//0x0090 | set to 0 on construction
-	short m_wFlags;					//0x0098 | set to 0 on construction
+	int16_t m_wFlags;				//0x0098 | set to 0 on construction
 	float m_flTickBase;				//0x009C |
 	void* m_pUnk0x00A0;				//0x00A0 | set to 0 on construction
-	short m_wUnk0x00A8;				//0x00A8 | set to -1 on construction
+	int16_t m_wUnk0x00A8;			//0x00A8 | set to -1 on construction
 };
 VALIDATE_OFFSET(CParts, m_flTickBase, 0x9C);
 VALIDATE_SIZE(CParts, 0xB0);
@@ -87,28 +87,28 @@ struct CShaderSetting
 
 struct CBoneSets
 {
-	short* m_pSets;
-	int m_nSets;
+	int16_t* m_pSets;
+	int32_t m_nSets;
 };
 
 struct CBatchInfo
 {
-	int m_iVertexGroupIndex;
-	int m_iMeshIndex;
-	int m_iMaterialIndex;
-	int m_iUnk;
-	int m_iMeshMaterialIndex;
-	int m_iUnk2;
+	int32_t m_iVertexGroupIndex;
+	int32_t m_iMeshIndex;
+	int32_t m_iMaterialIndex;
+	int32_t m_iUnk;
+	int32_t m_iMeshMaterialIndex;
+	int32_t m_iUnk2;
 };
 
 struct CDrawGroupInfo
 {
 	DWORD dword0;
-	int m_iLODLevel;
+	int32_t m_iLODLevel;
 	DWORD m_uBatchStart;
 	BYTE gapC[4];
 	CBatchInfo* m_pBatchInfos;
-	unsigned int m_nBatchInfos;
+	uint32_t m_nBatchInfos;
 };
 
 /*
@@ -125,7 +125,7 @@ struct CModelInstanceParam
 
 struct __declspec(align(8)) CConstantBufferInfo
 {
-	INT m_iStartIndex;				//0x00
+	int32_t m_iStartIndex;				//0x00
 	DWORD m_iCount;
 	DWORD m_nInstances;
 	DWORD dwordC;
@@ -151,15 +151,15 @@ struct CModelMatrixTable
 	char pad08[8];					//0x0008
 	CSamplerState* m_pSampler;		//0x0010
 	CBoneSets* m_pSets;				//0x0018
-	int m_nMatrixCount;				//0x001C
+	int32_t m_nMatrixCount;			//0x001C
 	char pad20[12];					//0x0020
-	int m_nBoneSets;
+	int32_t m_nBoneSets;
 	CConstantBufferContext m_ConstBufferCtx;
 	char pad30[12];
 	CModelMatrix* m_pMatrices;
 	CModelMatrix* m_pMatrices2;
-	INT m_nMatrices;
-	INT m_nMatrices2;
+	int32_t m_nMatrices;
+	int32_t m_nMatrices2;
 };
 
 class CModelExtendWork : public CModelExtendWorkBase
@@ -168,7 +168,7 @@ public:
 
 	float flUnk;				//0x0008
 	DWORD _0x0010;				//0x000C
-	unsigned int m_ObjectId;	//0x0010
+	uint32_t m_ObjectId;		//0x0010
 	char _0x0014[12];			//0x0014
 	CModel* m_pParent;			//0x0020 | maybe? might need CObj or CBehavior
 	DWORD m_dw28;
@@ -259,10 +259,11 @@ struct CModelEntryData
 };
 VALIDATE_OFFSET(CModelEntryData, m_pParams, 0x28);
 
-struct CModelEntry
+class CModelEntry
 {
+public:
 	CModelEntryData* m_pData;
-	struct CModelEntry* m_pNext;
+	CModelEntry* m_pNext;
 };
 
 class CModelShaderModuleBase
@@ -282,26 +283,26 @@ class CModelShaderModule : public CModelShaderModuleBase
 {
 public:
 
-	//void* m_pVtbl;					//0x0000
-	CShaderSetting* m_pSetting;			//0x0008
-	QWORD qword10;						//0x0010
-	CConstantBuffer* m_pConstantBuffer;	//0x0018
-	int m_nConstantBuffers;				//0x0020
-	char _0x0024[4];					//0x0024
-	CSamplerParam* m_pSamplerParameters;//0x0028
-	int m_nSamplerParameters;			//0x0030
-	char _0x0034[4];					//0x0034
-	CConstantBuffer* qword38;			//0x0038 | CConstantBuffer*
-	DWORD dword40;						//0x0040
-	char _0x0044[4];					//0x0044
-	CConstantBuffer* qword48;			//0x0048 | CConstantBuffer*
-	int m_nQword48;						//0x0050
-	DWORD dword54;						//0x0054
-	QWORD qword58;						//0x0058
-	Vector4 oword60;					//0x0060
-	Vector4 oword70;					//0x0070
-	int int80;							//0x0080
-	float m_flWetness;					//0x0084
+	//void* m_pVtbl;						//0x0000
+	CShaderSetting* m_pSetting;				//0x0008
+	QWORD qword10;							//0x0010
+	CConstantBuffer* m_pConstantBuffer;		//0x0018
+	int32_t m_nConstantBuffers;				//0x0020
+	char _0x0024[4];						//0x0024
+	CSamplerParam* m_pSamplerParameters;	//0x0028
+	int32_t m_nSamplerParameters;			//0x0030
+	char _0x0034[4];						//0x0034
+	CConstantBuffer* qword38;				//0x0038 | CConstantBuffer*
+	DWORD dword40;							//0x0040
+	char _0x0044[4];						//0x0044
+	CConstantBuffer* qword48;				//0x0048 | CConstantBuffer*
+	int32_t m_nQword48;						//0x0050
+	DWORD dword54;							//0x0054
+	QWORD qword58;							//0x0058
+	Vector4 oword60;						//0x0060
+	Vector4 oword70;						//0x0070
+	int32_t int80;							//0x0080
+	float m_flWetness;						//0x0084
 	char pad[4];
 };
 VALIDATE_OFFSET(CModelShaderModule, m_pSetting, 0x8);
@@ -311,21 +312,23 @@ VALIDATE_SIZE(CModelShaderModule, 0x90);
 /*
 Size of struct 0x318 (792) bytes
 */
-struct CModelShader
+class CModelShader
 {
+public:
 	CMaterial* m_pMaterial;
 	CModelShaderModule* m_pShader;
 	CTextureResource m_Resources[MAX_MATERIAL_TEXTURES];
 	char pad210[0x104];
-	int m_fFlags;	// should be 3?
+	int32_t m_fFlags;	// should be 3?
 };
 VALIDATE_SIZE(CModelShader, 0x318);
 
-struct CModelAnalyzer
+class CModelAnalyzer
 {
+public:
 	virtual void function0(char a2);
 	virtual void LOD_sub_143F4B620(__int64 a2);
-	virtual int FindTextureIndexByName(const char* szName);
+	virtual int32_t FindTextureIndexByName(const char* szName);
 	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, __int64 pModelWorkExtend, __int64 ppHeaps);
 	virtual void function4();
 	virtual void function5();
@@ -333,7 +336,8 @@ struct CModelAnalyzer
 
 struct MaterialShaderInfo
 {
-	int m_iShader;
+
+	int32_t m_iShader;
 	CModelShader* m_pShader;
 };
 
@@ -350,10 +354,10 @@ typedef struct CBone
 	Vector3Aligned	m_vUnk;				//0x70 | maybe min, max?
 	Vector3Aligned	m_vScaledRotation;	//0x80 | definetly some rotation vector (pitch, yaw, roll)
 	CBone* m_pUnk;						//0x90
-	int m_iFlags;						//0x98 | bones in head and feathers are m_iFlags > 512 (0x200) { 0x208 (origin bone), 0x220 }
+	int32_t m_iFlags;					//0x98 | bones in head and feathers are m_iFlags > 512 (0x200) { 0x208 (origin bone), 0x220 }
 	char _0x8C[4];						//0x9C
 	CBone* m_pParent;					//0xA0
-	short m_Id;							//0xA8
+	int16_t m_Id;						//0xA8
 	char _0x9A[6];						//0xAA
 } Bone;
 VALIDATE_SIZE(CBone, 0xB0);
@@ -363,8 +367,8 @@ struct CHitbox
 {
 	Vector3Aligned m_vMax;
 	Vector3Aligned m_vMin;
-	int m_iBone1;
-	int m_iBone2;
+	int32_t m_iBone1;
+	int32_t m_iBone2;
 };
 
 /*
@@ -380,9 +384,9 @@ struct CMeshPart
 	Vector3Aligned m_vMin;				//0x0030
 	const char* m_szMeshName;			//0x0040 
 	MaterialShaderInfo* m_pShaderInfo;	//0x0048 | important pointer 
-	int m_nShaderInfo;					//0x0050
+	int32_t m_nShaderInfo;				//0x0050
 	WMBBone* m_pBones;					//0x0058
-	int m_nBones;						//0x0060
+	int32_t m_nBones;					//0x0060
 	BOOL m_bShow;						//0x0064 | ? need to be synced with the other modifing threads
 	BOOL m_bUpdate;						//0x0068 | ? fucks with color vec
 	float m_flUnknown6C;				//0x006C
@@ -390,34 +394,34 @@ struct CMeshPart
 
 struct CVertexGroupEx
 {
-	void* m_pVertexData;	//0x00
-	void* m_pVertexData2;	//0x08
-	BYTE gap10[40];			//0x10
-	void* m_pIndexData;		//0x38
-	UINT m_uVertexSize;		//0x40
-	UINT m_nIndices;		//0x44
-	UINT m_uIndiceSize;		//0x48
+	void* m_pVertexData;		//0x00
+	void* m_pVertexData2;		//0x08
+	BYTE gap10[40];				//0x10
+	void* m_pIndexData;			//0x38
+	uint32_t m_uVertexSize;		//0x40
+	uint32_t m_nIndices;		//0x44
+	uint32_t m_uIndiceSize;		//0x48
 };
 
 struct CBatch
 {
-	int m_iVertexGroupIndex;
-	int m_iBoneSetIndex;
-	int m_iVertexStart;
-	int m_iIndexStart;
-	int m_nVertices;
-	int m_nIndices;
-	int m_nPrimitives;
+	int32_t m_iVertexGroupIndex;
+	int32_t m_iBoneSetIndex;
+	int32_t m_iVertexStart;
+	int32_t m_iIndexStart;
+	int32_t m_nVertices;
+	int32_t m_nIndices;
+	int32_t m_nPrimitives;
 };
 VALIDATE_SIZE(CBatch, 28);
 
 struct CModelDrawData
 {
 	CVertexGroup* m_pVertexGroups;	//0x0000
-	int m_nVertexGroups;			//0x0008
+	int32_t m_nVertexGroups;		//0x0008
 	CBatch* m_pBatches;				//0x0010
-	int m_nBatches;					//0x0018
-	int m_nPrimitiveVertices;		//0x001C
+	int32_t m_nBatches;				//0x0018
+	int32_t m_nPrimitiveVertices;	//0x001C
 };
 VALIDATE_SIZE(CModelDrawData, 32);
 
@@ -427,16 +431,17 @@ struct CMesh
 	Vector3Aligned m_vMin;		//0x10
 	const char* m_szName;		//0x20
 	WMBMaterial* m_pMaterials;	//0x28
-	int m_nMaterials;			//0x30
+	int32_t m_nMaterials;		//0x30
 	WMBBone* m_pBones;			//0x38
-	int m_nBones;				//0x40
-	int m_iLodLevel;			//0x44
+	int32_t m_nBones;			//0x40
+	int32_t m_iLodLevel;		//0x44
 };
 VALIDATE_SIZE(CMesh, 0x50);
 
 // Size of struct 0x140 (320) bytes
-struct CModelData
+class CModelData
 {
+public:
 	union {
 		byte* m_pWMB;						//0x0000
 		WMBHdr* m_pHdr;						//0x0000
@@ -444,44 +449,44 @@ struct CModelData
 	short* m_pBoneIndexTranslationTable;	//0x0008
 	Vector3Aligned m_vMin;					//0x0010
 	Vector3Aligned m_vMax;					//0x0020
-	int m_iReferenceCount;					//0x0030
-	int m_iUnk;								//0x0034
+	int32_t m_iReferenceCount;				//0x0030
+	int32_t m_iUnk;							//0x0034
 	CModelDrawData* m_pDrawData;			//0x0038
-	int* m_piVertexExFlags;					//0x0040 
-	int m_nVertexGroups;					//0x0048
+	int32_t* m_piVertexExFlags;				//0x0040 
+	int32_t m_nVertexGroups;				//0x0048
 	char pad4C[4];							//0x004C
 	CBone* m_pBones;						//0x0050
 	void* m_pBoneMaps;						//0x0058
-	int m_nBones;							//0x0060
+	int32_t m_nBones;						//0x0060
 	BOOL m_bVisible;						//0x0064
 	short* m_pBoneIndexTranslationTable2;	//0x0068
 	CHitbox* m_pHitboxes;					//0x0070
-	int m_nHitboxes;						//0x0078
+	int32_t m_nHitboxes;					//0x0078
 	char pad78[4];							//0x007C
 	void* m_pBoneMap;						//0x0080
-	int m_nBoneMapEntries;					//0x0088
+	int32_t m_nBoneMapEntries;				//0x0088
 	char pad8C[4];							//0x008C
 	short** m_pBoneSets;					//0x0090
-	int m_nBoneSets;						//0x0098
+	int32_t m_nBoneSets;					//0x0098
 	char pad9C[4];							//0x009C
 	void* m_pLODS;							//0x00A0
-	int m_nLODS;							//0x00A8
+	int32_t m_nLODS;						//0x00A8
 	char padAC[12];							//0x00AC
 	CMesh* m_pMeshes;						//0x00B8
-	int m_nMeshes;							//0x00C0
+	int32_t m_nMeshes;						//0x00C0
 	char padC4[4];							//0x00C4
 	CMaterial* m_pMaterials;				//0x00C8
-	int m_nMaterials;						//0x00CC
+	int32_t m_nMaterials;					//0x00CC
 	char padCC[4];							//0x00D0
 	void* m_pUnks2;							//0x00D4
-	int m_nUnks2;							//0x00DC
-	int padE0;								//0x00E0
+	int32_t m_nUnks2;						//0x00DC
+	int32_t padE0;							//0x00E0
 	BYTE gapE4[8];							//0x00E4
 	DWORD m_WMB0xE;							//0x00EC
 	BYTE gapF0[4];							//0x00F0
 	DWORD m_dwIndex;						//0x00F4
 	BYTE gapF8[48];
-	struct CModelData* m_pNext;
+	CModelData* m_pNext;
 	char pad9[8];
 };
 VALIDATE_OFFSET(CModelData, m_pBones, 0x50);
@@ -493,8 +498,8 @@ struct CModelDataList
 {
 	CModelData* m_pModelData;
 	QWORD m_ptr;
-	int m_iIndex;
-	int m_iCapacity;
+	int32_t m_iIndex;
+	int32_t m_iCapacity;
 	QWORD qword18;
 	CModelData* m_pLast;
 	DWORD m_iSize;
@@ -525,7 +530,7 @@ struct CModelManager
 	CModelAnalyzer* m_pModelAnalyzer;	//0x48
 	CSamplerParam m_Param;				//0x50
 	CCameraDevice* m_pCameraDevices;	//0x60
-	INT m_nCameraDevices;				//0x68
+	int32_t m_nCameraDevices;			//0x68
 	BYTE gap6C[4];						//0x6C
 	QWORD qword70;						//0x70
 	DWORD m_nOfQword70;					//0x78
@@ -566,9 +571,9 @@ struct CModelInfo
 
 struct CModelLOD
 {
-	int int0;
-	UINT m_uModelIndex;
-	UINT m_uShadowModelIndex;
+	int32_t int0;
+	uint32_t m_uModelIndex;
+	uint32_t m_uShadowModelIndex;
 	DWORD dwordC;
 	DWORD dword10;
 	DWORD dword14;
@@ -578,44 +583,45 @@ struct CModelLOD
 
 
 // size of struct 0x1A8 (424) bytes
-struct CModelWork
+class CModelWork
 {
+public:
 	enum ERenderFlags
 	{
 		RF_NO_LOD = 0x20,
 		RF_DONT_RENDER = 0x20000000,
 	};
 
-	CModelManager* m_pModelManager;			//0x0000
-	CModelData* m_pModelData;				//0x0008
-	CMeshPart* m_pMeshes;					//0x0010
-	int m_nMeshes;							//0x0018
-	char pad1C[4];							//0x001C	
-	CModelShader* m_pModelShaders;			//0x0020 | model shaders +0x20
-	int m_nMaterialShaders;					//0x0028 | (also is number of shaders)
-	char pad2C[4];							//0x002C
-	void* m_p0x030;							//0x0030
-	int m_n0x038;							//0x0038
-	char _0x03C[12];						//0x003C
-	void* m_p0x048;							//0x0048
-	int m_n0x48;							//0x0050
-	char _0x054[92];						//0x0054
-	//void*									//0x0060
-	CModelLOD* m_pLODS;						//0x00A0
-	int m_nLODS;							//0x00A8
-	char _0x0AC[0x24];						//0x00AC
-	CModelMatrixTable** m_pMatrixTables;	//0x00E0
-	CModelInstanceParam** m_pInstanceParams;//0x00E8
-	int m_nModelParams;						//0x00F0
-	char _0x0F4[140];						//0x00F4
-	//CHitbox* m_pHitboxes;					//0x0110
-	//int m_nHitboxes;						//0x0118
-	CModelExtendWork* m_pModelExtend;		//0x0180
-	CModelExtendWork* m_pModelExtend2;		//0x0188
-	DWORD m_dwRenderFlags;					//0x0190
-	char _0x018C[4];						//0x018C
-	CModelWork* m_pPrevious;				//0x0198
-	CModelWork* m_pNext;					//0x01A0
+	CModelManager* m_pModelManager;				//0x0000
+	CModelData* m_pModelData;					//0x0008
+	CMeshPart* m_pMeshes;						//0x0010
+	int32_t m_nMeshes;							//0x0018
+	char pad1C[4];								//0x001C	
+	CModelShader* m_pModelShaders;				//0x0020 | model shaders +0x20
+	int32_t m_nMaterialShaders;					//0x0028 | (also is number of shaders)
+	char pad2C[4];								//0x002C
+	void* m_p0x030;								//0x0030
+	int32_t m_n0x038;							//0x0038
+	char _0x03C[12];							//0x003C
+	void* m_p0x048;								//0x0048
+	int32_t m_n0x48;							//0x0050
+	char _0x054[92];							//0x0054
+	//void*										//0x0060
+	CModelLOD* m_pLODS;							//0x00A0
+	int32_t m_nLODS;							//0x00A8
+	char _0x0AC[0x24];							//0x00AC
+	CModelMatrixTable** m_pMatrixTables;		//0x00E0
+	CModelInstanceParam** m_pInstanceParams;	//0x00E8
+	int32_t m_nModelParams;						//0x00F0
+	char _0x0F4[140];							//0x00F4
+	//CHitbox* m_pHitboxes;						//0x0110
+	//int32_t m_nHitboxes;						//0x0118
+	CModelExtendWork* m_pModelExtend;			//0x0180
+	CModelExtendWork* m_pModelExtend2;			//0x0188
+	DWORD m_dwRenderFlags;						//0x0190
+	char _0x018C[4];							//0x018C
+	CModelWork* m_pPrevious;					//0x0198
+	CModelWork* m_pNext;						//0x01A0
 };
 VALIDATE_SIZE(CModelWork, 0x1A8);
 VALIDATE_OFFSET(CModelWork, m_pModelShaders, 0x20);
@@ -648,7 +654,7 @@ public:
 	CModelData* m_pModelData;				//0x0550
 	void* m_p0x00558;						//0x0558
 	CBone* m_pBones;						//0x0560
-	int m_nBones;							//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
+	int32_t m_nBones;						//0x0568 | changes the amount of vertices to get updated each frame (can't be more than 198 for 2B)
 	void* m_p0x00570;						//0x0570
 	float m_fl00578;						//0x0578
 	float m_fl0057C;						//0x057C

@@ -47,10 +47,10 @@ public:
 	Vector4 m_vPosition;										//0x0020 | CollisionInfo starts here	
 	float m_boundingbox[6];										//0x0030
 	BYTE gap48[60];												//0x0048
-	DWORD dwCollisionType;										//0x0084
+	Type m_CollisionType;										//0x0084
 	DWORD dword88;												//0x0088
-	int m_iBoneId;
-	int m_iBoneId2;
+	int32_t m_iBoneId;
+	int32_t m_iBoneId2;
 	DWORD dword94;
 	DWORD dword98;
 	DWORD dword9C;
@@ -147,13 +147,13 @@ size = 28 bytes
 */
 struct Level_t
 {
-	int m_iMinimumExperience;		//0x0000 
-	int m_iHealth;					//0x0004 new max health 
-	int m_iBaseAttack;				//0x0008 idk about this one for sure
-	int m_iDefense;					//0x000C
-	int m_iLevel;					//0x0010 new level
-	int unk0x14;					//0x0014
-	int unk0x18;					//0x0018
+	int32_t m_iMinimumExperience;		//0x0000 
+	int32_t m_iHealth;					//0x0004 new max health 
+	int32_t m_iBaseAttack;				//0x0008 idk about this one for sure
+	int32_t m_iDefense;					//0x000C
+	int32_t m_iLevel;					//0x0010 new level
+	int32_t unk0x14;					//0x0014
+	int32_t unk0x18;					//0x0018
 };
 
 class ExExpInfo : public CBehaviorExtension
@@ -169,7 +169,7 @@ public:
 	QWORD unk0x10;			//0x0010
 	QWORD unk0x18;			//0x0018
 	Level_t m_levels[99];	//0x0020 ordered 1 - 99 (99 is max level)
-	int m_nLevels;			//0x0AF4
+	int32_t m_nLevels;		//0x0AF4
 };
 VALIDATE_SIZE(ExExpInfo, 0x0AF8);
 
@@ -237,7 +237,7 @@ public:
 	virtual void function2(void) = 0; // CModel stub function
 	virtual void* GetTypeInfo(void) = 0;
 	virtual float function4(void) = 0; // return 1.0f;
-	virtual void function5() = 0;
+	virtual void function5() = 0; // Awake
 	virtual void function6() = 0;
 	virtual void PreUpdate(void) = 0;
 	virtual void Update(void) = 0;
@@ -250,7 +250,7 @@ public:
 	virtual void function15(Matrix4x4* pModel) = 0;
 	virtual void function16() = 0;
 	virtual void function17() = 0;
-	virtual void Animate(unsigned int id, int mode, int a4, int a5) = 0;
+	virtual void Animate(uint32_t id, int32_t mode, int32_t a4, int32_t a5) = 0;
 	virtual void function19() = 0;
 	virtual void function20() = 0;
 	virtual void function21() = 0;
@@ -260,10 +260,10 @@ public:
 	virtual void function25() = 0;
 	virtual void function26() = 0;
 	virtual void function27() = 0;
-	virtual CEntityInfo* function28(__int64 a1, unsigned int uObjectId) = 0;
+	virtual CEntityInfo* function28(__int64 a1, uint32_t uObjectId) = 0;
 	virtual bool IsValid(void) = 0; //  return m_pInfo && (m_pInfo->m_Flags & 3) == 0 && this->GetMaxHealth() > 0;
-	virtual int GetMaxHealth(void) = 0; //index: 30
-	virtual int GetHealth(void) = 0;
+	virtual int32_t GetMaxHealth(void) = 0; //index: 30
+	virtual int32_t GetHealth(void) = 0;
 	virtual void function32() = 0;
 	virtual bool IsDead(void) = 0;
 	virtual void function34() = 0;
@@ -272,9 +272,9 @@ public:
 	virtual void CollisionOff(void) = 0;
 	virtual void CollisionOn(void) = 0;
 	virtual void function39() = 0; // nullsub_2
-	virtual __int64 EmitSound(const char* szName, CBehavior* pSourceEntity, __int64 boneId, __int64 flags, unsigned int a6) = 0;
-	virtual void function41(const char* szName, Matrix4x4* pModelMatrix, void* pUnk, int, int, int) = 0;
-	virtual void function42(const char* szName, int a2, SoundType Type) = 0; // EmitSound
+	virtual __int64 EmitSound(const char* szName, CBehavior* pSourceEntity, __int64 boneId, __int64 flags, uint32_t a6) = 0;
+	virtual void function41(const char* szName, Matrix4x4* pModelMatrix, void* pUnk, int32_t, int32_t, int32_t) = 0;
+	virtual void function42(const char* szName, int32_t a2, SoundType Type) = 0; // EmitSound
 	virtual void function43() = 0;
 	virtual void function44() = 0;
 	virtual void function45() = 0;
@@ -298,14 +298,14 @@ public:
 	virtual void function63() = 0;
 	virtual void function64() = 0;
 
-	int m_iAnimationId;						//0x00670
-	int m_iAnimationMode;					//0x00674
-	int m_iAnimationA4;						//0x00678
-	int m_iAnimationA5;						//0x0067C
+	int32_t m_iAnimationId;					//0x00670
+	int32_t m_iAnimationMode;				//0x00674
+	int32_t m_iAnimationA4;					//0x00678
+	int32_t m_iAnimationA5;					//0x0067C
 	char _0x0680[4];						//0x00680
-	int m_iGroupId[2];						//0x00684
+	int32_t m_iGroupId[2];					//0x00684
 	char _0x068C[12];						//0x0068C
-	int m_iUnknown69C;
+	int32_t m_iUnknown69C;
 	void* m_pUnknown6A0; // set to 0 (on creation)
 	void* m_pUnknown6A8; // points to pThis
 	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16> m_BehaviourExtensions; // 0x06B0
@@ -344,9 +344,9 @@ public:
 	virtual void function81() = 0;
 	virtual void function82() = 0;
 	virtual void function83() = 0;
-	virtual void Hurt(int iDamage, BOOL bKeepAlive) = 0;
-	virtual void Heal(int iHealAmount) = 0;
-	virtual int GetLevel() = 0;
+	virtual void Hurt(int32_t iDamage, BOOL bKeepAlive) = 0;
+	virtual void Heal(int32_t iHealAmount) = 0;
+	virtual int32_t GetLevel() = 0;
 	virtual bool IsValid() = 0;
 	virtual void function88() = 0;
 	virtual void function89() = 0;
@@ -364,7 +364,7 @@ public:
 	virtual void function101() = 0;
 	virtual void function102() = 0;
 	virtual void function103() = 0;
-	virtual void SetLevel(int iLevel) = 0;
+	virtual void SetLevel(int32_t iLevel) = 0;
 	virtual void function105() = 0;
 	virtual void function106() = 0;
 	virtual void function107() = 0;
@@ -412,16 +412,16 @@ public:
 	virtual void function149() = 0;
 
 	ExActionState m_ActionState;						//0x00830  ExActionState (BehaviorExtension)
-	int m_iHealth;										//0x00858
-	int m_iMaxHealth;									//0x0085C
+	int32_t m_iHealth;									//0x00858
+	int32_t m_iMaxHealth;								//0x0085C
 	char _0x0860[36];									//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
 	BYTE m_flags;										//0x00884 | 0x40 = no collision
 	char _0x0885[91];									//0x00885
 	ExWaypoint m_Waypoint;								//0x008E0 | ExWaypoint (BehaviorExtension)
-	int m_iOldAnimationId;								//0x00990
-	int m_iOldAnimationMode;							//0x00994
-	int m_iOldAnimationA4;								//0x00998
-	int m_iOldAnimationA5;								//0x0099C
+	int32_t m_iOldAnimationId;							//0x00990
+	int32_t m_iOldAnimationMode;						//0x00994
+	int32_t m_iOldAnimationA4;							//0x00998
+	int32_t m_iOldAnimationA5;							//0x0099C
 	char _0x09A0[8];									//0x009A0
 	StaticArray<TimeLimitedFlag, 4> m_LimitedTimeFlags;	//0x009A8 class lib::StaticArray<BehaviorAppBase::TimeLimitedFlag,4,4>
 	char _0x09D8[0xC0];									//0x009D8

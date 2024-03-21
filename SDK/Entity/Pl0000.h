@@ -18,10 +18,10 @@ CBehaviorAppBase, CBehavior, CObj, CModel, CParts
 class Pl0000 : public CBehaviorAppBase
 {
 public:
-	typedef int PassiveSkill;
+	typedef int32_t PassiveSkill;
 
 	virtual void function150() = 0;
-	virtual void CalculateDamage(int a2, __int64 a3, float a4, int a5) = 0;
+	virtual void CalculateDamage(int32_t a2, __int64 a3, float a4, int32_t a5) = 0;
 	virtual void function152() = 0;
 	virtual void function153() = 0;
 	virtual void function154() = 0;
@@ -34,8 +34,8 @@ public:
 	//EntityHandle m_hUnk;					//0x00C80
 	char _0x0C90[0x82C];					//0x00C90
 	//EntityHandle m_hUnk;					//0x00DA0
-	//float m_flTickBase;						//0x01470
-	int m_iLevel;							//0x014BC
+	//float m_flTickBase;					//0x01470
+	int32_t m_iLevel;						//0x014BC
 	BOOL m_bLevelUp;						//0x014C0 | pretty sure
 	char _0x14C4[44];						//0x014C4
 	void* m_pCObjHitVtable;					//0x014F0 | start cObjHit
@@ -50,7 +50,7 @@ public:
 	ExExpInfo m_LevelsContainer;			//0x02078
 	//	EntityHandle m_hCaughtFish;			//0x03ED8 | on the pod
 	char _0x02B70[56056];					//0x02B70
-	int m_iHealth2;							//0x10668									
+	int32_t m_iHealth2;						//0x10668									
 	char _0x1066C[420];						//0x1066C
 	EntityHandle m_hPod;					//0x10810
 	EntityHandle m_hUnk2;					//0x10814
@@ -83,8 +83,8 @@ public:
 	EntityHandle m_hWig;					//0x17054
 	char _0x17058[52];						//0x17058
 	DWORD m_dwAccessory;					//0x1708C
-	int unk0x17090;							//0x17090
-	int m_iBodyType;						//0x17094
+	int32_t unk0x17090;						//0x17090
+	int32_t m_iBodyType;					//0x17094
 	char _0x17090[980];						//0x17098
 	EntityHandle m_hUnknown3;				//0x1746C
 	char _0x17470[896];						//0x17470
