@@ -9,7 +9,7 @@
 
 
 #include "SDK\Common.h"
-
+#include "SDK\CSaveDataDevice.h"
 #include "SDK\CCamera.h"
 
 #include "SDK\Entity\CBehavior.h"
@@ -26,8 +26,6 @@
 
 #define ALIGN(size, align) (((size) + (align) - 1) & ~(align))
 
-typedef ULONGLONG QWORD;
-
 
 // nier uses this https://github.com/rmind/tlsf
 // debug build has strings
@@ -39,7 +37,7 @@ Can be also used to convert from object name to object id
 */
 struct ObjectIdConvert
 {
-	int m_ObjectIdBase;
+	int32_t m_ObjectIdBase;
 	const char* m_szPrefix;
 };
 
@@ -51,7 +49,7 @@ class BannedWordChecker
 public:
 	struct BannedWordBinaryHeader
 	{
-		DWORD dwWordCount;
+		uint32_t uWordCount;
 	};
 
 	struct WordEntry
@@ -65,21 +63,21 @@ public:
 	void* m_pBuffer;
 	QWORD m_qwBufferSize;
 	WordEntry* m_pEntries;
-	DWORD m_dwWordCount;
+	uint32_t m_uWordCount;
 };
 
 struct Sound
 {
 	const char* m_szName;
-	DWORD m_dwFNV1Hash;
+	uint32_t m_uFNV1Hash;
 	DWORD m_Flags;		 //probably a bitflag - (values I've seen, 0x05000000, 0x7000000, 0x00000000, 0x800000 [mute probably])
 };
 
 struct ItemHashEntry
 {
-	int groupID;
-	int idx;
-	DWORD crc;
+	int32_t GroupID;
+	int32_t Idx;
+	uint32_t Crc32;
 };
 
 class Pl0000;
@@ -87,7 +85,7 @@ class Pl0000;
 struct SoundEmitter
 {
 	Pl0000* m_pEntity; // this is some lower interface like behaviour
-	int m_iBoneId;
+	int32_t m_iBoneId;
 };
 
 class CUnknown_t
@@ -131,13 +129,13 @@ struct CObjReadSystem
 			CObjReadSystem::Work::Desc* m_pParent;
 			CObjReadSystem::Work::Desc* m_pRight;
 			CObjReadSystem::Work::Desc* m_pLeft;
-			int m_Crc32;
-			INT m_0x20;
-			int gap2c;
+			int32_t m_Crc32;
+			volatile int32_t m_0x20;
+			int32_t gap2c;
 			DWORD m_dw0x30;
 			DWORD m_dwType;
 			char m_szFilename[64];
-			int m_objectId;
+			int32_t m_objectId;
 			DWORD m_dw0x78;
 			QWORD m_qw0x80;
 			SIZE_T m_nBytes;
@@ -163,10 +161,10 @@ struct CObjReadSystem
 		struct CObjReadSystem::Work* m_pPrev;	//0x0018
 		struct CObjReadSystem::Work* m_pNext;	//0x0020
 		DWORD m_flags;							//0x0028
-		int m_ObjectId;
-		int m_objectid2;
-		int m_objectid3;
-		CObjReadSystem::Work::Desc* m_pUnknown;	//0x0038
+		int32_t m_ObjectId;
+		int32_t m_objectid2;
+		int32_t m_objectid3;
+		CObjReadSystem::Work::Desc* m_pUnknown;	//0x0038 | Hw::cRBTreeNodeTemp<ObjReadSystem::Work>
 		HANDLE m_hSemaphore2;					//0x0040
 		void* m_pDatPtr;						//0x0048
 		void* m_pDatPtr2;						//0x0050
@@ -174,8 +172,32 @@ struct CObjReadSystem
 		void* m_unk2;
 	};
 
+	struct ObjConstructType
+	{
+		uint32_t m_uObjectId;
+		int32_t m_iSetType;
+	};
+
+	// Size of struct 0xCC
+	struct ObjType
+	{
+		uint32_t m_uObjectId;
+		int32_t m_iSetType;
+		char pad[0xC4];
+	};
+
+
+	int32_t m_iObjectId;
+	int32_t m_iType;
+	int32_t m_iUnk;
 	CReadWriteLock m_Lock;
-	CReadWriteLock m_Lock2;
+	BYTE gap3C[8];
+	ObjType* m_pTypes;
+	BYTE gap50[36];
+	DWORD* pdword70;
+	BYTE gap78[8];
+	QWORD qword88;
+	ObjConstructType m_ContructTypes[16]; // cause & 0xF
 };
 
 
@@ -207,8 +229,8 @@ struct CCollisionUnknown
 {
 	CCollisionUnk* m_pUnknownArray;
 	CCollisionUnk** m_ppUnknownArray;
-	int m_nAllocatedEntries;
-	int m_nFreeEntries;
+	int32_t m_nAllocatedEntries;
+	int32_t m_nFreeEntries;
 };
 
 struct CCollisionDataSegment
@@ -234,7 +256,7 @@ struct CCollisionDataSegment
 struct CCollisionObjectName
 {
 	char* m_szName;
-	int m_bInitalized;
+	int32_t m_bInitalized;
 };
 
 struct CCollisionTreeNode;
@@ -288,18 +310,18 @@ public:
 	QWORD qword78;
 	QWORD qword80;
 	CCollisionObjectName* m_pNames;
-	int m_nNames;
+	int32_t m_nNames;
 	char gap94[4];
 	CCollisionDataSegment* m_pSegments;
-	int m_nSegments;
+	int32_t m_nSegments;
 	char gapA4[4];
-	unsigned __int16* m_pBoneMaps;
-	int m_nBoneMaps;
+	uint16_t* m_pBoneMaps;
+	int32_t m_nBoneMaps;
 	char gapB4[74];
 	QWORD qword100;
 	CCollisionTreeNode* m_pCollisionTrees;
 	CCollisionTreeNode* m_pCollisionTree;
-	int m_nCollisionTreeNodes;
+	int32_t m_nCollisionTreeNodes;
 };
 VALIDATE_OFFSET(CCollisionDataObject, m_AABB, 0x10);
 VALIDATE_OFFSET(CCollisionDataObject, m_uScenePropIndex, 0x34);
@@ -319,8 +341,8 @@ struct CCollisionData
 {
 	CCollisionDataEntry* m_pEntries;
 	CCollisionDataEntry** m_ppEntries;
-	int m_nAllocatedEntries;
-	int m_nFreeEntries;
+	int32_t m_nAllocatedEntries;
+	int32_t m_nFreeEntries;
 	CCollisionDataObjectManager* m_pOwner;
 	CCollisionDataEntry* m_pEntries2;
 };
@@ -329,29 +351,29 @@ struct CCollisionVertex
 {
 	Vector4 m_vPosition;
 	Vector4 m_vBoneWeights;
-	unsigned int m_uBones[4];
+	uint32_t m_uBones[4];
 };
 
 struct CCollisionBatch
 {
 	CCollisionVertex* m_pVertices;
 	unsigned __int16* m_pIndices;
-	int m_iBoneIndex;
-	int m_iVertexCount;
-	int m_iIndiceCount;
-	int m_iPrimitiveCount;
+	int32_t m_iBoneIndex;
+	int32_t m_iVertexCount;
+	int32_t m_iIndiceCount;
+	int32_t m_iPrimitiveCount;
 };
 
 struct CCollisionMesh
 {
 	DWORD m_uBatchType;
-	int m_iNameIndex;
+	int32_t m_iNameIndex;
 	DWORD m_uFlags;
 	BYTE gapC[4];
 	DWORD dword10;
 	BYTE gap14[4];
 	CCollisionBatch* m_pBatches;
-	int m_iBatchCount;
+	int32_t m_iBatchCount;
 };
 
 struct CCollisionTreeNode
@@ -359,19 +381,19 @@ struct CCollisionTreeNode
 	Vector3Aligned m_vP1;
 	Vector3Aligned m_vP2;
 	unsigned __int16* m_pMeshIndices;
-	int m_uMeshIndexCount;
-	int m_iLeft;
-	int m_iRight;
-	int m_iUnk;
+	int32_t m_uMeshIndexCount;
+	int32_t m_iLeft;
+	int32_t m_iRight;
+	int32_t m_iUnk;
 };
 
 struct CCollisionContext
 {
-	unsigned int m_uReferenceCount;
+	uint32_t m_uReferenceCount;
 	char** m_pNames;
-	int m_nNameCount;
+	int32_t m_nNameCount;
 	CCollisionMesh* m_pMeshes;
-	int m_iMeshCount;
+	int32_t m_iMeshCount;
 	QWORD m_pBoneMap;
 	DWORD m_uBoneMapCount;
 	QWORD m_pBoneMap2;
@@ -379,7 +401,7 @@ struct CCollisionContext
 	QWORD m_pMeshMaps;
 	DWORD m_uMeshCount;
 	CCollisionTreeNode* m_pColTree;
-	int m_iColTreeNodeCount;
+	int32_t m_iColTreeNodeCount;
 	QWORD m_pPrimitives;
 	QWORD qword70;
 };
@@ -388,21 +410,21 @@ struct COLHdr
 {
 	union {
 		char id[4];
-		unsigned int magic;
+		uint32_t magic;
 	};
-	unsigned int version;
-	unsigned int offsetNames;
-	int nameCount;
-	unsigned int offsetMeshes;
-	int meshCount;
-	unsigned int offsetBoneMap;
-	unsigned int boneMapCount;
-	unsigned int offsetBoneMap2;
-	unsigned int boneMap2Count;
-	unsigned int offsetMeshMap;
-	int meshMapCount;
-	unsigned int offsetColTreeNodes;
-	int colTreeNodesCount;
+	uint32_t version;
+	uint32_t offsetNames;
+	int32_t nameCount;
+	uint32_t offsetMeshes;
+	int32_t meshCount;
+	uint32_t offsetBoneMap;
+	uint32_t boneMapCount;
+	uint32_t offsetBoneMap2;
+	uint32_t boneMap2Count;
+	uint32_t offsetMeshMap;
+	int32_t meshMapCount;
+	uint32_t offsetColTreeNodes;
+	int32_t colTreeNodesCount;
 };
 
 // CRedBlackTreeNode<T>*
@@ -429,11 +451,11 @@ struct CCollisionDataObjectManager
 	DWORD dword74;
 	CCollisionContextNode* m_pCollisionContext2;
 	CCollisionContextNode** m_ppCollisionContexts;
-	int m_nAllocatedCollisionTrees;
-	int m_nFreeCollisionTrees;
+	int32_t m_nAllocatedCollisionTrees;
+	int32_t m_nFreeCollisionTrees;
 	CCollisionContextNode* m_pCollisionContext;
 	CCollisionContextNode* m_pCurrentCollision;
-	int m_nUsedCollisionTrees;
+	int32_t m_nUsedCollisionTrees;
 	DWORD dwordA4;
 	CHeapInfo* m_pHeapInfo;
 	CHeapInfo* m_HeapInfo;
@@ -456,20 +478,20 @@ struct __declspec(align(16)) CollisionInfo
 typedef struct WTBHeader
 {
 	union {
-		char			id[4];			// 0x00
-		unsigned int	magic;
+		char		Id[4];			// 0x00
+		uint32_t	Magic;
 	};
-	int					unknown;
-	int					numTex;
-	unsigned int		ofsTexOfs;
-	unsigned int		ofsTexSizes;
-	unsigned int		ofsTexFlags;
-	unsigned int		texIdxOffset;
-	unsigned int		texInfoOffset;
+	int32_t			unknown;
+	int32_t			uTexCount;
+	uint32_t		ofsTexOfs;
+	uint32_t		ofsTexSizes;
+	uint32_t		ofsTexFlags;
+	uint32_t		uTexIdxOffset;
+	uint32_t		uTexInfoOffset;
 } WTBHeader, WTBHdr, WTAHeader, WTAHdr;
 
 
-struct CModelAnalyzer;
+class CModelAnalyzer;
 
 struct CMaterialInfo
 {
@@ -494,7 +516,7 @@ struct CTextureResourceManager
 };
 
 
-struct CModelWork;
+class CModelWork;
 struct CVertexLayout;
 
 class CObjHit
@@ -557,10 +579,10 @@ struct Mouse_t
 	BOOL bAcquired;
 	BOOL bShowCursor;
 	BOOL bShowCursorOld;
-	int field_1C;
-	int field_20;
+	int32_t field_1C;
+	int32_t field_20;
 	BOOL bClipCursor;
-	int field_28;
+	int32_t field_28;
 	float fl_field_2C;
 	float fl_field_30;
 };
@@ -604,7 +626,7 @@ struct controller_input_state2
 	float m_flThumbRY;			//0x0014
 	float m_flLeftTrigger;		//0x0018
 	float m_flRightTrigger;		//0x001C
-	DWORD m_dwButtons;			//0x0020 | eControllerButtons
+	uint32_t m_uButtons;		//0x0020 | eControllerButtons
 };
 
 /*
@@ -661,8 +683,8 @@ struct CMouseInputContext
 	LONG m_lHeight;
 	float m_flDeltaX;
 	float m_flDeltaY;
-	float m_flDeltaZ;	
-	DWORD m_fButtons; //  eMouseButtons
+	float m_flDeltaZ;
+	uint32_t m_fButtons; //  eMouseButtons
 };
 
 class CGraphicContextDx11;
@@ -685,9 +707,9 @@ struct CGraphicCommand
 	BYTE gap99[23];					//0x99
 	CModelEntry* m_pModelEntry;		//0xB0
 	BYTE gapB8[8];					//0xB8
-	int m_iVertexIndex;				//0xC0
-	int m_iInputLayout;				//0xC4
-	unsigned int unsignedCC;		//0xCC
+	int32_t m_iVertexIndex;			//0xC0
+	int32_t m_iInputLayout;			//0xC4
+	uint32_t unsignedCC;			//0xCC
 };
 VALIDATE_OFFSET(CGraphicCommand, qword30, 0x30);
 VALIDATE_OFFSET(CGraphicCommand, m_SamplerIndex, 0x90);
@@ -702,8 +724,8 @@ struct CGraphicCommandList
 	CGraphicCommand* m_pCommand;
 	struct CGraphicCommandList* m_pPrevious;
 	struct CGraphicCommandList* m_pNext;
-	DWORD m_dwFlags;
-	INT m_iCommandIndex;
+	uint32_t m_uFlags;
+	int32_t m_iCommandIndex;
 	CHAR pad28[8];
 };
 VALIDATE_SIZE(CGraphicCommandList, 0x30);
@@ -712,9 +734,9 @@ struct COtManagerPtr98
 {
 	CGraphicCommand* m_pCommands;
 	CGraphicCommandList* m_pCmdLists;
-	DWORD m_iCommandIndex;
+	int32_t m_iCommandIndex;
 	BYTE gap14[4];
-	LPINT m_pTags;
+	int32_t* m_pTags;
 };
 
 /*
@@ -730,15 +752,15 @@ struct COtManager
 	//0x10 | embededd struct
 	CGraphicCommandList** m_pCmdLists;		//0x50
 	BYTE gap58[8];							//0x58
-	INT* qword60;							//0x60
+	int32_t* qword60;						//0x60
 	CGraphicCommandList* m_pActiveList;		//0x68
-	INT m_iGraphicListCount;				//0x70
-	INT m_nMaxGraphicListCount;				//0x74
-	volatile ULONG64 m_uCmdIndex;			//0x78
-	ULONG64 m_uCmdCount;					//0x80
+	int32_t m_iGraphicListCount;			//0x70
+	int32_t m_nMaxGraphicListCount;			//0x74
+	volatile uint64_t m_uCmdIndex;			//0x78
+	uint64_t m_uCmdCount;					//0x80
 	DWORD m_uMaxTagCount;					//0x88
 	DWORD dword8C;							//0x8C
-	int signed90;							//0x90
+	int32_t signed90;						//0x90
 	BYTE gap94[4];							//0x94
 	COtManagerPtr98* m_ptr98;				//0x98
 	BYTE gapA0[4];							//0xA0
@@ -755,7 +777,7 @@ public:
 	HWND m_hWindow;
 	union
 	{
-		struct { POINT m_WindowPosition; INT m_iWidth; INT m_iHeight; };
+		struct { POINT m_WindowPosition; int32_t m_iWidth; int32_t m_iHeight; };
 		RECT m_windowRect;
 	};
 	BYTE gap20[4];
@@ -765,57 +787,6 @@ public:
 
 };
 
-struct CSaveSlot
-{
-	DWORD dwAccountId;
-	BOOL bInUse;
-};
-
-/*
-Size of the struct is 0xD0 (208) bytes
-*/
-struct CSaveDataDevice
-{
-	void* m_pVtable;				//0x0000
-	DWORD dwUnk0x08;				//0x0008
-	char _0x000C[4];				//0x000C
-	CSaveSlot* pSaveSlots;			//0x0010
-	int nMaxSlot;					//0x0018
-	DWORD dwError;					//0x001C
-	QWORD qw0x0020;					//0x0020
-	int i0x0028;					//0x0028
-	char _0x002C[4];				//0x002C
-	union
-	{
-		QWORD qwFlags;				//0x0030
-		struct
-		{
-			DWORD dwFlags;			//0x0030
-			DWORD dwStatus;			//0x0034
-		};
-	};
-	int nSlot;						//0x0038
-	char unk0x003C[4];				//0x003C | Aligment maybe
-	HANDLE hFile;					//0x0040
-	OVERLAPPED overlapped;			//0x0048
-	DWORD nBytesToIO;				//0x0068 | maybe nBytesToIO and nBytesIO are a struct
-	DWORD nBytesIO;					//0x006C
-	void* pSlotDataBuffer;			//0x0070
-	QWORD qwSlotDataBufferSize;		//0x0078
-	void* pGameDataBuffer;			//0x0080
-	QWORD qwGameDataBufferSize;		//0x0088
-	void* pSystemDataBuffer;		//0x0090 | includes screen dimensions
-	QWORD qwSystemDataBufferSize;	//0x0098
-	void* pBuffer;					
-	QWORD nBytesIO_SystemData;		//0x00A8
-	QWORD nBytesIO_GameData;		//0x00B0
-	QWORD nBytesIO_SaveData;		//0x00B8
-	DWORD dwUnk0xC0;				//0x00C0
-	DWORD dwUnk0xC4;				//0x00C4
-	QWORD qwUnk0xC8;				//0x00C8 | this is an inline struct
-	DWORD dwUnk0xD0;				//0x00D0 | this is a member of unk0xc8
-	DWORD dwUnk0xD4;				//0x00D4 | this is a member of unk0xc8
-};
 
 class CUserInfoBase
 {
@@ -825,23 +796,23 @@ class CUserInfoBase
 struct CpkMountInfo
 {
 	const char* m_szName;
-	int m_iLoadOrder;
+	int32_t m_iLoadOrder;
 };
 
 struct CpkLoader
 {
-	DWORD dwCpkCount;											//0x00
-	char alignment[4];											//0x04
-	void(*LoadCpks)(unsigned int index, const char* szCpkName); //0x08
-	void(*UnloadCpks)(unsigned int index);						//0x10
-	QWORD qw0x18;												//0x18
-	DWORD dwMaxCpkCount;
+	uint32_t m_uCpkCount;									//0x00
+	char alignment[4];										//0x04
+	void(*LoadCpks)(uint32_t index, const char* szCpkName); //0x08
+	void(*UnloadCpks)(uint32_t index);						//0x10
+	QWORD qw0x18;											//0x18
+	DWORD m_uMaxCpkCount;
 	QWORD qwMaxCpkCount;
 };
 
 struct CpkLoad_t
 {
-	signed int status;
+	int32_t m_Status;
 	BYTE gap4[4];
 	QWORD ptr8;
 	void* gap10;
@@ -924,8 +895,8 @@ struct CpkEntry
 	DWORD dw2;
 	CpkBinderHandle* m_pBinderHandle;
 	DWORD m_binderid;
-	DWORD m_status;
-	int m_iLoadOrder;
+	DWORD m_Status;
+	int32_t m_iLoadOrder;
 	DWORD dw7;
 };
 
@@ -934,7 +905,7 @@ struct CHeapInstance;
 template<typename T>
 struct CConstructionInfo
 {
-	int m_iObjectId;						//0x0000
+	uint32_t m_uObjectId;					//0x0000
 	char alignment[4];						//0x0004
 	T* (*Constructor)(CHeapInfo* pHeapInfo);//0x0008 
 	QWORD m_GroupId;						//0x0010
@@ -998,7 +969,7 @@ struct PuidMixin
 	char _0x0018;						// 0x0018
 	bool m_bLast;						// 0x0019
 	char _0x0020[6];					// 0x0020
-	unsigned int m_uDescriptionHash;	// 0x0026  FIXME: ???? this might be wrong
+	uint32_t m_uDescriptionHash;		// 0x0026  FIXME: ???? this might be wrong
 	char alignment[4];					// 0x0030
 	char* m_szDescription;				// 0x0038
 	UINT64 m_uReferenceCount;			// 0x0040
@@ -1066,8 +1037,8 @@ VALIDATE_OFFSET(CSceneStateSystem, m_States, 0x90);
 
 struct CSceneEntitySystem
 {
-	int m_nInfoLists;
-	int m_nMaxInfoLists;
+	int32_t m_nInfoLists;
+	int32_t m_nMaxInfoLists;
 	void* qword8;
 	void* qword10;
 	BOOL dword18;
@@ -1107,11 +1078,11 @@ struct set_info_t
 struct Create_t
 {
 	const char* m_szName;			//0x0000
-	unsigned int m_ObjectIds[2];	//0x0008
+	uint32_t m_ObjectIds[2];	//0x0008
 	set_info_t* m_pSetInfo;			//0x0010
 	DWORD m_dwSetType;				//0x0018 | this is the same as set_info_t::m_dwSetType
 	DWORD m_dwFlags;				//0x001C
-	int m_iGenerateMode;			//0x0020 | 0 = no bones & invisible, 1 = normal, 2 = no bones
+	int32_t m_iGenerateMode;			//0x0020 | 0 = no bones & invisible, 1 = normal, 2 = no bones
 	char alignment24[4];			//0x0024
 	void* m_pWMB;					//0x0028
 	CModelData* m_pModelData;		//0x0030
@@ -1180,10 +1151,10 @@ struct CHeapVramInstance
 	};
 
 	virtual void dtor(char a2);
-	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int32_t nChildren, int32_t flags);
 	virtual CHeapInfo* fn2(const void* pMemoryPool);
 	virtual QWORD GetPartitionSize(const void* pMemoryPool);
-	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int32_t flags);
 	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
 
 	CReadWriteLock m_Lock;					//0x0008
@@ -1199,8 +1170,8 @@ struct CHeapVramInstance
 	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
 	DWORD dword84;							//0x0084
 	DWORD m_dwReferenceCount;				//0x0088
-	int m_nRootHeaps;						//0x008C
-	int m_nHeaps;							//0x0090
+	int32_t m_nRootHeaps;						//0x008C
+	int32_t m_nHeaps;							//0x0090
 };
 
 /*
@@ -1216,10 +1187,10 @@ struct CHeapInstance
 	};
 
 	virtual void dtor(char a2);
-	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
+	virtual BOOL SetHeapInfo(CHeapInfo* pInfo, unsigned __int64 cbSize, int32_t nChildren, int32_t flags);
 	virtual CHeapAllocInfo* fn2(const void* pMemoryPool);
 	virtual QWORD GetPartitionSize(const void* pMemoryPool);
-	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int flags);
+	virtual CHeapAllocInfo* AllocPartition(__int64 nBytes, unsigned __int64 align, int32_t flags);
 	virtual void FreePartition(const void* pMemoryPool); // pMemoryPool - 8 = CHeapAllocInfo*
 
 	CReadWriteLock m_Lock;					//0x0008
@@ -1235,8 +1206,8 @@ struct CHeapInstance
 	DWORD m_uIndex;							//0x0080 | used for CMemoryDevice::GetHeapAligment
 	DWORD dword84;							//0x0084
 	DWORD m_dwReferenceCount;				//0x0088
-	int m_nRootHeaps;						//0x008C
-	int m_nHeaps;							//0x0090
+	int32_t m_nRootHeaps;						//0x008C
+	int32_t m_nHeaps;							//0x0090
 };
 VALIDATE_SIZE(CHeapInstance, 0x98);
 
@@ -1250,7 +1221,7 @@ struct CMemoryDevice
 	virtual __int64 dtor();
 	virtual BOOL Alloc(void** ppMem, SIZE_T nByteSize); // call heap
 	virtual BOOL Free(void** ppMem);
-	virtual QWORD GetHeapAlignment(int index);
+	virtual QWORD GetHeapAlignment(int32_t index);
 
 	CReadWriteLock m_Lock;		//0x08
 	CHeapInstance m_DeviceHeap;	//0x38
@@ -1305,8 +1276,8 @@ public:
 	DWORD m_uCpkCount;												//0x0010 
 	DWORD unk0x014;													//0x0014 
 	DWORD unk0x18;													//0x0018
-	void(*LoadCpks)(unsigned int index, const char* szCpkName);		//0x0020
-	void(*UnloadCpks)(unsigned int index);							//0x0028
+	void(*LoadCpks)(uint32_t index, const char* szCpkName);		//0x0020
+	void(*UnloadCpks)(uint32_t index);							//0x0028
 	CHeapInstance** m_ppHeap;										//0x0030 | probably a parent pointer
 	CGameContentDeviceSteam* m_pSteamContent;						//0x0038
 	DWORD unk0x40;													//0x0040
@@ -1323,8 +1294,8 @@ class CAchievementDeviceSteam
 	virtual ~CAchievementDeviceSteam();
 
 	virtual __int64 sub_1450F7720();
-	virtual BOOL SetAchievement(unsigned int index);
-	virtual BOOL IsAchievementUnlocked(unsigned int index);
+	virtual BOOL SetAchievement(uint32_t index);
+	virtual BOOL IsAchievementUnlocked(uint32_t index);
 	virtual BOOL IsUserLoggedOn();
 	virtual BOOL ReturnTrue();
 	virtual BOOL SetVar0x18True(BOOL b);
@@ -1564,39 +1535,64 @@ public:
 };
 VALIDATE_SIZE(CGameBootProcess, 24);
 
-
-struct Task;
-
-struct TaskInfo
+enum eTaskStatus
 {
-	Task* m_pParent;
-	void(*m_pCallback)();
+	TASK_0,
+	TASK_1,
+	TASK_2,
+	TASK_3,
+	TASK_ILLEGAL_SUSPENSION,
+};
+
+struct CTask;
+
+struct CTaskInfo
+{
+	CTask* m_pParent;
+	void(*m_pfnCallback)(void);
 	QWORD qword10;
 	DWORD dword18;
 	DWORD dword1C;
 	const char* m_szTaskName;
 	DWORD dword28;
 	BYTE gap2C[28];
-	TaskInfo* m_pPrevious;
-	TaskInfo* m_pNext;
+	CTaskInfo* m_pPrevious;
+	CTaskInfo* m_pNext;
 };
 
 /*
 Size of struct is 0x60 (96) bytes
 */
-struct Task
+struct CTask
 {
-	DWORD dwTaskCount;
-	BYTE pad[4];
-	TaskInfo* m_pHead;
-	TaskInfo* m_pInfo2;
-	TaskInfo* m_pInfo;
-	QWORD qword20;
-	DWORD gap28;
-	Task* m_pNext;
-	HANDLE hSemaphore;
-	HANDLE hSemaphore2;
+	DWORD dwTaskCount;			//0x0000
+	BYTE pad[4];				//0x0004
+	CTaskInfo* m_pHead;			//0x0008
+	CTaskInfo* m_pInfo2;		//0x0010
+	CTaskInfo* m_pInfo;			//0x0018
+	CTask* m_pNext;				//0x0020
+	eTaskStatus m_Status;		//0x0028
+	DWORD gap2C;				//0x002C | maybe bool32
+	CTask* m_pNext3;			//0x0038
+	HANDLE hSemaphore;			//0x0040
+	HANDLE hSemaphore2;			//0x0048
+	char pad50[24];
 };
+
+/// <summary>
+/// Used to schedule asynchronous task such as File I/O etc...
+/// </summary>
+struct CJobManager
+{
+	uint32_t m_uTaskCount;
+	CTask* m_pTasks;
+	QWORD field_10;
+	CTaskInfo* m_pTaskInfos;
+	uint8_t gap20[8];
+	DWORD dword28;
+	QWORD qword30;
+};
+
 
 struct CWetObjManagerDelay
 {
@@ -1630,7 +1626,7 @@ public:
 	virtual EntityHandle GetHandle(Pl0000* pEntity);
 	virtual Array<EntityHandle>* GetHandles();
 	virtual Pl0000* GetClosestEntity(Vector3Aligned* pvPosition, Pl0000* pEntity);
-	virtual unsigned int CountEntitiesWithinDistance(Vector3Aligned* pvPosition, float max_distance);
+	virtual uint32_t CountEntitiesWithinDistance(Vector3Aligned* pvPosition, float max_distance);
 	virtual void function4();
 
 	//void* m_pvtable;				//0x0000
@@ -1658,12 +1654,12 @@ public:
 class CAnimalManager
 {
 	CReadWriteLock m_Lock;
-  __declspec(align(8)) DWORD dword30;
-  BYTE gap34[84];
-  QWORD qword88;
-  QWORD qword90;
-  QWORD qword98;
-  QWORD qwordA0;
+	__declspec(align(8)) DWORD dword30;
+	BYTE gap34[84];
+	QWORD qword88;
+	QWORD qword90;
+	QWORD qword98;
+	QWORD qwordA0;
 };
 
 // Size of struct 0x1520 (5408) bytes
@@ -1680,17 +1676,17 @@ public:
 	virtual void function7();
 	virtual void function8();
 	virtual Array<EntityHandle>* GetHandles();
-	virtual unsigned int GetHandleIndex();
+	virtual uint32_t GetHandleIndex();
 	virtual Array<EntityHandle>* GetHandles2();
 	virtual Pl0000* GetEntity();  // from the 0x14bc handle
 	virtual Pl0000* GetEntity2(); // from the 0x14bc handle
 	virtual Array<EntityHandle>* GetHandles3();
 	virtual void SetField14B8(float a1);
 	virtual Array<EntityHandle>* GetHandles4();
-	virtual Pl0000* function17(Vector3Aligned* pvPosition, int a2);
+	virtual Pl0000* function17(Vector3Aligned* pvPosition, int32_t a2);
 	virtual Array<EntityHandle>* GetHandles5();
-	virtual Pl0000* function19(Vector3Aligned* pvPosition, int a2);
-	virtual Pl0000* function20(Vector3Aligned* pvPosition, int a2);
+	virtual Pl0000* function19(Vector3Aligned* pvPosition, int32_t a2);
+	virtual Pl0000* function20(Vector3Aligned* pvPosition, int32_t a2);
 	virtual bool function21(Pl0000* pEntity);
 	virtual bool function22(CEntityInfo* pInfo); //calls/returns vfunc 21
 	virtual bool function23(EntityHandle* pHandle); //calls/returns vfunc 21
@@ -1707,13 +1703,13 @@ public:
 	virtual void function34();
 	virtual bool IsFloatField14C8LessThanOrEqualToZero(); //return *(float *)(a1 + 0x14C8) <= 0.0;
 	virtual void function36();
-	virtual unsigned int GetField14CC();
-	virtual unsigned int GetField14D0();
+	virtual uint32_t GetField14CC();
+	virtual uint32_t GetField14D0();
 	virtual BOOL function39(); //could be bool tbh but uses eax not al
 	virtual bool IsField1508GreaterThanZero(); //return *(_DWORD *)(a1 + 0x1508) > 0;
-	virtual unsigned int CountEntitiesFromHandle2ObjectId(); //sub_1434B1740
-	virtual unsigned int CountEntitiesFromHandle2();		 //sub_1434B5B10
-	virtual void function43(int a2);
+	virtual uint32_t CountEntitiesFromHandle2ObjectId(); //sub_1434B1740
+	virtual uint32_t CountEntitiesFromHandle2();		 //sub_1434B5B10
+	virtual void function43(int32_t a2);
 	virtual void function44();
 
 	//void* m_pvtable;							//0x0000
@@ -1773,9 +1769,9 @@ class CUserInfo
 
 	BOOL m_bLoggedOn;	//0x08
 	char _0x0C[4];		//0x0C
-	int idk;			//0x10
+	int32_t idk;			//0x10
 	BOOL m_bInit;		//0x14
-	int index;			//0x18
+	int32_t index;			//0x18
 	char _0x1C[4];		//0x1C	
 };
 
@@ -1789,8 +1785,8 @@ public:
 	CReadWriteLock m_Lock;						//0x0008
 	//char alignment[4];						//0x0034
 	CUserInfo m_UsersInfo[4];					//0x0038
-	int m_iActiveUser;							//0x00B8
-	int m_iUserIndices[3];						//0x00BC
+	int32_t m_iActiveUser;							//0x00B8
+	int32_t m_iUserIndices[3];						//0x00BC
 	DWORD dwUnknown;							//0x00C8
 	QWORD qw0x00D0;								//0x00D0	
 	CGameBootProcess* m_pBootProcess;			//0x00D8
@@ -1873,18 +1869,18 @@ typedef struct mrb_gc {
 	struct RBasic* arena[MRB_GC_ARENA_SIZE]; /* GC protection array */
 #else
 	struct RBasic** arena;                   /* GC protection array */
-	int arena_capa;
+	int32_t arena_capa;
 #endif
 
-	int arena_idx;
+	int32_t arena_idx;
 	mrb_gc_state state; /* state of gc */
-	int current_white_part; /* make white object by white_part */
+	int32_t current_white_part; /* make white object by white_part */
 	struct RBasic* gray_list; /* list of gray objects to be traversed incrementally */
 	struct RBasic* atomic_gray_list; /* list of objects to be traversed atomically */
 	size_t live_after_mark;
 	size_t threshold;
-	int interval_ratio;
-	int step_ratio;
+	int32_t interval_ratio;
+	int32_t step_ratio;
 	mrb_bool iterating : 1;
 	mrb_bool disabled : 1;
 	mrb_bool full : 1;
@@ -1903,8 +1899,8 @@ typedef struct {
 	struct REnv* env;	//0x20 (padded)
 	mrb_code* pc;       //0x28	  /* return address */
 	mrb_code* err;      //0x30    /* error position */
-	int argc;			//0x38
-	int acc;			//0x40
+	int32_t argc;			//0x38
+	int32_t acc;			//0x40
 	struct RClass* target_class;
 } mrb_callinfo;
 
@@ -1936,10 +1932,10 @@ struct mrb_parser_state;
 
 typedef struct mrbc_context {
 	mrb_sym* syms;
-	int slen;
+	int32_t slen;
 	char* filename;
 	uint16_t lineno;
-	int (*partial_hook)(struct mrb_parser_state*);
+	int32_t (*partial_hook)(struct mrb_parser_state*);
 	void* partial_data;
 	struct RClass* target_class;
 	mrb_bool capture_errors : 1;
@@ -2137,7 +2133,7 @@ struct MrubyImpl
 	QWORD m_pGarbageCollector;										//0x0010 | mrb_value
 	StaticArray<EventEntry, 256> m_events;							//0x0018
 	StaticArray<EventEntry, 256> m_events2;
-	StaticArray<std::pair<unsigned int, EventFiber*>, 16> m_Fibers;
+	StaticArray<std::pair<uint32_t, EventFiber*>, 16> m_Fibers;
 	QWORD qword1180;//StaticArray<std::pair<lib::HashedString<sys::StringSystem::Allocator>,lib::HashedString<sys::StringSystem::Allocator>>,256,8>
 	QWORD qword1188;
 	QWORD qword1190;

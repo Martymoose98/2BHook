@@ -302,7 +302,10 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 	if (ImGui::Button("Spawn Pod C"))
 		Features::AddPod(POD_C);
 
-	ImGui::ListBox("Entity", &Vars.Gameplay.iSelectedEntityType, Vars.EntityTypeList, _ARRAYSIZE(Vars.EntityTypeList));
+	ImGui::ListBox("Entity", &Vars.Gameplay.iSelectedEntityType, 
+		[](void* pUserData, int idx) -> const char* { return ((Variables_t::Spawn*)pUserData)[idx].m_szName; },
+		(void*)Vars.SpawnEntities, _ARRAYSIZE(Vars.SpawnEntities));
+
 	ImGui::InputFloat3("Entity Scale", (float*)&Vars.Gameplay.vSpawnEntityScale);
 
 	if (ImGui::Button("Create Entity"))
@@ -322,15 +325,29 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 		set_info.m_dw0x74 = 0;
 		set_info.m_i0x078 = 0;
 
-		//ObjReadSystem::Work* pWork = GetWork(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId);
+		int ObjectId = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId;
 
-		//if (pWork)
-		//{
-		//	BOOL s = PreloadModel(pWork);	
-		//	RequestEnd(0, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId);
-		//}
+		CObjReadSystem::Work* pWork = FindObjectWork(ObjectId);
 
-		CEntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId, &set_info);
+		if (!pWork)
+		{
+			if (CreateWork(ObjectId))
+			{
+				static CObjReadSystem* pObjReadSystem = (CObjReadSystem*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 83 FA FF 74 4D", 2);
+				typedef __int64 (*CObjReadSystem_RequestStartFn)(CObjReadSystem* pThis, unsigned int uObjectId, int a3); // a3 usually 0
+				static CObjReadSystem_RequestStartFn RequestStart = (CObjReadSystem_RequestStartFn)FindPattern(NULL, "40 57 41 54 41 55 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 68 48 89 6C 24 70 48 89 74 24 78 41");
+				__int64 r = RequestStart(pObjReadSystem, ObjectId, 1); // bool return
+					
+				pWork = FindObjectWork(ObjectId);
+
+				typedef CObjReadSystem::Work* (*ReadWorkFn)(int ObjectId);
+				//static ReadWorkFn ReadWork = (ReadWorkFn)FindPattern(NULL, "48 89 5C 24 10 57 48 81 EC D0 00");
+				//pWork = ReadWork(ObjectId);
+			}
+		}
+
+		CEntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, 
+			ObjectId, &set_info);
 
 		if (pInfo)
 		{
@@ -503,7 +520,7 @@ void CMenu::MiscTab(void)
 	//FIXME: DEFO CRASH
 	if (ImGui::Button("Emit Sound"))
 	{
-		g_pLocalPlayer->EmitSound("core_level_up", g_pLocalPlayer, 5, 0x5000000, 0x200007F);
+		g_pLocalPlayer->EmitSound(Vars.Misc.szSoundName, g_pLocalPlayer, 5, 0x5000000, 0x200007F);
 		//Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
 		//QWORD rax = ((EmitSoundFn)(0x14081FD80))(&sound, &g_pLocalPlayer);
 		//LOG("RAX = %x\n", rax);
@@ -537,7 +554,7 @@ void CMenu::MiscTab(void)
 
 	if (ImGui::Button("Backup Save"))
 	{
-		Vars.Misc.bBackupSave = !BackupSave(Vars.Misc.nSlot);
+		Vars.Misc.bBackupSave = !BackupSave((CSaveDataDevice::Slot)Vars.Misc.nSlot);
 	}
 
 	ImGui::SameLine();

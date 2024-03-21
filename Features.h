@@ -103,12 +103,11 @@ namespace Features
 			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Load/A29S", 10); // Load/A29S | Load/A22B	
 			((CSceneStateSystem_SetFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
 			break;
-
-			break;
 		case PROTAGONIST_A2:
 			crc = HashStringCRC32("PL/A2", 5);
 			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "PL/A2", 5);
 			((CSceneStateSystem_SetFn)(0x14001EC80))((void*)0x14158CBC0, &pScene);
+			break;
 		default:
 			break;
 		}
@@ -545,7 +544,7 @@ namespace Features
 		if (!pChecker || !pChecker->m_pEntries)
 			return;
 
-		pChecker->m_dwWordCount = dwWordCount;
+		pChecker->m_uWordCount = dwWordCount;
 	}
 
 	// if this doesn't work might have to create critical section, enter, restore and free the backup array, then leave
@@ -555,9 +554,9 @@ namespace Features
 			return;
 
 		if (pdwWordCount)
-			*pdwWordCount = pChecker->m_dwWordCount;
+			*pdwWordCount = pChecker->m_uWordCount;
 
-		pChecker->m_dwWordCount = 0;
+		pChecker->m_uWordCount = 0;
 	}
 
 	// try to check if the buffer is valid and if so free with heap free ?
@@ -573,14 +572,14 @@ namespace Features
 
 		BannedWordChecker::BannedWordBinaryHeader* pHdr = (BannedWordChecker::BannedWordBinaryHeader*)pChecker->m_pBuffer;
 
-		UINT dwNextDataStartOffset = 4;
+		UINT dwNextDataStartOffset = sizeof(BannedWordChecker::BannedWordBinaryHeader);
 		DWORD i = 0;
 
-		pChecker->m_dwWordCount = pHdr->dwWordCount;
+		pChecker->m_uWordCount = pHdr->uWordCount;
 
-		if (pChecker->m_dwWordCount > 0)
+		if (pChecker->m_uWordCount > 0)
 		{
-			pChecker->m_pEntries = new BannedWordChecker::WordEntry[pChecker->m_dwWordCount];
+			pChecker->m_pEntries = new BannedWordChecker::WordEntry[pChecker->m_uWordCount];
 
 			do
 			{
@@ -605,7 +604,7 @@ namespace Features
 				}
 				*((WCHAR*)&lpDataStart[dwWordByteLength]) = 0; 	//*((WCHAR*)(lpDataStart + dwWordByteLength)) = 0;
 				pChecker->m_pEntries[i++].lpszBannedWord = (LPWSTR)lpDataStart;
-			} while (i < pChecker->m_dwWordCount);
+			} while (i < pChecker->m_uWordCount);
 		}
 	}
 };

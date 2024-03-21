@@ -125,9 +125,10 @@ typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CText
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
 typedef HeapAlloc_t*(*QueryHeapFn)(HeapAlloc_t* pResult, int objectid, int a3); // or void i guess
-typedef CObjReadSystem::Work*(*GetWorkFn)(int objectid);
+typedef BOOL (*CreateWorkFn)(int Objectid);
+typedef CObjReadSystem::Work* (*CObjReadSystem_FindObjectWorkFn)(int ObjectId);
 typedef CObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, CObjReadSystem::Work* pWork);
-typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int objectId);
+typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int ObjectId);
 typedef BOOL(*ObjReadSystem_PreloadModelFn)(CObjReadSystem::Work* pWork);
 typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
@@ -196,7 +197,8 @@ extern HashStringCRC32Fn HashStringCRC32;
 extern UnlockAchievementFn UnlockAchievement;
 extern FNV1HashFn FNV1Hash;
 extern QueryHeapFn QueryHeap;
-extern GetWorkFn GetWork;
+extern CreateWorkFn CreateWork;
+extern CObjReadSystem_FindObjectWorkFn FindObjectWork;
 extern PreloadFileFn PreloadFile;
 extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;

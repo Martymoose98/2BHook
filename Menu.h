@@ -8,6 +8,7 @@
 
 #include "Console.h"
 #include "Utils.h"
+#include "Variables.h"
 
 
 class CConfig;

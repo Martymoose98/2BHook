@@ -6,6 +6,7 @@
 
 #include "Globals.h"
 #include "Matrix4x4.h"
+#include "Log.h"
 
 #define STACK_TIMER(Name) StackTimer Name(__FUNCTION__)
 #define CS_LOCK(pCriticalSection) StackReadWriteLock _CRT_CONCATENATE(__FUNCTION__, Lock)(pCriticalSection)
@@ -244,7 +245,10 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 		Version.m_pHash = new BYTE[Version.m_uHashSize];
 
 		// Create the hash
-		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, Version.m_pHash, Version.m_uHashSize);
+		ULONG uBlockSize = (Version.m_uHashSize > UINT32_MAX) ? 0x100000 : Version.m_uHashSize;
+
+		// Files bigger than 0xFFFFFFFF are unsupported and invoke UB
+		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, Version.m_pHash, (ULONG)Version.m_uHashSize);	
 	}
 
 	// Free the binary from memory
@@ -528,7 +532,7 @@ static inline unsigned short EntityHandleToListIndex(const EntityHandle hEntity)
 
 static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const unsigned short index)
 {
-	return (index | (pList->m_dwShift << 16)) << 8;
+	return (index | (pList->m_uShift << 16)) << 8;
 }
 
 // NOTE: You should use these functions two get entity's by their handle from now on.
@@ -538,7 +542,7 @@ static CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, const Entit
 	int idx = EntityHandleToListIndex(hEntity);
 
 	// Check if the index is valid and the top 24-bits of the handles match
-	if (idx > pList->m_dwItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
+	if (idx > pList->m_uItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
 		return NULL;
 
 	CEntityInfo* pEntityInfo = pList->m_pItems[idx].second;
@@ -733,46 +737,95 @@ static void DataFile_FindFile(void* pBuffer, const char* szName, void** ppFile)
 	}
 }
 
+/// <summary>
+/// Rebuilt from IDA Database
+/// </summary>
+/// <typeparam name="N">Size of szPath</typeparam>
+/// <param name="szPath">File path of the game</param>
+/// <returns></returns>
+template<size_t N>
+static bool GetSaveFolderPath(char (&szPath)[N])
+{
+	if (SHGetSpecialFolderPathA(NULL, szPath, CSIDL_PERSONAL, FALSE))
+	{
+		sprintf_s(szPath, "%s\\%s\\%s\\", szPath, "My Games", "NieR_Automata");
+		return true;
+	}
+	return false;
+}
+
+/// <summary>
+/// Rebuilt from IDA Database
+/// </summary>
+/// <typeparam name="N"></typeparam>
+/// <param name="pSavedata"></param>
+/// <param name="szPath"></param>
+/// <returns></returns>
+template<size_t N = MAX_PATH>
+static bool GetGameDataPath(CSaveDataDevice* pSavedata, char(&szPath)[N])
+{
+	if (GetSaveFolderPath(szPath))
+	{
+		switch (pSavedata->m_nSlot)
+		{
+		case CSaveDataDevice::SLOT_SAVE_SYSTEMDATA:
+			//strcat_s(szPath, "SystemData.dat");
+			sprintf_s(szPath, "%sSystemData.dat", szPath);
+			break;
+		case CSaveDataDevice::SLOT_SAVE_GAMEDATA:
+			//strcat_s(szPath, "SystemData.dat");
+			sprintf_s(szPath, "%sGameData.dat", szPath);
+			break;
+		default:
+			sprintf_s(szPath, "%sSlotData_%d.dat", szPath, pSavedata->m_nSlot);
+			break;
+		}
+		return true;
+	}
+	return false;
+}
+
 // Rebuilt from the binary for the reason that it was inlined which
 // will complicate things in the hook otherwise
 static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 {
 	char szFilename[MAX_PATH];
 
-	switch (pSavedata->dwStatus)
+	switch (pSavedata->m_Status)
 	{
 	case 0:
-		if (((BOOL(*)(CSaveDataDevice*, char*))((LPBYTE)GetModuleHandle(NULL) + 0x282BD0))(pSavedata, szFilename)) // sub_140282BD0
+		// sub_140282BD0
+		if (GetGameDataPath(pSavedata, szFilename))
 		{
 			if (DeleteFileA(szFilename))
 			{
-				pSavedata->pSaveSlots[pSavedata->nSlot].dwAccountId = 0;
-				pSavedata->pSaveSlots[pSavedata->nSlot].bInUse = FALSE;
+				pSavedata->m_pSaveSlots[pSavedata->m_nSlot].m_uAccountId = 0;
+				pSavedata->m_pSaveSlots[pSavedata->m_nSlot].m_bInUse = FALSE;
 
-				if (pSavedata->hFile != INVALID_HANDLE_VALUE)
+				if (pSavedata->m_hFile != INVALID_HANDLE_VALUE)
 				{
-					CloseHandle(pSavedata->hFile);
-					pSavedata->hFile = INVALID_HANDLE_VALUE;
+					CloseHandle(pSavedata->m_hFile);
+					pSavedata->m_hFile = INVALID_HANDLE_VALUE;
 				}
 
-				*(&pSavedata->nMaxSlot + 1) = 0;
-				pSavedata->qwFlags = 0i64;
+				*(&pSavedata->m_nMaxSlot + 1) = 0;
+				pSavedata->m_uFlags64 = 0i64;
 			}
 			else
 			{
-				pSavedata->dwStatus = 1;
+				pSavedata->m_Status = CSaveDataDevice::STATUS_SAVE_DATA_READ_SLOTS;
 			}
 		}
 		break;
 	case 1:
-		if (pSavedata->hFile != INVALID_HANDLE_VALUE)
+		if (pSavedata->m_hFile != INVALID_HANDLE_VALUE)
 		{
-			CloseHandle(pSavedata->hFile);
-			pSavedata->hFile = INVALID_HANDLE_VALUE;
+			CloseHandle(pSavedata->m_hFile);
+			pSavedata->m_hFile = INVALID_HANDLE_VALUE;
 		}
 
-		*(&pSavedata->nMaxSlot + 1) = 3;
-		pSavedata->qwFlags = 0i64;
+		*(&pSavedata->m_nMaxSlot + 1) = 3;
+		pSavedata->m_uFlags64 = 0i64;
 		break;
 	case 2:
 
@@ -785,23 +838,23 @@ static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 		pSavedata->qwUnk0xC8 = 0i64;
 		break;
 	default:
-		pSavedata->dwStatus = 1;
+		pSavedata->m_Status = CSaveDataDevice::STATUS_SAVE_DATA_READ_SLOTS;
 		break;
 	}
 }
 
 static CMeshPart* GetModelMesh(CModelWork* pWork, const char* szMesh)
 {
-	for (int i = 0; i < pWork->m_nMeshes; ++i)
+	for (int32_t i = 0; i < pWork->m_nMeshes; ++i)
 		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
 			return &pWork->m_pMeshes[i];
 
 	return NULL;
 }
 
-static int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh)
+static int32_t GetModelMeshIndex(const CModelWork* pWork, const char* szMesh)
 {
-	for (int i = 0; i < pWork->m_nMeshes; ++i)
+	for (int32_t i = 0; i < pWork->m_nMeshes; ++i)
 		if (!strcmp(pWork->m_pMeshes[i].m_szMeshName, szMesh))
 			return i;
 
@@ -809,24 +862,24 @@ static int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh)
 }
 
 // Rebuilt from binary
-static short GetBoneIndex(const CModelData* pModelData, short id)
+static int16_t GetBoneIndex(const CModelData* pModelData, int16_t Id)
 {
-	short* pTable;
-	short iBoneIndex, t1, t2;
+	int16_t* pTable;
+	int16_t iBoneIndex, t1, t2;
 
 	pTable = pModelData->m_pBoneIndexTranslationTable2;
 
 	if (pTable)
 	{
-		t1 = pTable[(id >> 8) & 0xF];	// id / 256  clamped to 0-15
+		t1 = pTable[(Id >> 8) & 0xF];	// id / 256  clamped to 0-15
 
 		if (t1 != -1)
 		{
-			t2 = pTable[t1 + ((id >> 4) & 0xF)]; // id
+			t2 = pTable[t1 + ((Id >> 4) & 0xF)]; // id
 
 			if (t2 != -1)
 			{
-				iBoneIndex = pTable[t2 + (id & 0xF)];
+				iBoneIndex = pTable[t2 + (Id & 0xF)];
 
 				if (iBoneIndex != 0xFFF) // 4095
 					return iBoneIndex;
@@ -836,11 +889,11 @@ static short GetBoneIndex(const CModelData* pModelData, short id)
 	return -1;
 }
 
-static short GetBoneId(short index)
+static int16_t GetBoneId(int16_t index)
 {
 }
 
-static void SwapTexture(unsigned int srcid, CTexture* pReplace)
+static void SwapTexture(uint32_t srcid, CTexture* pReplace)
 {
 	CTextureResource* pRes = TextureResourceManager_FindResource(srcid);
 
@@ -856,7 +909,7 @@ static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 	IWICBitmapFrameDecode* pFrame;
 	WICPixelFormatGUID Format;
 
-	unsigned int w, h, uFrames, * rgba;
+	uint32_t w, h, uFrames, uStride, uSize, * rgba;
 
 	HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, (void**)&pFactory);
 
@@ -885,6 +938,25 @@ static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 
 	hr = pFrame->GetSize(&w, &h);
 
+	uStride = w * sizeof(uint32_t);
+	uSize = uStride * h;
+
+	if (!IsEqualGUID(Format, GUID_WICPixelFormat32bppBGRA))
+	{
+		hr = pFactory->CreateFormatConverter(&pConverter);
+
+		hr = pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA,
+			WICBitmapDitherTypeNone,         // Specified dither pattern
+			NULL,                            // Specify a particular palette 
+			0.f,                             // Alpha threshold
+			WICBitmapPaletteTypeCustom);     // Palette translation type
+
+		hr = pConverter->CopyPixels(NULL, uStride, uSize, (uint8_t*)rgba);
+
+		pConverter->Release();
+	}
+	else
+		hr = pFrame->CopyPixels(NULL, uStride, uSize, (uint8_t*)rgba);
 
 	return hr;
 }
@@ -950,7 +1022,7 @@ static void CreateMaterial(
 	const char* szTechnique,
 	const char** szTextureNames,
 	CTextureDescription* pDescriptions,
-	int nTextures,
+	int32_t nTextures,
 	CSamplerParameterGroup* pParams, // float* pParams, int nParams,
 	CMaterial** ppMaterial
 )
@@ -966,7 +1038,7 @@ static void CreateMaterial(
 	if (nTextures > 15)
 		nTextures = 15;
 
-	for (int i = 0; i < nTextures; ++i)
+	for (int32_t i = 0; i < nTextures; ++i)
 	{
 		TextureIds[i] = HashStringCRC32(szTextureNames[i], strlen(szTextureNames[i]));
 		// old sig: 33 D2 48 8D 05 ? ? ? ? 48 89 51 58
@@ -993,9 +1065,9 @@ static void CreateMaterial(
 	(*ppMaterial)->m_szTechniqueName = szTechnique;
 	(*ppMaterial)->m_nShaderParameters = 0;
 
-	for (int i = 0; i < nTextures; ++i)
+	for (int32_t i = 0; i < nTextures; ++i)
 	{
-		int nTexture = g_pModelAnalyzer->FindTextureIndexByName(szTextureNames[i]);
+		int32_t nTexture = g_pModelAnalyzer->FindTextureIndexByName(szTextureNames[i]);
 
 		if (nTexture > 15)
 			break;
@@ -1079,7 +1151,7 @@ static ShaderParamter CNS00_XXXXX_PARAMS[] = {
 	{ "g_bAlbedoOverWrite", 0.0f }
 };
 
-static HRESULT MyPreloadModel(int objectId)
+static HRESULT MyPreloadModel(uint32_t uObjectId)
 {
 	char szObjectName[16];
 	char szFilename[64];
@@ -1088,11 +1160,11 @@ static HRESULT MyPreloadModel(int objectId)
 	CObjReadSystem::Work::Desc* pDesc;
 	HeapAlloc_t lmao;
 
-	if (ObjectIdToObjectName(szObjectName, ARRAYSIZE(szObjectName), objectId, &pConvert))
+	if (ObjectIdToObjectName(szObjectName, ARRAYSIZE(szObjectName), uObjectId, &pConvert))
 	{
-		QueryHeap(&lmao, objectId, 1);
-		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dtt");
-		pWork = GetWork(objectId);
+		QueryHeap(&lmao, uObjectId, 1);
+		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(uObjectId), ".dtt");
+		pWork = FindObjectWork(uObjectId);
 		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
 
 		if (pDesc)
@@ -1102,7 +1174,7 @@ static HRESULT MyPreloadModel(int objectId)
 			pWork->m_ObjectId = pDesc->m_objectId;
 		}
 
-		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(objectId), ".dat");
+		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(uObjectId), ".dat");
 		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
 
 		if (pDesc)
@@ -1158,27 +1230,27 @@ may occur when copying files whilst being modified by another thread. Thread
 safety will be added in the future. This method fails if the "My Documents" folder's
 path has a greater length than MAX_PATH (260).
 */
-static BOOL BackupSave(int nSlot)
+static BOOL BackupSave(CSaveDataDevice::Slot Slot)
 {
 	WCHAR szPath[MAX_PATH];
 	WCHAR szSavePath[MAX_PATH];
 	WCHAR szBackupPath[MAX_PATH];
 	SYSTEMTIME time;
 
-	if (!IS_SAVE_SLOTDATA(nSlot))
+	if (!IS_SAVE_SLOTDATA(Slot))
 		return ERROR_INVALID_PARAMETER;
 
 	if (!SHGetSpecialFolderPathW(NULL, szPath, CSIDL_MYDOCUMENTS, FALSE))
 		return ERROR_PATH_NOT_FOUND;
 
-	int nCharsWritten = swprintf_s(szSavePath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d.dat", szPath, nSlot);
+	int32_t nCharsWritten = swprintf_s(szSavePath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d.dat", szPath, Slot);
 
 	if (nCharsWritten == -1)
 		return ERROR_NOT_ENOUGH_MEMORY;
 
 	GetSystemTime(&time);
 
-	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%4d%02d%02d_%02d%02d%02d.dat.bak", szPath, nSlot,
+	nCharsWritten = swprintf_s(szBackupPath, MAX_PATH, L"%s\\My Games\\NieR_Automata\\SlotData_%d_%4d%02d%02d_%02d%02d%02d.dat.bak", szPath, Slot,
 		time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
 
 	if (nCharsWritten == -1)
@@ -1207,9 +1279,7 @@ static BOOL WriteMiniDump(EXCEPTION_POINTERS* pException)
 		return FALSE;
 
 	MINIDUMP_EXCEPTION_INFORMATION ExceptionInfo = { GetCurrentThreadId(), pException, FALSE };
-	MINIDUMP_TYPE Type = 
-		MINIDUMP_TYPE(MiniDumpWithUnloadedModules |
-			MiniDumpWithIndirectlyReferencedMemory | 
+	MINIDUMP_TYPE Type = MINIDUMP_TYPE(MiniDumpWithUnloadedModules | MiniDumpWithIndirectlyReferencedMemory | 
 			MiniDumpWithFullMemoryInfo);
 	
 	BOOL Status = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(),
@@ -1245,7 +1315,7 @@ static BOOL QueryProcessHeaps(OUT HANDLE** pphHeaps, OUT OPTIONAL DWORD* pdwHeap
 	}
 	else if (dwNumberOfHeaps > dwHeapsLength)
 	{
-		ERROR("Another component created a heap between calls therefore, the result will be inaccurate.");
+		LERROR("Another component created a heap between calls therefore, the result will be inaccurate.");
 		return ERROR_INSUFFICIENT_BUFFER;
 	}
 
@@ -1270,7 +1340,7 @@ static BOOL EnumProcessHeapInfo(IN HANDLE* phHeaps, IN DWORD dwHeaps)
 static LONG UnhandledExceptionHandlerChild(EXCEPTION_POINTERS* pException)
 {
 	if (!WriteMiniDump(pException))
-		ERROR("Failed to write dump file!\n");
+		LERROR("Failed to write dump file!\n");
 
 	return EXCEPTION_CONTINUE_SEARCH;
 }

@@ -143,8 +143,8 @@ public:
 	virtual void Write(const char* szFilename) = 0;
 
 protected:
-	const char* m_szCategory;
-	const char* m_szName;
+	const char* m_szCategory = nullptr;
+	const char* m_szName = nullptr;
 };
 
 class KeybindToggleable : public CKeybind

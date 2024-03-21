@@ -92,7 +92,7 @@ public:
 						LPCSTR szFunctionName = (LPCSTR)((PIMAGE_IMPORT_BY_NAME)((ULONG_PTR)pDosHeader + pImportNameTable[i].u1.AddressOfData))->Name;
 
 						// Compare function names
-						if (!strcmp(szFunctionName, szFunction))
+						if (szFunctionName && !strcmp(szFunctionName, szFunction))
 							return InitHook(&pImportAddressTable[i]);
 					}
 				}
