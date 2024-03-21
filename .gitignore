@@ -18,3 +18,4 @@ Build
 *.recipe
 *.ilk
 *.xml
+/x64/Debug
