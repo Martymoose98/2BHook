@@ -72,11 +72,11 @@ public:
 							DWORD dwHint = FindNptProc(hModule, pAddressOfNames, pExportDirectory->NumberOfNames, szFunction);
 
 							// If the function name was found compare use the hint to find the function ordinal and compare
-							if (dwHint != -1)
+							if (dwHint != 0xFFFFFFFF)
 							{
-								WORD ordinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[dwHint] + pExportDirectory->Base);
+								WORD wOrdinal = (WORD)(((PWORD)((ULONG_PTR)hModule + pExportDirectory->AddressOfNameOrdinals))[dwHint] + pExportDirectory->Base);
 
-								if (ordinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
+								if (wOrdinal == IMAGE_ORDINAL(pImportNameTable[i].u1.Ordinal))
 									return InitHook(&pImportAddressTable[i]);
 							}
 						}
@@ -153,7 +153,7 @@ private:
 			else
 				return dwMid;
 		}
-		return -1;
+		return -1; //	0xFFFFFFFF
 	}
 
 #ifdef FAST_HOOKING
