@@ -74,42 +74,32 @@ struct CpkEntry;
 typedef ULONGLONG QWORD;
 
 typedef Level_t*(*CalculateLevelFn)(ExExpInfo* pInfo, int experience);
-typedef CBehaviorAppBase*(*GetEntityFromHandleFn)(EntityHandle* pHandle);
-typedef CEntityInfo*(*GetEntityInfoFromHandleFn)(EntityHandle* pHandle);
-typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, int objectId); //0x140628940
+typedef CBehaviorAppBase*(*GetEntityFromHandleFn)(EntityHandle_t* pHandle);
+typedef CEntityInfo*(*GetEntityInfoFromHandleFn)(EntityHandle_t* pHandle);
+typedef BOOL(*ObjectIdToObjectNameFn)(char* szObjectName, size_t size, uint32_t ObjectId); //0x140628940
 typedef int(*CItemManager_GetItemIdByNameFn)(CItemManager* pThis, const char* szItemName);			//returns a sItem* maybe?
 typedef const char*(*CItemManager_GetItemNameByIdFn)(CItemManager* pThis, int item_id);	//returns a sItem* maybe?
 typedef bool(*CItemManager_AddItemFn)(CItemManager* pThis, int item_id, int iQuantity);
 typedef bool(*CItemManager_UseItemFn)(CItemManager* pThis, const char* szItemName);
 typedef bool(*CItemManager_UseItemByIdFn)(CItemManager* pThis, int item_id);
 typedef void(*ChangePlayerFn)(CBehaviorAppBase* pEntity);
-typedef __int64(*SetLocalPlayerFn)(EntityHandle* pHandle);
+typedef __int64(*SetLocalPlayerFn)(EntityHandle_t* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
-typedef void(*CSaveDataDevice_SaveFileIOFn)(CSaveDataDevice* pSave); // NOTE: not a real function points to CUserManager::SaveFileIO's switch
-typedef void(*CSaveDataDevice_ReadSaveSlotsFn)(CSaveDataDevice* pSave);
-typedef void(*CSaveDataDevice_ReadSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(*CSaveDataDevice_WriteSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(*CSaveDataDevice_DeleteSaveDataFn)(CSaveDataDevice* pSave);
-typedef void(*CWetObjectManager_AddLocalEntityFn)(CWetObjManager* pThis, CEntityInfo* pInfo);
-typedef void(*CWetObjectManager_SetWetFn)(CWetObjManager* pThis, byte wet_level, int index);
-typedef void(*CWetObjectManager_SetDryFn)(CWetObjManager* pThis, CEntityInfo *pInfo);
-typedef void(*CCameraGame_SetLookAtFn)(CCameraGame* pThis);
-typedef void(*ResetCameraFn)(CCameraGame* pCamera);
 typedef bool(*DestroyBuddyFn)(CBehaviorAppBase* pBuddy);
 typedef __int64(*NPC_ChangeSetTypeFollowFn)(CBehaviorAppBase* pNPC);
 typedef __int64(*NPC_ChangeSetTypeIdleFn)(CBehaviorAppBase* pNPC);
 typedef __int64(*EmitSoundFn)(Sound* pSound, CBehavior** ppSourceEntity); // also second arg is another custom struct
 typedef __int64(*PlaySoundFn)(Sound* pSound);
-typedef unsigned int(*HashStringCRC32Fn)(const char* szName, __int64 length);
-typedef unsigned int(*FNV1HashFn)(const char* szString);
+typedef uint32_t(*HashStringCRC32Fn)(const char* szName, __int64 length);
+typedef uint32_t(*FNV1HashFn)(const char* szString);
 typedef __int64(*HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
-typedef void*(*CSceneEntitySystem_FindSceneStateFn)(CSceneEntitySystem* pThis, unsigned int crc, const char* szName, __int64 length); // not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
+typedef void*(*CSceneEntitySystem_FindSceneStateFn)(CSceneEntitySystem* pThis, uint32_t crc, const char* szName, __int64 length);
 typedef bool(*CSceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
 typedef BOOL(*SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
-typedef void(*SetSceneEntityFn)(const char*, CEntityInfo*);
-typedef __int64(*CallTutorialDialogFn)(__int64, unsigned int dialogId); //callTutorialDialog address = 0x1401B1F30
+typedef void(*SetSceneEntityFn)(const char* szHashName, CEntityInfo* pInfo);
+typedef __int64(*CallTutorialDialogFn)(__int64, uint32_t dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(*QuestState_RequestStateInternalFn)(DWORD *pQuestId);
-typedef CConstructionInfo<void>*(*GetConstructorFn)(int objectId); //0x1401A2C20  templates are shit tbh
+typedef CConstructionInfo<void>*(*GetConstructorFn)(uint32_t ObjectId); //0x1401A2C20  templates are shit tbh
 typedef CEntityInfo*(*CSceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
@@ -125,6 +115,11 @@ typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CText
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
 typedef HeapAlloc_t*(*QueryHeapFn)(HeapAlloc_t* pResult, int objectid, int a3); // or void i guess
+
+typedef void(*CJobManager_YieldToNextTaskFn)(void);
+typedef void(*CJobManager_SetTaskFunctionFn)(void (*pFunc)(void*), void* pParams);
+typedef uint32_t(*CreateTaskFn)(void* pfnCallback, void* pParam, uint32_t uPriority, const char* szName);
+
 typedef BOOL (*CreateWorkFn)(int Objectid);
 typedef CObjReadSystem::Work* (*CObjReadSystem_FindObjectWorkFn)(int ObjectId);
 typedef CObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, CObjReadSystem::Work* pWork);
@@ -174,29 +169,44 @@ extern CItemManager_GetItemIdByNameFn ItemManager_GetItemIdByName;
 extern CItemManager_AddItemFn ItemManager_AddItem;
 extern CItemManager_UseItemFn ItemManager_UseItem;
 extern SetLocalPlayerFn SetLocalPlayer;
-extern ResetCameraFn ResetCamera;
+extern CCameraGame::ResetCameraFn ResetCamera;
 extern ChangePlayerFn ChangePlayer;
 extern DestroyBuddyFn DestroyBuddy;
-extern CSaveDataDevice_SaveFileIOFn SaveFileIO;
-extern CSaveDataDevice_ReadSaveSlotsFn ReadSaveSlots;
-extern CSaveDataDevice_ReadSaveDataFn ReadSaveData;
-extern CSaveDataDevice_WriteSaveDataFn WriteSaveData;
-extern CSaveDataDevice_DeleteSaveDataFn DeleteSaveData;
-extern CWetObjectManager_SetWetFn WetObjectManager_SetWet;
-extern CWetObjectManager_SetDryFn WetObjectManager_SetDry;
-extern CWetObjectManager_AddLocalEntityFn WetObjectManager_AddLocalEntity;
-extern CSceneEntitySystem_CreateEntityFn SceneEntitySystem_CreateEntity;
+extern CSaveDataDevice::SaveFileIOFn SaveFileIO;
+extern CSaveDataDevice::ReadSaveSlotsFn ReadSaveSlots;
+extern CSaveDataDevice::ReadSaveDataFn ReadSaveData;
+extern CSaveDataDevice::WriteSaveDataFn WriteSaveData;
+extern CSaveDataDevice::DeleteSaveDataFn DeleteSaveData;
+extern CWetObjectManager::SetWetFn WetObjectManager_SetWet;
+extern CWetObjectManager::SetDryFn WetObjectManager_SetDry;
+extern CWetObjectManager::AddLocalEntityFn WetObjectManager_AddLocalEntity;
+extern CEntityInfo::DeleteFn EntityInfo_Delete;
+extern CSceneEntitySystem::CreateEntityFn SceneEntitySystem_CreateEntity;
+extern CSceneEntitySystem::FindSceneStateFn SceneEntitySystem_FindSceneState;
+extern CSceneEntitySystem::FindByObjectIdFn SceneEntitySystem_FindByObjectId;
 extern CSceneStateSystem_SetFn SceneStateSystem_Set;
-extern CCameraGame_SetLookAtFn CameraGame_SetLookAt;
-extern CCameraGame_SetLookAtFn CameraGame_SetLookAtNoDistance;
+extern CCameraGame::SetLookAtFn CameraGame_SetLookAt;
+extern CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;
 extern ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
-extern CSceneEntitySystem_FindSceneStateFn SceneEntitySystem_FindSceneState;
+
 extern HashStringCRC32Fn HashStringCRC32;
 extern UnlockAchievementFn UnlockAchievement;
 extern FNV1HashFn FNV1Hash;
 extern QueryHeapFn QueryHeap;
+extern CreateTaskFn CreateTask;
+extern CJobManager::CreateTaskFn JobManager_CreateTask;
+extern CJobManager::SuspendTaskFn JobManager_SuspendTask;
+
+extern CJobManager::DestroyTaskFn JobManager_DestroyTask;
+// Specific to ObjReadSystem ?
+extern CJobManager::SuspendTaskFn JobManager_PauseTask2;
+
+extern CJobManager::YieldFn JobManager_Yield;
+// Specific to ObjReadSyste
+extern CJobManager_YieldToNextTaskFn YieldToNextTask;
+extern CJobManager_SetTaskFunctionFn SetTaskFunction;
 extern CreateWorkFn CreateWork;
 extern CObjReadSystem_FindObjectWorkFn FindObjectWork;
 extern PreloadFileFn PreloadFile;
@@ -218,12 +228,14 @@ extern XInputPowerOffControllerFn XInputPowerOffController;
 extern XInputGetBaseBusInformationFn XInputGetBaseBusInformation;
 extern XInputGetCapabilitiesExFn InputGetCapabilitiesEx;
 
-extern unsigned int* g_pDebugFlags;
-extern unsigned int* g_pCameraFlags;
-extern unsigned int* g_pGameFlags;
+extern CreateStub_t g_CreateCtx;
 
-extern int* g_piMoney;
-extern int* g_piExperience;
+extern uint32_t* g_pDebugFlags;
+extern uint32_t* g_pCameraFlags;
+extern uint32_t* g_pGameFlags;
+
+extern int32_t* g_piMoney;
+extern int32_t* g_piExperience;
 
 extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
@@ -236,8 +248,8 @@ extern std::vector<MrubyImpl*> g_pRubyInstances;
 //extern void* g_pTextureVtbl;
 
 extern Pl0000* g_pLocalPlayer;
-extern EntityHandle* g_pLocalPlayerHandle;
-extern EntityHandle* g_pEmilHandle;
+extern EntityHandle_t* g_pLocalPlayerHandle;
+extern EntityHandle_t* g_pEmilHandle;
 extern CEntityList* g_pEntityList;
 extern CItemManager* g_pItemManager;
 extern CYorhaManager* g_pYorhaManager;
@@ -252,6 +264,7 @@ extern CModelManager* g_pModelManager;
 extern CModelAnalyzer* g_pModelAnalyzer;
 extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
+extern CJobManager* g_pJobManager;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern CSceneEntitySystem* g_pSceneEntitySystem;
 extern CNetworkDevice* g_pNetworkDevice;

@@ -24,7 +24,7 @@ public:
 
 class ExCollision : public CBehaviorExtension // lib::Noncopyable
 {
-	enum Type : DWORD
+	enum Type : uint32_t
 	{
 		COLLISION_TYPE_INVALID,
 		COLLISION_TYPE_SPHERE,
@@ -33,6 +33,8 @@ class ExCollision : public CBehaviorExtension // lib::Noncopyable
 	};
 
 public:
+	typedef void(*GetOBBMaxFn)(ExCollision* pThis, Vector3Aligned* pvMax);
+
 	virtual void function0(char a1);
 	virtual void function1();
 	virtual void function2();
@@ -42,7 +44,7 @@ public:
 
 	EntityHandle m_hOwner;										//0x0010
 	BOOL m_bEnabled;											//0x0014
-	BOOL m_bCollison;											//0x0018
+	BOOL m_bCollision;											//0x0018
 	BOOL dword1C;												//0x001C
 	Vector4 m_vPosition;										//0x0020 | CollisionInfo starts here	
 	float m_boundingbox[6];										//0x0030
@@ -252,9 +254,9 @@ public:
 	virtual void function17() = 0;
 	virtual void Animate(uint32_t id, int32_t mode, int32_t a4, int32_t a5) = 0;
 	virtual void function19() = 0;
-	virtual void function20() = 0;
-	virtual void function21() = 0;
-	virtual void function22() = 0;
+	virtual void function20(void) = 0;	// mov eax,1 ret stub
+	virtual void function21(void) = 0;	// mov eax,1 ret stub
+	virtual void function22(void) = 0;	// mov eax,1 ret stub
 	virtual void function23() = 0;
 	virtual void function24() = 0;
 	virtual void function25() = 0;

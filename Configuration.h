@@ -3,10 +3,14 @@
 #include <Shlwapi.h>
 //#include <Wsdxml.h>
 #include <xmllite.h>
+#include <wrl.h>
 #include <tchar.h>
 
 #include <vector>
+#include <map>
+#include <stack>
 #include <functional>
+#include <string>
 
 #include "Globals.h"
 
@@ -76,16 +80,36 @@
 //	static void WriteFloat(const ConfigItem* pItem);
 //};
 
+#if defined(CONFIG_XML)
+#define CATEGORY_VISUALS _CRT_WIDE("Visuals")
+#define CATEGORY_GAMEPLAY _CRT_WIDE("Gameplay")
+#define CATEGORY_KEYBINDS _CRT_WIDE("Keybinds")
+#define CATEGORY_MISC _CRT_WIDE("Misc")
+#define CATEGORY_MENU _CRT_WIDE("Menu")
+#define CONFIG_EXTENSION _CRT_WIDE(".xml")
+#else
 #define CATEGORY_VISUALS "Visuals"
 #define CATEGORY_GAMEPLAY "Gameplay"
 #define CATEGORY_KEYBINDS "Keybinds"
 #define CATEGORY_MISC "Misc"
 #define CATEGORY_MENU "Menu"
 
-#define CONFIG_DEFAULT TEXT("default")
 #define CONFIG_EXTENSION TEXT(".ini")
+#endif // CONFIG_XML
+
+#define XCATEGORY_VISUALS _CRT_WIDE(CATEGORY_VISUALS)
+#define XCATEGORY_GAMEPLAY _CRT_WIDE(CATEGORY_GAMEPLAY)
+#define XCATEGORY_KEYBINDS _CRT_WIDE(CATEGORY_KEYBINDS)
+#define XCATEGORY_MISC _CRT_WIDE(CATEGORY_MISC)
+#define XCATEGORY_MENU _CRT_WIDE(CATEGORY_MENU)
+
+
+#define CONFIG_DEFAULT TEXT("default")
+
 #define CONFIG_SEARCH_WILDCARD _CRT_CONCATENATE(TEXT("*"), CONFIG_EXTENSION)
 #define CONFIG_DEFAULT_INI _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
+
+using namespace Microsoft::WRL;
 
 class IKeybind
 {
@@ -115,25 +139,26 @@ public:
 class CKeybind : public IKeybind
 {
 public:
-	CKeybind(void) : m_szName(NULL), m_keycode(-1), m_mode(KEYBIND_INVALID) {}
+	CKeybind(void) : m_szName(NULL), m_Keycode(-1), m_Mode(KEYBIND_INVALID) {}
 
-	CKeybind(const char* szName, int keycode, Mode mode)
-		: m_szName(szName), m_keycode(keycode), m_mode(mode)
+	CKeybind(const char* szName, int32_t Keycode, Mode Mode)
+		: m_szName(szName), m_Keycode(Keycode), m_Mode(Mode)
 	{
 	}
 
 	virtual void OnPressed(void) = 0;
 
 	const char* GetName(void) const { return m_szName; }
-	int GetKeycode(void) const { return m_keycode; }
-	void SetKeycode(int keycode) { m_keycode = keycode; }
-	Mode GetMode(void) const { return m_mode; }
+	int GetKeycode(void) const { return m_Keycode; }
+	void SetKeycode(int keycode) { m_Keycode = keycode; }
+	Mode GetMode(void) const { return m_Mode; }
 
 private:
 	const char* m_szName;
-	int m_keycode;
-	Mode m_mode;
+	int32_t m_Keycode;
+	Mode m_Mode;
 };
+
 
 class IConfigItem
 {
@@ -426,6 +451,126 @@ public:
 
 private:
 	std::function<Ret()> m_callback;
+};
+
+
+class IConfigItemXml
+{
+public:
+	virtual HRESULT Read(IXmlReader* pReader) = 0;
+	virtual HRESULT Write(IXmlWriter* pWriter) = 0;
+
+	template<typename T>
+	static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(const wchar_t* szSector,
+		const wchar_t* szName, T& Value) noexcept
+	{
+		return std::make_pair(szSector, new CConfigItemXml<T>(szSector, szName, Value));
+	}
+};
+
+
+class CConfigItemXmlNamespace
+{
+public:
+	CConfigItemXmlNamespace(ComPtr<IXmlReader> pReader, const wchar_t* szName, uint32_t uChildrenCount)
+		: m_pReader(pReader), m_pWriter(nullptr), m_szName(szName), m_uChildrenCount(uChildrenCount)
+	{
+		Read();
+	}
+
+	CConfigItemXmlNamespace(ComPtr<IXmlWriter> pWriter, const wchar_t* szName, uint32_t uChildrenCount)
+		: m_pReader(nullptr), m_pWriter(pWriter), m_szName(szName), m_uChildrenCount(uChildrenCount)
+	{
+		BeginWrite();
+	}
+
+	~CConfigItemXmlNamespace(void)
+	{
+		if (m_pWriter)
+			EndWrite();
+	}
+
+	HRESULT Read(void)
+	{
+		HRESULT hr = S_OK;
+
+
+
+		return hr;
+	}
+
+	HRESULT BeginWrite(void)
+	{
+		HRESULT hr = S_OK;
+
+		wchar_t szBuffer[33] = { 0 };
+
+		_ultow_s(m_uChildrenCount, szBuffer, 10);
+
+		if (SUCCEEDED(hr = m_pWriter->WriteStartElement(NULL, m_szName, NULL)))
+		{
+			hr = m_pWriter->WriteAttributeString(NULL, L"num_children", NULL, szBuffer);
+			hr = m_pWriter->WriteWhitespace(L"\r\n");
+		}
+
+		return hr;
+	}
+
+	HRESULT EndWrite(void)
+	{
+		HRESULT hr = S_OK;
+
+		if (SUCCEEDED(hr = m_pWriter->WriteFullEndElement()))
+			hr = m_pWriter->WriteWhitespace(L"\r\n");
+
+		return hr;
+	}
+
+	bool operator!=(const wchar_t* szName) const
+	{
+		return (wcscmp(m_szName, szName) != 0);
+	}
+
+	bool operator==(const wchar_t* szName) const
+	{
+		return (wcscmp(m_szName, szName) == 0);
+	}
+
+	ComPtr<IXmlReader> m_pReader;
+	ComPtr<IXmlWriter> m_pWriter;
+	const wchar_t* m_szName;
+	volatile uint32_t m_uChildrenCount;
+};
+
+template<typename T>
+class CConfigItemXml : public IConfigItemXml
+{
+public:
+	CConfigItemXml(const wchar_t* szSector, const wchar_t* szName, T& Value)
+		: m_szSector(szSector), m_szName(szName), m_Value(Value)
+	{
+
+	}
+
+	// Global Read Stub
+	virtual HRESULT Read(IXmlReader* pReader) override
+	{
+		return CConfigItemXml<T>::Read(pReader);
+	}
+
+	// Global Write Stub
+	virtual HRESULT Write(IXmlWriter* pWriter) override
+	{
+		return CConfigItemXml<T>::Write(pWriter);
+	}
+
+protected:
+	// XML Namespace
+	const wchar_t* m_szSector;
+	// XML Local Name
+	const wchar_t* m_szName;
+	// XML Value
+	T& m_Value;
 };
 
 class ConfigItemBool : public IConfigItem
@@ -984,7 +1129,7 @@ public:
 	virtual bool CreateConfig(LPTSTR szFilename) = 0;
 	virtual void ResetConfig(void) = 0;
 	virtual void Load(LPCWSTR szFilename) = 0;
-	virtual void Save(LPCTSTR szFilename) = 0;
+	virtual void Save(LPCWSTR szFilename) = 0;
 
 	static BOOL FileExists(LPCTSTR szFilename);
 
@@ -994,15 +1139,62 @@ public:
 	static BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
 		OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath);
 
+protected:
+	bool SetFilename(LPCTSTR szFilename);
+
 };
 
 class CConfigXml : public IConfig
 {
+public:
+
+	virtual bool CreateConfig(LPTSTR szFilename) override;
+	virtual void ResetConfig(void) override;
 	virtual void Load(LPCWSTR szFilename) override;
+	virtual void Save(LPCWSTR szFilename) /*override*/;
 
-	void ReadNode(XmlNodeType Type);
+	HRESULT ReadNode(XmlNodeType Type);
+	HRESULT WriteNode(XmlNodeType Type);
 
-	IXmlReader* m_pReader;
+	HRESULT BeginReadElement(void);
+	HRESULT EndReadElement(void);
+
+	void InitializeConfig(void);
+
+	bool SetFilename(LPCTSTR szFilename)
+	{
+		TCHAR szDLLFilename[MAX_PATH];
+		LPCTSTR	szExtension;
+
+		ZeroMemory(m_szFilename, sizeof(m_szFilename));
+		GetModuleFileName(g_hInstance, szDLLFilename, MAX_PATH);
+
+		if (SanitizePath(TEXT("\\"), szDLLFilename, MAX_PATH, m_szFilename, MAX_PATH))
+			return false;
+
+		if (szFilename)
+		{
+			_tcscat_s(m_szFilename, szFilename);
+
+			szExtension = _tcsrchr(szFilename, '.');
+
+			if (szExtension && _tcsicmp(szExtension, CONFIG_EXTENSION))
+				_tcscat_s(m_szFilename, CONFIG_EXTENSION);
+		}
+		else
+		{
+			_tcscat_s(m_szFilename, CONFIG_DEFAULT_INI);
+		}
+
+		return true;
+	}
+
+	TCHAR m_szFilename[MAX_PATH];
+	ComPtr<IXmlReader> m_pReader;
+	ComPtr<IXmlWriter> m_pWriter;
+
+	std::multimap<const std::wstring, IConfigItemXml*> m_Items;
+	//std::multimap<const wchar_t*, IConfigItemXml*> m_Items;
 };
 
 class CConfig : public IConfig
@@ -1011,17 +1203,18 @@ public:
 	CConfig(void);
 	~CConfig(void);
 
-	bool CreateConfig(LPTSTR szFilename) override;
-	void ResetConfig(void);
-	void Load(LPCWSTR szFilename) override;
-	void Save(LPCTSTR szFilename) override;
+	virtual bool CreateConfig(LPTSTR szFilename) override;
+	virtual void ResetConfig(void) override;
+	virtual void Load(LPCWSTR szFilename) override;
+	virtual void Save(LPCWSTR szFilename) override;
 
 	// HACK! for compat
 	void Load(LPCTSTR szFilename);
+	void Save(LPCTSTR szFilename);
 
 	BOOL EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const;
 
-	std::vector<CKeybind*>& GetKeybinds(void) { return m_keybinds; }
+	std::vector<CKeybind*>& GetKeybinds(void) { return m_Keybinds; }
 	LPCTSTR GetConfigPath(void) const { return m_szFilename; }
 
 	friend class CMenu;
@@ -1046,8 +1239,8 @@ private:
 	bool SetFilename(LPCTSTR szFilename);
 
 	TCHAR m_szFilename[MAX_PATH];
-	std::vector<IConfigItem*> m_items;
-	std::vector<CKeybind*> m_keybinds;
+	std::vector<IConfigItem*> m_Items;
+	std::vector<CKeybind*> m_Keybinds;
 };
 
 

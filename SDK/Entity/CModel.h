@@ -167,11 +167,11 @@ class CModelExtendWork : public CModelExtendWorkBase
 public:
 
 	float flUnk;				//0x0008
-	DWORD _0x0010;				//0x000C
+	uint32_t m_uFlags;			//0x000C
 	uint32_t m_ObjectId;		//0x0010
 	char _0x0014[12];			//0x0014
 	CModel* m_pParent;			//0x0020 | maybe? might need CObj or CBehavior
-	DWORD m_dw28;
+	DWORD m_fFlags;
 	QWORD qword30;
 	DWORD dword38;
 	QWORD qword40;
@@ -298,10 +298,10 @@ public:
 	CConstantBuffer* qword48;				//0x0048 | CConstantBuffer*
 	int32_t m_nQword48;						//0x0050
 	DWORD dword54;							//0x0054
-	QWORD qword58;							//0x0058
+	QWORD m_pfnCallback;					//0x0058
 	Vector4 oword60;						//0x0060
 	Vector4 oword70;						//0x0070
-	int32_t int80;							//0x0080
+	BOOL m_bHasData;						//0x0080
 	float m_flWetness;						//0x0084
 	char pad[4];
 };
@@ -462,7 +462,7 @@ public:
 	short* m_pBoneIndexTranslationTable2;	//0x0068
 	CHitbox* m_pHitboxes;					//0x0070
 	int32_t m_nHitboxes;					//0x0078
-	char pad78[4];							//0x007C
+	BOOL m_bUnk;							//0x007C
 	void* m_pBoneMap;						//0x0080
 	int32_t m_nBoneMapEntries;				//0x0088
 	char pad8C[4];							//0x008C
@@ -588,6 +588,7 @@ class CModelWork
 public:
 	enum ERenderFlags
 	{
+		RF_UNK = 0x04, // 1 << 2
 		RF_NO_LOD = 0x20,
 		RF_DONT_RENDER = 0x20000000,
 	};
@@ -639,6 +640,13 @@ VALIDATE_OFFSET(CModelWork, m_pModelExtend, 0x180);
 class CModel : public CParts
 {
 public:
+	enum ERenderFlags
+	{
+		RFEX_UNK0 = 0x04,
+		RFEX_UNK1 = 0x08,
+		RFEX_RENDER = 0x40, // CModelExtendWork::m_fFlags
+	};
+
 
 	virtual void function0(void) = 0;
 	virtual void UpdateModelPhysics(Vector4* v1, Vector4* v2, Vector4* v3) = 0;

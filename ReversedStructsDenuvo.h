@@ -127,8 +127,8 @@ public:
 	virtual T* Find(IN T* pSearchItem, OUT T* pFound);
 
 	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
+	QWORD m_Count;	//0x0010
+	QWORD m_Size;	//0x0018
 };
 
 /*
@@ -138,7 +138,7 @@ template<typename T, size_t size, size_t element_size = sizeof(T)>
 class StaticArray : public Array<T>
 {
 public:
-	T m_items[size];	//0x0020
+	T m_Items[size];	//0x0020
 };
 
 /*
@@ -149,8 +149,8 @@ class AllocatedArray
 {
 public:
 	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
+	QWORD m_Count;	//0x0010
+	QWORD m_Size;	//0x0018
 };
 
 
@@ -692,7 +692,7 @@ public:
 	StaticArray<std::pair<TypeId, CBehaviorExtension*>, 16, 8>* m_pBehaviourExtensions;	//0x0008
 	EntityHandle m_hOwner;																//0x0010
 	BOOL m_bEnabled;																	//0x0014
-	BOOL m_bCollison;																	//0x0018
+	BOOL m_bCollision;																	//0x0018
 	BOOL dword1C;																		//0x001C
 	Vector4 m_vPosition;																//0x0020
 	float m_boundingbox[6];																//0x0030
@@ -1472,7 +1472,7 @@ class CObj : public CModel
 {
 };
 
-//TODO("fill & verify CModel, CObj and CBehaviour struct out")
+//TODO "fill & verify CModel, CObj and CBehaviour struct out"
 class CBehavior : public CObj
 {
 };
@@ -2838,7 +2838,7 @@ public:
 	union
 	{
 		struct { POINT m_WindowPosition; INT m_iWidth; INT m_iHeight; };
-		RECT m_windowRect;
+		RECT m_WindowRect;
 	};
 	BYTE gap20[4];
 	BOOL m_bUpdateRect;

@@ -177,7 +177,8 @@ void Overlay::Render(OverlayDrawList* pList)
 		if (pCameraEntity)
 		{
 			// FIXME: hack until we figure out the other classes
-			ExCollision* pCollision = &((Pl0000*)pCameraEntity)->m_VerticalCollision;
+			ExCollision* pVertCollision = &((Pl0000*)pCameraEntity)->m_VerticalCollision;
+			ExCollision* pHorCollision = &((Pl0000*)pCameraEntity)->m_HorizontalCollision;
 
 			vMin = pCameraEntity->m_vPosition;
 
@@ -187,7 +188,7 @@ void Overlay::Render(OverlayDrawList* pList)
 				_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
 					_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));*/
 
-			ExCollision_GetOBBMax(pCollision, &vMax);
+			ExCollision_GetOBBMax(pVertCollision, &vMax);
 
 			for (int i = 0; i < pCameraEntity->m_Work.m_nMeshes; ++i)
 			{/*
@@ -201,22 +202,31 @@ void Overlay::Render(OverlayDrawList* pList)
 				*/
 			}
 
-
 			if (Vars.Visuals.bEspBox && WorldToScreen(vMin, vMin2D) && WorldToScreen(vMax, vMax2D))
 			{
+				ImRect Rect;
+
 				int h = (int)(vMin2D.y - vMax2D.y);
-				int w = h / 2;
+				int w = h / 2;	
+
+				const char* szObject = (pCameraEntity->m_ObjectId == OBJECTID_2B) ? "2B" :
+					(pCameraEntity->m_ObjectId == OBJECTID_A2) ? "A2" :
+					(pCameraEntity->m_ObjectId == OBJECTID_9S) ? "9S" : "Unknown";
 
 				if (Vars.Visuals.b2DEspBox)
 				{
-					pList->AddRectCorners((int)vMin2D.x - (w / 2), (int)(vMin2D.y - h), w, h, 5, ImColor(23, 128, 150));
-					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, (pCameraEntity->m_ObjectId == 0x10000) ? "2B" : (pCameraEntity->m_ObjectId == 0x10100) ? "A2" : (pCameraEntity->m_ObjectId == 0x10200) ? "9S" : "Unknown");
-					pList->AddHealthBar((int)vMin2D.x + 20 + (w / 2), (int)(vMin2D.y - h), h, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
+					pList->Add2DBox(Vector3(-0.3f, 0, -0.2f), Vector3(0.3f, 1.5f, 0.2f), pCameraEntity->m_matTransform,
+						5, ImColor(23, 128, 150), Rect);
+
+					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
+
+					pList->AddHealthBar((int)(vMin2D.x + 20.0f + (Rect.GetWidth() * 0.5f)),
+						Rect.Min.y, Rect.GetHeight(), pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
 				}
 				else
 				{
 					pList->Add3DBox(Vector3(-0.5f, 0, -0.5f), Vector3(0.5f, 1.5f, 0.5f), pCameraEntity->m_matTransform, ImColor(23, 128, 150));
-					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, (pCameraEntity->m_ObjectId == 0x10000) ? "2B" : (pCameraEntity->m_ObjectId == 0x10100) ? "A2" : (pCameraEntity->m_ObjectId == 0x10200) ? "9S" : "Unknown");
+					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
 					pList->AddHealthBar((int)vMin2D.x + 30 + (w / 2), (int)(vMin2D.y - h), h, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
 				}
 			}
@@ -252,7 +262,7 @@ void Overlay::Render(OverlayDrawList* pList)
 
 			if (Vars.Visuals.bEnemyInfo)
 			{
-				for (int i = 0; i < g_pEnemyManager->m_handles.m_count; ++i)
+				for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
 				{
 					CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
@@ -306,7 +316,7 @@ void Overlay::Render(OverlayDrawList* pList)
 
 	if (Vars.Visuals.bNPCInfo)
 	{
-		for (int i = 0; i < g_pNPCManager->m_handles.m_count; ++i)
+		for (size_t i = 0; i < g_pNPCManager->m_handles.m_Count; ++i)
 		{
 			CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
 

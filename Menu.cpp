@@ -11,9 +11,9 @@ CMenu::CMenu(const CAdapter* pAdapter)
 	ImTextStrToUtf8(m_szOutputUtf8, sizeof(m_szOutputUtf8), (const ImWchar*)pOutput->m_szDeviceName, NULL);
 
 	m_pConfig->AddKeybind(new KeybindToggleable("kb_open_menu", DIK_INSERT, &m_bOpened));
-	m_pConfig->m_items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", m_bIgnoreInputWhenOpened));
-	m_pConfig->m_items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_fg", m_Primary));
-	m_pConfig->m_items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_bg", m_PrimaryBg));
+	m_pConfig->m_Items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", m_bIgnoreInputWhenOpened));
+	m_pConfig->m_Items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_fg", m_Primary));
+	m_pConfig->m_Items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_bg", m_PrimaryBg));
 
 	m_pConfig->CreateConfig(NULL);
 	m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
@@ -74,6 +74,12 @@ void CMenu::Draw(const ImVec2 vSize)
 				ImGui::EndTabItem();
 			}
 
+			if (ImGui::BeginTabItem("Spawn"))
+			{
+				SpawnTab(static_cast<Pl0000*>(pCameraEnt));
+				ImGui::EndTabItem();
+			}
+
 			if (ImGui::BeginTabItem("Miscellaneous"))
 			{
 				MiscTab();
@@ -96,96 +102,6 @@ void CMenu::Draw(const ImVec2 vSize)
 		}
 	}
 	ImGui::End();
-}
-
-// FIXME: CHANGE TO MEM ARENA FOR PERF
-void CMenu::DisplayEntityHandles(void)
-{
-	if (!g_pNPCManager)
-		return;
-
-	int count = (int)(g_pNPCManager->m_handles.m_count + g_pYorhaManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count);
-	char** ppszHandles = new char* [count];
-	EntityHandle* handles = new EntityHandle[count];
-
-	int i = 0;
-	for (; i < g_pNPCManager->m_handles.m_count; ++i)
-	{
-		ppszHandles[i] = new char[64];
-		EntityHandle hCurrent = g_pNPCManager->m_handles.m_pItems[i];
-		handles[i] = hCurrent;
-		Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
-
-		sprintf_s(ppszHandles[i], 64, "NPC: %s | Handle: %x | ObjectId: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
-	}
-
-	for (; i < g_pNPCManager->m_handles.m_count + g_pEnemyManager->m_handles.m_count; ++i)
-	{
-		ppszHandles[i] = new char[64];
-		EntityHandle hCurrent = g_pEnemyManager->m_handles.m_pItems[i];
-		handles[i] = hCurrent;
-		Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
-
-		sprintf_s(ppszHandles[i], 64, "Enemy %s | Handle: %x | ObjectId: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
-	}
-
-	for (; i < count; ++i)
-	{
-		ppszHandles[i] = new char[64];
-		EntityHandle hCurrent = g_pYorhaManager->m_handles.m_pItems[i];
-		handles[i] = hCurrent;
-		Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
-
-		sprintf_s(ppszHandles[i], 64, "Yorha: %s | Handle: %x | ObjectId: %x", pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
-	}
-	//ImGui::ListBox(const char* label, int* current_item, bool (*items_getter)(void*, int, const char**), void* data, int items_count, int height_in_items)
-	ImGui::ListBox("NPC, Yorha & Enemy Handles", &Vars.Gameplay.iSelectedEntityHandle, ppszHandles, count);
-
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.25f);
-
-	ImGui::InputInt("Level", &Vars.Gameplay.iSelectedEntityLevel, 1, 5);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Set Level"))
-		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&handles[Vars.Gameplay.iSelectedEntityHandle]), Vars.Gameplay.iSelectedEntityLevel - 1, Vars.Gameplay.iSelectedEntityLevel - 1);
-
-	ImGui::PopItemWidth();
-
-	//FIXME: DEFO CRASH
-	if (ImGui::Button("Set NPC Follow"))
-	{
-		CBehaviorAppBase* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
-
-		if (pNPC)
-			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC);
-	}
-
-	ImGui::SameLine();
-
-	//FIXME: DEFO CRASH
-	if (ImGui::Button("Set NPC Idle"))
-	{
-		CBehaviorAppBase* pNPC = GetEntityFromHandle(&handles[Vars.Gameplay.iSelectedEntityHandle]);
-
-		if (pNPC)
-			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);
-	}
-
-#ifdef  _DEBUG
-	ImGui::SameLine();
-
-	if (ImGui::Button("Set Player"))
-	{
-		Features::SetPlayer(handles[Vars.Gameplay.iSelectedEntityHandle]);
-	}
-#endif
-
-	for (int i = 0; i < count; ++i)
-		delete[] ppszHandles[i];
-
-	delete[] ppszHandles;
-	delete[] handles;
 }
 
 HRESULT CMenu::KeyboardHandler(HRESULT Result, LPVOID lpvData, DWORD cbData)
@@ -223,435 +139,6 @@ HRESULT CMenu::MouseHandler(LPVOID lpvData, DWORD cbData)
 bool CMenu::IsOpen(void) const
 {
 	return m_bOpened;
-}
-
-// 40 53 48 83 EC 20 48 8B 91 80 72 - pl0000::SetStateMosaic
-void CMenu::GameplayTab(Pl0000* pCameraEnt)
-{
-	ImGui::Checkbox("Godmode", &Vars.Gameplay.bGodmode);
-	ImGui::SameLine();
-	ImGui::Checkbox("No Fall Damage", &Vars.Gameplay.bNoWorldDamage);
-	ImGui::SameLine();
-	ImGui::Checkbox("No Enemy Damage", &Vars.Gameplay.bNoEnemyDamage);
-	ImGui::SliderFloat("Tick Base", &pCameraEnt->m_pInfo->m_pUnknown->m_flTickBase, 0.0f, 32.0f);
-
-
-	ImGui::Columns(2);
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
-
-	ImGui::InputInt("Experience:", g_piExperience, 1, 5);
-	ImGui::InputInt("Level:", &Vars.Gameplay.iLevel, 1, 5);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Apply Level"))
-	{
-		if (g_piExperience)
-		{
-			Vars.Gameplay.iLevel = min(MAX_LEVELS, max(MIN_LEVELS, Vars.Gameplay.iLevel));
-			*g_piExperience = g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
-		}
-	}
-
-	ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Max Money"))
-		*g_piMoney = MAX_MONEY;
-
-	ImGui::PopItemWidth();
-	ImGui::NextColumn();
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
-
-	ImGui::InputInt((Vars.Gameplay.bLevelBuffMode) ? "Enemy Level (1-99):" : "Enemy Level Tolerance (+/-):",
-		(Vars.Gameplay.bLevelBuffMode) ? &Vars.Gameplay.iEnemyLevel : &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
-
-	ImGui::Checkbox("Balance Enemy Levels", &Vars.Gameplay.bBalanceEnemyLevels);
-	ImGui::SameLine();
-	ImGui::Checkbox("Exclusively Positive", &Vars.Gameplay.bExclusivelyPositiveTolerance);
-	ImGui::Checkbox("Absolute Level", &Vars.Gameplay.bLevelBuffMode);
-
-	ImGui::PopItemWidth();
-	ImGui::Columns();
-
-	char szDesc[64];
-	char* szName = (char*)ItemManager_GetItemNameById(g_pItemManager, Vars.Gameplay.iSpawnItemId);
-	// FIXME: Broken on the new version this fucking function keeps crashing
-	sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
-	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
-	int id = ItemManager_GetItemIdByName(g_pItemManager, Vars.Gameplay.szItemName);
-	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
-	ImGui::InputInt("Quantity", &Vars.Gameplay.iSpawnItemQuantity);
-	ImGui::Checkbox("Instant Equip", &Vars.Gameplay.bInstantEquip);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Spawn Item"))
-		Features::AddItem(Vars.Gameplay.iSpawnItemId, Vars.Gameplay.iSpawnItemQuantity);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Spawn Pod A"))
-		Features::AddPod(POD_A);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Spawn Pod B"))
-		Features::AddPod(POD_B);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Spawn Pod C"))
-		Features::AddPod(POD_C);
-
-	ImGui::ListBox("Entity", &Vars.Gameplay.iSelectedEntityType, 
-		[](void* pUserData, int idx) -> const char* { return ((Variables_t::Spawn*)pUserData)[idx].m_szName; },
-		(void*)Vars.SpawnEntities, _ARRAYSIZE(Vars.SpawnEntities));
-
-	ImGui::InputFloat3("Entity Scale", (float*)&Vars.Gameplay.vSpawnEntityScale);
-
-	if (ImGui::Button("Create Entity"))
-	{
-		set_info_t set_info;
-
-		set_info.m_mat = Matrix4x4();
-		set_info.m_vPosition = pCameraEnt->m_vPosition + (pCameraEnt->m_matTransform.GetAxis(FORWARD) * 2.f);
-		set_info.m_vRotation = pCameraEnt->m_matModelToWorld.GetAxis(POSITION); //  Vector3Aligned(0, 1, 0);
-		set_info.m_vScale = Vars.Gameplay.vSpawnEntityScale;
-		set_info.m_i0x080 = -1;
-		set_info.m_i0x084 = 0;
-		set_info.m_i0x088 = 1;
-		set_info.m_iGroupId = -1;
-		set_info.m_i0x07C = 1; //flags
-		set_info.m_dwSetType = 1;
-		set_info.m_dw0x74 = 0;
-		set_info.m_i0x078 = 0;
-
-		int ObjectId = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId;
-
-		CObjReadSystem::Work* pWork = FindObjectWork(ObjectId);
-
-		if (!pWork)
-		{
-			if (CreateWork(ObjectId))
-			{
-				static CObjReadSystem* pObjReadSystem = (CObjReadSystem*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 83 FA FF 74 4D", 2);
-				typedef __int64 (*CObjReadSystem_RequestStartFn)(CObjReadSystem* pThis, unsigned int uObjectId, int a3); // a3 usually 0
-				static CObjReadSystem_RequestStartFn RequestStart = (CObjReadSystem_RequestStartFn)FindPattern(NULL, "40 57 41 54 41 55 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 68 48 89 6C 24 70 48 89 74 24 78 41");
-				__int64 r = RequestStart(pObjReadSystem, ObjectId, 1); // bool return
-					
-				pWork = FindObjectWork(ObjectId);
-
-				typedef CObjReadSystem::Work* (*ReadWorkFn)(int ObjectId);
-				//static ReadWorkFn ReadWork = (ReadWorkFn)FindPattern(NULL, "48 89 5C 24 10 57 48 81 EC D0 00");
-				//pWork = ReadWork(ObjectId);
-			}
-		}
-
-		CEntityInfo* pInfo = Features::CreateEntity(Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass, 
-			ObjectId, &set_info);
-
-		if (pInfo)
-		{
-			switch (pInfo->m_ObjectId)
-			{
-			case OBJECTID_2B:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				SetSceneEntity("buddy_2B", pInfo); // FIXME: !!!
-				SetSceneEntity("buddy", pInfo);
-				break;
-			case OBJECTID_A2:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				SetSceneEntity("buddy_A2", pInfo);
-				SetSceneEntity("buddy", pInfo);
-				break;
-			case OBJECTID_9S:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				SetSceneEntity("buddy_9S", pInfo);
-				SetSceneEntity("buddy", pInfo);
-				break;
-			case 0x11010:
-				*g_pEmilHandle = pInfo->m_hEntity;
-				break;
-			case 0x10010:
-				typedef void (*Pl_ChangeFlightSuitFn)(void* pEnt);
-				//pCameraEnt->m_bFlightSuit = TRUE;
-				pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
-				((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4F8300))(pCameraEnt); /*0x4E9DB0*/
-				//((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4E0340))(pCameraEnt);
-				break;
-			}
-		}
-	}
-
-	ImGui::ListBox("Animations", &Vars.Gameplay.iSelectedAnimation, Vars.AnimationListBoxList, _ARRAYSIZE(Vars.AnimationListBoxList));
-
-	if (ImGui::Button("Play Animation"))
-	{
-		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 1, 0);
-	}
-
-	DisplayEntityHandles();
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Change Player"))
-	{
-		Features::SwapPlayer();
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
-	{
-		Pl0000* pBuddy = static_cast<Pl0000*>(GetEntityFromHandle2(&g_pLocalPlayer->m_hBuddy));
-
-		if (pBuddy)
-			DestroyBuddy(pBuddy);
-	}
-
-	if (ImGui::Button("Duplicate Buddy As NPC") && g_pLocalPlayer)
-	{
-		g_pLocalPlayer->m_hBuddy = NULL;
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("A2 As Buddy"))
-	{
-		Features::ChangeBuddy(PROTAGONIST_A2);
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("2B As Buddy"))
-	{
-		Features::ChangeBuddy(PROTAGONIST_2B);
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("9S As Buddy"))
-	{
-		Features::ChangeBuddy(PROTAGONIST_9S);
-	}
-
-	ImGui::Checkbox("No Model Collision", &Vars.Gameplay.bNoCollision);
-
-	Vars.Gameplay.bNoCollision ? Features::RemoveHorizontalCollision(pCameraEnt) : Features::ApplyHorizontalCollision(pCameraEnt);
-
-	ImGui::SameLine();
-
-	if (pCameraEnt)
-		ImGui::Checkbox("Model Gravity", (bool*)&pCameraEnt->m_VerticalCollision.m_bEnabled);
-
-	ImGui::ListBox("Spawn Blacklist", &Vars.Gameplay.iSelectedBlacklistItem, BlacklistItemCallback, Vars.Gameplay.SpawnBlacklist.data(), (int)Vars.Gameplay.SpawnBlacklist.size());
-	ImGui::InputText("Blacklist Item", Vars.Gameplay.szBlacklistName, 32);
-
-	if (ImGui::Button("Add Item"))
-	{
-		Vars.Gameplay.SpawnBlacklist.emplace_back(Vars.Gameplay.szBlacklistName);
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Delete Item"))
-	{
-		Vars.Gameplay.SpawnBlacklist.erase(std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), Vars.Gameplay.SpawnBlacklist.data()[Vars.Gameplay.iSelectedBlacklistItem]));
-	}
-}
-
-void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
-{
-	ImGui::Checkbox("Wireframe", &Vars.Misc.bWireframe);
-
-	ImGui::SameLine();
-
-	ImGui::Checkbox("Chams", &Vars.Visuals.bChams);
-
-	ImGui::SameLine();
-
-	ImGui::Checkbox("Use Shader", (bool*)&Vars.Visuals.iChamType);
-
-	ImGui::SameLine();
-
-	ImGui::Checkbox("Display Enemy Info", &Vars.Visuals.bEnemyInfo);
-
-	ImGui::SameLine();
-
-	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
-
-	ImGui::Separator();
-
-	ImGui::Checkbox("Display Collision Object Info", &Vars.Visuals.bCollisionObjectInfo);
-	ImGui::Checkbox("Display Collision Object Info 2", &Vars.Visuals.bCollisionObjectInfo2);
-	ImGui::Checkbox("Display Collision Debug Object Info", &Vars.Visuals.bCollisionDebugObjectInfo);
-
-
-	ImGui::Separator();
-
-	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 300.0f);
-
-	ImGui::Separator();
-	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
-
-	ApplyModelMods(static_cast<Pl0000*>(pCameraEnt));
-}
-
-void CMenu::MiscTab(void)
-{
-	if (ImGui::Button("Teleport Emil To Me"))
-		Features::TeleportEntityToOther(*g_pLocalPlayerHandle, *g_pEmilHandle);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Teleport Me To Emil"))
-		Features::TeleportEntityToOther(*g_pEmilHandle, *g_pLocalPlayerHandle);
-
-	ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
-
-	//FIXME: DEFO CRASH
-	if (ImGui::Button("Play Sound"))
-	{
-		Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
-		((PlaySoundFn)(0x14081FB90))(&sound);
-	}
-
-	ImGui::SameLine();
-
-	//FIXME: DEFO CRASH
-	if (ImGui::Button("Emit Sound"))
-	{
-		g_pLocalPlayer->EmitSound(Vars.Misc.szSoundName, g_pLocalPlayer, 5, 0x5000000, 0x200007F);
-		//Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
-		//QWORD rax = ((EmitSoundFn)(0x14081FD80))(&sound, &g_pLocalPlayer);
-		//LOG("RAX = %x\n", rax);
-	}
-
-	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_vViewangles);
-
-	ImGui::Checkbox("Speedhack", &Vars.Gameplay.bSpeedhack);
-	ImGui::SameLine();
-	ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when the framerate is uncapped this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
-	ImGui::Separator();
-	ImGui::InputText("Mount Custom Cpk", Vars.Misc.szCpkName, _ARRAYSIZE(Vars.Misc.szCpkName));
-
-	if (ImGui::Button("Mount"))
-	{
-		CpkEntry* pEntry = Features::LoadCpk(Vars.Misc.szCpkName);
-		Vars.Misc.bCpkLoaded = pEntry != NULL;
-	}
-	ImGui::SameLine();
-	ImGui::Text((Vars.Misc.bCpkLoaded) ? "%s successfully mounted!" : "%s failed to mount!", Vars.Misc.szCpkName);
-
-	if (ImGui::Button("Unlock All Achivements"))
-		Features::UnlockAllAchievements();
-
-	ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
-	ImGui::SameLine();
-	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
-	ImGui::SameLine();
-	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Backup Save"))
-	{
-		Vars.Misc.bBackupSave = !BackupSave((CSaveDataDevice::Slot)Vars.Misc.nSlot);
-	}
-
-	ImGui::SameLine();
-	ImGui::Text(Vars.Misc.bBackupSave ? "Succeded!" : "Failed!");
-
-	static int ui_ids[3];
-
-	ImGui::InputInt3("UI Id", ui_ids);
-	ImGui::SameLine();
-
-	if (ImGui::Button("Create UI Element"))
-	{
-		// TODO: Move function typedefs to globals!
-		typedef unsigned int (*HashLowercaseStringCRC32Fn)(const char* szString);
-		// Retreives game text from crc32
-		typedef wchar_t* (*DialogUI_System_GetTextFn)(void* pThis, int crc32, unsigned int index);
-		// Creates a white dialog
-		typedef __int64(*DialogUI_System_CreateYesNoDialogFn)(wchar_t* szMessage);
-		// Creates a white dialog w/ options
-		typedef __int64(*DialogUI_System_CreateDialogFn)(void* pThis, wchar_t* szMessage, int bWhiteDialog, DialogUIWhiteType type, int darkness);
-		// Creates a black banner
-		typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int a1, int crc32, wchar_t* szMessage, wchar_t* szText, DialogUIBlackType type, unsigned int a8, int darkness);
-
-
-		ULONG_PTR uNier = (ULONG_PTR)GetModuleHandle(NULL);
-
-		unsigned int crc = ((HashLowercaseStringCRC32Fn)(uNier + 0x14C4C0))("CORE_QUEST_EMP_TXT_MONEY");// CORE_MAP_VOICECNG_01
-		wchar_t* szMsg = ((DialogUI_System_GetTextFn)(uNier + 0x9BD090))((void*)(uNier + 0x14207A0), crc, 24);
-		// e8a92ebf crc32 | CORE_ITEM_NAME_935
-		//((DialogUI_System_CreateDialogFn)(uNier + 0x2F4F60))((void*)(uNier + 0xF04018), L"Cazzone", (DialogUIWhiteType)ui_ids[0], ui_ids[1], ui_ids[2]);
-		((DialogUI_System_CreateBlackBannerFn)(uNier + 0x2F5040))((void*)(uNier + 0xF04018), -1, 0, szMsg, L"It wasn't supposed to be like this!\nCazzone", (DialogUIBlackType)ui_ids[0], ui_ids[1], ui_ids[2]);
-		//((DialogUI_System_CreateYesNoDialogFn)(uNier + 0x2F4760))(L"Bad News!");
-		//CreateUIFromId(ui_id);
-	}
-
-	// new test shit
-	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
-	ImGui::InputInt("Camera Flags", (int*)g_pCameraFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
-	ImGui::InputInt("Game Flags", (int*)g_pGameFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
-}
-
-void CMenu::ConfigTab(void)
-{
-	LPCTSTR szConfig;
-
-	ImGui::Checkbox("Ignore Input", &m_bIgnoreInputWhenOpened);
-
-	for (auto& it : m_pConfig->GetKeybinds())
-	{
-		const KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
-
-		if (pKey)
-		{
-			if (ImGui::BeginCombo(it->GetName(), pKey->m_szName))
-			{
-				for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
-					if (ImGui::Selectable(s_Keycodes[i].m_szName))
-						it->SetKeycode(s_Keycodes[i].m_uKeyCode);
-
-				ImGui::EndCombo();
-			}
-		}
-	}
-
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
-
-	ImGui::ColorPicker4("ThemePrimary", (float*)&m_Primary.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
-	ImGui::SameLine();
-	ImGui::ColorPicker4("ThemePrimaryBg", (float*)&m_PrimaryBg.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
-
-	ImGui::PopItemWidth();
-
-	if (ImGui::Button("Apply Theme"))
-		ApplyStyle(m_Primary, m_PrimaryBg);
-
-	ImGui::ListBox("Configs", &Config.iSelectedConfig, ConfigCallback, Config.pHead, (INT)FindDataListCount(Config.pHead));
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
-	ImGui::InputText("Config Name", Config.szName, _ARRAYSIZE(Config.szName));
-	ImGui::PopItemWidth();
-	ImGui::SameLine();
-
-	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
-	szConfig = Config.szName[0] ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
-
-	if (ImGui::Button("Refresh"))
-	{
-		FindDataListFree(Config.pHead);
-		m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
-	}
-
-	if (ImGui::Button("Load"))
-		LoadConfig(szConfig);
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Save"))
-		SaveConfig(szConfig);
 }
 
 // https://www.htmlcsscolor.com/hex/B3C4D8
@@ -748,6 +235,518 @@ void CMenu::SaveConfig(LPCTSTR szConfig)
 {
 	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving config. (%s)", szConfig);
 	m_pConfig->Save(szConfig);
+}
+
+// 40 53 48 83 EC 20 48 8B 91 80 72 - pl0000::SetStateMosaic
+void CMenu::GameplayTab(Pl0000* pCameraEnt)
+{
+	ImGui::Checkbox("Godmode", &Vars.Gameplay.bGodmode);
+	ImGui::SameLine();
+	ImGui::Checkbox("No Fall Damage", &Vars.Gameplay.bNoWorldDamage);
+	ImGui::SameLine();
+	ImGui::Checkbox("No Enemy Damage", &Vars.Gameplay.bNoEnemyDamage);
+
+	if (!pCameraEnt)
+		return;
+
+	ImGui::SliderFloat("Tick Base", &pCameraEnt->m_pInfo->m_pUnknown->m_flTickBase, 0.0f, 32.0f);
+
+	ImGui::Columns(2);
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+
+	ImGui::InputInt("Experience:", g_piExperience, 1, 5);
+	ImGui::InputInt("Level:", &Vars.Gameplay.iLevel, 1, 5);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Apply Level"))
+	{
+		if (g_piExperience)
+		{
+			Vars.Gameplay.iLevel = min(MAX_LEVELS, max(MIN_LEVELS, Vars.Gameplay.iLevel));
+			*g_piExperience = g_pLocalPlayer->m_LevelsContainer.m_levels[Vars.Gameplay.iLevel - 1].m_iMinimumExperience;
+		}
+	}
+
+	ImGui::InputInt("Money:", g_piMoney, 1000, 10000);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Max Money"))
+		*g_piMoney = MAX_MONEY;
+
+	ImGui::PopItemWidth();
+	ImGui::NextColumn();
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.2f);
+
+	ImGui::InputInt((Vars.Gameplay.bLevelBuffMode) ? "Enemy Level (1-99):" : "Enemy Level Tolerance (+/-):",
+		(Vars.Gameplay.bLevelBuffMode) ? &Vars.Gameplay.iEnemyLevel : &Vars.Gameplay.iEnemyLevelTolerance, 1, 5);
+
+	ImGui::Checkbox("Balance Enemy Levels", &Vars.Gameplay.bBalanceEnemyLevels);
+	ImGui::SameLine();
+	ImGui::Checkbox("Exclusively Positive", &Vars.Gameplay.bExclusivelyPositiveTolerance);
+	ImGui::Checkbox("Absolute Level", &Vars.Gameplay.bLevelBuffMode);
+
+	ImGui::PopItemWidth();
+	ImGui::Columns();
+
+	char szDesc[64];
+	char* szName = (char*)ItemManager_GetItemNameById(g_pItemManager, Vars.Gameplay.iSpawnItemId);
+	// FIXME: Broken on the new version this fucking function keeps crashing
+	sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
+	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
+	int id = ItemManager_GetItemIdByName(g_pItemManager, Vars.Gameplay.szItemName);
+	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
+	ImGui::InputInt("Quantity", &Vars.Gameplay.iSpawnItemQuantity);
+	ImGui::Checkbox("Instant Equip", &Vars.Gameplay.bInstantEquip);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Spawn Item"))
+		Features::AddItem(Vars.Gameplay.iSpawnItemId, Vars.Gameplay.iSpawnItemQuantity);
+
+	ImGui::Separator();
+
+	ImGui::ListBox("Animations", &Vars.Gameplay.iSelectedAnimation, Vars.AnimationListBoxList, _ARRAYSIZE(Vars.AnimationListBoxList));
+
+	if (ImGui::Button("Play Animation"))
+	{
+		pCameraEnt->Animate(Vars.Gameplay.iSelectedAnimation, 0, 1, 0);
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Change Player"))
+	{
+		Features::SwapPlayer();
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Destroy Buddy") && g_pLocalPlayer)
+	{
+		Pl0000* pBuddy = static_cast<Pl0000*>(GetEntityFromHandle2(&g_pLocalPlayer->m_hBuddy));
+
+		if (pBuddy)
+			DestroyBuddy(pBuddy);
+	}
+
+	if (ImGui::Button("Duplicate Buddy As NPC") && g_pLocalPlayer)
+	{
+		//Features::DuplicateBuddyAsNPC()
+		g_pLocalPlayer->m_hBuddy.m_uValue = NULL;
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("A2 As Buddy"))
+	{
+		Features::ChangeBuddy(PROTAGONIST_A2);
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("2B As Buddy"))
+	{
+		Features::ChangeBuddy(PROTAGONIST_2B);
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("9S As Buddy"))
+	{
+		Features::ChangeBuddy(PROTAGONIST_9S);
+	}
+
+	ImGui::Checkbox("No Model Collision", &Vars.Gameplay.bNoCollision);
+
+	Vars.Gameplay.bNoCollision ? Features::RemoveHorizontalCollision(pCameraEnt) : Features::ApplyHorizontalCollision(pCameraEnt);
+
+	ImGui::SameLine();
+
+	if (pCameraEnt)
+		ImGui::Checkbox("Model Gravity", (bool*)&pCameraEnt->m_VerticalCollision.m_bEnabled);
+}
+
+void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
+{
+	ImGui::Checkbox("Wireframe", &Vars.Misc.bWireframe);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Chams", &Vars.Visuals.bChams);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Use Shader", (bool*)&Vars.Visuals.iChamType);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Display Enemy Info", &Vars.Visuals.bEnemyInfo);
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
+
+	ImGui::Separator();
+
+	ImGui::Checkbox("Display Collision Object Info", &Vars.Visuals.bCollisionObjectInfo);
+	ImGui::Checkbox("Display Collision Object Info 2", &Vars.Visuals.bCollisionObjectInfo2);
+	ImGui::Checkbox("Display Collision Debug Object Info", &Vars.Visuals.bCollisionDebugObjectInfo);
+
+
+	ImGui::Separator();
+
+	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 300.0f);
+
+	ImGui::Separator();
+	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
+
+	ApplyModelMods(static_cast<Pl0000*>(pCameraEnt));
+}
+
+void CMenu::SpawnTab(Pl0000* pCameraEnt)
+{
+	if (ImGui::Button("Spawn Pod A"))
+		Features::AddPod(POD_A);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Spawn Pod B"))
+		Features::AddPod(POD_B);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Spawn Pod C"))
+		Features::AddPod(POD_C);
+
+	DisplayEntityHandles();
+
+	if (!pCameraEnt)
+		return;
+
+	ImGui::ListBox("Entity", &Vars.Gameplay.iSelectedEntityType,
+		[](void* pUserData, int idx) -> const char* { return ((Variables_t::Spawn*)pUserData)[idx].m_szName; },
+		(void*)Vars.SpawnEntities, _ARRAYSIZE(Vars.SpawnEntities));
+
+	ImGui::InputFloat3("Entity Scale", (float*)&Vars.Gameplay.vSpawnEntityScale);
+
+	if (ImGui::Button("Create Entity"))
+	{
+		set_info_t set_info;
+
+		set_info.m_mat = Matrix4x4();
+		set_info.m_vPosition = pCameraEnt->m_vPosition + (pCameraEnt->m_matTransform.GetAxis(FORWARD) * 2.f);
+		set_info.m_vRotation = pCameraEnt->m_matModelToWorld.GetAxis(POSITION); //  Vector3Aligned(0, 1, 0);
+		set_info.m_vScale = Vars.Gameplay.vSpawnEntityScale;
+		set_info.m_i0x080 = -1;
+		set_info.m_i0x084 = 0;
+		set_info.m_i0x088 = 1;
+		set_info.m_iGroupId = -1;
+		set_info.m_i0x07C = 1; //flags
+		set_info.m_dwSetType = 1;
+		set_info.m_dw0x74 = 0;
+		set_info.m_i0x078 = 0;
+
+		const char* szClass = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass;
+		uint32_t ObjectId = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId;
+
+		//CObjReadSystem::Work* pWork = FindObjectWork(ObjectId);
+
+		//if (!pWork)
+		//{
+		//	if (CreateWork(ObjectId))
+		//	{
+		//		static CObjReadSystem* pObjReadSystem = (CObjReadSystem*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 83 FA FF 74 4D", 2);
+		//		typedef __int64 (*CObjReadSystem_RequestStartFn)(CObjReadSystem* pThis, unsigned int uObjectId, int a3); // a3 usually 0
+		//		static CObjReadSystem_RequestStartFn RequestStart = (CObjReadSystem_RequestStartFn)FindPattern(NULL, "40 57 41 54 41 55 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 68 48 89 6C 24 70 48 89 74 24 78 41");
+		//		__int64 r = RequestStart(pObjReadSystem, ObjectId, 1); // bool return
+		//			
+		//		pWork = FindObjectWork(ObjectId);
+		//
+		//		typedef CObjReadSystem::Work* (*ReadWorkFn)(int ObjectId);
+		//		//static ReadWorkFn ReadWork = (ReadWorkFn)FindPattern(NULL, "48 89 5C 24 10 57 48 81 EC D0 00");
+		//		//pWork = ReadWork(ObjectId);
+		//	}
+		//}
+	
+		CEntityInfo* pInfo = Features::CreateEntity(szClass, ObjectId, &set_info);
+
+		if (pInfo)
+		{
+			switch (pInfo->m_ObjectId)
+			{
+			case OBJECTID_2B:
+				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+				//SetSceneEntity("buddy_2B", pInfo); // FIXME: !!!
+				//SetSceneEntity("buddy", pInfo);
+				break;
+			case OBJECTID_A2:
+				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+				//SetSceneEntity("buddy_A2", pInfo);
+				//SetSceneEntity("buddy", pInfo);
+				break;
+			case OBJECTID_9S:
+				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
+				//SetSceneEntity("buddy_9S", pInfo);
+				//SetSceneEntity("buddy", pInfo);
+				break;
+			case 0x11010:
+				*g_pEmilHandle = pInfo->m_hEntity;
+				break;
+			case 0x10010:
+				typedef void (*Pl_ChangeFlightSuitFn)(void* pEnt);
+				//pCameraEnt->m_bFlightSuit = TRUE;
+				pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
+				((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4F8300))(pCameraEnt); /*0x4E9DB0*/
+				//((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4E0340))(pCameraEnt);
+				break;
+			}
+		}
+	}
+
+	ImGui::ListBox("Spawn Blacklist", &Vars.Gameplay.iSelectedBlacklistItem, BlacklistItemCallback, Vars.Gameplay.SpawnBlacklist.data(), (int)Vars.Gameplay.SpawnBlacklist.size());
+	ImGui::InputText("Blacklist Item", Vars.Gameplay.szBlacklistName, ARRAYSIZE(Vars.Gameplay.szBlacklistName));
+
+	if (ImGui::Button("Add Item"))
+	{
+		Vars.Gameplay.SpawnBlacklist.emplace_back(Vars.Gameplay.szBlacklistName);
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Delete Item"))
+	{
+		Vars.Gameplay.SpawnBlacklist.erase(std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), Vars.Gameplay.SpawnBlacklist.data()[Vars.Gameplay.iSelectedBlacklistItem]));
+	}
+}
+
+void CMenu::MiscTab(void)
+{
+	if (ImGui::Button("Teleport Emil To Me"))
+		Features::TeleportEntityToOther(*g_pLocalPlayerHandle, *g_pEmilHandle);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Teleport Me To Emil"))
+		Features::TeleportEntityToOther(*g_pEmilHandle, *g_pLocalPlayerHandle);
+
+	ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
+
+	//FIXME: DEFO CRASH
+	if (ImGui::Button("Play Sound"))
+	{
+		Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
+		((PlaySoundFn)(0x14081FB90))(&sound);
+	}
+
+	ImGui::SameLine();
+
+	//FIXME: DEFO CRASH
+	if (ImGui::Button("Emit Sound"))
+	{
+		g_pLocalPlayer->EmitSound(Vars.Misc.szSoundName, g_pLocalPlayer, 5, 0x5000000, 0x200007F);
+		//Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
+		//QWORD rax = ((EmitSoundFn)(0x14081FD80))(&sound, &g_pLocalPlayer);
+		//LOG("RAX = %x\n", rax);
+	}
+
+	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_vViewangles);
+
+	ImGui::Checkbox("Speedhack", &Vars.Gameplay.bSpeedhack);
+	ImGui::SameLine();
+	ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when the framerate is uncapped this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
+	ImGui::Separator();
+	ImGui::InputText("Mount Custom Cpk", Vars.Misc.szCpkName, _ARRAYSIZE(Vars.Misc.szCpkName));
+
+	if (ImGui::Button("Mount"))
+	{
+		CpkEntry* pEntry = Features::LoadCpk(Vars.Misc.szCpkName);
+		Vars.Misc.bCpkLoaded = pEntry != NULL;
+	}
+	ImGui::SameLine();
+	ImGui::Text((Vars.Misc.bCpkLoaded) ? "%s successfully mounted!" : "%s failed to mount!", Vars.Misc.szCpkName);
+
+	if (ImGui::Button("Unlock All Achievements"))
+		Features::UnlockAllAchievements();
+
+	ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
+	ImGui::SameLine();
+	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
+	ImGui::SameLine();
+	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Backup Save"))
+	{
+		Vars.Misc.bBackupSave = !BackupSave((CSaveDataDevice::Slot)Vars.Misc.nSlot);
+	}
+
+	ImGui::SameLine();
+	ImGui::Text(Vars.Misc.bBackupSave ? "Succeeded!" : "Failed!");
+
+	static int ui_ids[3];
+
+	ImGui::InputInt3("UI Id", ui_ids);
+	ImGui::SameLine();
+
+	if (ImGui::Button("Create UI Element"))
+	{
+		// TODO: Move function typedefs to globals!
+		typedef unsigned int (*HashLowercaseStringCRC32Fn)(const char* szString);
+		// Retreives game text from crc32
+		typedef wchar_t* (*DialogUI_System_GetTextFn)(void* pThis, int crc32, unsigned int index);
+		// Creates a white dialog
+		typedef __int64(*DialogUI_System_CreateYesNoDialogFn)(wchar_t* szMessage);
+		// Creates a white dialog w/ options
+		typedef __int64(*DialogUI_System_CreateDialogFn)(void* pThis, wchar_t* szMessage, int bWhiteDialog, DialogUIWhiteType type, int darkness);
+		// Creates a black banner
+		typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int a1, int crc32, wchar_t* szMessage, wchar_t* szText, DialogUIBlackType type, unsigned int a8, int darkness);
+
+
+		ULONG_PTR uNier = (ULONG_PTR)GetModuleHandle(NULL);
+
+		unsigned int crc = ((HashLowercaseStringCRC32Fn)(uNier + 0x14C4C0))("CORE_QUEST_EMP_TXT_MONEY");// CORE_MAP_VOICECNG_01
+		wchar_t* szMsg = ((DialogUI_System_GetTextFn)(uNier + 0x9BD090))((void*)(uNier + 0x14207A0), crc, 24);
+		// e8a92ebf crc32 | CORE_ITEM_NAME_935
+		//((DialogUI_System_CreateDialogFn)(uNier + 0x2F4F60))((void*)(uNier + 0xF04018), L"Cazzone", (DialogUIWhiteType)ui_ids[0], ui_ids[1], ui_ids[2]);
+		((DialogUI_System_CreateBlackBannerFn)(uNier + 0x2F5040))((void*)(uNier + 0xF04018), -1, 0, szMsg, L"It wasn't supposed to be like this!\nCazzone", (DialogUIBlackType)ui_ids[0], ui_ids[1], ui_ids[2]);
+		//((DialogUI_System_CreateYesNoDialogFn)(uNier + 0x2F4760))(L"Bad News!");
+		//CreateUIFromId(ui_ids[0]);
+	}
+
+	// new test shit
+	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Camera Flags", (int*)g_pCameraFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Game Flags", (int*)g_pGameFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+}
+
+void CMenu::ConfigTab(void)
+{
+	LPCTSTR szConfig;
+
+	ImGui::Checkbox("Ignore Input", &m_bIgnoreInputWhenOpened);
+
+	for (auto& it : m_pConfig->GetKeybinds())
+	{
+		const KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
+
+		if (pKey)
+		{
+			if (ImGui::BeginCombo(it->GetName(), pKey->m_szName))
+			{
+				for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
+					if (ImGui::Selectable(s_Keycodes[i].m_szName))
+						it->SetKeycode(s_Keycodes[i].m_uKeyCode);
+
+				ImGui::EndCombo();
+			}
+		}
+	}
+
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
+
+	ImGui::ColorPicker4("ThemePrimary", (float*)&m_Primary.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
+	ImGui::SameLine();
+	ImGui::ColorPicker4("ThemePrimaryBg", (float*)&m_PrimaryBg.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
+
+	ImGui::PopItemWidth();
+
+	if (ImGui::Button("Apply Theme"))
+		ApplyStyle(m_Primary, m_PrimaryBg);
+
+	ImGui::ListBox("Configs", &Config.iSelectedConfig, ConfigCallback, Config.pHead, (INT)FindDataListCount(Config.pHead));
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
+	ImGui::InputText("Config Name", Config.szName, _ARRAYSIZE(Config.szName));
+	ImGui::PopItemWidth();
+	ImGui::SameLine();
+
+	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
+	szConfig = Config.szName[0] ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
+
+	if (ImGui::Button("Refresh"))
+	{
+		FindDataListFree(Config.pHead);
+		m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
+	}
+
+	if (ImGui::Button("Load"))
+		LoadConfig(szConfig);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Save"))
+		SaveConfig(szConfig);
+}
+
+void CMenu::DisplayEntityHandles(void)
+{
+	if (!g_pNPCManager)
+		return;
+
+	int count = (int)(g_pNPCManager->m_handles.m_Count + g_pYorhaManager->m_handles.m_Count + g_pEnemyManager->m_handles.m_Count);
+	EntityHandle_t* pHandles = new EntityHandle_t[count];
+
+	ImGui::ListBox("NPC, Yorha & Enemy Handles", &Vars.Gameplay.iSelectedActorEntityHandle,
+		&EntityHandlesCallback, pHandles, count);
+
+	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.25f);
+
+	ImGui::InputInt("Level", &Vars.Gameplay.iSelectedEntityLevel, 1, 5);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Set Level"))
+		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]), Vars.Gameplay.iSelectedEntityLevel - 1, Vars.Gameplay.iSelectedEntityLevel - 1);
+
+	ImGui::PopItemWidth();
+
+#if 0
+	//FIXME: DEFO CRASH
+	if (ImGui::Button("Set NPC Follow"))
+	{
+		CBehaviorAppBase* pNPC = GetEntityFromHandle(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+
+		if (pNPC)
+			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC);
+	}
+
+	ImGui::SameLine();
+
+	//FIXME: DEFO CRASH
+	if (ImGui::Button("Set NPC Idle"))
+	{
+		CBehaviorAppBase* pNPC = GetEntityFromHandle(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+
+		if (pNPC)
+			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);
+	}
+#endif
+
+	if (ImGui::Button("Delete"))
+		Features::DeleteEntity(pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+
+#ifdef  _DEBUG
+	ImGui::SameLine();
+
+	if (ImGui::Button("Set Player"))
+	{
+		Features::SetPlayer(pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+	}
+#endif
+
+	delete[] pHandles;
+
+	ImGui::SeparatorEx(ImGuiSeparatorFlags_::ImGuiSeparatorFlags_Horizontal);
+
+	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, NULL, g_pEntityList->m_uSize);
+
+	if (ImGui::Button("Delete Entity"))
+		Features::DeleteEntity(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Set Player"))
+	{
+		Features::SetPlayer(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
+	}
 }
 
 void ApplyPodMods(Pl0000* pOwner)

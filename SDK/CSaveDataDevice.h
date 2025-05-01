@@ -13,8 +13,15 @@ struct CSaveSlot
 /*
 Size of the struct is 0xD0 (208) bytes
 */
-struct CSaveDataDevice
+class CSaveDataDevice
 {
+public:
+	typedef void(*SaveFileIOFn)(CSaveDataDevice* pSave); // NOTE: not a real function points to CUserManager::SaveFileIO's switch
+	typedef void(*ReadSaveSlotsFn)(CSaveDataDevice* pSave);
+	typedef void(*ReadSaveDataFn)(CSaveDataDevice* pSave);
+	typedef void(*WriteSaveDataFn)(CSaveDataDevice* pSave);
+	typedef void(*DeleteSaveDataFn)(CSaveDataDevice* pSave);
+
 	enum Slot : int32_t
 	{
 		SLOT_SAVE_SYSTEMDATA = -2,

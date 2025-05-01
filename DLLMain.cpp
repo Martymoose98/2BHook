@@ -43,7 +43,7 @@ void InitHooks(void)
 	// Take ownership of the internal CDIDev's critical section to stop crashes
 	IDirectInputDevice_Lock(g_pKeyboard->pDevice);
 
-	// Initalize a virtual table hook for the keyboard
+	// Initialize a virtual table hook for the keyboard
 	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice);
 
 	g_pKeyboardHook->Unhook();
@@ -56,7 +56,7 @@ void InitHooks(void)
 	// Take ownership of the internal CDIDev's critical section to stop crashes
 	IDirectInputDevice_Lock(g_pMouse->pDevice);
 
-	// Initalize a virtual table hook for the mouse
+	// Initialize a virtual table hook for the mouse
 	g_pMouseHook = new VirtualTableHook((ULONG_PTR**)g_pMouse->pDevice);
 
 	g_pMouseHook->Unhook();
@@ -153,7 +153,7 @@ void InitHooks(void)
 #ifdef DENUVO_STEAM_BUILD
 	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
 #else
-	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ?? ?? ?? ?? 44 89 6B 68"), 9);
+	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ?? ?? ?? ?? 44 89 6B 68"), 9);
 #endif
 	NopMemory(&nop_HairColor);
 }
@@ -576,24 +576,24 @@ void FindDenuvoSteamOffsets(void)
 	ItemManager_UseItem = (CItemManager_UseItemFn)0x1405DC5A0; // TODO: Sig but low priority!
 	SetLocalPlayer = (SetLocalPlayerFn)FindPatternPtr(NULL, "E8 ? ? ? ? C6 43 48 00 81 7B", 1);
 	UnlockAchievement = (UnlockAchievementFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B D8 83 3D", 1);
-	ResetCamera = (ResetCameraFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
+	ResetCamera = (CCameraGame::ResetCameraFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
 	ChangePlayer = (ChangePlayerFn)FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
-	SceneEntitySystem_FindSceneState = (CSceneEntitySystem_FindSceneStateFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
+	SceneEntitySystem_FindSceneState = (CSceneEntitySystem::FindSceneStateFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
 	SetSceneEntity = (SetSceneEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
 
-	SaveFileIO = (CSaveDataDevice_SaveFileIOFn)FindPattern(NULL, "8B 51 30 FF CA");
-	ReadSaveSlots = (CSaveDataDevice_ReadSaveSlotsFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B AE ? ? ? ? 48 85 ED 74 38", 1);
-	ReadSaveData = (CSaveDataDevice_ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ?", 1);
-	WriteSaveData = (CSaveDataDevice_WriteSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 0C E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ? ? ", 1);
-	DeleteSaveData = (CSaveDataDevice_DeleteSaveDataFn)FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
+	SaveFileIO = (CSaveDataDevice::SaveFileIOFn)FindPattern(NULL, "8B 51 30 FF CA");
+	ReadSaveSlots = (CSaveDataDevice::ReadSaveSlotsFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B AE ? ? ? ? 48 85 ED 74 38", 1);
+	ReadSaveData = (CSaveDataDevice::ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ?", 1);
+	WriteSaveData = (CSaveDataDevice::WriteSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 0C E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ? ? ", 1);
+	DeleteSaveData = (CSaveDataDevice::DeleteSaveDataFn)FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
 
-	SceneEntitySystem_CreateEntity = (CSceneEntitySystem_CreateEntityFn)0x1404F9AA0; // TODO: Sig but low priority!
+	SceneEntitySystem_CreateEntity = (CSceneEntitySystem::CreateEntityFn)0x1404F9AA0; // TODO: Sig but low priority!
 	SceneStateSystem_Set = (CSceneStateSystem_SetFn)0x14001EC80; // TODO: Sig but low priority!
 
-	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
-	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
-	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87", 1);
-	CameraGame_SetLookAt = (CCameraGame_SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 7F 10 01", 1);
+	WetObjectManager_SetWet = (CWetObjManager::SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
+	WetObjectManager_SetDry = (CWetObjManager::SetDryFn)FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
+	WetObjectManager_AddLocalEntity = (CWetObjManager::AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87", 1);
+	CameraGame_SetLookAt = (CCameraGame::SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 7F 10 01", 1);
 	DestroyBuddy = (DestroyBuddyFn)FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	FNV1Hash = (FNV1HashFn)FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
 	HashStringCRC32 = (HashStringCRC32Fn)FindPattern(NULL, "40 57 83 C8 FF");
@@ -614,8 +614,8 @@ void FindDenuvoSteamOffsets(void)
 	CpkMount = (CpkMountFn)FindPattern(NULL, "48 83 EC 28 44 8B C9");
 
 	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "4C 8B 4A 10 48 8D 15 ? ? ? ? 4D 8D 89", 7);
-	g_pLocalPlayerHandle = (EntityHandle*)FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05", 6);
-	g_pEmilHandle = (EntityHandle*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
+	g_pLocalPlayerHandle = (EntityHandle_t*)FindPatternPtr(NULL, "45 33 F6 4C 8D 25 ? ? ? ? 4C 8D 05", 6);
+	g_pEmilHandle = (EntityHandle_t*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 85 D2 74 59", 2);
 	g_piMoney = (int*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8D 8D", 3);
 	g_piExperience = (int*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pItemManager = (CItemManager*)0x14133B510; // TODO: Sig but low priority!
@@ -625,7 +625,7 @@ void FindDenuvoSteamOffsets(void)
 	g_pUserManager = *(CUserManager**)FindPatternPtr(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
 	g_pWetObjectManager = (CWetObjManager*)(ReadPtr(FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87", 1) + 0x1B, 3));
 	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)FindPatternPtr(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
-	g_pTextureResourceManager = *(CTextureResourceManager**)FindPatternPtr(NULL, "48 8B D1 48 8D 0D ?? ?? ?? ?? 4C 89 44 24", 6);
+	g_pTextureResourceManager = *(CTextureResourceManager**)FindPatternPtr(NULL, "48 8B D1 48 8D 0D ? ? ? ? 4C 89 44 24", 6);
 	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 89 44 24 ? 48 8D 05", 15);
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
@@ -651,7 +651,7 @@ void FindDenuvoSteamOffsets(void)
 		g_pSecondarySwapChain = (IDXGISwapChain*)(*(byte**)((*(byte**)((*(byte**)((*(byte**)((byte*)g_pGraphics + 0x1B8)) + 0x140))) + 0x10)));// I have no idea what this swapchain is for, but it points to the right place
 
 	g_pAntiVSync = (byte*)FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40"); //unused
-	g_pAntiFramerateCap_Sleep = (byte*)FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24 ?") + 2;
+	g_pAntiFramerateCap_Sleep = (byte*)FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
 	g_pAntiFramerateCap_Test4 = (byte*)FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
 	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
@@ -678,9 +678,17 @@ void FindSteamOffsets(void)
 	ItemManager_AddItem = (CItemManager_AddItemFn)FindPattern(NULL, "48 8B C4 57 41 54 41 55 41 56 41 57 48 81 EC ? ? ? ? 48 C7 44 24 ? ? ? ? ? 48 89 58 ? 48 89 68 ? 48 89 70 ? 45 8B F0"); // [E8 ? ? ? ? EB 10 33 D2 + 1]
 	ItemManager_UseItem = (CItemManager_UseItemFn)FindPattern(NULL, "40 53 48 83 EC ? 48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? F3 0F 10 15"); //[E8 ? ? ? ? C7 45 ? ? ? ? ? 48 8D 75 D0 + 1] 
 	//CItemManager_UseItemByIdFn 40 53 55 57 48 83 EC ? 0F 29 74 24 ? | [E8 ? ? ? ? 48 63 83 ? ? ? ? 48 8B CB + 1]
-	ResetCamera = (ResetCameraFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 81 A6", 1);
+	ResetCamera = (CCameraGame::ResetCameraFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 81 A6", 1);
 	ChangePlayer = (ChangePlayerFn)FindPattern(NULL, "40 53 48 83 EC 30 48 8B D9 E8 ? ? ? ? 81 25");
-	SceneEntitySystem_FindSceneState = (CSceneEntitySystem_FindSceneStateFn)FindPattern(NULL, "40 56 57 41 54 41 56 41 57 48 83 EC ? 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 4D 8B F1"); // [E8 ? ? ? ? 48 89 45 E0 + 1]
+	SetLocalPlayer = (SetLocalPlayerFn)FindPattern(NULL, "40 53 56 57 48 83 EC 70 48 8B F1");
+	EntityInfo_Delete = (CEntityInfo::DeleteFn)FindPattern(NULL, "40 53 48 83 EC 20 8B 41 2C");
+	SceneEntitySystem_FindSceneState = (CSceneEntitySystem::FindSceneStateFn)FindPattern(NULL, "40 56 57 41 54 41 56 41 57 48 83 EC ? 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 4D 8B F1"); // [E8 ? ? ? ? 48 89 45 E0 + 1]
+	SceneEntitySystem_FindByObjectId = (CSceneEntitySystem::FindByObjectIdFn)FindPattern(NULL, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 83 79 48 00 48");
+	SceneEntitySystem_CreateEntity = (CSceneEntitySystem::CreateEntityFn)FindPattern(NULL, "48 8B C4 56 57 41 56 48 83 EC ? 48 C7 40 B8 ? ? ? ? 48 89 58 ? 48 89 68 ? 4C 8B F2 48 8B F1");
+	//(CSceneEntitySystem::UpdateFn)FindPattern(NULL, "40 56 57 41 56 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 58 48 89 6C 24 60 4C 8B F1");
+	SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 89 5C 24 ? 57 48 83 EC 20 48 8B 02 48 8B FA"); // [E8 ? ? ? ? EB 38 48 89 5C 24 ? + 1]
+	// this is the internal function both work but using the internal func probably has consecquences I am not aware of
+	//SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 8B C4 57 48 81 EC 60 04 00 00 48 C7 44 24 ? FE FF FF FF 48 89 58 ? 48 89 70"); // [E8 ? ? ? ? 84 C0 74 19 B2 01 + 1]
 
 	FNV1Hash = (FNV1HashFn)FindPattern(NULL, "40 56 48 81 EC ? ? ? ? 48 8B F1 48 85 C9"); // [E8 ? ? ? ? 8B D3 C1 FA 08 + 1]
 	HashStringCRC32 = (HashStringCRC32Fn)FindPattern(NULL, "48 85 C9 0F 85 ? ? ? ? 33 C0 C3 CC CC CC CC 48 89 5C 24");
@@ -689,22 +697,28 @@ void FindSteamOffsets(void)
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.
-	SaveFileIO = (CSaveDataDevice_SaveFileIOFn)FindPattern(NULL, "8B 4B 30 83 E9 01");
-	ReadSaveSlots = (CSaveDataDevice_ReadSaveSlotsFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B B5 ? ? ? ? 48 85 F6", 1);
-	ReadSaveData = (CSaveDataDevice_ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 08 48 8B CB E8 ? ? ? ? 48 8B B5", 1);
-	WriteSaveData = (CSaveDataDevice_WriteSaveDataFn)FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
-	DeleteSaveData = (CSaveDataDevice_DeleteSaveDataFn)CSaveDataDevice_DeleteSaveData; // Inlined on new version hmmm this may not work may have to rebuild function
+	SaveFileIO = (CSaveDataDevice::SaveFileIOFn)FindPattern(NULL, "8B 4B 30 83 E9 01");
+	ReadSaveSlots = (CSaveDataDevice::ReadSaveSlotsFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B B5 ? ? ? ? 48 85 F6", 1);
+	ReadSaveData = (CSaveDataDevice::ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 08 48 8B CB E8 ? ? ? ? 48 8B B5", 1);
+	WriteSaveData = (CSaveDataDevice::WriteSaveDataFn)FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
+	DeleteSaveData = (CSaveDataDevice::DeleteSaveDataFn)CSaveDataDevice_DeleteSaveData; // Inlined on new version hmmm this may not work may have to rebuild function
 
-	SceneEntitySystem_CreateEntity = (CSceneEntitySystem_CreateEntityFn)FindPattern(NULL, "48 8B C4 56 57 41 56 48 83 EC ? 48 C7 40 B8 ? ? ? ? 48 89 58 ? 48 89 68 ? 4C 8B F2 48 8B F1");
-	SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 89 5C 24 ? 57 48 83 EC 20 48 8B 02 48 8B FA"); // [E8 ? ? ? ? EB 38 48 89 5C 24 ? + 1]
-	// this is the internal function both work but using the internal func probably has consecquences I am not aware of
-	//SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 8B C4 57 48 81 EC 60 04 00 00 48 C7 44 24 ? FE FF FF FF 48 89 58 ? 48 89 70"); // [E8 ? ? ? ? 84 C0 74 19 B2 01 + 1]
+	CreateTask = (CreateTaskFn)FindPattern(NULL, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 30 44 8B 1D");
+	JobManager_CreateTask = (CJobManager::CreateTaskFn)FindPattern(NULL, "48 89 5C 24 10 48 89 6C 24 18 56 48 83 EC 20 48 8B 59 18 49");
+	// JobManager_ReleaseTask/SuspendTask and this a should be equivalent 
+	// typedef DWORD(*SuspendTask_SetGameBitFlagsFn)(DWORD fFlags);
+	//JobManager_PauseTask2 = (CJobManager::PauseTaskFn)FindPattern(NULL, "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B 3D ? ? ? ? 8B");
+	JobManager_DestroyTask = (CJobManager::DestroyTaskFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 8B 42 28");
+	JobManager_Yield = (CJobManager::YieldFn)FindPattern(NULL, "40 53 48 83 EC 20 48 8B 59 20");
+	JobManager_SuspendTask = (CJobManager::SuspendTaskFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 48 8B 59 20");
+	YieldToNextTask = (CJobManager_YieldToNextTaskFn)FindPattern(NULL, "40 53 48 83 EC 20 48 8B 05 ? ? ? ? 48 8B 58 20 83 7B 28 04 74 0C 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 4B 40 45 33 C0 C7 43 28 00 00 00 00 41 8D 50 01 FF 15 ? ? ? ? 48 83 C4 20 5B E9");
+	SetTaskFunction = (CJobManager_SetTaskFunctionFn)FindPattern(NULL, "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B 05 ? ? ? ? 48 8B FA 48 8B F1");
 
-	WetObjectManager_SetDry = (CWetObjectManager_SetDryFn)FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 8B EA 48 8B F9 83 79 28 00 74 61");
-	WetObjectManager_SetWet = (CWetObjectManager_SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
-	WetObjectManager_AddLocalEntity = (CWetObjectManager_AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF", 1);
-	CameraGame_SetLookAt = (CCameraGame_SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 33 C9 4C 89 67 18", 1);
-	CameraGame_SetLookAtNoDistance = (CCameraGame_SetLookAtFn)FindPattern(NULL, "40 53 48 81 EC 80 00 00 00 0F 29 74 24 70 0F 57");
+	WetObjectManager_SetDry = (CWetObjManager::SetDryFn)FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 48 8B EA 48 8B F9 83 79 28 00 74 61");
+	WetObjectManager_SetWet = (CWetObjManager::SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 BE ? ? ? ? FF C7", 1);
+	WetObjectManager_AddLocalEntity = (CWetObjManager::AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 BF ? ? ? ? 48 C7 87 ? ? ? ? ? ? ? ? 4C 89 AF", 1);
+	CameraGame_SetLookAt = (CCameraGame::SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 33 C9 4C 89 67 18", 1);
+	CameraGame_SetLookAtNoDistance = (CCameraGame::SetLookAtFn)FindPattern(NULL, "40 53 48 81 EC 80 00 00 00 0F 29 74 24 70 0F 57");
 	DestroyBuddy = (DestroyBuddyFn)FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	ExCollision_GetOBBMax = (ExCollision_GetOBBMaxFn)FindPattern(NULL, "48 89 5C 24 ? 56 48 83 EC ? 48 83 79 08 00");
 
@@ -715,16 +729,17 @@ void FindSteamOffsets(void)
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0A");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0C");
 	
-	g_pDebugFlags = (unsigned int*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
-	g_pCameraFlags = (unsigned int*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
-	g_pGameFlags = (unsigned int*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
+	g_pDebugFlags = (uint32_t*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
+	g_pCameraFlags = (uint32_t*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
+	g_pGameFlags = (uint32_t*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
 
 	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24", 3);
-	g_pLocalPlayerHandle = (EntityHandle*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
-	g_pEmilHandle = (EntityHandle*)FindPatternPtr(NULL, "0F 84 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 4D 77", 9);
-	g_piMoney = (int*)FindPatternPtr(NULL, "48 83 EC 68 4C 8D 05 ? ? ? ? 48 8D 15", 7);
-	g_piExperience = (int*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 48 8D 8F ? ? ? ? E8 ? ? ? ? 8B 48 04", 2);
+	g_pLocalPlayerHandle = (EntityHandle_t*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
+	g_pEmilHandle = (EntityHandle_t*)FindPatternPtr(NULL, "0F 84 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 4D 77", 9);
+	g_piMoney = (int32_t*)FindPatternPtr(NULL, "48 83 EC 68 4C 8D 05 ? ? ? ? 48 8D 15", 7);
+	g_piExperience = (int32_t*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 48 8D 8F ? ? ? ? E8 ? ? ? ? 8B 48 04", 2);
 
+	g_pJobManager = (CJobManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 85 C0 0F 84 00 01 00 00", 3);
 	g_pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 35 ? ? ? ? 48 89 74 24 ? C7 44 24 ? ? ? ? ? C7 44 24", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 8D 0D ? ? ? ? 48 8D 05 ? ? ? ? 48 89 05 ? ? ? ? E8", 3);
 	g_pWetObjectManager = (CWetObjManager*)FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B", 6);
@@ -775,11 +790,17 @@ void Setup(void)
 	SetUnhandledExceptionFilter(&UnhandledExceptionHandler);
 	g_pExceptionHandlers.push_back(&UnhandledExceptionHandlerChild);
 
+	g_CreateCtx.hControlSemaphore = CreateSemaphore(NULL, 0, 1, TEXT("SpawnCtrl"));
+
+	//CConfigXml xml;
+
+	//xml.InitializeConfig();
+	//xml.Load(L"Z:\\NieRAutomata\\config.xml");
+
 	NierVersionInfo* pVersion = QueryNierBinaryVersion();
 	SHA256DigestStr SHA256Hash;
 
 	SHA256_PrintDigest((SHA256Digest*)pVersion->m_pHash, &SHA256Hash);
-
 
 	LOG("SHA256: %32s\n", SHA256Hash);
 
@@ -816,14 +837,14 @@ void Setup(void)
 		return;
 	}
 
-	//InitalizeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);
-	InitalizeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
-	InitalizeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
-	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
-	InitalizeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
+	//InitializeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);
+	InitializeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
+	InitializeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
+	InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
+	InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
-	InitalizeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
-	InitalizeBytePatchMemory(&bp_NoTutorialDialogs, (void*)FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
+	InitializeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
+	InitializeBytePatchMemory(&bp_NoTutorialDialogs, (void*)FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
 
 	InitHooks();
 
@@ -840,6 +861,8 @@ void Unhook(void)
 	RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
 	RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
+
+	CloseHandle(g_CreateCtx.hControlSemaphore);
 
 	// FIXME: Unhook functions with hookfunc
 
