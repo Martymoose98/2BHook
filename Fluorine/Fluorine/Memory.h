@@ -123,7 +123,7 @@ static inline VOID InitalizeNopMemoryDefault(PNOP_MEMORY pNop)
 	InitializeCriticalSection(&pNop->CriticalSection);
 }
 
-static VOID InitalizeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
+static VOID InitializeNopMemory(PNOP_MEMORY pNop, VOID* address, SIZE_T cb)
 {
 	pNop->Magic = NOP_MEMORY_MAGIC;
 	pNop->Patched = FALSE;
@@ -162,7 +162,7 @@ static VOID InitalizeBytePatchMemoryDefault(PBYTE_PATCH_MEMORY pBytePatch)
 	InitializeCriticalSection(&pBytePatch->CriticalSection);
 }
 
-static VOID InitalizeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, CONST BYTE* pOpcodes, SIZE_T cb)
+static VOID InitializeBytePatchMemory(PBYTE_PATCH_MEMORY pBytePatch, VOID* address, CONST BYTE* pOpcodes, SIZE_T cb)
 {
 	pBytePatch->Magic = BYTE_PATCH_MEMORY_MAGIC;
 	pBytePatch->Patched = FALSE;

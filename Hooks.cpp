@@ -32,6 +32,8 @@ static ID3D11RasterizerState* pNorm, * pBias;
 //VirtualTableHook m_ctxhook;
 //VirtualTableHook m_shaderhook[MAX_MATERIAL_TEXTURES];
 
+void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData);
+
 class CPl0000Hook
 {
 public:
@@ -46,13 +48,12 @@ public:
 			m_bMeshShow[i] = pEntity->m_Work.m_pMeshes[i].m_bShow;
 		}
 
-		//m_pShaderHooks = new VirtualTableHook()
 
-		//for (int i = 0; i < pEntity->m_Work.m_nMaterialShaders; ++i)
-		//{
-		//	m_pShaderHooks.push_back(new VirtualTableHook((ULONG_PTR**)pEntity->m_Work.m_pModelShaders->m_pShader));
-		//	m_pShaderHooks[i]->HookFunction((ULONG_PTR)&CModelShaderModule_Draw, 3);
-		//}
+		/*	for (int i = 0; i < pEntity->m_Work.m_nMaterialShaders; ++i)
+			{
+				m_pShaderHooks[i] = new VirtualTableHook((ULONG_PTR**)pEntity->m_Work.m_pModelShaders->m_pShader);
+				m_pShaderHooks[i]->HookFunction((ULONG_PTR)&CModelShaderModule_Draw, 3);
+			}*/
 
 		m_Hook.HookFunction((ULONG_PTR)&hkPl0000Destructor, 0);
 		m_Hook.HookFunction((ULONG_PTR)&hkPl0000Update, 8);
@@ -82,38 +83,38 @@ void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
 	//pThis->Update(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2, 2);
 	//pThis->ApplyExternalForces(pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pNext->m_pModelExtend2);
+	CModel* pModel = pData->m_pWork->m_pModelExtend2->m_pParent;
 
-	/*CModelMatrixTable* pTbl = pData->m_pMatrices[0];
+	Matrix4x4 RotM;
 
-	for (int i = 0; i < pTbl->m_nMatrices2; ++i)
-	{
+	//CModelMatrixTable* pTbl = pData->m_pMatrices[0];
 
-		Matrix4x4* pBoneMat = (Matrix4x4*)pData->m_pConstBuffer[i]->m_pResources;
+	//for (int i = 0; i < pTbl->m_nMatrixCount; ++i)
+	//{
 
-		pBoneMat->Transpose();
+	//	Matrix4x4* pBoneMat = (Matrix4x4*)pData->m_pConstBuffer[i]->m_pResources;
 
-		Matrix4x4 RotM;
+	//	pBoneMat->Transpose();
 
-		RotM.InitAxisAngle(pData->m_pWork->m_pModelExtend2->m_pParent->m_matTransform.GetAxis(RIGHT), M_PI_F / 2.0f);
+	//	RotM.InitAxisAngle(pModel->m_matTransform.GetAxis(RIGHT), M_PI_F / 2.0f);
 
-		*pBoneMat = RotM * (*pBoneMat);
+	//	*pBoneMat = RotM * (*pBoneMat);
 
-		pBoneMat->Transpose();
-	}*/
+	//	pBoneMat->Transpose();
+	//}
 
-	CPl0000Hook* pEntityHook = g_pHookedEntities[CONTAINING_RECORD(pData->m_pWork, CObj, m_Work)];
+	CPl0000Hook* pEntityHook = g_pHookedEntities[pModel];//g_pHookedEntities[CONTAINING_RECORD(pData->m_pWork, CObj, m_Work)];
 
 	if (pEntityHook)
 	{
+		//pEntityHook->m_vTint = Vector4(0.0f, 1.0f, 1.0f, 1.0f);
+		//pEntityHook->m_pShaderHooks[0]->Call<void, CModelShaderModule, CModelEntryData*>(3, pData);
+
 		// Always Render
 		pData->m_pWork->m_dwRenderFlags &= (~CModelWork::RF_DONT_RENDER);
-
 		pEntityHook->m_pShaderHooks[0]->Call<void, CModelShaderModule, CModelEntryData*>(3, pData);
 	}
 
-	//((Original2Fn)m_shaderhook[0].GetFunctionAddress(2))(pThis, pData->m_pWork->m_pModelShaders, pData->m_pWork->m_pModelExtend2);
-
-	//((OriginalFn)m_shaderhook[0].GetFunctionAddress(3))(pThis, pData);
 	//pThis->Draw(pData);
 
 	// Exception thrown at 0x000000014500537C in NieRAutomata.exe: 
@@ -344,17 +345,6 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (pCameraEnt)
 	{
-		// FIXME: HACK move code to HOOK
-		//if (!hookupdate)
-		//{
-		//	hookupdate = true;
-
-		//	for (int i = 0; i < g_pLocalPlayer->m_Work.m_nMaterialShaders; ++i)
-		//	{
-		//		m_shaderhook[i].Initialize((ULONG_PTR**)g_pLocalPlayer->m_Work.m_pModelShaders[i].m_pShader);
-		//		m_shaderhook[i].HookFunction((ULONG_PTR)CModelShaderModule_Draw, 3);
-		//	}		
-		//}
 
 		if (Vars.Gameplay.bRainbowPod)
 		{
@@ -657,7 +647,7 @@ return TRUE;*/
 
 		float theta = Math::GetFov(vForward, pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD),
 			pThis->m_pCamEntity->m_matTransform.GetAxis(RIGHT));
-		
+
 		if (fabsf(theta) > 90.0f)
 		{
 			pThis->m_vViewangles.y += 90.0f - theta;
@@ -673,7 +663,7 @@ return TRUE;*/
 		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_Work.m_pModelData, BONE_HEAD);
 
 		Vector3Aligned& vHeadPos = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition;
-		
+
 		pThis->m_vSource = vHeadPos + pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * 0.05f;
 		pThis->m_vTarget = vHeadPos + vForward * 4.f;
 
@@ -882,23 +872,22 @@ void hkPl0000Update(Pl0000* pThis)
 	}
 }
 
-
+//#define EXP_ENT_HOOK
 
 // TODO: new hook doesn't need last param and shadow space in thunk
-// FIXME: entities that are not loaded in before creation will crash the game still!
-void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId, int iGroupId, CHeapInfo* pHeapInfo)
+void* hkCreateEntity(CSceneEntitySystemUnk* pUnknown, CEntityInfo* pInfo, uint32_t uObjectId, int32_t iGroupId, CHeapInfo* pHeapInfo)
 {
 	CConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
 	void* pEntity = NULL;
 
-	CObjReadSystem::Work* pWork = FindObjectWork(uObjectId);
+	//CObjReadSystem::Work* pWork = FindObjectWork(uObjectId);
 
 	// pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId, pHeapInfo); //0x1401A2B40 old denuvo
 	if (Vars.Gameplay.SpawnBlacklist.empty() || std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), pConstruct->m_szName) == Vars.Gameplay.SpawnBlacklist.cend())
 		pEntity = oCreateEntity(pUnknown, pInfo, uObjectId, iGroupId);
 
 	if (!pEntity)
-		g_pConsole->Warn("Failed to create %s -> %s (ObjectId = %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->m_szName, uObjectId, pInfo->m_uSetType);
+		g_pConsole->Warn("Failed to create %s -> %s (ObjectId %x, SetType %x)\n", pInfo->m_szEntityType, pConstruct->m_szName, uObjectId, pInfo->m_uSetType);
 	else
 	{
 #if defined(_DEBUG) && defined(EXP_ENT_HOOK)
@@ -908,8 +897,8 @@ void* hkCreateEntity(void* pUnknown, CEntityInfo* pInfo, unsigned int uObjectId,
 		}
 #endif
 
-		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId = %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->m_szName, uObjectId, pInfo->m_uSetType, pEntity);
-	}
+		g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "Created %s -> %s (ObjectId %x, SetType %x) Base %llx\n", (pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout", pConstruct->m_szName, uObjectId, pInfo->m_uSetType, pEntity);
+}
 
 
 	return pEntity;
@@ -1053,7 +1042,7 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 
 	return ((OleLoadPictureFn)(g_pOleLoadPictureHook->GetOriginalFunction()))(lpStream, lSize, fRunmode, riid, lplpvObj);
 }
-
+volatile LONG g_flag = 0;
 void hkSaveFileIO(CSaveDataDevice* pSavedata)
 {
 	if (!pSavedata)

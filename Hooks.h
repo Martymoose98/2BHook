@@ -98,8 +98,8 @@ extern "C" BOOL hkLoadWordBlacklistThunk(BannedWordChecker * pThis, __int64 this
 extern "C" BOOL hkLoadWordBlacklist(BannedWordChecker * pThis, __int64 thisrdx, QWORD * thisr8, const char* szBlacklistName);
 extern "C" void hkUpdateModelPartsThunk(Pl0000 * pEntity);
 extern "C" void hkUpdateModelParts(Pl0000 * pEntity); //proabably not a pl0000 must be a parent
-extern "C" void* hkCreateEntityThunk(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
-extern "C" void* hkCreateEntity(void* pUnknown, CEntityInfo * pInfo, unsigned int objectId, int iGroupId, CHeapInfo * pHeapInfo);
+extern "C" void* hkCreateEntityThunk(CSceneEntitySystemUnk* pUnknown, CEntityInfo * pInfo, uint32_t objectId, int32_t iGroupId, CHeapInfo * pHeapInfo);
+extern "C" void* hkCreateEntity(CSceneEntitySystemUnk* pUnknown, CEntityInfo * pInfo, uint32_t uObjectId, int32_t iGroupId, CHeapInfo * pHeapInfo);
 bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript);
 void hkPl0000Destructor(Pl0000* pThis);
 void hkPl0000Update(Pl0000* pThis);

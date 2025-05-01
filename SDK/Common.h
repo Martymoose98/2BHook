@@ -82,13 +82,17 @@ class Array
 {
 public:
 	virtual Array<T>* Clear(BYTE flags);
-	virtual QWORD GetSize();
+	virtual size_t GetSize(void);
 	virtual bool GetItem(OUT T* pItem);
 	virtual T* Find(IN T* pSearchItem, OUT T* pFound);
 
+	T& operator[](int32_t i) { return m_pItems[i]; }
+
+	//T* operator[](int32_t i) { return m_pItems[i]; }
+
 	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
+	size_t m_Count;	//0x0010
+	size_t m_Size;	//0x0018
 };
 
 /*
@@ -98,7 +102,7 @@ template<typename T, size_t size, size_t element_size = sizeof(T)>
 class StaticArray : public Array<T>
 {
 public:
-	T m_items[size];	//0x0020
+	T m_Items[size];	//0x0020
 };
 
 /*
@@ -109,15 +113,16 @@ class AllocatedArray
 {
 public:
 	T* m_pItems;	//0x0008 
-	QWORD m_count;	//0x0010
-	QWORD m_size;	//0x0018
+	size_t m_Count;	//0x0010
+	size_t m_Size;	//0x0018
 };
 
 /*
 Nier Automata's lib::DynamicArray<T, A> : lib::Array<T>
+A = allocator
 */
-template<typename T, typename A>
-class DynamicArray 
+template<typename T, typename A = void>
+class DynamicArray : public Array<T>
 {
 
 };
@@ -125,10 +130,10 @@ class DynamicArray
 template<typename T>
 class CRedBlackTreeNode
 {
-	BOOL m_bRoot;
-	CRedBlackTreeNode<T>* m_pParent;
-	CRedBlackTreeNode<T>* m_pRight;
-	CRedBlackTreeNode<T>* m_pLeft;
+	BOOL m_bRoot;						//0x00
+	CRedBlackTreeNode<T>* m_pParent;	//0x08
+	CRedBlackTreeNode<T>* m_pRight;		//0x10
+	CRedBlackTreeNode<T>* m_pLeft;		//0x18
 	T m_Data;
 };
 
@@ -151,13 +156,28 @@ class CRedBlackTree
 
 };
 
+template<typename T>
+class FunctionExporterF
+{
+	void* m_pVtbl;
+	T m_Function;
+};
+
+
+template<typename R, typename T, typename... Args>
+class FunctionExporterF<R(T::*)(Args...)>;
+
+template<typename R, typename... Args>
+class FunctionExporterF<R(*)(Args...)>;
+
+
 // Size of structiure is 0x30 (48) bytes 
 struct CReadWriteLock
 {
 	CRITICAL_SECTION m_CriticalSection;
 	BOOL m_bCriticalSectionInitialized;
 
-	CReadWriteLock()
+	CReadWriteLock(void)
 	{
 		InitializeCriticalSection(&m_CriticalSection);
 		m_bCriticalSectionInitialized = TRUE;
@@ -169,7 +189,7 @@ struct CReadWriteLock
 		m_bCriticalSectionInitialized = TRUE;
 	}
 
-	~CReadWriteLock()
+	~CReadWriteLock(void)
 	{
 		DeleteCriticalSection(&m_CriticalSection);
 		m_bCriticalSectionInitialized = FALSE;

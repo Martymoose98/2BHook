@@ -882,3 +882,82 @@ VALIDATE_OFFSET(CGraphics, m_Display, 0x30);
 VALIDATE_OFFSET(CGraphics, m_pGraphicalDevice, 0x2B8);
 VALIDATE_OFFSET(CGraphics, m_Lock, 0x2C8);
 VALIDATE_SIZE(CGraphics, 0x320);
+
+class CModelEntry;
+struct CModelEntryData;
+struct CShaderSetting;
+
+struct CGraphicCommand
+{
+	CModelEntryData* m_pModelData;	//0x00
+	void* m_p0x008;					//0x08
+	void* m_pCallback;				//0x10
+	CShaderSetting* m_pSetting;		//0x18
+	BYTE gap18[16];					//0x20
+	QWORD qword30;					//0x30
+	BYTE gap38[88];					//0x38
+	BYTE m_SamplerIndex;			//0x90
+	BYTE gap91[7];					//0x91
+	BYTE m_PrimitiveWorkIndex;		//0x98
+	BYTE gap99[23];					//0x99
+	CModelEntry* m_pModelEntry;		//0xB0
+	BYTE gapB8[8];					//0xB8
+	int32_t m_iVertexIndex;			//0xC0
+	int32_t m_iInputLayout;			//0xC4
+	uint32_t unsignedCC;			//0xCC
+};
+VALIDATE_OFFSET(CGraphicCommand, qword30, 0x30);
+VALIDATE_OFFSET(CGraphicCommand, m_SamplerIndex, 0x90);
+VALIDATE_OFFSET(CGraphicCommand, m_pModelEntry, 0xB0);
+VALIDATE_OFFSET(CGraphicCommand, m_iVertexIndex, 0xC0);
+
+struct CGraphicCommandList
+{
+	__int64(__fastcall* m_pCallback)(CGraphics*, CGraphics*, CGraphicCommand*); // seems rdx is a garbage pointer
+	CGraphicCommand* m_pCommand;
+	struct CGraphicCommandList* m_pPrevious;
+	struct CGraphicCommandList* m_pNext;
+	uint32_t m_uFlags;
+	int32_t m_iCommandIndex;
+	CHAR pad28[8];
+};
+VALIDATE_SIZE(CGraphicCommandList, 0x30);
+
+struct COtManagerPtr98
+{
+	CGraphicCommand* m_pCommands;
+	CGraphicCommandList* m_pCmdLists;
+	int32_t m_iCommandIndex;
+	BYTE gap14[4];
+	int32_t* m_pTags;
+};
+
+/*
+This is from memcpy
+This must mean everything after is a different struct
+
+Size of struct is 0xA8 (168) bytes
+*/
+struct COtManager
+{
+	void* m_pVtbl;							//0x00
+	BYTE gap8[72];							//0x08
+	//0x10 | embededd struct
+	CGraphicCommandList** m_pCmdLists;		//0x50
+	BYTE gap58[8];							//0x58
+	int32_t* qword60;						//0x60
+	CGraphicCommandList* m_pActiveList;		//0x68
+	int32_t m_iGraphicListCount;			//0x70
+	int32_t m_nMaxGraphicListCount;			//0x74
+	volatile uint64_t m_uCmdIndex;			//0x78
+	uint64_t m_uCmdCount;					//0x80
+	DWORD m_uMaxTagCount;					//0x88
+	DWORD dword8C;							//0x8C
+	int32_t signed90;						//0x90
+	BYTE gap94[4];							//0x94
+	COtManagerPtr98* m_ptr98;				//0x98
+	BYTE gapA0[4];							//0xA0
+	BOOL m_bGraphicListInitalized;			//0xA4
+};
+VALIDATE_OFFSET(COtManager, m_bGraphicListInitalized, 0xA4);
+VALIDATE_SIZE(COtManager, 0xA8);

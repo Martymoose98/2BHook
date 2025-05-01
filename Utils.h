@@ -434,7 +434,8 @@ VALIDATE_SIZE(CWrapMouseDevice8, 0x48);
 
 static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
 {
-	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("dinput8.dll"));
+	// For fucks that have a dinput8.dll hook we need to specify we want the original dll!
+	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("System32\\dinput8.dll"));
 	HMODULE hOwnerModule = NULL;
 
 	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
@@ -450,7 +451,8 @@ static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
 
 static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
 {
-	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("dinput8.dll"));
+	// For fucks that have a dinput8.dll hook we need to specify we want the original dll!
+	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("System32\\dinput8.dll"));
 	HMODULE hOwnerModule = NULL;
 
 	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
@@ -471,10 +473,6 @@ static float GetFovFromProjectionMatrix(void)
 }
 
 /*
-	Doesn't seem to be 100% accurate.
-	I tired adding the fov math into it but no success
-	all the examples use a different method than me.
-	Either that or CGameCamera::m_flFov isn't the fov value and I fucked up
 	https://guidedhacking.com/threads/world2screen-direct3d-and-opengl-worldtoscreen-functions.8044/
 	https://www.cs.toronto.edu/~jepson/csc420/notes/imageProjection.pdf
 	https://www.scratchapixel.com/lessons/3d-basic-rendering/computing-pixel-coordinates-of-3d-point/mathematics-computing-2d-coordinates-of-3d-points
@@ -499,47 +497,47 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	if (w < 0.001f)
 		return false;
 
-	// transform by viewmatrix
+	// transform by view matrix
 	vMatrix.Transform(vIn, vTransform);
 
 	// multiply by inverse w (vTransform /= w)
 	vTransform *= 1.0f / w;
 
-	int width = g_pGraphicDevice->m_iScreenWidth;
-	int height = g_pGraphicDevice->m_iScreenHeight;
+	float width = g_pGraphicDevice->m_iScreenWidth;
+	float height = g_pGraphicDevice->m_iScreenHeight;
 
-	float x = width / 2.0f;
-	float y = height / 2.0f;
-	//float flFocalLengthY = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
-	//float flFocalLengthX = flFocalLengthX / (width / height);
+	float flFocalLengthY = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
+	float flFocalLengthX = flFocalLengthY / (width / height);
 
-	//vOut.x = x * (1.f + (vTransform.x / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
-	//vOut.y = y * (1.f - (vTransform.y / tanf(g_pCamera->m_flFov * 0.5f) / vTransform.z));
+	float x = (1.f + (vTransform.x/* * flFocalLengthX * (1.0f / vTransform.z))*/));
+	float y = (1.f - (vTransform.y /** flFocalLengthY*/ /* * (1.0f / vTransform.z)*/));
+	vOut.x = x * width * 0.5f;
+	vOut.y = y * height * 0.5f;
 
 	//vOut.x = x + vTransform.x * flFocalLengthX * width / vTransform.z;
 	//vOut.y = y - vTransform.y * flFocalLengthY * height / vTransform.z;
 
-	vOut.x = x + 0.5f * vTransform.x * (float)width + 0.5f;
-	vOut.y = y - 0.5f * vTransform.y * (float)height + 0.5f;
+	//vOut.x = x + 0.5f * vTransform.x * width + 0.5f;
+	//vOut.y = y - 0.5f * vTransform.y * height + 0.5f;
 
 	return true;
 }
 
-static inline unsigned short EntityHandleToListIndex(const EntityHandle hEntity)
+static inline uint16_t EntityHandleToListIndex(const EntityHandle hEntity)
 {
-	return (unsigned short)((hEntity & 0x00FFFF00) >> 8); // (unsigned short)(handle >> 8)
+	return (uint16_t)((hEntity & 0x00FFFF00) >> 8); // (uint16_t)(handle >> 8)
 }
 
-static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const unsigned short index)
+static inline EntityHandle GenerateEntityHandle(const CEntityList* pList, const uint16_t index)
 {
-	return (index | (pList->m_uShift << 16)) << 8;
+	return (index | (pList->m_uSector << 16)) << 8;
 }
 
 // NOTE: You should use these functions two get entity's by their handle from now on.
 // It is the proper way to do it, since it doesn't do any filtering.
 static CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, const EntityHandle hEntity)
 {
-	int idx = EntityHandleToListIndex(hEntity);
+	int32_t idx = EntityHandleToListIndex(hEntity);
 
 	// Check if the index is valid and the top 24-bits of the handles match
 	if (idx > pList->m_uItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
@@ -557,31 +555,31 @@ static CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, const Entit
 // actual standalone function doesn't exist in the binary no more
 // NOTE: You should use these functions two get entity's by their handle from now on.
 // It is the proper way to do it, since it doesn't do any filtering.
-static CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle* phEntity)
+static CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity)
 {
 	CEntityInfo* pEntityInfo = GetEntityInfoFromHandle(phEntity);
 	return pEntityInfo ? pEntityInfo->m_pParent : NULL;
 }
 
 // Rebuilt from binary with added functionality
-static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, ObjectIdConvert** ppConvert)
+static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, uint32_t ObjectId, ObjectIdConvert** ppConvert)
 {
 	static char HexChars[] = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f' };
 	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
 										{ 0x70000, "it" }, { 0x90000, "sc" }, { 0xA0000, "um" }, { 0xC0000, "bg" }, { 0xE0000, "bh" }, { 0xF0000, "ba" } };
 
-	unsigned int i = 0;
+	uint32_t i = 0;
 
 	do
 	{
-		if (Converts[i].m_ObjectIdBase == (objectId & 0xFFFF0000)) // high word of the int
+		if (Converts[i].m_ObjectIdBase == (ObjectId & 0xFFFF0000)) // high word of the int
 		{
 			szObjectName[0] = Converts[i].m_szPrefix[0];
 			szObjectName[1] = Converts[i].m_szPrefix[1];
-			szObjectName[2] = HexChars[(objectId >> 12) & 0xF];
-			szObjectName[3] = HexChars[(objectId >> 8) & 0xF];
-			szObjectName[4] = HexChars[(objectId >> 4) & 0xF];
-			szObjectName[5] = HexChars[objectId & 0xF];
+			szObjectName[2] = HexChars[(ObjectId >> 12) & 0xF];
+			szObjectName[3] = HexChars[(ObjectId >> 8) & 0xF];
+			szObjectName[4] = HexChars[(ObjectId >> 4) & 0xF];
+			szObjectName[5] = HexChars[ObjectId & 0xF];
 			szObjectName[6] = 0; //null terminator
 
 			if (*ppConvert)
@@ -594,10 +592,10 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, 
 
 	memset(szObjectName, 0, size);
 
-	if (objectId == -1)
+	if (ObjectId == -1)
 		strcpy_s(szObjectName, size, "eObjInvalid");
 	else
-		strcpy_s(szObjectName, size, (objectId != 0x700000) ? "Unknow" : "Null");
+		strcpy_s(szObjectName, size, (ObjectId != 0x700000) ? "Unknow" : "Null");
 
 	if (*ppConvert)
 		*ppConvert = NULL;
@@ -605,7 +603,7 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, int objectId, 
 	return FALSE;
 }
 
-static BOOL ObjectNameToObjectId(int* pObjectId, const char* szObjectName)
+static BOOL ObjectNameToObjectId(uint32_t* pObjectId, const char* szObjectName)
 {
 	static ObjectIdConvert Converts[] = { { 0x10000, "pl" }, { 0x20000, "em" }, { 0x30000, "wp" }, { 0x40000, "et" }, { 0x50000, "ef" }, { 0x60000, "es" },
 										{ 0x70000, "it" }, { 0x90000, "sc" }, { 0xA0000, "um" }, { 0xC0000, "bg" }, { 0xE0000, "bh" }, { 0xF0000, "ba" } };
@@ -919,22 +917,38 @@ static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 	hr = pFactory->CreateDecoderFromFilename(szFile, NULL, GENERIC_READ, WICDecodeMetadataCacheOnDemand, &pDecoder);
 
 	if (FAILED(hr))
+	{
+		pFactory->Release();
 		return hr;
+	}
 
 	hr = pDecoder->GetFrameCount(&uFrames);
 
 	if (FAILED(hr))
+	{
+		pDecoder->Release();
+		pFactory->Release();
 		return hr;
+	}
 
 	hr = pDecoder->GetFrame(0, &pFrame);
 
 	if (FAILED(hr))
+	{
+		pDecoder->Release();
+		pFactory->Release();
 		return hr;
+	}
 
 	hr = pFrame->GetPixelFormat(&Format);
 
 	if (FAILED(hr))
+	{
+		pFrame->Release();
+		pDecoder->Release();
+		pFactory->Release();
 		return hr;
+	}
 
 	hr = pFrame->GetSize(&w, &h);
 
@@ -957,6 +971,11 @@ static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 	}
 	else
 		hr = pFrame->CopyPixels(NULL, uStride, uSize, (uint8_t*)rgba);
+
+
+	pFrame->Release();
+	pDecoder->Release();
+	pFactory->Release();
 
 	return hr;
 }

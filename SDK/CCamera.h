@@ -122,6 +122,9 @@ This struct is 16 byte aligned
 class __declspec(align(16)) CCameraGame : public CCameraBase
 {
 public:
+	typedef void(*SetLookAtFn)(CCameraGame* pThis);
+	typedef void(*ResetCameraFn)(CCameraGame* pThis);
+
 	typedef float NormalCameraFloatOffset;
 
 	virtual void* function0(char a1) PURE;

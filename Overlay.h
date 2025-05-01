@@ -125,6 +125,68 @@ struct OverlayDrawList : public ImDrawList
 		AddRectFilled(ImVec2((float)(x + w), (float)((y + h) - v_leg)), ImVec2((float)(x + w + thickness), (float)(y + h)), color); //v
 	}
 
+	// REF: https://www.unknowncheats.me/forum/counterstrike-global-offensive/124388-bounding-esp-boxes.html	
+	void Add2DBox(const Vector3& vMin, const Vector3& vMax, const Matrix4x4& mTransform, float flThickness,
+		const ImColor& color, ImRect& R)
+	{
+		Vector2 vCorners2D[8];
+		Vector3 vCornersTransform[8];
+		Vector3 vCorners[8] =
+		{
+			Vector3(vMin.x, vMin.y, vMin.z),
+			Vector3(vMin.x, vMax.y, vMin.z),
+			Vector3(vMax.x, vMax.y, vMin.z),
+			Vector3(vMax.x, vMin.y, vMin.z),
+			Vector3(vMin.x, vMin.y, vMax.z),
+			Vector3(vMin.x, vMax.y, vMax.z),
+			Vector3(vMax.x, vMax.y, vMax.z),
+			Vector3(vMax.x, vMin.y, vMax.z)
+		};
+
+		mTransform.Transform(vCorners[0], vCornersTransform[0]);
+		mTransform.Transform(vCorners[1], vCornersTransform[1]);
+		mTransform.Transform(vCorners[2], vCornersTransform[2]);
+		mTransform.Transform(vCorners[3], vCornersTransform[3]);
+		mTransform.Transform(vCorners[4], vCornersTransform[4]);
+		mTransform.Transform(vCorners[5], vCornersTransform[5]);
+		mTransform.Transform(vCorners[6], vCornersTransform[6]);
+		mTransform.Transform(vCorners[7], vCornersTransform[7]);
+
+		if (WorldToScreen(vCornersTransform[0], vCorners2D[0]) && WorldToScreen(vCornersTransform[1], vCorners2D[1]) &&
+			WorldToScreen(vCornersTransform[2], vCorners2D[2]) && WorldToScreen(vCornersTransform[3], vCorners2D[3]) &&
+			WorldToScreen(vCornersTransform[4], vCorners2D[4]) && WorldToScreen(vCornersTransform[5], vCorners2D[5]) &&
+			WorldToScreen(vCornersTransform[6], vCorners2D[6]) && WorldToScreen(vCornersTransform[7], vCorners2D[7]))
+		{
+			float flLeft = vCorners2D[3].x;	// left
+			float flTop = vCorners2D[3].y;	// top
+			float flRight = flLeft;			// right
+			float flBottom = flTop;			// bottom
+
+			for (int i = 0; i < ARRAYSIZE(vCorners2D); i++)
+			{
+				if (flLeft > vCorners2D[i].x)
+					flLeft = vCorners2D[i].x;
+
+				if (flTop < vCorners2D[i].y)
+					flTop = vCorners2D[i].y;
+
+				if (flRight < vCorners2D[i].x)
+					flRight = vCorners2D[i].x;
+
+				if (flBottom > vCorners2D[i].y)
+					flBottom = vCorners2D[i].y;
+			}
+
+			R = ImRect(flLeft, flBottom, flRight, flTop);
+
+			AddRectCorners(flLeft, flBottom, flRight - flLeft, flTop - flBottom, flThickness, color);
+			//AddLine(ImVec2(left, bottom), ImVec2(left + flThickness, top), color, flThickness);
+			//AddLine(ImVec2(left, top), ImVec2(right, top), color, flThickness);
+			//AddLine(ImVec2(right, top), ImVec2(right, bottom), color, flThickness);
+			//AddLine(ImVec2(right, bottom), ImVec2(left, bottom), color, flThickness);
+		}
+	}
+
 	void Add3DBox(const Vector3& vMin, const Vector3& vMax, const Matrix4x4& mTransform, const ImColor& color)
 	{
 		Vector2 vCorners2D[8];
@@ -276,10 +338,10 @@ struct OverlayDrawList : public ImDrawList
 class Overlay
 {
 public:
-	Overlay() : m_pList(NULL) 
+	Overlay() : m_pList(NULL)
 	{
 	}
-	
+
 	~Overlay() { if (m_pList) IM_DELETE(m_pList); }
 
 	OverlayDrawList* m_pList;

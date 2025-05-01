@@ -14,10 +14,14 @@ Size of struct 0x178F0 (96496) bytes old version (denuvo)
 Size of struct 0x17920 (96544) bytes new version
 
 CBehaviorAppBase, CBehavior, CObj, CModel, CParts
+
+48 89 5C 24 08 57 48 83 EC 60 48 8B D9 E8 - Pl0000::SetBuddyFromNpc
 */
 class Pl0000 : public CBehaviorAppBase
 {
 public:
+	typedef void(* SetBuddyFromNpcFn)(Pl0000* pThis);
+
 	typedef int32_t PassiveSkill;
 
 	virtual void function150() = 0;
@@ -52,24 +56,24 @@ public:
 	char _0x02B70[56056];					//0x02B70
 	int32_t m_iHealth2;						//0x10668									
 	char _0x1066C[420];						//0x1066C
-	EntityHandle m_hPod;					//0x10810
-	EntityHandle m_hUnk2;					//0x10814
+	EntityHandle_t m_hPod;					//0x10810
+	EntityHandle_t m_hUnk2;					//0x10814
 	char _0x10818[844];						//0x10818
 	BOOL m_bUnkCamera;						//0x10B64 | Camera boolean
 	char _0x10B68[9048];					//0x10B68
 	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
 	char _0x130E0[10880];					//0x130E0
 	BOOL m_bFlightSuit;						//0x15B50
-	EntityHandle m_hFlightSuit;				//0x15B54 now 0x15B64
+	EntityHandle_t m_hFlightSuit;			//0x15B54
 	char _0x15B58[880];						//0x15B58
 	StaticArray<EntityHandle, 64> m_Handles;//0x15EC8
 	char _0x15FE8[1156];					//0x15FE8
-	EntityHandle m_hBuddy;					//0x1646C now 0x1647C | Localplayer = 0x1000C00, Buddy = 0x1020400
-	EntityHandle m_hPascal;					//0x16470
+	EntityHandle_t m_hBuddy;				//0x1646C now 0x1647C | Localplayer = 0x1000C00, Buddy = 0x1020400
+	EntityHandle_t m_hPascal;				//0x16470
 	char _0x16474[268];						//0x16474
 	StaticArray<EntityHandle, 4> m_Handles2;//0x16580
 	char _0x165B0[72];						//0x165B0 | const hap::hap_action::PuidMixin
-	StaticArray<Pl0000::PassiveSkill, 100> m_PassiveSkills;	//0x165F8
+	StaticArray<PassiveSkill, 100> m_PassiveSkills;	//0x165F8
 	char _0x167A8[1320];					//0x167A8
 	BOOL b0x16CD0;							//0x16CD0
 	BOOL m_bRenderSkirt;					//0x16CD4

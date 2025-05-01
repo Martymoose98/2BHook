@@ -40,6 +40,9 @@
     <Filter Include="Header Files\SDK\Entity">
       <UniqueIdentifier>{c6ed01ec-9579-4da5-9128-78c87186504b}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\SDK">
+      <UniqueIdentifier>{0cc904ff-049e-46bb-ac18-22cd0b8a67da}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Log.h">
@@ -241,6 +244,9 @@
     </ClCompile>
     <ClCompile Include="Menu.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="SDK\EntityList.cpp">
+      <Filter>Source Files\SDK</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

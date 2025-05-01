@@ -10,6 +10,8 @@
 #include "Utils.h"
 #include "Variables.h"
 
+#include "SDK/Entity/CObj.h"
+
 
 class CConfig;
 
@@ -67,8 +69,6 @@ public:
 
 	void Draw(const ImVec2 vSize);
 
-	void DisplayEntityHandles(void);
-
 	HRESULT KeyboardHandler(HRESULT Result, LPVOID lpvData, DWORD cbData);
 	HRESULT MouseHandler(LPVOID lpvData, DWORD cbData);
 
@@ -83,9 +83,12 @@ public:
 private:
 	void GameplayTab(Pl0000* pCameraEnt);
 	void VisualsTab(CBehaviorAppBase* pCameraEnt);
+	void SpawnTab(Pl0000* pCameraEnt);
 	void MiscTab(void);
 	void ConfigTab(void);
-	
+
+	void DisplayEntityHandles(void);
+
 	bool m_bOpened;
 	bool m_bIgnoreInputWhenOpened;
 	char m_szAdapterUtf8[128 * 4];
@@ -118,3 +121,59 @@ static void ApplyModelMods(Pl0000* pEntity);
 static bool BlacklistItemCallback(void* data, int idx, const char** out_text);
 
 static bool ConfigCallback(void* data, int idx, const char** out_text);
+
+// NPC
+//Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
+static const char* EntityHandlesCallback(void* user_data, int idx)
+{
+	static char s_Buffer[64];
+	EntityHandle_t hCurrent = {};
+	CBehaviorAppBase* pCurrent = nullptr;
+	const char* szType = "Unknown";
+
+	if (idx < 0)
+		return nullptr;
+
+	if (idx < g_pNPCManager->m_handles.m_Count)
+	{
+		hCurrent = g_pNPCManager->m_handles[idx];
+		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
+		szType = "NPC";
+	}
+	else if (idx < g_pNPCManager->m_handles.m_Count + g_pEnemyManager->m_handles.m_Count)
+	{
+		hCurrent = g_pEnemyManager->m_handles[idx];
+		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
+		szType = "Enemy";
+	}
+	else
+	{
+		hCurrent = g_pYorhaManager->m_handles[idx];
+		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
+		szType = "Yorha";
+	}
+
+	((EntityHandle*)(user_data))[idx] = hCurrent;
+
+	sprintf_s(s_Buffer, "%s: %s | Handle: %x | ObjectId: %x", szType,
+		pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
+
+	return s_Buffer;
+}
+
+static const char* EntityCallback(void* user_data, int idx)
+{
+	static char s_Buffer[1024];
+
+	CEntityInfo* pInfo = g_pEntityList->m_pItems[idx].second;
+
+	if (pInfo)
+	{
+		sprintf_s(s_Buffer, "%s (ObjectId %x, SetType %x) Base %llx EHANDLE %08x\n",
+			(pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout",
+			pInfo->m_ObjectId, pInfo->m_uSetType, pInfo->m_pEntity, pInfo->m_hEntity);
+	}
+
+
+	return s_Buffer;
+}
