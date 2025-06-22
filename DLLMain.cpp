@@ -791,7 +791,7 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
-	PVOID pfnIoAllocateMdl = GetExportAddressFromDisk("ntoskrnl.exe", "IoAllocateMdl");
+	//PVOID pfnIoAllocateMdl = GetExportAddressFromDisk("ntoskrnl.exe", "IoAllocateMdl");
 
 	{
 		STACK_TIMER(AVX_timer);
