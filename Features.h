@@ -8,7 +8,7 @@
 #include "Console.h"
 
 CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
-CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle* phEntity);
+CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity);
 int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 
 
@@ -146,7 +146,7 @@ namespace Features
 	static void Firstperson(CBehavior* pEntity)
 	{
 		if (pEntity &&
-			(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
 			!(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
 			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
@@ -186,7 +186,7 @@ namespace Features
 	static void Thirdperson(CBehavior* pEntity)
 	{
 		if (pEntity &&
-			!(Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+			!(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
 			(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 		{
 			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
@@ -659,28 +659,31 @@ namespace Features
 	}
 
 	// if this doesn't work might have to create critical section, enter, copy the array contents and zero out the array, then leave
-	static void EnableWordBlacklist(IN BannedWordChecker* pChecker, IN DWORD dwWordCount)
+	static void EnableWordBlacklist(IN CBannedWordChecker* pChecker, IN uint32_t uWordCount)
 	{
 		if (!pChecker || !pChecker->m_pEntries)
 			return;
 
-		pChecker->m_uWordCount = dwWordCount;
+		pChecker->m_uWordCount = uWordCount;
 	}
 
 	// if this doesn't work might have to create critical section, enter, restore and free the backup array, then leave
-	static void DisableWordBlacklist(IN BannedWordChecker* pChecker, OPTIONAL OUT PDWORD pdwWordCount)
+	static void DisableWordBlacklist(IN CBannedWordChecker* pChecker, OPTIONAL OUT uint32_t* puWordCount)
 	{
 		if (!pChecker || !pChecker->m_pEntries)
 			return;
 
-		if (pdwWordCount)
-			*pdwWordCount = pChecker->m_uWordCount;
+		if (puWordCount)
+			*puWordCount = pChecker->m_uWordCount;
 
 		pChecker->m_uWordCount = 0;
 	}
 
 	// try to check if the buffer is valid and if so free with heap free ?
-	static void DecryptWordBlacklist(IN BannedWordChecker* pChecker)
+	// Rebuilt from old binary but is the same in the new one
+	// new version is VECTORIZED LOOOL
+	// NEW FUNC SIG "48 89 5C 24 10 48 89 6C 24 18 56 57 41 54 48"
+	static void DecryptWordBlacklist(IN CBannedWordChecker* pChecker)
 	{
 		BYTE current_byte;
 		PBYTE pData, lpDataEnd, lpDataStart;
@@ -690,25 +693,25 @@ namespace Features
 		if (!pChecker || !pChecker->m_pBuffer)
 			return;
 
-		BannedWordChecker::BannedWordBinaryHeader* pHdr = (BannedWordChecker::BannedWordBinaryHeader*)pChecker->m_pBuffer;
+		CBannedWordChecker::BinaryHeader* pHdr = (CBannedWordChecker::BinaryHeader*)pChecker->m_pBuffer;
 
-		UINT dwNextDataStartOffset = sizeof(BannedWordChecker::BannedWordBinaryHeader);
+		UINT dwNextDataStartOffset = sizeof(CBannedWordChecker::BinaryHeader);
 		DWORD i = 0;
 
-		pChecker->m_uWordCount = pHdr->uWordCount;
+		pChecker->m_uWordCount = pHdr->m_uWordCount;
 
 		if (pChecker->m_uWordCount > 0)
 		{
-			pChecker->m_pEntries = new BannedWordChecker::WordEntry[pChecker->m_uWordCount];
+			pChecker->m_pEntries = new CBannedWordChecker::WordEntry[pChecker->m_uWordCount];
 
 			do
 			{
 				dwDataStartOffset = dwNextDataStartOffset;
-				dwDataEndOffset = dwNextDataStartOffset + 4;
+				dwDataEndOffset = dwNextDataStartOffset + sizeof(uint32_t);
 				lpDataStart = (BYTE*)pChecker->m_pBuffer + dwDataStartOffset;
 				lpDataEnd = (BYTE*)pChecker->m_pBuffer + dwDataEndOffset;
-				pChecker->m_pEntries[i].dwLength = *(DWORD*)lpDataStart;
-				dwWordByteLength = pChecker->m_pEntries[i].dwLength * sizeof(WCHAR);
+				pChecker->m_pEntries[i].m_uLength = *(uint32_t*)lpDataStart;
+				dwWordByteLength = pChecker->m_pEntries[i].m_uLength * sizeof(wchar_t);
 				dwNextDataStartOffset = dwWordByteLength + dwDataEndOffset;
 
 				if (dwWordByteLength)
@@ -722,8 +725,9 @@ namespace Features
 						*(pData - 1) = current_byte - 19;
 					} while (--length);
 				}
-				*((WCHAR*)&lpDataStart[dwWordByteLength]) = 0; 	//*((WCHAR*)(lpDataStart + dwWordByteLength)) = 0;
-				pChecker->m_pEntries[i++].lpszBannedWord = (LPWSTR)lpDataStart;
+				*((wchar_t*)&lpDataStart[dwWordByteLength]) = 0;
+				//*((WCHAR*)(lpDataStart + dwWordByteLength)) = 0;
+				pChecker->m_pEntries[i++].m_szBannedWord = (wchar_t*)lpDataStart;
 			} while (i < pChecker->m_uWordCount);
 		}
 	}

@@ -189,7 +189,7 @@ public:
 	Vector3Aligned m_vF0;
 	DWORD dword100;
 	float dword104;
-	BYTE gap108[12 +32];
+	BYTE gap108[44];
 	/*__unaligned __declspec(align(1)) QWORD qword114;
 	__unaligned __declspec(align(1)) QWORD qword11C;
 	__unaligned __declspec(align(1)) QWORD qword124;
@@ -231,7 +231,7 @@ struct CVertexGroup
 };
 VALIDATE_SIZE(CVertexGroup, 24);
 
-struct __declspec(align(8)) CModelDrawContext
+struct CModelDrawContext
 {
 	CVertexGroup* m_pVertexGroups;		// 0x0000
 	BYTE gap8[8];						// 0x0008
@@ -328,8 +328,8 @@ class CModelAnalyzer
 public:
 	virtual void function0(char a2);
 	virtual void LOD_sub_143F4B620(__int64 a2);
-	virtual int32_t FindTextureIndexByName(const char* szName);
-	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, __int64 pModelWorkExtend, __int64 ppHeaps);
+	virtual int32_t FindTextureIndexByName(const char* szName); 
+	virtual CModelShaderModule* CreateModelShaderModule(CMaterialDescription* pMaterialDescription, CModelExtendWork* pModelWorkExtend, __int64 ppHeaps);
 	virtual void function4();
 	virtual void function5();
 };

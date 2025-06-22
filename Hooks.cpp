@@ -639,7 +639,7 @@ return TRUE;*/
 	pThis->m_flFov = DEGTORAD(Vars.Visuals.flFov);
 
 	// TODO: CLAMP ANGLES
-	if (pThis->m_pCamEntity && (Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
+	if (pThis->m_pCamEntity && (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
 	{
 		Features::Firstperson(pThis->m_pCamEntity);
 
@@ -669,7 +669,7 @@ return TRUE;*/
 
 		CameraGame_SetLookAt(pThis);
 	}
-	else if ((Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+	else if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
 	{
 		Math::AngleVectors(pThis->m_vViewangles, &vForward, &vRight, &vUp);
 
@@ -719,9 +719,9 @@ return TRUE;*/
 		Features::Thirdperson(pThis->m_pCamEntity);
 	}
 
-	Vars.Misc.bCameraFlagsOld = Vars.Misc.bCameraFlags;
+	Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
 
-	return (Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_ALT_MASK) ?
+	return (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_ALT_MASK) ?
 		TRUE : oCCameraGameSetViewAngles(pThis);
 }
 
@@ -733,7 +733,7 @@ void* hkCCameraGameMove(CCameraGame* pThis)
 		(decltype(CCameraGame_FREECAM_sub_14073AAE0))FindPattern(NULL,
 			"48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 83 EC 60 83");
 
-	if ((Vars.Misc.bCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+	if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
 	{
 		Vector3Aligned vDir;
 		Vector3Aligned vForward, vRight, vUp, vRotX, vRotY;
@@ -904,7 +904,7 @@ void* hkCreateEntity(CSceneEntitySystemUnk* pUnknown, CEntityInfo* pInfo, uint32
 	return pEntity;
 }
 
-BOOL hkLoadWordBlacklist(BannedWordChecker* pThis, __int64 thisrdx, QWORD* thisr8, const char* szBlacklistName)
+BOOL hkLoadWordBlacklist(CBannedWordChecker* pThis, __int64 thisrdx, QWORD* thisr8, const char* szBlacklistName)
 {
 #if 0
 	QWORD size;
@@ -1042,7 +1042,7 @@ HRESULT hkOleLoadPicture(LPSTREAM lpStream, LONG lSize, BOOL fRunmode, REFIID ri
 
 	return ((OleLoadPictureFn)(g_pOleLoadPictureHook->GetOriginalFunction()))(lpStream, lSize, fRunmode, riid, lplpvObj);
 }
-volatile LONG g_flag = 0;
+
 void hkSaveFileIO(CSaveDataDevice* pSavedata)
 {
 	if (!pSavedata)
@@ -1112,19 +1112,20 @@ BOOL hkSetCursorPos(int X, int Y)
 
 DWORD hkXInputGetState(DWORD dwUserIndex, PXINPUT_STATE pState)
 {
-	ZeroMemory(&Vars.Menu.Input.emulate, sizeof(XINPUT_STATE)); // need to zero out the input state before emulating new inputs
+	// Pretty much obselete code that was dumb
+	//ZeroMemory(&Vars.Menu.Input.emulate, sizeof(XINPUT_STATE)); // need to zero out the input state before emulating new inputs
 
-	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_A)
-		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_A;
+	//if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_A)
+	//	pState->Gamepad.wButtons |= XINPUT_GAMEPAD_A;
 
-	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_X)
-		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_X;
+	//if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_X)
+	//	pState->Gamepad.wButtons |= XINPUT_GAMEPAD_X;
 
-	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_Y)
-		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_Y;
+	//if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_Y)
+	//	pState->Gamepad.wButtons |= XINPUT_GAMEPAD_Y;
 
-	if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_B)
-		pState->Gamepad.wButtons |= XINPUT_GAMEPAD_B;
+	//if (Vars.Menu.Input.emulate.Gamepad.wButtons & XINPUT_GAMEPAD_B)
+	//	pState->Gamepad.wButtons |= XINPUT_GAMEPAD_B;
 
 	return oXInputGetState(dwUserIndex, pState);
 }

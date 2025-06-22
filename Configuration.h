@@ -80,13 +80,21 @@
 //	static void WriteFloat(const ConfigItem* pItem);
 //};
 
+//#define CATEGORY_VISUALS "Visuals"
+//#define CATEGORY_GAMEPLAY "Gameplay"
+//#define CATEGORY_KEYBINDS "Keybinds"
+//#define CATEGORY_MISC "Misc"
+//#define CATEGORY_MENU "Menu"
+
+#define CONFIG_XML
+
 #if defined(CONFIG_XML)
 #define CATEGORY_VISUALS _CRT_WIDE("Visuals")
 #define CATEGORY_GAMEPLAY _CRT_WIDE("Gameplay")
 #define CATEGORY_KEYBINDS _CRT_WIDE("Keybinds")
 #define CATEGORY_MISC _CRT_WIDE("Misc")
 #define CATEGORY_MENU _CRT_WIDE("Menu")
-#define CONFIG_EXTENSION _CRT_WIDE(".xml")
+#define CONFIG_EXTENSION TEXT(".xml")
 #else
 #define CATEGORY_VISUALS "Visuals"
 #define CATEGORY_GAMEPLAY "Gameplay"
@@ -97,17 +105,11 @@
 #define CONFIG_EXTENSION TEXT(".ini")
 #endif // CONFIG_XML
 
-#define XCATEGORY_VISUALS _CRT_WIDE(CATEGORY_VISUALS)
-#define XCATEGORY_GAMEPLAY _CRT_WIDE(CATEGORY_GAMEPLAY)
-#define XCATEGORY_KEYBINDS _CRT_WIDE(CATEGORY_KEYBINDS)
-#define XCATEGORY_MISC _CRT_WIDE(CATEGORY_MISC)
-#define XCATEGORY_MENU _CRT_WIDE(CATEGORY_MENU)
-
 
 #define CONFIG_DEFAULT TEXT("default")
 
 #define CONFIG_SEARCH_WILDCARD _CRT_CONCATENATE(TEXT("*"), CONFIG_EXTENSION)
-#define CONFIG_DEFAULT_INI _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
+#define CONFIG_DEFAULT_NAME _CRT_CONCATENATE(CONFIG_DEFAULT, CONFIG_EXTENSION)
 
 using namespace Microsoft::WRL;
 
@@ -134,50 +136,49 @@ public:
 	virtual void OnPressed(void) = 0;
 };
 
-
 // TODO: maybe remove and revert to IKeybind only
 class CKeybind : public IKeybind
 {
 public:
 	CKeybind(void) : m_szName(NULL), m_Keycode(-1), m_Mode(KEYBIND_INVALID) {}
 
-	CKeybind(const char* szName, int32_t Keycode, Mode Mode)
+	CKeybind(const wchar_t* szName, int32_t Keycode, Mode Mode)
 		: m_szName(szName), m_Keycode(Keycode), m_Mode(Mode)
 	{
 	}
 
-	virtual void OnPressed(void) = 0;
+	// Move constructor
+	CKeybind(CKeybind&& other) noexcept
+		: m_szName(std::move(other.m_szName)),
+		m_Keycode(other.m_Keycode),
+		m_Mode(other.m_Mode)
+	{
+		// Optional: reset source
+		other.m_Keycode = -1;
+		other.m_Mode = KEYBIND_INVALID;
+	}
 
-	const char* GetName(void) const { return m_szName; }
+	CKeybind(const CKeybind&) = default;
+
+	virtual void OnPressed(void) {}//= 0;
+
+	const wchar_t* GetName(void) const { return m_szName; }
 	int GetKeycode(void) const { return m_Keycode; }
 	void SetKeycode(int keycode) { m_Keycode = keycode; }
 	Mode GetMode(void) const { return m_Mode; }
 
 private:
-	const char* m_szName;
+	const wchar_t* m_szName;
 	int32_t m_Keycode;
 	Mode m_Mode;
 };
 
-
-class IConfigItem
+class CKeybindToggleable : public CKeybind
 {
 public:
+	CKeybindToggleable(void) : CKeybind(), m_pbToggle(NULL) {}
 
-	virtual void Read(const char* szFilename) = 0;
-	virtual void Write(const char* szFilename) = 0;
-
-protected:
-	const char* m_szCategory = nullptr;
-	const char* m_szName = nullptr;
-};
-
-class KeybindToggleable : public CKeybind
-{
-public:
-	KeybindToggleable(void) : CKeybind(), m_pbToggle(NULL) {}
-
-	KeybindToggleable(const char* szName, int keycode, bool* pToggle)
+	CKeybindToggleable(const wchar_t* szName, int keycode, bool* pToggle)
 		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pbToggle(pToggle)
 	{
 	}
@@ -189,19 +190,20 @@ private:
 };
 
 template<typename GetterFn>
-class KeybindDynamicToggleable;
+class CKeybindDynamicToggleable;
 
 //template<typename R, class Base>
 template<class Base>
-class KeybindDynamicToggleable<bool (Base::*)(void) const> : public CKeybind
+class CKeybindDynamicToggleable<bool (Base::*)(void) const> : public CKeybind
 {
 public:
 	typedef bool (Base::* GetterFn)(void) const;
 
-	constexpr explicit KeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
-	{}
+	constexpr explicit CKeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
+	{
+	}
 
-	constexpr explicit KeybindDynamicToggleable(const char* szName, int keycode, Base* pBase, GetterFn pGetter)
+	constexpr explicit CKeybindDynamicToggleable(const wchar_t* szName, int keycode, Base* pBase, GetterFn pGetter)
 		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pBase(pBase), m_pGetter(pGetter)
 	{
 	}
@@ -223,15 +225,16 @@ private:
 };
 
 template<>
-class KeybindDynamicToggleable<bool* (*)(void)> : public CKeybind
+class CKeybindDynamicToggleable<bool* (*)(void)> : public CKeybind
 {
 public:
 	typedef bool* (*GetterFn)(void);
 
-	explicit KeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
-	{}
+	explicit CKeybindDynamicToggleable(void) : CKeybind(), m_pGetter(NULL)
+	{
+	}
 
-	explicit KeybindDynamicToggleable(const char* szName, int keycode, GetterFn pGetter)
+	explicit CKeybindDynamicToggleable(const wchar_t* szName, int keycode, GetterFn pGetter)
 		: CKeybind(szName, keycode, IKeybind::KEYBIND_ON_KEYPRESSED), m_pGetter(pGetter)
 	{
 	}
@@ -257,7 +260,7 @@ class KeybindIncremental : public CKeybind
 public:
 	KeybindIncremental(void) : CKeybind(), m_pIncremental(NULL) {}
 
-	KeybindIncremental(const char* szName, int keycode, Mode mode, T* pIncremental, T step)
+	KeybindIncremental(const wchar_t* szName, int keycode, Mode mode, T* pIncremental, T step)
 		: CKeybind(szName, keycode, mode), m_pIncremental(pIncremental), m_step(step)
 	{
 	}
@@ -270,14 +273,14 @@ private:
 };
 
 template<typename T>
-class KeybindDynamicIncremental : public CKeybind
+class CKeybindDynamicIncremental : public CKeybind
 {
 public:
 	typedef T* (*GetterFn)(void);
 
-	KeybindDynamicIncremental(void) : CKeybind(), m_step(), m_pGetter(NULL) {}
+	CKeybindDynamicIncremental(void) : CKeybind(), m_step(), m_pGetter(NULL) {}
 
-	constexpr KeybindDynamicIncremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
+	constexpr CKeybindDynamicIncremental(const wchar_t* szName, int keycode, Mode mode, GetterFn pGetter, T step)
 		: CKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
 	{
 	}
@@ -305,7 +308,7 @@ class KeybindDecremental : public CKeybind
 public:
 	KeybindDecremental(void) : CKeybind(), m_pDecremental(NULL) {}
 
-	KeybindDecremental(const char* szName, int keycode, Mode mode, T* pDecremental, T step)
+	KeybindDecremental(const wchar_t* szName, int keycode, Mode mode, T* pDecremental, T step)
 		: CKeybind(szName, keycode, mode), m_pDecremental(pDecremental), m_step(step)
 	{
 	}
@@ -318,14 +321,14 @@ private:
 };
 
 template<typename T>
-class KeybindDynamicDecremental : public CKeybind
+class CKeybindDynamicDecremental : public CKeybind
 {
 public:
 	typedef T* (*GetterFn)(void);
 
-	KeybindDynamicDecremental(void) : CKeybind(), m_pGetter(NULL) {}
+	CKeybindDynamicDecremental(void) : CKeybind(), m_pGetter(NULL) {}
 
-	constexpr KeybindDynamicDecremental(const char* szName, int keycode, Mode mode, GetterFn pGetter, T step)
+	constexpr CKeybindDynamicDecremental(const wchar_t* szName, int keycode, Mode mode, GetterFn pGetter, T step)
 		: CKeybind(szName, keycode, mode), m_pGetter(pGetter), m_step(step)
 	{
 	}
@@ -354,11 +357,12 @@ public:
 
 	KeybindIncrement(void) : m_inc(), m_dec() {}
 
-	KeybindIncrement(const char* szNameInc, const char* szNameDec, int keycodeInc, int keycodeDec, Mode mode, T* pVariable, T step)
-		: m_inc(szNameInc, keycodeInc, mode, pVariable, step), m_dec(szNameDec, keycodeDec, mode, pVariable, step)
-	{}
-
-
+	KeybindIncrement(const wchar_t* szNameInc, const wchar_t* szNameDec, 
+		int keycodeInc, int keycodeDec, Mode mode, T* pVariable, T step)
+		: m_inc(szNameInc, keycodeInc, mode, pVariable, step),
+		m_dec(szNameDec, keycodeDec, mode, pVariable, step)
+	{
+	}
 
 	KeybindIncremental<T> m_inc;
 	KeybindDecremental<T> m_dec;
@@ -373,22 +377,23 @@ public:
 
 	KeybindDynamicIncrement(void) : m_inc(), m_dec() {}
 
-	constexpr KeybindDynamicIncrement(const char* szNameInc, const char* szNameDec, int keycodeInc, int keycodeDec, Mode mode, GetterFn pGetter, T step)
+	constexpr KeybindDynamicIncrement(const wchar_t* szNameInc, const wchar_t* szNameDec, int keycodeInc, int keycodeDec, Mode mode, GetterFn pGetter, T step)
 		: m_inc(szNameInc, keycodeInc, mode, pGetter, step), m_dec(szNameDec, keycodeDec, mode, pGetter, step)
-	{}
+	{
+	}
 
 
-	KeybindDynamicIncremental<T> m_inc;
-	KeybindDynamicDecremental<T> m_dec;
+	CKeybindDynamicIncremental<T> m_inc;
+	CKeybindDynamicDecremental<T> m_dec;
 };
 
 template<typename Ret, typename... Args>
-class KeybindFunctional : public CKeybind
+class CKeybindFunctional : public CKeybind
 {
 public:
-	KeybindFunctional(void) : CKeybind(), m_callback() {}
+	CKeybindFunctional(void) : CKeybind(), m_callback() {}
 
-	KeybindFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(Args...), Args... callback_params)
+	CKeybindFunctional(const wchar_t* szName, int keycode, Mode mode, Ret(*callback)(Args...), Args... callback_params)
 		: CKeybind(szName, keycode, mode), m_callback(std::bind(callback, callback_params...))
 	{
 	}
@@ -404,17 +409,26 @@ private:
 };
 
 template<typename Ret, typename Base, typename... Args>
-class KeybindVirtualFunctional : public CKeybind
+class CKeybindVirtualFunctional : public CKeybind
 {
 public:
-	KeybindVirtualFunctional(void) : CKeybind(), m_callback() {}
+	CKeybindVirtualFunctional(void) : CKeybind(), m_callback() {}
 
-	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, size_t index, const Base* pThis, Args... callback_params)
-		: KeybindVirtualFunctional(szName, keycode, mode, GetVirtual(pThis, index), pThis, callback_params...)
+	CKeybindVirtualFunctional(const wchar_t* szName, int keycode, Mode mode, size_t index, 
+		const Base* pThis, Args&&... callback_params)
+		: CKeybindVirtualFunctional(szName, keycode, mode, GetVirtual(pThis, index), pThis, callback_params...)
 	{
 	}
 
-	KeybindVirtualFunctional(const char* szName, int keycode, Mode mode, Ret(*callback)(const Base*, Args...), const Base* pThis, Args... callback_params)
+	CKeybindVirtualFunctional(const wchar_t* szName, int keycode, Mode mode, 
+		Ret(Base::*callback)(Args...) const, const Base* pThis, Args&&... callback_params)
+		: CKeybind(szName, keycode, mode), m_callback(std::bind(callback, pThis, callback_params...))
+	{
+	}
+
+
+	CKeybindVirtualFunctional(const wchar_t* szName, int keycode, Mode mode,
+		Ret(*callback)(const Base*, Args...), const Base* pThis, Args&&... callback_params)
 		: CKeybind(szName, keycode, mode), m_callback(std::bind(callback, pThis, callback_params...))
 	{
 	}
@@ -460,14 +474,124 @@ public:
 	virtual HRESULT Read(IXmlReader* pReader) = 0;
 	virtual HRESULT Write(IXmlWriter* pWriter) = 0;
 
+	//template<typename T>
+	//static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(const wchar_t* szSector,
+	//	const wchar_t* szName, T& Value) noexcept
+	//{		
+	//	return std::make_pair(szSector, new CConfigItemXml<std::add_lvalue_reference_t<T>>(szSector, szName, Value));
+	//}
+
 	template<typename T>
-	static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(const wchar_t* szSector,
-		const wchar_t* szName, T& Value) noexcept
+	static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(
+		const wchar_t* szSector,
+		const wchar_t* szName, T&& Value) noexcept
 	{
-		return std::make_pair(szSector, new CConfigItemXml<T>(szSector, szName, Value));
+		return std::make_pair(szSector,
+			new CConfigItemXml<T>(szSector, szName, std::forward<T>(Value)));
 	}
 };
 
+// TODO: make make like a setting class for templates with a desc and
+template<typename T> // std::enable_if_t<std::is_fundamental_v<T>>
+class CConfigItemXml : public IConfigItemXml
+{
+public:
+	using value_type = std::remove_reference_t<T>;
+	//CConfigItemXml(const wchar_t* szSector, const wchar_t* szName, T& Value)
+	//	: m_szSector(szSector), m_szName(szName), m_Value(Value)
+	//{
+	//}
+
+	CConfigItemXml(const wchar_t* szSector, const wchar_t* szName, T&& Value)
+		: m_szSector(szSector), m_szName(szName), m_Value(std::forward<T>(Value))
+	{
+	}
+
+	// Global Read Stub
+	virtual HRESULT Read(IXmlReader* pReader) override
+	{
+		HRESULT hr = S_OK;
+
+		XmlNodeType NodeType;
+
+		LPCWSTR szPrefix;
+		uint32_t cchPrefix;
+
+		LPCWSTR szValue;
+		uint32_t cchValue;
+
+		LPCWSTR szName;
+		uint32_t cchLocalName;
+
+		//uint32_t nAttributes;
+
+		hr = pReader->GetPrefix(&szPrefix, &cchPrefix);
+
+		if (SUCCEEDED(hr = pReader->GetLocalName(&szName, &cchLocalName)))
+		{
+			if (!wcscmp(m_szName, szName))
+			{
+				// Read Next Node (should be text)
+				if (SUCCEEDED(hr = pReader->Read(&NodeType)) && NodeType == XmlNodeType_Text)
+				{
+					if (SUCCEEDED(hr = pReader->GetValue(&szValue, &cchValue)))
+					{
+						CConfigItemXml<T>::SetValue(szValue, cchValue);
+					}
+				}
+			}
+		}
+
+		return hr;
+	}
+
+
+	// Global Write Stub
+	virtual HRESULT Write(IXmlWriter* pWriter) override
+	{
+		return CConfigItemXml<T>::Write(pWriter);
+	}
+
+	T& GetValue(void)
+	{
+		return m_Value;
+	}
+
+private:
+	void SetValue(LPCWSTR szValue, uint32_t cchValue);
+
+	//template<typename Ret, typename... Args>
+	//HRESULT CConfigItemXml<CKeybindFunctional<Ret, Args...>>::Write(IXmlWriter* pWriter)
+	//{
+	//	return 0;
+	//}
+
+protected:
+	// XML Namespace
+	const wchar_t* m_szSector;
+	// XML Local Name
+	const wchar_t* m_szName;
+	// XML Value Description
+	//const wchar_t* m_szDesc;
+	// XML Value
+	T m_Value;
+};
+
+template<>
+HRESULT CConfigItemXml<ImColor&>::Write(IXmlWriter* pWriter)
+{
+	HRESULT hr = S_OK;
+	wchar_t szBuffer[33] = { 0 };
+
+	//swprintf_s(szBuffer, L"%i", m_Value);
+	_itow_s(m_Value, szBuffer, 16);
+
+	hr = pWriter->WriteElementString(NULL, m_szName, NULL, szBuffer);
+	// BUG: IDK where I was told to write this but this fucks with indentation
+	//hr = pWriter->WriteWhitespace(L"\r\n");
+
+	return hr;
+}
 
 class CConfigItemXmlNamespace
 {
@@ -493,8 +617,10 @@ public:
 	HRESULT Read(void)
 	{
 		HRESULT hr = S_OK;
-
-
+		XmlNodeType NodeType;
+		// TODO: Forgot still need to move even if we don't want to read anything
+		// Read whitespace
+		hr = m_pReader->Read(&NodeType);
 
 		return hr;
 	}
@@ -510,7 +636,6 @@ public:
 		if (SUCCEEDED(hr = m_pWriter->WriteStartElement(NULL, m_szName, NULL)))
 		{
 			hr = m_pWriter->WriteAttributeString(NULL, L"num_children", NULL, szBuffer);
-			hr = m_pWriter->WriteWhitespace(L"\r\n");
 		}
 
 		return hr;
@@ -521,7 +646,10 @@ public:
 		HRESULT hr = S_OK;
 
 		if (SUCCEEDED(hr = m_pWriter->WriteFullEndElement()))
-			hr = m_pWriter->WriteWhitespace(L"\r\n");
+		{
+			// BUG: IDK where I was told to write this but this fucks with indentation
+			//hr = m_pWriter->WriteWhitespace(L"\r\n");
+		}
 
 		return hr;
 	}
@@ -542,35 +670,18 @@ public:
 	volatile uint32_t m_uChildrenCount;
 };
 
-template<typename T>
-class CConfigItemXml : public IConfigItemXml
+
+
+class IConfigItem
 {
 public:
-	CConfigItemXml(const wchar_t* szSector, const wchar_t* szName, T& Value)
-		: m_szSector(szSector), m_szName(szName), m_Value(Value)
-	{
 
-	}
-
-	// Global Read Stub
-	virtual HRESULT Read(IXmlReader* pReader) override
-	{
-		return CConfigItemXml<T>::Read(pReader);
-	}
-
-	// Global Write Stub
-	virtual HRESULT Write(IXmlWriter* pWriter) override
-	{
-		return CConfigItemXml<T>::Write(pWriter);
-	}
+	virtual void Read(const char* szFilename) = 0;
+	virtual void Write(const char* szFilename) = 0;
 
 protected:
-	// XML Namespace
-	const wchar_t* m_szSector;
-	// XML Local Name
-	const wchar_t* m_szName;
-	// XML Value
-	T& m_Value;
+	const char* m_szCategory = nullptr;
+	const char* m_szName = nullptr;
 };
 
 class ConfigItemBool : public IConfigItem
@@ -745,40 +856,40 @@ public:
 	std::string& m_value;
 };
 
-class ConfigItemKeybind : public IConfigItem
-{
-public:
-	ConfigItemKeybind(const char* szCategory, CKeybind& Key)
-		: m_Key(Key)
-	{
-		m_szCategory = szCategory;
-		m_szName = Key.GetName();
-	}
-
-	virtual void Read(const char* szFilename)
-	{
-		char szDefaultKeybindKeycode[33];
-		char szKeybindKeycode[33];
-
-		_itoa_s(m_Key.GetKeycode(), szDefaultKeybindKeycode, 10);
-
-		GetPrivateProfileString(m_szCategory, m_szName, szDefaultKeybindKeycode, szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
-
-		m_Key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
-	}
-
-	virtual void Write(const char* szFilename)
-	{
-		char szKeybindKeycode[33];
-
-		_itoa_s(m_Key.GetKeycode(), szKeybindKeycode, 10);
-
-		WritePrivateProfileString(m_szCategory, m_szName, szKeybindKeycode, szFilename);
-	}
-
-private:
-	CKeybind& m_Key;
-};
+//class ConfigItemKeybind : public IConfigItem
+//{
+//public:
+//	ConfigItemKeybind(const char* szCategory, CKeybind& Key)
+//		: m_Key(Key)
+//	{
+//		m_szCategory = szCategory;
+//		m_szName = Key.GetName();
+//	}
+//
+//	virtual void Read(const char* szFilename)
+//	{
+//		char szDefaultKeybindKeycode[33];
+//		char szKeybindKeycode[33];
+//
+//		_itoa_s(m_Key.GetKeycode(), szDefaultKeybindKeycode, 10);
+//
+//		GetPrivateProfileString(m_szCategory, m_szName, szDefaultKeybindKeycode, szKeybindKeycode, sizeof(szKeybindKeycode), szFilename);
+//
+//		m_Key.SetKeycode(strtol(szKeybindKeycode, NULL, 0));
+//	}
+//
+//	virtual void Write(const char* szFilename)
+//	{
+//		char szKeybindKeycode[33];
+//
+//		_itoa_s(m_Key.GetKeycode(), szKeybindKeycode, 10);
+//
+//		WritePrivateProfileString(m_szCategory, m_szName, szKeybindKeycode, szFilename);
+//	}
+//
+//private:
+//	CKeybind& m_Key;
+//};
 
 //template<typename T>
 //class ConfigItemVector : public IConfigItem
@@ -1126,10 +1237,10 @@ class IConfig
 {
 public:
 
-	virtual bool CreateConfig(LPTSTR szFilename) = 0;
+	virtual bool CreateConfig(LPCWSTR szFilename) = 0;
 	virtual void ResetConfig(void) = 0;
-	virtual void Load(LPCWSTR szFilename) = 0;
-	virtual void Save(LPCWSTR szFilename) = 0;
+	virtual HRESULT Load(LPCWSTR szFilename) = 0;
+	virtual HRESULT Save(LPCWSTR szFilename) = 0;
 
 	static BOOL FileExists(LPCTSTR szFilename);
 
@@ -1137,7 +1248,13 @@ public:
 		OUT LPTSTR szSanitizedPath, IN SIZE_T cchSanitizedPath);
 
 	static BOOL SanitizePath(IN LPCTSTR szDelimiter, IN LPTSTR szOriginalPath, IN SIZE_T cchOriginalPath,
-		OUT LPTSTR* pszSanitizedPath, IN OUT SIZE_T* pcchSanitizedPath);
+		OUT LPTSTR* pszSanitizedPath, OUT SIZE_T* pcchSanitizedPath);
+
+	static BOOL SanitizePath(IN LPCWSTR szDelimiter, IN LPWSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+		OUT LPWSTR szSanitizedPath, IN SIZE_T cchSanitizedPath);
+
+	static BOOL SanitizePath(IN LPCWSTR szDelimiter, IN LPWSTR szOriginalPath, IN SIZE_T cchOriginalPath,
+		OUT LPWSTR* pszSanitizedPath, OUT SIZE_T* pcchSanitizedPath);
 
 protected:
 	bool SetFilename(LPCTSTR szFilename);
@@ -1147,11 +1264,13 @@ protected:
 class CConfigXml : public IConfig
 {
 public:
+	CConfigXml(void);
+	~CConfigXml(void);
 
-	virtual bool CreateConfig(LPTSTR szFilename) override;
+	virtual bool CreateConfig(LPCWSTR szFilename) override;
 	virtual void ResetConfig(void) override;
-	virtual void Load(LPCWSTR szFilename) override;
-	virtual void Save(LPCWSTR szFilename) /*override*/;
+	virtual HRESULT Load(LPCWSTR szFilename) override;
+	virtual HRESULT Save(LPCWSTR szFilename) override;
 
 	HRESULT ReadNode(XmlNodeType Type);
 	HRESULT WriteNode(XmlNodeType Type);
@@ -1159,42 +1278,34 @@ public:
 	HRESULT BeginReadElement(void);
 	HRESULT EndReadElement(void);
 
+	std::pair<
+		std::multimap<std::wstring, IConfigItemXml*>::const_iterator,
+		std::multimap<std::wstring, IConfigItemXml*>::const_iterator
+	> GetKeybinds(void) const;
+
+	template<class T>
+	void AddKeybind(T&& Keybind);
+
+	friend class CMenu;
+protected:
+	bool SetFilename(LPCWSTR szFilename);
+	BOOL EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_DATA_LIST* ppData) const;
+private:
+
 	void InitializeConfig(void);
+	void PurgeConfig(void);
 
-	bool SetFilename(LPCTSTR szFilename)
-	{
-		TCHAR szDLLFilename[MAX_PATH];
-		LPCTSTR	szExtension;
+	static BOOL CConfigXml::FileExists(LPCWSTR szFilename);
 
-		ZeroMemory(m_szFilename, sizeof(m_szFilename));
-		GetModuleFileName(g_hInstance, szDLLFilename, MAX_PATH);
-
-		if (SanitizePath(TEXT("\\"), szDLLFilename, MAX_PATH, m_szFilename, MAX_PATH))
-			return false;
-
-		if (szFilename)
-		{
-			_tcscat_s(m_szFilename, szFilename);
-
-			szExtension = _tcsrchr(szFilename, '.');
-
-			if (szExtension && _tcsicmp(szExtension, CONFIG_EXTENSION))
-				_tcscat_s(m_szFilename, CONFIG_EXTENSION);
-		}
-		else
-		{
-			_tcscat_s(m_szFilename, CONFIG_DEFAULT_INI);
-		}
-
-		return true;
-	}
-
-	TCHAR m_szFilename[MAX_PATH];
+	WCHAR m_szFilename[MAX_PATH];
 	ComPtr<IXmlReader> m_pReader;
 	ComPtr<IXmlWriter> m_pWriter;
+	XmlNodeType m_CurrentNodeType;
 
 	std::multimap<const std::wstring, IConfigItemXml*> m_Items;
 	//std::multimap<const wchar_t*, IConfigItemXml*> m_Items;
+	//std::vector<CKeybind> m_Keybinds;
+	// std::vector<CKeybind*> m_Keybinds; // works
 };
 
 class CConfig : public IConfig
@@ -1203,10 +1314,10 @@ public:
 	CConfig(void);
 	~CConfig(void);
 
-	virtual bool CreateConfig(LPTSTR szFilename) override;
+	virtual bool CreateConfig(LPCWSTR szFilename) override;
 	virtual void ResetConfig(void) override;
-	virtual void Load(LPCWSTR szFilename) override;
-	virtual void Save(LPCWSTR szFilename) override;
+	virtual HRESULT Load(LPCWSTR szFilename) override;
+	virtual HRESULT Save(LPCWSTR szFilename) override;
 
 	// HACK! for compat
 	void Load(LPCTSTR szFilename);
@@ -1228,7 +1339,7 @@ private:
 	void AddKeybind(CKeybind* pKeybind);
 
 	template<size_t N>
-	void AddKeybinds(CKeybind* (&& Keybind)[N])
+	void AddKeybinds(CKeybind* (&Keybind)[N])
 	{
 		for (auto it : Keybind)
 		{

@@ -42,7 +42,7 @@ typedef void* (*CreateEntityFn)(void* pUnknown, CEntityInfo* pInfo, unsigned int
 typedef void* (*CreateEntityFn)(void* pUnknown, CEntityInfo* pInfo, unsigned int objectId, int iGroupId);
 #endif
 
-typedef BOOL(*LoadWordBlacklistFn)(BannedWordChecker* pThis, __int64 thisrdx, QWORD* a3, const char* szBlacklistName);
+typedef BOOL(*LoadWordBlacklistFn)(CBannedWordChecker* pThis, __int64 thisrdx, QWORD* a3, const char* szBlacklistName);
 
 typedef bool(*MRubyLoadScriptFn)(MrubyImpl* pThis, MrubyScript* pScript);
 typedef BOOL(*CCameraGame_SetViewAnglesFn)(CCameraGame* pCamera);
@@ -94,8 +94,8 @@ HRESULT hkMouseAcquire(IDirectInputDevice8A* pThis);
 HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID lpvData);
 extern "C" void hkSaveFileIOThunk(void); // idk args yet
 extern "C" void hkSaveFileIO(CSaveDataDevice * pSave);
-extern "C" BOOL hkLoadWordBlacklistThunk(BannedWordChecker * pThis, __int64 thisrdx, QWORD * thisr8, const char* szBlacklistName);
-extern "C" BOOL hkLoadWordBlacklist(BannedWordChecker * pThis, __int64 thisrdx, QWORD * thisr8, const char* szBlacklistName);
+extern "C" BOOL hkLoadWordBlacklistThunk(CBannedWordChecker * pThis, __int64 thisrdx, QWORD * thisr8, const char* szBlacklistName);
+extern "C" BOOL hkLoadWordBlacklist(CBannedWordChecker * pThis, __int64 thisrdx, QWORD * thisr8, const char* szBlacklistName);
 extern "C" void hkUpdateModelPartsThunk(Pl0000 * pEntity);
 extern "C" void hkUpdateModelParts(Pl0000 * pEntity); //proabably not a pl0000 must be a parent
 extern "C" void* hkCreateEntityThunk(CSceneEntitySystemUnk* pUnknown, CEntityInfo * pInfo, uint32_t objectId, int32_t iGroupId, CHeapInfo * pHeapInfo);

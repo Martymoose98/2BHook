@@ -2,18 +2,25 @@
 
 CMenu* g_pMenu;
 
-CMenu::CMenu(const CAdapter* pAdapter)
-	: m_bOpened(false), m_bIgnoreInputWhenOpened(true), m_pConfig(new CConfig())
+CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
+	: m_bOpened(false), m_bIgnoreInputWhenOpened(true), m_pConfig(new CConfigXml())
 {
-	COutput* pOutput = &pAdapter->m_pOutputs[g_pGraphicDevice->m_iOutput];
+	//no ini file
+	ImGui::GetIO().IniFilename = NULL;
+
+	//const CAdapter* pAdapter = &g_pGraphicDevice->m_Factory.m_pAdapters[AdapterOutput.m_iAdapter];
+	const CAdapter* pAdapter = g_pGraphicDevice->GetAdapter(AdapterOutput.m_iAdapter);
+	const COutput* pOutput = &pAdapter->m_pOutputs[AdapterOutput.m_iOutput];
 
 	ImTextStrToUtf8(m_szAdapterUtf8, sizeof(m_szAdapterUtf8), (const ImWchar*)pAdapter->m_szDescription, NULL);
 	ImTextStrToUtf8(m_szOutputUtf8, sizeof(m_szOutputUtf8), (const ImWchar*)pOutput->m_szDeviceName, NULL);
 
-	m_pConfig->AddKeybind(new KeybindToggleable("kb_open_menu", DIK_INSERT, &m_bOpened));
-	m_pConfig->m_Items.emplace_back(new ConfigItemBool(CATEGORY_MENU, "b_ignore_input", m_bIgnoreInputWhenOpened));
-	m_pConfig->m_Items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_fg", m_Primary));
-	m_pConfig->m_Items.emplace_back(new ConfigItemColor(CATEGORY_MENU, "i_theme_bg", m_PrimaryBg));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_KEYBINDS, L"kb_open_menu",
+		CKeybindToggleable(L"kb_open_menu", DIK_INSERT, &m_bOpened)));
+
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"b_ignore_input", m_bIgnoreInputWhenOpened));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_fg", m_Primary));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_bg", m_PrimaryBg));
 
 	m_pConfig->CreateConfig(NULL);
 	m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
@@ -43,10 +50,9 @@ void CMenu::Draw(const ImVec2 vSize)
 
 	//static size_t title_off = 0;
 	//static size_t last_move = 0;
-	//static std::string_view title = { "Burn slow like blunts with yayo... peel more skins the Idaho potato" };
+	//static std::string_view title = "Burn slow like blunts with yayo... peel more skins the Idaho potato";
 	//
 	//std::string_view view = title.substr(title_off);
-
 	//
 	//if (ImGui::GetCurrentContext()->FrameCount - last_move >= 50)
 	//{
@@ -109,19 +115,38 @@ HRESULT CMenu::KeyboardHandler(HRESULT Result, LPVOID lpvData, DWORD cbData)
 	memcpy(&m_OldKeyboardState, &m_KeyboardState, cbData);
 	memcpy(&m_KeyboardState, lpvData, cbData);
 
-	for (CKeybind* pKeybind : m_pConfig->GetKeybinds())
+	auto [begin, end] = m_pConfig->GetKeybinds();
+
+	for (auto& it = begin; it != end; ++it)
 	{
-		if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
+		CConfigItemXml<CKeybind>* pItem = static_cast<CConfigItemXml<CKeybind>*>(it->second);
+		CKeybind& Keybind = pItem->GetValue();
+
+		if (Keybind.GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
 		{
-			if (KEYPRESSED(m_KeyboardState, m_OldKeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
+			if (KEYPRESSED(m_KeyboardState, m_OldKeyboardState, Keybind.GetKeycode()))
+				Keybind.OnPressed();
 		}
-		else if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYDOWN)
+		else if (Keybind.GetMode() == IKeybind::KEYBIND_ON_KEYDOWN)
 		{
-			if (KEYDOWN(m_KeyboardState, pKeybind->GetKeycode()))
-				pKeybind->OnPressed();
+			if (KEYDOWN(m_KeyboardState, Keybind.GetKeycode()))
+				Keybind.OnPressed();
 		}
 	}
+
+	//for (CKeybind* pKeybind : m_pConfig->GetKeybinds())
+	//{
+	//	if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYPRESSED)
+	//	{
+	//		if (KEYPRESSED(m_KeyboardState, m_OldKeyboardState, pKeybind->GetKeycode()))
+	//			pKeybind->OnPressed();
+	//	}
+	//	else if (pKeybind->GetMode() == IKeybind::KEYBIND_ON_KEYDOWN)
+	//	{
+	//		if (KEYDOWN(m_KeyboardState, pKeybind->GetKeycode()))
+	//			pKeybind->OnPressed();
+	//	}
+	//}
 
 	return (m_bOpened && m_bIgnoreInputWhenOpened) ? DIERR_INPUTLOST : Result;
 }
@@ -224,14 +249,14 @@ ImGuiStyle* CMenu::ApplyStyle(ImColor& Primary, ImColor& PrimaryBg)
 	return pStyle;
 }
 
-void CMenu::LoadConfig(LPCTSTR szConfig)
+void CMenu::LoadConfig(LPCWSTR szConfig)
 {
 	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Loading config. (%s)", szConfig);
 	m_pConfig->Load(szConfig);
 	ApplyStyle(m_Primary, m_PrimaryBg);
 }
 
-void CMenu::SaveConfig(LPCTSTR szConfig)
+void CMenu::SaveConfig(LPCWSTR szConfig)
 {
 	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving config. (%s)", szConfig);
 	m_pConfig->Save(szConfig);
@@ -466,7 +491,7 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 		//		//pWork = ReadWork(ObjectId);
 		//	}
 		//}
-	
+
 		CEntityInfo* pInfo = Features::CreateEntity(szClass, ObjectId, &set_info);
 
 		if (pInfo)
@@ -530,11 +555,10 @@ void CMenu::MiscTab(void)
 
 	ImGui::InputText("Sound Name", Vars.Misc.szSoundName, _ARRAYSIZE(Vars.Misc.szSoundName));
 
-	//FIXME: DEFO CRASH
 	if (ImGui::Button("Play Sound"))
 	{
 		Sound sound = { Vars.Misc.szSoundName, FNV1Hash(Vars.Misc.szSoundName), 0 };
-		((PlaySoundFn)(0x14081FB90))(&sound);
+		ExecuteSound(&sound);
 	}
 
 	ImGui::SameLine();
@@ -624,17 +648,24 @@ void CMenu::ConfigTab(void)
 
 	ImGui::Checkbox("Ignore Input", &m_bIgnoreInputWhenOpened);
 
-	for (auto& it : m_pConfig->GetKeybinds())
+	auto [begin, end] = m_pConfig->GetKeybinds();
+
+	for (auto& it = begin; it != end; ++it)
 	{
-		const KeyOrdinal* pKey = FindKeyOrdinal(it->GetKeycode());
+		CConfigItemXml<CKeybind>* pItem = static_cast<CConfigItemXml<CKeybind>*>(it->second);
+		CKeybind& Keybind = pItem->GetValue();
+		const KeyOrdinal* pKey = FindKeyOrdinal(Keybind.GetKeycode());
 
 		if (pKey)
 		{
-			if (ImGui::BeginCombo(it->GetName(), pKey->m_szName))
+			char name[256];
+			wcstombs_s(nullptr, name, Keybind.GetName(), _TRUNCATE);
+
+			if (ImGui::BeginCombo(name, pKey->m_szName))
 			{
 				for (int i = 0; i < ARRAYSIZE(s_Keycodes); ++i)
 					if (ImGui::Selectable(s_Keycodes[i].m_szName))
-						it->SetKeycode(s_Keycodes[i].m_uKeyCode);
+						Keybind.SetKeycode(s_Keycodes[i].m_uKeyCode);
 
 				ImGui::EndCombo();
 			}
@@ -667,13 +698,16 @@ void CMenu::ConfigTab(void)
 		m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
 	}
 
+	wchar_t cfgname[MAX_PATH];
+	mbstowcs_s(nullptr, cfgname, szConfig, _TRUNCATE);
+
 	if (ImGui::Button("Load"))
-		LoadConfig(szConfig);
+		LoadConfig(cfgname);
 
 	ImGui::SameLine();
 
 	if (ImGui::Button("Save"))
-		SaveConfig(szConfig);
+		SaveConfig(cfgname);
 }
 
 void CMenu::DisplayEntityHandles(void)
@@ -796,12 +830,12 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::SameLine();
 
-	ImGui::CheckboxFlagsT("Firstperson", &Vars.Misc.bCameraFlags,
+	ImGui::CheckboxFlagsT("Firstperson", &Vars.Misc.uCameraFlags,
 		(uint32_t)Variables::Misc_t::CameraFlg::CAMERA_FIRSTPERSON);
 
 	ImGui::SameLine();
 
-	ImGui::CheckboxFlagsT("Freecamera", &Vars.Misc.bCameraFlags,
+	ImGui::CheckboxFlagsT("Freecamera", &Vars.Misc.uCameraFlags,
 		(uint32_t)Variables::Misc_t::CameraFlg::CAMERA_FREE);
 
 	ImGui::SameLine();

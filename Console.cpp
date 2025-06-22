@@ -2,14 +2,16 @@
 
 CConsole* g_pConsole = new CConsole();
 
-// FIXME: Console has perf issues when scratch buffer is populated
+// FIXME/REPROFILE: Console has perf issues when scratch buffer is populated
 // Circular buffer? or LRU cache?
+// can use std::lock_guard<std::mutex> lock(m_Mutex);
+// to try and make it thread safe with mutex in this ptr obj.
+// REF: https://github.com/rmxbalanque/imgui-console/blob/master/src/imgui_console.cpp
 CConsole::CConsole(void)
-	: m_Items(), m_bFilter(false), m_bScrollToBottom(false), 
-	m_bShouldScrollToBottom(true), m_History(), m_iHistoryPos(0), m_Commands()
+	: m_Items(), m_uFlags(0), m_bFilter(false), m_bScrollToBottom(false),
+	m_bShouldScrollToBottom(true), m_Commands()
 {
 	ZeroMemory(m_szInput, sizeof(m_szInput));
-	ZeroMemory(m_szFilter, sizeof(m_szFilter));
 }
 
 CConsole::~CConsole(void)
@@ -100,55 +102,35 @@ void CConsole::Write(const ImVec4& color, const char* szFormat, va_list args)
 
 		m_Items.emplace_back(next);
 	}
-	m_bShouldScrollToBottom = true;
+
+	m_uFlags |= CONFLAGS_SHOULD_AUTOSCROLL;
 }
 
-void CConsole::Draw(const char* szTitle)
+void CConsole::Draw(const char* szTitle, const ImVec2 WindowSize)
 {
 	bool bReclaimFocus = false;
-	ImVec2 size = ImVec2(820, 400);
-	std::vector<Entry> m_Display = m_Items;
 
-	if (!ImGui::BeginChild(szTitle, size, true, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
+	// NOTE: sending a zero vector for window size enables auto sizing
+	if (!ImGui::BeginChild(szTitle, WindowSize, true, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
 	{
 		ImGui::EndChild();
 		return;
 	}
 
 	// Fix the filter so it floats at the top
-	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows))
-		ImGui::InputText("Filter", m_szFilter, ARRAYSIZE(m_szFilter));
+	// RETURNS? bool didChange = ??
+	FilterBar();
 
-	if (strlen(m_szFilter) > 0)
-	{
-		for (auto& it = m_Display.begin(); it != m_Display.end(); )
-			if (!strstr(it->szText, m_szFilter))
-				it = m_Display.erase(it);
-			else
-				++it;
-	}
+	if (m_TextFilter.IsActive())
+		m_uFlags |= CONFLAGS_FILTER_ENTRIES;
+	else
+		m_uFlags &= ~CONFLAGS_FILTER_ENTRIES;
 
-	ImGui::PushTextWrapPos(ImGui::GetWindowPos().x + size.x);
+	EnumConsoleData();
 
-	for (auto& it : m_Display)
-	{
-		ImGui::PushStyleColor(ImGuiCol_Text, it.color);
-		ImGui::TextUnformatted(it.szText);
-		ImGui::PopStyleColor();
-	}
-
-	if (m_bScrollToBottom)
-	{
-		if (m_bShouldScrollToBottom)
-		{
-			ImGui::SetScrollHereY(1.0f);
-			m_bShouldScrollToBottom = false;
-		}
-	}
-
-	ImGui::PopTextWrapPos();
 	ImGui::EndChild();
 
+	// Command input box
 	if (ImGui::InputText("Command", m_szInput, ARRAYSIZE(m_szInput), ImGuiInputTextFlags_EnterReturnsTrue))
 	{
 		bReclaimFocus = true;
@@ -162,7 +144,7 @@ void CConsole::Draw(const char* szTitle)
 
 	ImGui::SameLine();
 
-	ImGui::Checkbox("Auto Scroll", &m_bScrollToBottom);
+	ImGui::CheckboxFlagsT<uint32_t>("Auto Scroll", &m_uFlags, CONFLAGS_ENABLE_AUTOSCROLL);
 
 	ImGui::SameLine();
 
@@ -171,7 +153,47 @@ void CConsole::Draw(const char* szTitle)
 
 	ImGui::Separator();
 	ImGui::Checkbox("Show Game Errors", &Vars.Misc.bConsoleShowGameErrors);
+}
 
+void CConsole::FilterBar(void)
+{
+	m_TextFilter.Draw("Filter", ImGui::GetWindowWidth() * 0.25f);
+	ImGui::Separator();
+}
+
+
+void CConsole::EnumConsoleData(void)
+{
+	if (!ImGui::BeginChild("ConsoleTextArea##"))
+	{
+		ImGui::EndChild();
+		return;
+	}
+
+	ImGui::PushTextWrapPos(ImGui::GetWindowPos().x + ImGui::GetWindowWidth());
+
+	// Display items.
+	for (const auto& Entry : m_Items)
+	{
+		// Filter out the item if the text fails
+		if (!m_TextFilter.PassFilter(Entry.szText))
+			continue;
+
+		ImGui::PushStyleColor(ImGuiCol_Text, Entry.color);
+		ImGui::TextUnformatted(Entry.szText);
+		ImGui::PopStyleColor();
+	}
+
+	ImGui::PopTextWrapPos();
+
+	// Autoscroll
+	if ((m_uFlags & CONFLAGS_ENABLE_AUTOSCROLL) && (m_uFlags & CONFLAGS_SHOULD_AUTOSCROLL))
+	{
+		ImGui::SetScrollHereY(1.0f);
+		m_uFlags &= ~CONFLAGS_SHOULD_AUTOSCROLL;
+	}
+
+	ImGui::EndChild();
 }
 
 void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)

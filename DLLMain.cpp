@@ -8,6 +8,9 @@
 #include <Fluorine\VirtualTableHook.h>
 #include <Fluorine\ImportTableHook.h>
 
+#include <Fluorine\ExportUtil.h>
+
+
 #include "cpk.h"
 #include "mot.h"
 #include "Hooks.h"
@@ -489,6 +492,7 @@ void LogOffsets(void)
 	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
 	LOG_OFFSET("GetItemNameById", ItemManager_GetItemNameById);
 	LOG_OFFSET("CalculateLevel", CalculateLevel);
+	LOG_OFFSET("PlaySound", ExecuteSound);
 	LOG_OFFSET("GetItemIdByName", ItemManager_GetItemIdByName);
 	LOG_OFFSET("SetLocalPlayer", SetLocalPlayer);
 	LOG_OFFSET("UnlockAchievement", UnlockAchievement);
@@ -593,6 +597,10 @@ void FindDenuvoSteamOffsets(void)
 	WetObjectManager_SetWet = (CWetObjManager::SetWetFn)FindPatternPtr(NULL, "E8 ? ? ? ? 4C 8D 05 ? ? ? ? 41 FF C6", 1);
 	WetObjectManager_SetDry = (CWetObjManager::SetDryFn)FindPattern(NULL, "48 85 D2 0F 84 ? ? ? ? 53 48 83 EC 20 83 3D ? ? ? ? ? 48 8B DA 0F 84 ? ? ? ? 48 89 74 24 ? 48 8D 35 ? ? ? ? 48 89 7C 24 ? 48 8B CE FF 15 ? ? ? ? 4C 8B 1D ? ? ? ? 44 8B 15 ? ? ? ? 45 33 C9 48 8D 0D ? ? ? ? 48 8D 3D ? ? ? ? 44 8B 01 45 85 C0 74 34 41 8B C0 C1 F8 08 0F B7 D0 41 3B D2 73 26 48 03 D2 41 8B 04 D3 41 33 C0 A9 ? ? ? ? 75 15 49 8B 44 D3 ? 48 85 C0 74 0B F6 40 2C 03 75 05 48 3B C3 74 0E 48 83 C1 04 41 FF C1 48 3B CF 7C B8 EB 1B");
 	WetObjectManager_AddLocalEntity = (CWetObjManager::AddLocalEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87", 1);
+	
+	// TODO: Sig low priority!
+	ExecuteSound = (PlaySoundFn)0x14081FB90;
+	
 	CameraGame_SetLookAt = (CCameraGame::SetLookAtFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 7F 10 01", 1);
 	DestroyBuddy = (DestroyBuddyFn)FindPattern(NULL, "40 53 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 8B D9 48 8B 01");
 	FNV1Hash = (FNV1HashFn)FindPatternPtr(NULL, "E8 ? ? ? ? 85 C0 74 A3", 1);
@@ -601,7 +609,8 @@ void FindDenuvoSteamOffsets(void)
 	ExCollision_GetOBBMax = (ExCollision_GetOBBMaxFn)FindPattern(NULL, "48 8B C4 48 89 68 18 56");
 
 	QueryHeap = (QueryHeapFn)FindPattern(NULL, "48 83 EC 28 4C 8B D9 C7 41");
-	CreateWork = 0; // find low proirity!
+	// TODO: Sig low priority!
+	CreateWork = 0; 
 	FindObjectWork = (CObjReadSystem_FindObjectWorkFn)FindPattern(NULL, "40 57 48 83 EC 20 8B F9");
 	PreloadFile = (PreloadFileFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8D 5F 01", 1);
 	RequestEnd = (ObjReadSystem_RequestEndFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 8D 46 FF", 1);
@@ -689,6 +698,8 @@ void FindSteamOffsets(void)
 	SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 89 5C 24 ? 57 48 83 EC 20 48 8B 02 48 8B FA"); // [E8 ? ? ? ? EB 38 48 89 5C 24 ? + 1]
 	// this is the internal function both work but using the internal func probably has consecquences I am not aware of
 	//SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 8B C4 57 48 81 EC 60 04 00 00 48 C7 44 24 ? FE FF FF FF 48 89 58 ? 48 89 70"); // [E8 ? ? ? ? 84 C0 74 19 B2 01 + 1]
+
+	ExecuteSound = (PlaySoundFn)FindPattern(NULL, "40 56 57 41 56 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 58 48 89 6C 24 60 48 8B E9");
 
 	FNV1Hash = (FNV1HashFn)FindPattern(NULL, "40 56 48 81 EC ? ? ? ? 48 8B F1 48 85 C9"); // [E8 ? ? ? ? 8B D3 C1 FA 08 + 1]
 	HashStringCRC32 = (HashStringCRC32Fn)FindPattern(NULL, "48 85 C9 0F 85 ? ? ? ? 33 C0 C3 CC CC CC CC 48 89 5C 24");
@@ -780,6 +791,8 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
+	Query
+
 	{
 		STACK_TIMER(AVX_timer);
 
@@ -791,11 +804,6 @@ void Setup(void)
 	g_pExceptionHandlers.push_back(&UnhandledExceptionHandlerChild);
 
 	g_CreateCtx.hControlSemaphore = CreateSemaphore(NULL, 0, 1, TEXT("SpawnCtrl"));
-
-	//CConfigXml xml;
-
-	//xml.InitializeConfig();
-	//xml.Load(L"Z:\\NieRAutomata\\config.xml");
 
 	NierVersionInfo* pVersion = QueryNierBinaryVersion();
 	SHA256DigestStr SHA256Hash;
@@ -820,12 +828,11 @@ void Setup(void)
 
 	InitD3D11();
 
-	CAdapter* pAdapter = &g_pGraphicDevice->m_pAdapters[g_pGraphicDevice->m_iAdapter];
+	CAdapterOutputPair AdapterOutput;
 
-	//no ini file
-	ImGui::GetIO().IniFilename = NULL;
+	g_pGraphicDevice->GetCurrentAdapterOutput(AdapterOutput);
 
-	g_pMenu = new CMenu(pAdapter);
+	g_pMenu = new CMenu(AdapterOutput);
 
 	//g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
 

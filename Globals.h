@@ -194,6 +194,7 @@ extern GetConstructorFn GetConstructionInfo;
 extern HashStringCRC32Fn HashStringCRC32;
 extern UnlockAchievementFn UnlockAchievement;
 extern FNV1HashFn FNV1Hash;
+extern PlaySoundFn ExecuteSound;
 extern QueryHeapFn QueryHeap;
 extern CreateTaskFn CreateTask;
 extern CJobManager::CreateTaskFn JobManager_CreateTask;

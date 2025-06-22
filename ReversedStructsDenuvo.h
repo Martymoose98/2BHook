@@ -2656,7 +2656,7 @@ public:
 	//void* pVtable;						//0x0000
 	int m_iScreenWidth;						//0x0008 
 	int m_iScreenHeight;					//0x000C 
-	float flScreenHz;						//0x0010 / fps / 60hz capped
+	float m_flScreenHz;						//0x0010 / fps / 60hz capped
 	BOOL isFullscreen;						//0x0014
 	BOOL bUnk0x018;							//0x0018
 	BOOL bUnk0x01C;							//0x001C
@@ -2681,7 +2681,7 @@ public:
 	float m_flFrameRate;					//0x00E4
 	int m_iAdapter;							//0x00E8
 	int m_iOutput;							//0x00EC
-	D3D11_QUERY_DESC m_OccusionDesc;		//0x00F0
+	D3D11_QUERY_DESC m_OcclusionDesc;		//0x00F0
 	D3D11_QUERY_DESC m_TimestampDesc;		//0x00F8
 	CAdapter* m_pAdapters;					//0x0100 | CAdapter* //wchar_t* m_szGraphicsAdapterName;	
 	UINT m_uAdapters;						//0x0108 | ID3D11DeviceContext* m_pContext;
