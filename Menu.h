@@ -63,7 +63,7 @@ struct ImColorScheme : public ImColor
 class CMenu
 {
 public:
-	CMenu(const CAdapter* pAdapter);
+	CMenu(const CAdapterOutputPair& AdapterOutput);
 
 	~CMenu(void);
 
@@ -77,8 +77,8 @@ public:
 	ImGuiStyle* ApplyStyle(ImColor& Primary = ImColor(7, 74, 25, 255),
 		ImColor& PrimaryBg = ImColor(7, 17, 74, 220));
 
-	void LoadConfig(LPCTSTR szConfig);
-	void SaveConfig(LPCTSTR szConfig);
+	void LoadConfig(LPCWSTR szConfig);
+	void SaveConfig(LPCWSTR szConfig);
 
 private:
 	void GameplayTab(Pl0000* pCameraEnt);
@@ -94,15 +94,17 @@ private:
 	char m_szAdapterUtf8[128 * 4];
 	char m_szOutputUtf8[32 * 4];
 
-	BOOLEAN m_KeyboardState[256];
+	BOOLEAN m_KeyboardState[256];		// c_dfDIKeyboard
 	BOOLEAN m_OldKeyboardState[256];
-	DIMOUSESTATE2 MouseState;
+	DIMOUSESTATE2 MouseState;			// c_dfDIMouse2
 	DIMOUSESTATE2 OldMouseState;
 
 	ImColor m_Primary;
 	ImColor m_PrimaryBg;
 
-	CConfig* m_pConfig;
+	// TODO: 
+	// IConfig* m_pConfig;
+	CConfigXml* m_pConfig;
 
 	struct Config_t
 	{

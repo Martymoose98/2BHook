@@ -273,16 +273,19 @@ struct RenderInfo
 	UINT m_uIndexCountPerInstance;
 };
 
-struct CGraphicObjectFactoryDx11
+// Size of struct 0x10 (16) bytes  new version
+struct CComputeContextDx11
 {
-	ID3D11Device* m_pDevice;			//0x0000
-	IDXGIFactory* m_pFactory;			//0x0008
-	char _0x0010[12];					//0x0010
-	DXGI_SAMPLE_DESC m_SampleDescs[5];	//0x001C
-	char _0x0050[4];
-	QWORD qword48;
-	QWORD qword50;
+	char pad0[16];
 };
+
+
+struct CAdapterOutputPair
+{
+	int32_t m_iAdapter;
+	int32_t m_iOutput;
+};
+
 
 struct CShaderMemorizeVS
 {
@@ -373,7 +376,7 @@ struct ComputeShaderContext
 
 struct COcclusionQuery
 {
-	BYTE gap0[40];
+	BYTE gap0[32];
 	ID3D11Query** m_ppQuery;
 };
 
@@ -449,6 +452,7 @@ struct CRenderTarget
 	CTexture* m_pTexture;
 	//const Hw::cRenderTargetImpl::`vftable'{for `Hw::cGraphicObjectBase' }
 };
+VALIDATE_SIZE(CRenderTarget, 0x68);
 
 /*
 Size of struct 504 (0x1F8) bytes //wrong
@@ -516,37 +520,81 @@ struct CGraphicOutputDx11
 * https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-querydisplayconfig
 *
 *   Size of struct 0xB8 (184) bytes  old version (denuvo)
+*	WritePrivateProfileStructA("Graphic", "Output", pOutput, 0x40u, szGraphicsINI)
+* 
 *	Size of struct 0xB8 (184) bytes  new version
+*	WritePrivateProfileStructA("Graphic", "Output", pOutput, 0x80u, szGraphicsINI)
+*	
 */
 struct COutput
 {
-	wchar_t m_szDeviceName[32];
-	BYTE gap0[64];
-	IDXGIOutput* m_pOutput;
-	DXGI_MODE_DESC* m_pDisplayModes;
-	int32_t m_nDisplayModes;
+	wchar_t m_szDeviceName[64];			//0x0000
+	IDXGIOutput* m_pOutput;				//0x0080
+	DXGI_MODE_DESC* m_pDisplayModes;	//0x0088
+	int32_t m_nDisplayModes;			//0x0090
 	BYTE gap94[4];
 	QWORD qword98;
 	DWORD dwordA0;
-	DWORD dwordA4;
-	DWORD dwordA8;
-	DWORD dwordAC;
-	DWORD dwordB0;
-	DWORD dwordB4;
+	RECT m_OutputDimensions;
+	//DWORD dwordB0;
+	//DWORD dwordB4;
 };
+VALIDATE_SIZE(COutput, 0xB8);
 
 /*
 *
 *   Size of struct 0x118 (280) bytes  old version (denuvo)
 *	Size of struct 0x118 (280) bytes  new version
+*   new & old version
+*   WritePrivateProfileStructA("Graphic", "VideoCard", pAdapter, 0x100u, szGraphicsINI)
 */
 struct CAdapter
 {
-	wchar_t m_szDescription[128];
-	IDXGIAdapter* m_pAdapter;
-	COutput* m_pOutputs;
-	UINT m_uOutputs;
+	wchar_t m_szDescription[128];	//0x0000
+	IDXGIAdapter* m_pAdapter;		//0x0100
+	COutput* m_pOutputs;			//0x0108
+	UINT m_uOutputs;				//0x0110
 };
+VALIDATE_SIZE(CAdapter, 0x118);
+
+/*
+*	NOTE: name might not be right as it's a guess.
+*	while this object calls a lot of DX11 Create functions
+*	it appears to have members that would be odd to store in a
+*	'factory'.
+*/
+// Size of struct UNK (?) bytes  old version(denuvo)
+// Size of struct UNK (?) bytes  new version
+// Location CGraphicDeviceDx11 +0x70 old version(denuvo)
+// Location CGraphicDeviceDx11 +0x98 new version
+struct CGraphicObjectFactoryDx11
+{
+	ID3D11Device* m_pDevice;			//0x0000
+	IDXGIFactory* m_pFactory;			//0x0008
+	uint32_t* m_pUnk0x10;				//0x0010 | uint32_t color
+	uint32_t m_nUnks0x14;				//0x0014
+	DXGI_SAMPLE_DESC m_SampleDescs[5];	//0x001C
+	char _0x0050[4];
+	QWORD qword48;
+	QWORD pComputeCtxHeap50;
+	DWORD qword58;
+	char gap5C[4];
+	QWORD qword60;
+	QWORD qword68;
+	BOOL m_bWindowed;
+	float m_flFrameRate;
+	int32_t m_iWidth;
+	int32_t m_iHeight;
+	D3D11_QUERY_DESC m_OcclusionDesc;	// apparently CAdapterOutputPair too wtf??
+	CAdapterOutputPair m_AdapterOutput;
+	CAdapter* m_pAdapters;
+	UINT m_uAdapters;
+	BOOL m_nAdapters;
+	ID3D11DeviceContext* m_pContext;	//NOT SURE if this is here or in 
+	//void* m_pComputeContext;
+};
+VALIDATE_SIZE(CGraphicObjectFactoryDx11, 0xA8);
+//VALIDATE_SIZE(CGraphicObjectFactoryDx11, 0xB0);
 
 class CGraphicDeviceDx11;
 class CGraphics;
@@ -625,13 +673,13 @@ public:
 	{
 		enum ClearFlags
 		{
-			NONE,
+			CLEAR_NONE,
 			CLEAR_RENDERTARGETVIEW = 1,
 			CLEAR_DEPTH = 2,
 			CLEAR_STENCIL = 4
 		};
 
-		DWORD m_dwColor; //argb format
+		DWORD m_dwColor;	// ARGB format
 		FLOAT m_flDepth;
 		BYTE m_Stencil;
 		ClearFlags m_Flags;
@@ -654,7 +702,7 @@ public:
 	virtual BOOL UnmapResource2(__int64 pResource) PURE;
 	virtual BOOL MapResource(void** ppMappedData, __int64 pResource) PURE;
 	virtual BOOL UnmapResource(__int64 pResource) PURE;
-	virtual BOOL Clear(Clear_t* pClearArgs) PURE;
+	virtual BOOL Clear(Clear_t* pClearArgs) PURE; // probs can be const &
 	virtual BOOL function12() PURE; // returns 1
 	virtual BOOL SetScissorRect(int32_t x, int32_t y, int32_t width, int32_t height) PURE;
 	virtual BOOL SetViewport(int32_t x, int32_t y, int32_t width, int32_t height, float min_depth, float max_depth) PURE;
@@ -680,7 +728,7 @@ public:
 	virtual BOOL ClearUnorderedAccessViewUint(__int64 a2, const uint32_t a3) PURE;
 	virtual BOOL SetTexture(TextureContext* pCtx, CTexture* pTexture, int32_t iShaderResourceView) PURE;
 	virtual BOOL UnsetTexture(CTexture* pTexture) PURE;
-	virtual BOOL SetSamplerState() PURE;
+	virtual BOOL SetSamplerState(void* pSampler) PURE;
 	virtual BOOL SetBlendState(__int64 p) PURE;
 	virtual BOOL SetRasterizerState(__int64 p) PURE;
 	virtual BOOL SetDepthStencilState(CDepthStencilState* pState) PURE;
@@ -701,7 +749,7 @@ public:
 	//void* m_pVtbl;								//0x0000
 	ID3D11DeviceContext* m_pContext;				//0x0008
 	Vector4 m_vBlendFactor;							//0x0010
-	CRenderTarget* m_pRenderTarget;					//0x0020
+	CRenderTarget* m_RenderTarget;					//0x0020
 	void* ptrs[4];									//0x0028
 	CDepthSurface* m_pDepthSurface;					//0x0048
 	CVertexBuffer* m_pVertexBuffer;					//0x0050
@@ -712,47 +760,93 @@ public:
 	CVertexBuffer* m_pVertexBuffer2;				//0x0090
 	CGraphicRenderContext m_RenderContext;			//0x0098
 	char pad368[512];								//0x0368
-	int32_t m_iRenderWidth;							//0x0568
-	int32_t m_iRenderHeight;						//0x056C
-	char pad570[8];									//0x0570
-	ID3D11Device* m_pDevice;						//0x0578
+	void* qword568;									//0x0568 | ID3D11SamplerState*
+	int32_t m_iRenderWidth;							//0x0570 | 0x0568
+	int32_t m_iRenderHeight;						//0x0574 | 0x056C
+	char pad578[8];									//0x0578
 };
-VALIDATE_SIZE(CGraphicContextDx11, 1408);
+
 VALIDATE_OFFSET(CGraphicContextDx11, m_RenderContext, 0x98);
-VALIDATE_OFFSET(CGraphicContextDx11, m_iRenderWidth, 0x568);
+// NOTE: 0x570 on latest patch 0x568 before 
+VALIDATE_OFFSET(CGraphicContextDx11, m_iRenderWidth, 0x570);
+VALIDATE_OFFSET(CGraphicContextDx11, m_iRenderHeight, 0x574);
+VALIDATE_SIZE(CGraphicContextDx11, 0x580);
+
+/*
+* Struct is used to construct CGraphics, CGraphicDeviceDx11::Create and child funcs!
+* Stack var size of struct is guessed!
+* https://en.wikipedia.org/wiki/List_of_common_display_resolutions
+* default case is HD 1280x720
+*/
+struct CGraphicCreateContext
+{
+	enum ResolutionType
+	{
+		RESOLUTION_HD,			//1280x720
+		RESOLUTION_1440x810,	//1440x810
+		RESOLUTION_HD_PLUS,		//1600x900
+		RESOLUTION_FHD,			//1920x1080
+		RESOLUTION_WQXGA_PLUS,	//3200x1800
+		RESOLUTION_4KUHD,		//3840x2160
+	};
+
+	ResolutionType m_PresetResolution;	//0x0000
+	int32_t m_Width;					//0x0004
+	int32_t m_Height;					//0x0008
+	char pad0C[4];						//0x000C
+	CHeapInfo* m_pHeapInfo;				//0x0010
+	QWORD* m_Ptr18;						//0x0018 | important
+	QWORD* m_Ptr20;						//0x0020 |
+	QWORD* m_Ptr28;						//0x0028 | important
+	int32_t m_Unk30;					//0x0030 | ida only says 3
+	BOOL m_bUnk34;						//0x0034
+	int32_t m_UnkFlag38;				//0x0038
+	char pad3C[4];						//0x003C
+	__int64 m_Unk40;					//0x0040
+	Vector4* m_pvColors;				//0x0048 | important
+	int32_t m_nColors;					//0x0050
+	int32_t m_Unk54[9];					//0x0054
+	bool m_bUnk;						//0x0078
+	char pad79[3];						//0x0079
+	int32_t m_Unk7C[4];					//0x007C
+};
 
 /*
 this structure is used to create d3d and is used in many of NieR: Automata's
 direct3d functions. It might have more to it that I haven't explored so, this is just
-the basic layout of the stucture. Strangley enough, it has device pointers and factory
+the basic layout of the structure. Strangely enough, it has device pointers and factory
 pointers but not a swapchain pointer nor an adapter pointer. Perhaps, I just have not
-disovered them. In addition I haven't found a global pointer that directly points to
+discovered them. In addition I haven't found a global pointer that directly points to
 this structure. This is a virtual class after further investigation. Correctly
 renamed the class to it's proper name. It seems there might be a nested struct too.
 
  Size of struct 0x110 (272) bytes  old version (denuvo)
  Size of struct 0x140 (320) bytes  new version
- */
+*/
 class CGraphicDeviceDx11
 {
 public:
+
 	virtual CGraphicDeviceDx11* function0();
-	virtual BOOL Create(CGraphicContextDx11** ppContext, CDisplay* pDisplay, HWND hWnd, void* pInfo);
-	virtual BOOL function2();
-	virtual BOOL function3();
-	virtual BOOL function4();
-	virtual BOOL function5();
-	virtual BOOL Render(CGraphics* pGraphics, DWORD* a2, CDisplay* pDisplay);
-	virtual BOOL function7();
+	virtual BOOL Create(CGraphicContextDx11** ppContext, CDisplay* pDisplay,
+		HWND hWnd, CGraphicCreateContext* pCreateCtx);
+	// Writes current in use CAdapter & COutput names to ini using deprecated WritePrivateProfileStructA 
+	// Writes:  m_pAdapters[m_iAdapter], m_pOutputs[m_iOutput] 
+	virtual BOOL WriteConfig(void) const;
+	virtual bool IsFullscreen(void) const; // return (m_bAcquiredFullscreen == 0);
+	virtual BOOL function4(void) const; // return true; mov eax, 1; ret
+	virtual BOOL function5(); // null stub most likely retn 0
+	virtual BOOL Render(CGraphics* pGraphics, BOOL* pbFullscreen, CDisplay* pDisplay);
+	virtual BOOL CreateShaderMemorizeVS(); // not too confident on this one if name is accurate
 	virtual BOOL CreateComputeContext(__int64 a1, __int64 a2);
-	virtual BOOL function9();
-	virtual BOOL function10();
-	virtual void function11();
+	virtual BOOL function9();	// tex func
+	virtual BOOL function10();	// tex func
+	virtual void function11();	// tex func
 	virtual BOOL function12();
 	virtual BOOL function13();
 	virtual BOOL function14();
-	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile); // index: 11 now according to ida
-	virtual BOOL CreateIndexBuffer(CVertexBuffer* pBuffer, __int64* a2);
+	virtual BOOL LoadDirectDrawSurface(CTexture* pTexture, void* pFile); 
+	virtual BOOL CreateVertexBuffer(CVertexBuffer* pBuffer, __int64* a2);
 	virtual BOOL CreateImmutableVertexBuffer(CVertexBuffer* pBuffer, const void* pData, int32_t* pcbVertexSizes, int32_t Index, int32_t iElement);
 	virtual BOOL CreateDynamicVertexBuffer(CVertexBuffer* pBuffer, uint32_t uByteWidth);
 	virtual BOOL CreateIndexBuffer(CIndexBuffer* pBuffer, __int64* a2);
@@ -771,14 +865,46 @@ public:
 	virtual BOOL function32();
 	virtual BOOL function33();
 	virtual BOOL CreateDepthStencilState(CDepthStencilState* pState, CDepthStencilStateInfo* pInfo);
-	virtual BOOL CreateSamplerState();
+	virtual BOOL CreateSamplerState(void* a2, void* a3);
 	virtual BOOL CreateOcclusionQuery(COcclusionQuery* pQuery);
+	virtual BOOL function37();	// return true; mov eax, 1; ret
+	virtual BOOL function38();	// calls present on swapchain again?
+	virtual BOOL function39();	// return true; mov eax, 1; ret
+	virtual BOOL function40();	// mov eax, 4 ret
+	virtual BOOL IsSampleDescValid(int32_t iSampler);  // not too confident on this one if name is accurate
+	virtual float GetFrameRate(void) const;	// m_Factory.m_flFrameRate
+	virtual bool IsWindowed(void) const;	// m_Factory.m_bWindowed
+	virtual BOOL function44(void);	// xor eax,eax; ret
+	virtual BOOL function45(void);	// return true; mov eax, 1; ret
+	virtual const CAdapter* GetAdapter(int32_t iAdapter);	// probably would return const CAdapter*
+	virtual uint32_t GetAdapterCount(void) const;	// m_Factory.m_uAdapters
+	virtual BOOL SetAdapterOutput(const CAdapterOutputPair& AdapterOutput); 
+	virtual BOOL function49();
+	virtual BOOL function50();
+	/*
+	* MSVC for some reason encodes the by value return as a silent 2nd param (RDX) which would be wrong
+	* for the original vfunc. This crashes on debug but *can* run on release if you change func signature.
+	* Not sure why it doesn't see the sizeof the struct is 8 bytes and can fit into rax.
+	* 
+	*	CGraphicDeviceDx11__GetCurrentAdapterOutput proc near
+	*		mov rax, qword ptr [rcx+0120h]
+	*		mov qword ptr [rdx], rax
+	*		retn
+	*	CGraphicDeviceDx11__GetCurrentAdapterOutput endp
+	* 
+	* Discarding the return value held in rax solves the issue, however I don't think it's ideal.
+	* 
+	* True vfunc signature:
+	* virtual CAdapterOutputPair GetCurrentAdapterOutput(CAdapterOutputPair& AdapterPair) const = 0;
+	*/
+	virtual void GetCurrentAdapterOutput(CAdapterOutputPair& AdapterPair) const;
+	virtual RECT* function52(RECT* a2);
 
 public:
 	//void* pVtable;						//0x0000
 	int32_t m_iScreenWidth;					//0x0008 
 	int32_t m_iScreenHeight;				//0x000C 
-	float flScreenHz;						//0x0010 / fps / 60hz capped
+	float m_flScreenHz;						//0x0010 / fps / 60hz capped
 	BOOL m_bFullscreen;						//0x0014 | UINT
 	BOOL m_bUnk0x018;						//0x0018
 	BOOL m_bUnk0x01C;						//0x001C
@@ -786,7 +912,7 @@ public:
 	BOOL m_bUnk0x024;						//0x0024
 	BOOL m_bUnk0x028;						//0x0028
 	BOOL m_bUnk0x02C;						//0x002C
-	BOOL m_bFullscreen2;					//0x0030
+	BOOL m_bSetFullscreenFailed;			//0x0030
 	BOOL m_bUnk0x034;						//0x0034
 	IDXGIOutput* m_pOutput;					//0x0038
 	UINT m_uFullscreenTimer;				//0x0040
@@ -795,62 +921,18 @@ public:
 	IDXGIFactory* m_pFactory;				//0x0050 | IDXGIFactory2*
 	HWND m_hWindow;							//0x0058
 	CVertexBuffer* m_pVertexBuffer;			//0x0060 | Hw::cVertexBufferImpl
-	ID3D11Device* m_pID3D11Device2;			//0x0068
-	IDXGIFactory2* m_pFactory2;				//0x0070		
+	ID3D11Device* m_pID3D11Device2;			//0x0068 | FIXME: not accurate
+	IDXGIFactory2* m_pFactory2;				//0x0070 | FIXME: not accurate	
 	CVertexLayout* m_pVertexLayout;			//0x0078 | Hw::cVertexLayoutImpl
 	CConstantBuffer* m_pConstantBuffer;		//0x0080 | Hw::cConstantBufferImpl
-	char _0x0048[8];						//0x0088
-	CGraphicObjectFactoryDx11 m_Factory;	//0x0090
-	char _0x00A4[32];						//0x00B4
-
-	//void* pd3dunk;						//0x00A0 
-
-	BOOL m_bWindowed;						//0x0108 | UINT
-	float m_flFrameRate;					//0x00E4
-	int32_t m_iWidth;						//0x0120
-	int32_t m_iHeight;						//0x0124
-	D3D11_QUERY_DESC m_OccusionDesc;		//0x00F0
-	//D3D11_QUERY_DESC m_TimestampDesc;		//0x00F8
-	int32_t m_iAdapter;						//0x0120
-	int32_t m_iOutput;						//0x0124
-	CAdapter* m_pAdapters;					//0x0128
-	UINT m_uAdapters;						//0x0130
-	BOOL m_b0x0134;							//0x0134
-	void* m_pUnk0x0138;						//0x0138
+	char _0x0088[16];						//0x0088
+	CGraphicObjectFactoryDx11 m_Factory;	//0x0098
+	
+	//ID3D11DeviceContext* m_pContext;		//0x0138 | not sure who owns this
 };
 VALIDATE_OFFSET(CGraphicDeviceDx11, m_pOutput, 0x38);
-VALIDATE_OFFSET(CGraphicDeviceDx11, m_bWindowed, 0x108);
-VALIDATE_OFFSET(CGraphicDeviceDx11, m_pAdapters, 0x128);
-VALIDATE_SIZE(CGraphicDeviceDx11, 320);
-
-/*
-* Struct is used to contruct CGraphics!
-* Stack var size of struct is guessed!
-* 
-*/
-struct CGraphicCreateContext
-{
-	int32_t m_ScreenType;	//0x0000 | windowed, fullscreen, borderless ????
-	int32_t m_Width;		//0x0004
-	int32_t m_Height;		//0x0008
-	char pad0C[4];			//0x000C
-	CHeapInfo* m_pHeapInfo;	//0x0010
-	QWORD* m_Ptr18;			//0x0018
-	QWORD* m_Ptr20;			//0x0020
-	QWORD* m_Ptr28;			//0x0028
-	int32_t m_Unk30;		//0x0030 | ida only says 3
-	BOOL m_bUnk34;			//0x0034
-	int32_t m_UnkFlag38;	//0x0038
-	char pad3C[4];			//0x003C
-	__int64 m_Unk40;		//0x0040
-	Vector4* m_pvUnk48;		//0x0048
-	int32_t m_Unk50;		//0x0050
-	int32_t m_Unk54[9];		//0x0054
-	bool m_bUnk;			//0x0078
-	char pad79[3];			//0x0079
-	int32_t m_Unk7C[4];		//0x007C
-};
-
+VALIDATE_OFFSET(CGraphicDeviceDx11, m_Factory, 0x98);
+VALIDATE_SIZE(CGraphicDeviceDx11, 0x140);
 
 /*
 * Size of struct 0x0F0 (240) bytes	old version (denuvo)
@@ -864,8 +946,8 @@ public:
 	void* m_pComputeCtx;					//0x0008 | gets passed to CreateComputeContext
 	UINT m_uUAVStartSlot;					//0x0010
 	char unk0x0C[4];						//0x0014
-	void* m_pSamplerState;					//0x0018
-	DWORD dw0x18;							//0x0020
+	void* m_pSamplerState;					//0x0018 | sizeof 256 bytes
+	int32_t m_nSamplerStates;				//0x0020
 	char unk0x1C[4];						//0x0024
 	CGraphicContextDx11* m_pContext;		//0x0028
 	CDisplay m_Display;						//0x0030
@@ -873,9 +955,13 @@ public:
 	CGraphicDeviceDx11* m_pGraphicalDevice;	//0x02B8
 	CHeapInfo* m_pHeapInfo;					//0x02C0 
 	CReadWriteLock m_Lock;					//0x02C8
-	char padCC[12];							//0x02F8
-	int32_t m_iTimeStep;					//0x00DC |  g_flDeltaTime * 3000.0 
-	char padE0[20];							//0x00E0
+	QWORD qword2F8;							//0x02F8
+	QWORD qword300;							//0x0300
+	DWORD dword308;							//0x0308
+	BYTE gap30C[4];							//0x030C
+	DWORD dword310;							//0x0310
+	BYTE gap314[4];							//0x0314
+	BOOL m_bUseDirectX11;					//0x0318
 };
 VALIDATE_OFFSET(CGraphics, m_pContext, 0x28);
 VALIDATE_OFFSET(CGraphics, m_Display, 0x30);

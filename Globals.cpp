@@ -32,6 +32,7 @@ GetConstructorFn GetConstructionInfo;
 HashStringCRC32Fn HashStringCRC32;
 UnlockAchievementFn UnlockAchievement;
 FNV1HashFn FNV1Hash;
+PlaySoundFn ExecuteSound;
 QueryHeapFn QueryHeap;
 CreateTaskFn CreateTask;
 CJobManager::CreateTaskFn JobManager_CreateTask;

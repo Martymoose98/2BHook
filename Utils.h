@@ -245,7 +245,7 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 		Version.m_pHash = new BYTE[Version.m_uHashSize];
 
 		// Create the hash
-		ULONG uBlockSize = (Version.m_uHashSize > UINT32_MAX) ? 0x100000 : Version.m_uHashSize;
+		ULONG uBlockSize = (ULONG) Version.m_uHashSize;
 
 		// Files bigger than 0xFFFFFFFF are unsupported and invoke UB
 		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, Version.m_pHash, (ULONG)Version.m_uHashSize);	

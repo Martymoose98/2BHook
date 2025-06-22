@@ -81,7 +81,7 @@ typedef struct Variables_t
 		bool bCpkLoaded;
 		bool bFirstperson;
 		bool bFirstpersonOld;
-		unsigned int bCameraFlags;
+		unsigned int uCameraFlags;
 		unsigned int bCameraFlagsOld;
 		float flDeltaX;
 		float flDeltaY;
@@ -94,22 +94,6 @@ typedef struct Variables_t
 		bool bLoading;
 		int nSlot;
 	} Misc;
-
-	struct Menu_t
-	{
-		bool bOpened;
-		bool bIgnoreInputWhenOpened;
-
-		struct Input_t
-		{
-			XINPUT_STATE state;
-			XINPUT_STATE emulate;
-			LPDIDATAFORMAT pKeyboardFormat;	// c_dfDIKeyboard
-			LPDIDATAFORMAT pMouseFormat;	// c_dfDIMouse2
-
-		} Input;
-
-	} Menu;
 
 	struct Animation
 	{

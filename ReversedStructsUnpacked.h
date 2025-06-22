@@ -42,26 +42,26 @@ struct ObjectIdConvert
 };
 
 /*
-Nier Automata's BannedWord::cChecker
+NieR Automata's BannedWord::cChecker
 */
-class BannedWordChecker
+class CBannedWordChecker
 {
 public:
-	struct BannedWordBinaryHeader
+	struct BinaryHeader
 	{
-		uint32_t uWordCount;
+		uint32_t m_uWordCount;
 	};
 
 	struct WordEntry
 	{
-		DWORD dwLength;
-		LPWSTR lpszBannedWord;
+		uint32_t m_uLength;
+		wchar_t* m_szBannedWord;
 	};
 
 	virtual void* function0(BYTE flags);
 
-	void* m_pBuffer;
-	QWORD m_qwBufferSize;
+	void* m_pBuffer;		// uint32_t*
+	QWORD m_qwBufferSize;	// size_t 
 	WordEntry* m_pEntries;
 	uint32_t m_uWordCount;
 };
@@ -133,9 +133,9 @@ struct CTaskContext
 	void (*m_pfnCallbackStub)(CTaskContext* pTaskCtx);
 	CTaskContext* m_pStubTaskCtx;
 	uint32_t m_uThreadId;
-	DWORD dword14;
+	DWORD dword14;		// maybe priority
 	HANDLE m_hThread;
-	uint32_t dword20;
+	uint32_t dword20;	// maybe priority
 	void(*m_pfnCallback)(void*);
 	void* m_pCallbackParameters;
 };
