@@ -4,5 +4,4 @@
 	branch = master
 [submodule "Fluorine"]
 	path = Fluorine
-	url = https://github.com/Martymoose98/Fluorine.git
-	branch = master
+	url = git@github.com:Martymoose98/Fluorine.git
