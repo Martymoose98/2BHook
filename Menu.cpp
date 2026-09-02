@@ -563,7 +563,6 @@ void CMenu::MiscTab(void)
 
 	ImGui::SameLine();
 
-	//FIXME: DEFO CRASH
 	if (ImGui::Button("Emit Sound"))
 	{
 		g_pLocalPlayer->EmitSound(Vars.Misc.szSoundName, g_pLocalPlayer, 5, 0x5000000, 0x200007F);
@@ -571,6 +570,12 @@ void CMenu::MiscTab(void)
 		//QWORD rax = ((EmitSoundFn)(0x14081FD80))(&sound, &g_pLocalPlayer);
 		//LOG("RAX = %x\n", rax);
 	}
+
+	ImGui::SameLine();
+
+	// TODO: EXPERIMENTAL
+	if (ImGui::Button("Emit Particle"))
+		Features::CreateParticle(g_pCamera->m_pCamEntity, 15);
 
 	ImGui::InputFloat3("Viewangles", (float*)&g_pCamera->m_vViewangles);
 

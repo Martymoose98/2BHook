@@ -398,6 +398,9 @@ HRESULT CConfigXml::BeginReadElement(void)
 	if (FAILED(hr = m_pReader->GetLocalName(&szLocalName, &cchLocalName)))
 		return hr;
 
+	if (!szLocalName)
+		return E_FAIL;
+
 	auto& It = m_Items.find(szLocalName);
 
 	if (It != m_Items.end())

@@ -195,7 +195,7 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 	// Set the inital status to success
 	NTSTATUS Status = STATUS_SUCCESS;
 
-	// Retrieve the size of the nier bin ary file path
+	// Retrieve the size of the nier binary file path
 	uint32_t uFileNameSize = MAX_PATH;//GetModuleFileName(NULL, NULL, 0);
 
 	// Allocate the correct amount of memory
@@ -231,7 +231,7 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 	if (dwFileSize != dwBytesRead)
 	{
 		delete[] pBinary;
-		return ERROR_CLUSTER_PARTIAL_READ;
+		return STATUS_PARTIAL_COPY;
 	}
 
 	ULONG uHashLengthSize;
@@ -300,7 +300,7 @@ static NTSTATUS QueryNierBinaryHash(BYTE*& pHash, ULONG& uHashSize)
 	if (dwFileSize != dwBytesRead)
 	{
 		delete[] pBinary;
-		return ERROR_CLUSTER_PARTIAL_READ;
+		return STATUS_PARTIAL_COPY;
 	}
 
 	ULONG uHashLengthSize;

@@ -17,16 +17,14 @@ struct CEntityList;
 //  EntityHandles are 32 bit values laid out as follows:
 //
 //  32								   0
-//   SSSSSSSS IIIIIIIIIIIIIIII RRRRRRRR
+//   GGGGGGGG IIIIIIIIIIIIIIII RRRRRRRR
 //  +--------+----------------+--------+
-//  | Sector |      Index     |        |
+//  | Gen.   |      Index     |        |
 //  +--------+----------------+--------+
 //
 //  Where
 //
-//      S - Sector - 8 bit shift value (0-255) resets every 256 items
-//			therefore, grouping entities in 256 bundles
-//
+//      G - Generation - 8 bit value (0-255) increments when an entity is destroyed and reallocated
 //      I - Index - 16 unsigned value
 //          Index into the CEntityList::m_pItems
 // 
@@ -35,10 +33,10 @@ struct CEntityList;
 typedef uint32_t EntityHandle;
 
 #define EHANDLE_INDEX(ehandle) ((ehandle) >> 8) & 0xFFFF)
-#define EHANDLE_SECTOR(ehandle) ((ehandle) >> 24) & 0xFF)
+#define EHANDLE_GENERATION(ehandle) ((ehandle) >> 24) & 0xFF)
 #define INVALID_EHANDLE_INDEX (0xFFFFFFFF)
 
-#define MAX_ENTITIES_IN_SECTOR 256
+#define MAX_ENTITIES_IN_GENERATION 256
 
 // TODO: idk if my increment operators are correct!
 // IDA code is so gay I can't grasp it well
@@ -48,7 +46,7 @@ typedef struct EntityHandle_t
 		struct {
 			uint32_t m_uReserved : 8;
 			uint32_t m_uIndex : 16;
-			uint32_t m_uSector : 8;
+			uint32_t m_uGeneration : 8;
 		} m_Parts;
 
 		uint32_t m_uValue;
@@ -66,7 +64,7 @@ typedef struct EntityHandle_t
 	EntityHandle_t& operator++(void)
 	{
 		if (!(++m_Parts.m_uIndex & 0xFF)) // % 256
-			++m_Parts.m_uSector;
+			++m_Parts.m_uGeneration;
 
 		return *this;
 	}
@@ -74,7 +72,7 @@ typedef struct EntityHandle_t
 	EntityHandle_t& operator++(int32_t)
 	{
 		if (!(++m_Parts.m_uIndex & 0xFF)) // % 256
-			++m_Parts.m_uSector;
+			++m_Parts.m_uGeneration;
 
 		return *this;
 	}
@@ -92,11 +90,11 @@ typedef struct EntityHandle_t
 	}
 
 	inline uint32_t GetIndex(void) const { return m_Parts.m_uIndex; }
-	inline uint32_t GetSector(void) const { return m_Parts.m_uSector; }
+	inline uint32_t GetGeneration(void) const { return m_Parts.m_uGeneration; }
 
 	inline uint32_t GetEntIndex(void) const
 	{
-		return m_Parts.m_uIndex + MAX_ENTITIES_IN_SECTOR * (m_Parts.m_uSector - 1);
+		return m_Parts.m_uIndex + MAX_ENTITIES_IN_GENERATION * (m_Parts.m_uGeneration - 1);
 	}
 
 	inline bool operator!=(EntityHandle_t hOther) const { return (m_uValue != hOther.m_uValue); }
@@ -123,9 +121,9 @@ struct CEntityInfoUnk_t
 	int32_t m_0x08;
 	volatile int32_t m_nReferenceCount;	// 0x0C
 	float m_flUnk0x10;					// 0x10
-	float m_flTickBase;					// 0x14 local entity time coefficent
+	float m_flTickBase;					// 0x14 local entity time coefficient
 	float m_flUnk0x14;					// 0x18
-	float m_flTickCoefficent;			// 0x14 local entity time coefficent
+	float m_flTickCoefficient;			// 0x14 local entity time coefficient
 };
 
 class CSceneEntitySystemUnk;
@@ -149,7 +147,7 @@ struct CEntityInfo
 	char _0x0038[4];							//0x0034
 	CTextureData* m_pTextureData[2];			//0x0038
 	CBehaviorAppBase* m_pEntity;				//0x0048
-	DatafileDesc* m_pDatDesc;					//0x0050  | m_pWMB
+	DatafileDesc* m_pDatDesc;					//0x0050  | m_pWMB (germans say its "animation manager")
 	CSceneEntitySystemUnk* m_pUnk;				//0x0058  | m_pWTA (debug build) dword array 2 members (0x1415F6B50) CSceneEntitySystem::qword10
 	CBehaviorAppBase* m_pParent;				//0x0060  | m_pWTP (debug build)
 	BOOL m_bDataExists;							//0x0068
@@ -372,6 +370,51 @@ struct CXmlBinary //: CXML
 	DWORD m_dwFlags; // 1u = m_uQWordCount >= 0xFFFF		
 };
 
+enum EParticle : int32_t
+{
+
+};
+
+class CObj;
+
+#define PARTICLE_MAX_INFO 10
+
+class CParticle
+{
+public:
+	typedef CParticle* (*InitializeFn)(CParticle* pThis);
+	typedef void (*ReserveInfoSlotFn)(CParticle* pThis, CEntityInfo* pInfo, uint8_t uValue);
+
+	uint64_t m_unk0;							//0x0000 | pointer
+	uint32_t m_uFlags;							//0x0008 | init to 0x80000000
+	uint32_t m_unkC;							//0x000C
+	int64_t m_unk10;							//0x0010
+	CObj* m_pParent;							//0x0020
+	int64_t m_unk28;							//0x0028
+	int64_t m_unk30;							//0x0030
+	float m_flScale;							//0x0038 | init to 1.0f (applies to matTransform)
+	uint32_t m_unk3C;							//0x003C
+	Matrix4x4 m_matTransform;					//0x0040
+	uint16_t m_word80;							//0x0080
+	uint8_t gap82[14];							//0x0082
+	uint32_t dword90;							//0x0090
+	uint8_t gap94[4];							//0x0094
+	uint32_t m_uIndexInfo;						//0x0098
+	CEntityInfo* m_pInfos[PARTICLE_MAX_INFO];	//0x00A0
+	uint8_t m_pInfosSet[PARTICLE_MAX_INFO];
+};
+
+// Sig: 33 C0 C7 41 08 00 00 00 80 48 89 01
+typedef CParticle* (*CParticle_InitializeFn)(CParticle* pThis);
+// Sig: 4C 8B D2 41 80
+typedef void (*CParticle_ReserveInfoSlotFn)(CParticle* pThis, CEntityInfo* pInfo, uint8_t uValue);
+
+// mov     [rcx+20h], rdx
+// ret
+// AKA
+// m_pParent = p;
+typedef void (*CParticle_SetParentFn)(CParticle* pThis, void* p);
+
 /*
 * Size of struct 0x670 (1648) bytes
 *
@@ -402,10 +445,13 @@ public:
 	void* _0x600;							//0x00600
 	float fl0x60C;							//0x0060C
 	CEntityInfo* m_pInfo;					//0x00610 
-	CXmlBinary m_xmlBinary;					//0x00618
+	CXmlBinary m_XmlBinary;					//0x00618
 	BOOL m_bObjectRegistered;				//0x00658 | cObj::construct is registered multiple times.
 	char _0x065C[20];						//0x0065C
 };
 VALIDATE_OFFSET(CObj, m_pTextureData, 0x5B0);
 VALIDATE_OFFSET(CObj, m_ObjectId, 0x5B8);
 VALIDATE_SIZE(CObj, 0x670);
+
+// Sig: 48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 20 48 8B B9 10
+typedef __int64 (*CObj_EmitParticleFn)(CObj* pThis, int32_t iType, CParticle* pParticle);

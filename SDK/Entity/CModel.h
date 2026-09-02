@@ -142,6 +142,28 @@ public:
 	virtual void function1() {};
 };
 
+struct DrawStateCache 
+{ 
+	int32_t m_iLastVertexGroup; 
+	int32_t m_iLastMatrixSet; 
+};
+
+struct DrawBatchKey 
+{
+	int32_t m_iVertexGroup; 
+	int32_t m_iMatrixSet;
+	int32_t m_nInstances;  
+	int32_t m_iParamMode;
+};
+
+struct DrawRange
+{
+	int32_t m_iVertexStart; 
+	int32_t m_iPrimStart;
+	int32_t m_iVertexEnd;  
+	int32_t m_iPrimEnd;
+};
+
 /*
 Size of struct 0xA8 (168) bytes
 */
@@ -178,12 +200,12 @@ public:
 	QWORD qword48;
 	QWORD qword50;
 	QWORD qword58;
-	QWORD qword60;
-	QWORD qword68;
-	QWORD qword70;
+	QWORD m_pWTBBake;
+	QWORD m_pWTBLod;
+	QWORD m_pWTB_RNT;
 	BYTE gap78[56];
-	QWORD qwordB0;
-	BYTE gapB8[28];
+	QWORD m_pWTBNormalAnims[3];
+	BYTE gapC8[12];
 	DWORD dwordD4;
 	BYTE gapD8[24];
 	Vector3Aligned m_vF0;
@@ -336,7 +358,6 @@ public:
 
 struct MaterialShaderInfo
 {
-
 	int32_t m_iShader;
 	CModelShader* m_pShader;
 };
@@ -438,7 +459,8 @@ struct CMesh
 };
 VALIDATE_SIZE(CMesh, 0x50);
 
-// Size of struct 0x140 (320) bytes
+// Red-Black Tree Node adds 0x20 to make it 0x140 (320) bytes
+// Size of struct 0x120 (288) bytes
 class CModelData
 {
 public:
@@ -477,35 +499,58 @@ public:
 	char padC4[4];							//0x00C4
 	CMaterial* m_pMaterials;				//0x00C8
 	int32_t m_nMaterials;					//0x00CC
-	char padCC[4];							//0x00D0
-	void* m_pUnks2;							//0x00D4
-	int32_t m_nUnks2;						//0x00DC
-	int32_t padE0;							//0x00E0
-	BYTE gapE4[8];							//0x00E4
-	DWORD m_WMB0xE;							//0x00EC
-	BYTE gapF0[4];							//0x00F0
-	DWORD m_dwIndex;						//0x00F4
-	BYTE gapF8[48];
-	CModelData* m_pNext;
-	char pad9[8];
+	char            padD4[4];               //0x00D4
+	void* m_pUnks2;							//0x00D8
+	int32_t         m_nUnks2;               //0x00E0
+	char            padE4[4];               //0x00E4
+	BYTE            gapE8[8];               //0x00E8
+	DWORD           m_WMB0xE;               //0x00F0
+	char            padF4[4];               //0x00F4
+	DWORD           m_dwIndex;              //0x00F8  <- pool slot from Init's 4th arg
+	char            padFC[4];               //0x00FC
+	uint64_t        m_uKey;                 //0x0100  tree key
+	CModelDataNode* m_pNext;                //0x0108  newer
+	CModelDataNode* m_pPrev;                //0x0110  older
+	char            pad118[8];              //0x0118
 };
+VALIDATE_OFFSET(CModelData, m_pDrawData, 0x38);   // confirmed: zeroed pre-ctor
 VALIDATE_OFFSET(CModelData, m_pBones, 0x50);
 VALIDATE_OFFSET(CModelData, m_pLODS, 0xA0);
 VALIDATE_OFFSET(CModelData, m_pMeshes, 0xB8);
-VALIDATE_SIZE(CModelData, 0x140);
+VALIDATE_OFFSET(CModelData, m_uKey, 0x100);  // confirmed: tree compare + write
+VALIDATE_OFFSET(CModelData, m_pNext, 0x108);
+VALIDATE_OFFSET(CModelData, m_pPrev, 0x110);
+VALIDATE_SIZE(CModelData, 0x120);
 
-struct CModelDataList
+struct CModelDataList                                 // 0x40
 {
-	CModelData* m_pModelData;
-	QWORD m_ptr;
-	int32_t m_iIndex;
-	int32_t m_iCapacity;
-	QWORD qword18;
-	CModelData* m_pLast;
-	DWORD m_iSize;
-	BYTE gap2C[12];
-	void(__fastcall* pfunc38)(__int64);
+	CModelDataNode* m_pPool;                          // 0x00
+	CModelDataNode** m_ppFreeStack;                   // 0x08
+	int              m_iPoolCount;                    // 0x10
+	int              m_iFreeTop;                      // 0x14
+	CModelDataNode* m_pTreeRoot;                      // 0x18
+	CModelDataNode* m_pTail;                          // 0x20
+	int              m_iSize;                         // 0x28
+	BYTE             gap2C[12];                       // 0x2C  unknown
+	void(__fastcall* m_pfnOnCreate)(CModelData*);     // 0x38
 };
+VALIDATE_SIZE(CModelDataList, 0x40);
+
+// Red-Black Tree Node for CModelData
+// aka CRedBlackTreeNode<CModelData>
+// Size of struct 0x140 (320) bytes
+typedef CRedBlackTreeNode<CModelData> CModelDataNode;
+// 
+//struct CModelDataNode          // sizeof = 0x140
+//{
+//	int32_t         m_iColour;   // 0x00  RB colour / balance factor
+//	int32_t         pad04;
+//	CModelDataNode* m_pParent;   // 0x08  (inferred — zeroed here, set by the insert helper)
+//	CModelDataNode* m_pRight;    // 0x10  taken when node.key <  search key
+//	CModelDataNode* m_pLeft;     // 0x18  taken when node.key >  search key
+//	CModelData       m_Data;     // 0x20  (0x120 bytes)
+//};
+//
 
 // FIXME: wtf finish this unacceptable
 struct CCameraDevice
@@ -563,10 +608,6 @@ struct CModelInfo
 {
 	Vector4 m_vTint;			//0x0000
 	CModelData* m_pData;		//0x0010
-	char pad18[88];				//0x0018
-	Vector3Aligned m_vPosition; //0x0070
-	char pad90[0x50];			//0x0090
-	UINT m_Flags;				//0x00D0 | |= 0x10u this happens a lot
 };
 
 struct CModelLOD
@@ -635,7 +676,7 @@ VALIDATE_OFFSET(CModelWork, m_pModelExtend, 0x180);
 * Size of struct 0x584 (1412) bytes
 * could be 0x590 bytes
 *
-* apprently supposed to inherit cparts??
+* apparently supposed to inherit cparts??
 */
 class CModel : public CParts
 {
@@ -652,8 +693,8 @@ public:
 	virtual void UpdateModelPhysics(Vector4* v1, Vector4* v2, Vector4* v3) = 0;
 	virtual void function2(void) = 0;
 
-	Matrix4x4 m_matB0;						//0x00B0 | set to indentity matrix on construction
-	Matrix4x4 m_matF0;						//0x00F0 | set to indentity matrix on construction
+	Matrix4x4 m_matB0;						//0x00B0 | set to identity matrix on construction
+	Matrix4x4 m_matF0;						//0x00F0 | set to identity matrix on construction
 	CModelExtendWork m_ExtendWork;			//0x0140
 	CModelWork m_Work;						//0x0390
 	QWORD m_qw0x538;						//0x0538

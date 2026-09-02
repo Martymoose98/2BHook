@@ -791,14 +791,13 @@ void Setup(void)
 #endif
 	srand((unsigned int)time(NULL));
 
-	//PVOID pfnIoAllocateMdl = GetExportAddressFromDisk("ntoskrnl.exe", "IoAllocateMdl");
-
 	{
 		STACK_TIMER(AVX_timer);
 
 		HashStringCRC32 = (HashStringCRC32Fn)FindPatternAVXEx(GetModuleHandleA(NULL),
 			"\x48\x85\xC9\x0F\x85????\x33\xC0\xC3\xCC\xCC\xCC\xCC\x48\x89\x5C\x24");
 	}
+
 	// add VEH?
 	SetUnhandledExceptionFilter(&UnhandledExceptionHandler);
 	g_pExceptionHandlers.push_back(&UnhandledExceptionHandlerChild);
@@ -817,6 +816,13 @@ void Setup(void)
 #if defined(_DEBUG) || defined(VERBOSE)
 	DumpModules();
 #endif
+
+	//const char* szModule = "ntoskrnl.exe";
+	//const char* szFunction = "IoAllocateMdl";
+
+	//PVOID pfnIoAllocateMdl = GetExportAddressFromDisk(szModule, szFunction);
+
+	//LOG("Found %s!%s = %p\n", szModule, szModule, pfnIoAllocateMdl);
 
 	FindOffsets();
 

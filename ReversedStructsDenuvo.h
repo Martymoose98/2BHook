@@ -1318,8 +1318,8 @@ struct CModelDataManager
 struct CModelInfo
 {
 	Vector4 m_vTint;			//0x0000
-	CModelData* m_pData;		//0x0008
-	char pad10[96];				//0x0010
+	CModelData* m_pData;		//0x0010
+	char pad18[96];				//0x0018
 	Vector3Aligned m_vPosition; //0x0070
 	UINT m_Flags;				//0x00D0
 };
@@ -2524,13 +2524,13 @@ struct COtManager
 											//0x10 | embededd struct
 	CGraphicCommandList** m_pCmdLists;		//0x50
 	BYTE gap58[8];							//0x58
-	QWORD qword60;							//0x60
+	QWORD m_pOccupancyTable;							//0x60
 	CGraphicCommandList* m_pActiveList;		//0x68
 	INT m_iGraphicListCount;				//0x70
 	INT m_nMaxGraphicListCount;				//0x74
 	volatile ULONG64 m_uCmdIndex;			//0x78
 	ULONG64 m_uCmdCount;					//0x80
-	DWORD m_uMaxTagCount;					//0x88
+	DWORD m_iMaxTagCount;					//0x88
 	DWORD dword8C;							//0x8C
 	int signed90;							//0x90
 	BYTE gap94[4];							//0x94

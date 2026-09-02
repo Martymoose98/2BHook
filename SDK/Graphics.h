@@ -571,7 +571,7 @@ struct CGraphicObjectFactoryDx11
 {
 	ID3D11Device* m_pDevice;			//0x0000
 	IDXGIFactory* m_pFactory;			//0x0008
-	uint32_t* m_pUnk0x10;				//0x0010 | uint32_t color
+	uint32_t* m_puColors;				//0x0010 | uint32_t color
 	uint32_t m_nUnks0x14;				//0x0014
 	DXGI_SAMPLE_DESC m_SampleDescs[5];	//0x001C
 	char _0x0050[4];
@@ -1031,15 +1031,15 @@ struct COtManager
 	//0x10 | embededd struct
 	CGraphicCommandList** m_pCmdLists;		//0x50
 	BYTE gap58[8];							//0x58
-	int32_t* qword60;						//0x60
+	int32_t* m_pOccupancyTable;				//0x60
 	CGraphicCommandList* m_pActiveList;		//0x68
 	int32_t m_iGraphicListCount;			//0x70
 	int32_t m_nMaxGraphicListCount;			//0x74
 	volatile uint64_t m_uCmdIndex;			//0x78
 	uint64_t m_uCmdCount;					//0x80
-	DWORD m_uMaxTagCount;					//0x88
-	DWORD dword8C;							//0x8C
-	int32_t signed90;						//0x90
+	int32_t m_nMaxTagCount;					//0x88
+	int32_t m_nMaxCmdListCount;				//0x8C
+	int32_t m_nGroups;						//0x90
 	BYTE gap94[4];							//0x94
 	COtManagerPtr98* m_ptr98;				//0x98
 	BYTE gapA0[4];							//0xA0
