@@ -130,11 +130,12 @@ class DynamicArray : public Array<T>
 template<typename T>
 class CRedBlackTreeNode
 {
-	BOOL m_bRoot;						//0x00
-	CRedBlackTreeNode<T>* m_pParent;	//0x08
-	CRedBlackTreeNode<T>* m_pRight;		//0x10
-	CRedBlackTreeNode<T>* m_pLeft;		//0x18
-	T m_Data;
+	int32_t m_iColour;					// 0x00  RB colour / balance factor
+	int32_t pad04;
+	CRedBlackTreeNode<T>* m_pParent;	//0x08	(inferred — zeroed here, set by the insert helper)
+	CRedBlackTreeNode<T>* m_pRight;		//0x10	taken when node.key < search key
+	CRedBlackTreeNode<T>* m_pLeft;		//0x18	taken when node.key > search key
+	T m_Data;							//0x20
 };
 
 // Hw::cRBTreeNodeTemp<T>

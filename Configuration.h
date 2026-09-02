@@ -529,7 +529,7 @@ public:
 
 		if (SUCCEEDED(hr = pReader->GetLocalName(&szName, &cchLocalName)))
 		{
-			if (!wcscmp(m_szName, szName))
+			if (szName && !wcscmp(m_szName, szName))
 			{
 				// Read Next Node (should be text)
 				if (SUCCEEDED(hr = pReader->Read(&NodeType)) && NodeType == XmlNodeType_Text)
@@ -1308,6 +1308,12 @@ private:
 	// std::vector<CKeybind*> m_Keybinds; // works
 };
 
+template<class T>
+inline void CConfigXml::AddKeybind(T&& Keybind)
+{
+
+}
+
 class CConfig : public IConfig
 {
 public:
@@ -1359,3 +1365,4 @@ private:
 #include "Menu.h"
 #include "Variables.h"
 #include "Features.h"
+

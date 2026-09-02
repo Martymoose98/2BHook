@@ -180,6 +180,9 @@
     <ClInclude Include="SDK\CSaveDataDevice.h">
       <Filter>Header Files\SDK</Filter>
     </ClInclude>
+    <ClInclude Include="SDK\Entity\NPC.h">
+      <Filter>Header Files\SDK\Entity</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLLMain.cpp">

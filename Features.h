@@ -626,6 +626,67 @@ namespace Features
 		return g_CreateCtx.pInfo;
 	}
 
+	struct ParticleStub_t
+	{
+		CObj* m_pObj;
+		int32_t m_iType;
+	};
+
+	// this fucking thread will hang the whole game if not returned promptly wtf!
+	static __declspec(noreturn) void CreateParticleStub(ParticleStub_t* pParams)
+	{
+		static CParticle::InitializeFn ParticleInit =
+			(CParticle::InitializeFn)FindPattern(NULL, "33 C0 C7 41 08 00 00 00 80 48 89 01");
+
+		static CParticle::ReserveInfoSlotFn ReserveInfoSlot =
+			(CParticle::ReserveInfoSlotFn)FindPattern(NULL, "4C 8B D2 41 80");
+
+		static CObj_EmitParticleFn EmitParticle =
+			(CObj_EmitParticleFn)FindPattern(NULL, "48 89 5C 24 10 48 89 74 24 18 57 48 83 EC 20 48 8B B9 10");
+
+		static CJobManager* pJobMgrAlt = (CJobManager*)
+			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
+
+		static void* pFunc = (void*)FindPattern(NULL, "48 83 EC 48 48 8D 0D ? ? ? ? E8");
+
+		// Stops the SceneTask thread from running
+		//JobManager_PauseTask(g_pJobManager, 1); 
+
+		CParticle p;
+
+		ParticleInit(&p);
+		ReserveInfoSlot(&p, pParams->m_pObj->m_pInfo, 0xFF);
+		p.m_pParent = pParams->m_pObj;
+
+		p.m_matTransform = pParams->m_pObj->m_matTransform;
+
+		EmitParticle(pParams->m_pObj, pParams->m_iType, &p);
+		// HACK: I don't know how to properly use their async job manager well enough!
+		//SetTaskFunction((void(*)(void*))pFunc, NULL);
+		//JobManager_PauseTask(pJobMgrAlt, pJobMgrAlt->m_pActiveTasks->m_uTaskId);
+		//JobManager_SuspendTask2(pJobMgrAlt, 1);
+		JobManager_Yield(pJobMgrAlt);
+		//YieldToNextTask();
+	}
+
+	static void CreateParticle(CObj* pObj, int32_t iType)
+	{
+		thread_local ParticleStub_t p;
+
+		p.m_pObj = pObj;
+		p.m_iType = iType;
+
+		static CJobManager* pJobMgrAlt = (CJobManager*)
+			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
+
+		static CJobManager::FindAndDestoryTaskFn FindDestroyTsk = (CJobManager::FindAndDestoryTaskFn)
+			FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 8B");
+		static CJobManager::UpdateFn UpdateMgr = (CJobManager::UpdateFn)
+			FindPattern(NULL, "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B 59 10 33");
+
+		JobManager_CreateTask(pJobMgrAlt, &CreateParticleStub, &p, 0, "ParticleTask");
+	}
+
 	//static CEntityInfo* CreateEntity(const char* szName, int ObjectId, OPTIONAL set_info_t* pSetInfo)
 	//{
 	//	Create_t c;
