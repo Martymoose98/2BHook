@@ -2,8 +2,17 @@
 
 CMenu* g_pMenu;
 
+const ImColor CMenu::s_DefaultPrimary = ImColor(7, 74, 25, 255);
+const ImColor CMenu::s_DefaultPrimaryBg = ImColor(7, 17, 74, 255);
+
 CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
-	: m_bOpened(false), m_bIgnoreInputWhenOpened(true), m_pConfig(new CConfigXml())
+	// m_Primary/m_PrimaryBg were left out of this list, so ImColor default-constructed them
+	// to a fully transparent (0,0,0,0). The first Save() wrote that pair out as 0, and
+	// every Load() since restored it - which is how default.xml ended up with
+	// i_theme_fg/i_theme_bg of 0 where the older backup had real colours.
+	: m_bOpened(false), m_bIgnoreInputWhenOpened(true),
+	m_Primary(s_DefaultPrimary), m_PrimaryBg(s_DefaultPrimaryBg),
+	m_pConfig(new CConfigXml())
 {
 	//no ini file
 	ImGui::GetIO().IniFilename = NULL;
@@ -22,14 +31,39 @@ CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
 	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_fg", m_Primary));
 	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_bg", m_PrimaryBg));
 
-	m_pConfig->CreateConfig(NULL);
+	if (!m_pConfig->CreateConfig(NULL))
+		LERROR("CreateConfig failed - no config was loaded or written!\n");
+
+	Config.pHead = NULL;
+
 	m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
 
 	// Set selected config to head.
 	Config.iSelectedConfig = 0;
 
-	// filename copy.
-	_tcscpy_s(Config.szName, Config.pHead->m_Data.cFileName);
+	// filename copy. EnumerateConfigs legitimately finds nothing when no config file
+	// exists yet; this used to dereference the null head and take the whole Setup thread
+	// down with it, before InitHooks() had installed the D3D Present hook.
+	if (Config.pHead)
+	{
+		_tcscpy_s(Config.szName, Config.pHead->m_Data.cFileName);
+	}
+	else
+	{
+		_tcscpy_s(Config.szName, CONFIG_DEFAULT_NAME);
+		LERROR("EnumerateConfigs found no config files - defaulting to %s\n", Config.szName);
+	}
+
+	// Repair a fully transparent theme loaded from an existing config. Zeroed colours are
+	// never a deliberate choice - they build the entire style out of transparent black -
+	// and configs written before the constructor initialized these contain exactly that.
+	if (m_Primary.Value.w <= 0.0f || m_PrimaryBg.Value.w <= 0.0f)
+	{
+		LERROR("Config theme is fully transparent - restoring default theme colours\n");
+
+		m_Primary = s_DefaultPrimary;
+		m_PrimaryBg = s_DefaultPrimaryBg;
+	}
 
 	ApplyStyle(m_Primary, m_PrimaryBg);
 }

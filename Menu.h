@@ -99,6 +99,10 @@ private:
 	DIMOUSESTATE2 MouseState;			// c_dfDIMouse2
 	DIMOUSESTATE2 OldMouseState;
 
+	// Theme defaults, matching the colours documented in ApplyStyle.
+	static const ImColor s_DefaultPrimary;
+	static const ImColor s_DefaultPrimaryBg;
+
 	ImColor m_Primary;
 	ImColor m_PrimaryBg;
 
