@@ -1,4 +1,4 @@
-#include <Windows.h>
+﻿#include <Windows.h>
 #include <VersionHelpers.h>
 #include <d3d11.h>
 
@@ -832,7 +832,12 @@ void Setup(void)
 
 	QueryProcessHeaps(&g_phHeaps, NULL);
 
-	InitD3D11();
+	// Keep checking this result - a failed ImGui backend init is otherwise silent, and
+	// everything downstream still runs as if the overlay were alive.
+	HRESULT hrInitD3D11 = InitD3D11();
+
+	if (hrInitD3D11 != S_OK)
+		LERROR("InitD3D11 did not fully succeed (%08X) - ImGui cannot render!\n", hrInitD3D11);
 
 	CAdapterOutputPair AdapterOutput;
 
@@ -842,11 +847,16 @@ void Setup(void)
 
 	//g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
 
+	// This early return happens before InitHooks(), so a failure here means no Present
+	// hook and therefore no overlay at all.
+	SetLastError(ERROR_SUCCESS);
+
 	oWndProc = (WNDPROC)SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
 
 	if (!oWndProc)
 	{
-		LERROR("2B Hook Failed Initialization!\nCould not get old wndproc function pointer!\n");
+		LERROR("2B Hook Failed Initialization!\nCould not get old wndproc function pointer! (hWnd %p, error %u)\n",
+			g_hWnd, GetLastError());
 		return;
 	}
 

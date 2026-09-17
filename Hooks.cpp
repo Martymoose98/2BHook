@@ -395,6 +395,17 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	g_pMenu->Draw(ImVec2(875, 600));
 
 	ImGui::Render();
+
+	// Bind the swapchain's back buffer before submitting ImGui's geometry.
+	//
+	// CreateRenderTarget() binds this once during initialization, but the game's very next
+	// draw call replaces the binding - it swaps render targets all through the frame for
+	// its own passes. Whatever happened to be bound at Present time is not the back
+	// buffer, so ImGui was drawing perfectly valid geometry into the wrong target and
+	// nothing ever reached the screen.
+	if (g_pRenderTargetView)
+		g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
+
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	//COtManager::GetGraphicCommand(176i64);
