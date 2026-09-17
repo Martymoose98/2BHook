@@ -4,6 +4,8 @@
 
 FILE* Log::pStdout;
 FILE* Log::pStderr;
+FILE* Log::pLogFile;
+bool Log::bLogFileTried;
 
 void WINAPI UserNotify(PUSER_NOTIFY pParams)
 {
