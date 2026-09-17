@@ -1,17 +1,14 @@
-#pragma once
+﻿#pragma once
 
 #include <Windows.h>
-#include <vector>
+#include <deque>
+#include <mutex>
+#include <string>
+#include <unordered_map>
 #include <stdio.h>
 #include "ImGui/imgui.h"
 
 #include "Utils.h"
-
-template<typename T>
-class CircularBuffer
-{
-
-};
 
 class CConsole
 {
@@ -19,29 +16,28 @@ class CConsole
 	{
 		CONFLAGS_ENABLE_AUTOSCROLL = (1 << 0),
 		CONFLAGS_SHOULD_AUTOSCROLL = (1 << 1),
-		CONFLAGS_FILTER_ENTRIES = (1 << 2),
-		CONFLAGS_ENABLE_TIMESTAMPS = (1 << 3),
+		CONFLAGS_ENABLE_TIMESTAMPS = (1 << 2),
 	} ConsoleFlags;
-
 
 	struct ConCmd
 	{
 		const char* m_szName;
-
 	};
 
 	struct Entry
 	{
-		typedef enum Type
-		{
-
-		};
-
-		char* szText;
-		ImVec4 color;
+		std::string m_Text;
+		ImVec4      m_Color;
+		// Captured when the entry is logged, not when it is drawn, so toggling timestamps
+		// on shows the real times of lines that are already in the buffer.
+		SYSTEMTIME  m_Time;
 	};
 
 public:
+
+	// Oldest entries are dropped past this. Bounds both memory and the per-frame cost of
+	// walking the list, which is what made the console crawl once it filled up.
+	static constexpr size_t s_uMaxEntries = 4096;
 
 	CConsole(void);
 
@@ -66,16 +62,22 @@ private:
 	void InputBar(void);
 	void EnumConsoleData(void);
 
+	void WritePrefixed(const ImVec4& color, const char* szPrefix, const char* szFormat, va_list args);
+	void Append(const ImVec4& color, std::string&& Text);
+
 private:
 	char						m_szInput[256];
 	ImGuiTextFilter				m_TextFilter;
-	uint32_t					m_uFlags;	// FIXME: maybe volatile?
-	bool						m_bFilter;
-	bool						m_bScrollToBottom;
-	bool						m_bShouldScrollToBottom;
-	std::vector<Entry>			m_Items;
-	//std::deque<Entry>			m_Items;
-	std::unordered_map<const char*, ConCmd> m_Commands;
+	uint32_t					m_uFlags;
+
+	// Log entries are produced from whatever thread happens to be logging - the game's CRI
+	// callback threads and the Setup thread both do - while Draw() walks the list on the
+	// render thread. Everything touching m_Items or m_uFlags takes this.
+	mutable std::mutex			m_Mutex;
+
+	// deque, not vector: dropping the oldest entry is O(1) and never reallocates the rest.
+	std::deque<Entry>			m_Items;
+	std::unordered_map<std::string, ConCmd> m_Commands;
 };
 extern CConsole* g_pConsole;
 
