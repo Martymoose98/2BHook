@@ -108,10 +108,56 @@ public:
 		va_end(Args);
 	}
 
+	// Lazily opens <game exe directory>\2BHook.log. The debug console is easy to miss
+	// behind the game window and dies with the process, so tee everything to disk too.
+	static FILE* GetLogFile(void)
+	{
+		if (!pLogFile && !bLogFileTried)
+		{
+			CHAR szPath[MAX_PATH];
+			DWORD cch = GetModuleFileNameA(NULL, szPath, MAX_PATH);
+
+			bLogFileTried = true;
+
+			if (cch && cch < MAX_PATH)
+			{
+				CHAR* szSlash = strrchr(szPath, '\\');
+
+				if (szSlash)
+				{
+					strcpy_s(szSlash + 1, MAX_PATH - (szSlash + 1 - szPath), "2BHook.log");
+					fopen_s(&pLogFile, szPath, "w");
+				}
+			}
+		}
+
+		return pLogFile;
+	}
+
 	static void Write(FILE* pStream, enum ConsoleColors Foreground, enum ConsoleColors Background, const char* szFunction, const char* szFmt, va_list Args)
 	{
 		enum ConsoleColors PreviousForeground;
 		enum ConsoleColors PreviousBackground;
+
+		if (FILE* pFile = GetLogFile())
+		{
+			va_list FileArgs;
+			SYSTEMTIME Time;
+
+			// Wall clock rather than a tick count: the useful question of a log line is
+			// usually "what was the game doing when this happened", and it lines up with
+			// the console's own stamps.
+			GetLocalTime(&Time);
+
+			va_copy(FileArgs, Args);
+			fprintf(pFile, "[%02hu:%02hu:%02hu.%03hu] [%s]: ",
+				Time.wHour, Time.wMinute, Time.wSecond, Time.wMilliseconds, szFunction);
+			vfprintf(pFile, szFmt, FileArgs);
+			va_end(FileArgs);
+
+			// Flush every line - the interesting runs are the ones that end in a crash.
+			fflush(pFile);
+		}
 
 		GetConsoleColors(PreviousForeground, PreviousBackground);
 		fprintf(pStream, "[%s]: ", szFunction);
@@ -212,4 +258,6 @@ public:
 private:
 	static FILE* pStdout;
 	static FILE* pStderr;
+	static FILE* pLogFile;
+	static bool bLogFileTried;
 };
