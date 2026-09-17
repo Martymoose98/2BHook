@@ -124,9 +124,9 @@ extern CMenu* g_pMenu;
 
 static void ApplyModelMods(Pl0000* pEntity);
 
-static bool BlacklistItemCallback(void* data, int idx, const char** out_text);
+static const char* BlacklistItemCallback(void* data, int idx);
 
-static bool ConfigCallback(void* data, int idx, const char** out_text);
+static const char* ConfigCallback(void* data, int idx);
 
 // NPC
 //Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
