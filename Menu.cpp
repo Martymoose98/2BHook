@@ -54,22 +54,7 @@ CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
 		LERROR("EnumerateConfigs found no config files - defaulting to %s\n", Config.szName);
 	}
 
-	// Repair a fully transparent theme loaded from an existing config. Zeroed colours are
-	// never a deliberate choice - they build the entire style out of transparent black -
-	// and configs written before the constructor initialized these contain exactly that.
-	if (m_Primary.Value.w <= 0.0f || m_PrimaryBg.Value.w <= 0.0f)
-	{
-		LERROR("Config theme is fully transparent - restoring default theme colours\n");
-
-		// Say so in the console too. This silently rewrites what the config asked for, so
-		// the user should be told rather than left wondering why their theme changed.
-		g_pConsole->Warn("Config theme was fully transparent (i_theme_fg/i_theme_bg were 0), "
-			"which hides the entire menu. Restored the default theme colours - "
-			"save your config to keep them.");
-
-		m_Primary = s_DefaultPrimary;
-		m_PrimaryBg = s_DefaultPrimaryBg;
-	}
+	RepairTransparentTheme();
 
 	ApplyStyle(m_Primary, m_PrimaryBg);
 }
@@ -79,6 +64,39 @@ CMenu::~CMenu(void)
 	FindDataListFree(Config.pHead);
 
 	delete m_pConfig;
+}
+
+// Repair a fully transparent theme colour loaded from a config. Zero alpha is never a
+// deliberate choice - it builds the whole style out of transparent black and hides the
+// menu completely - and configs written before the constructor initialized these members
+// contain exactly that.
+//
+// Only the component that is actually transparent is replaced: the two are independent,
+// and clobbering both would throw away a colour the user did choose. Runs on every config
+// load, not just construction, because LoadConfig overwrites these the same way.
+void CMenu::RepairTransparentTheme(void)
+{
+	const bool bPrimary = (m_Primary.Value.w <= 0.0f);
+	const bool bPrimaryBg = (m_PrimaryBg.Value.w <= 0.0f);
+
+	if (!bPrimary && !bPrimaryBg)
+		return;
+
+	const char* szWhich = (bPrimary && bPrimaryBg) ? "i_theme_fg and i_theme_bg were both"
+		: (bPrimary) ? "i_theme_fg was" : "i_theme_bg was";
+
+	LERROR("Config theme is transparent (%s 0) - restoring default\n", szWhich);
+
+	// Say so in the console too. This silently rewrites what the config asked for, so the
+	// user should be told rather than left wondering why their theme changed.
+	g_pConsole->Warn("Config theme was transparent (%s 0), which hides the menu. "
+		"Restored the default - save your config to keep it.", szWhich);
+
+	if (bPrimary)
+		m_Primary = s_DefaultPrimary;
+
+	if (bPrimaryBg)
+		m_PrimaryBg = s_DefaultPrimaryBg;
 }
 
 void CMenu::Draw(const ImVec2 vSize)
@@ -293,6 +311,12 @@ void CMenu::LoadConfig(LPCWSTR szConfig)
 {
 	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Loading config. (%s)", szConfig);
 	m_pConfig->Load(szConfig);
+
+	// Load overwrites the theme straight from the file, so a config holding zeroed colours
+	// would rebuild the whole style as transparent black and make the menu vanish - with no
+	// way to get it back, since the menu is what you would use to fix it.
+	RepairTransparentTheme();
+
 	ApplyStyle(m_Primary, m_PrimaryBg);
 }
 
@@ -734,13 +758,30 @@ void CMenu::ConfigTab(void)
 	ImGui::PopItemWidth();
 	ImGui::SameLine();
 
-	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
-	szConfig = Config.szName[0] ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
-
 	if (ImGui::Button("Refresh"))
 	{
 		FindDataListFree(Config.pHead);
+		Config.pHead = NULL;
 		m_pConfig->EnumerateConfigs(NULL, &Config.pHead);
+
+		// The list the selection indexed into is gone; a stale index would walk off the
+		// rebuilt one.
+		Config.iSelectedConfig = 0;
+	}
+
+	// Resolve the name *after* Refresh. This used to be read above it, so clicking Refresh
+	// freed the node szConfig pointed into and the mbstowcs_s below read freed memory.
+	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
+
+	szConfig = (Config.szName[0]) ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
+
+	// FindDataListNav returns NULL past the end, and the name box can be empty, so szConfig
+	// is genuinely reachable as NULL - which trips the CRT invalid parameter handler and
+	// takes the process down.
+	if (!szConfig)
+	{
+		ImGui::TextDisabled("No config selected");
+		return;
 	}
 
 	wchar_t cfgname[MAX_PATH];

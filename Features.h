@@ -236,6 +236,12 @@ namespace Features
 			if (g_pWetObjectManager->m_LocalHandles[i] == pEntity->m_pInfo->m_hEntity)
 				break;
 
+		// AddLocalEntity can decline to register the entity - the array fills up - and the
+		// loop then falls out at one past the end. Passing that index to SetWet wrote
+		// through it into whatever the game keeps after m_LocalHandles.
+		if (i == ARRAYSIZE(g_pWetObjectManager->m_LocalHandles))
+			return -1;
+
 		WetObjectManager_SetWet(g_pWetObjectManager, wetness, i);
 
 		return i;

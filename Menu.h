@@ -89,6 +89,8 @@ private:
 
 	void DisplayEntityHandles(void);
 
+	void RepairTransparentTheme(void);
+
 	bool m_bOpened;
 	bool m_bIgnoreInputWhenOpened;
 	char m_szAdapterUtf8[128 * 4];
@@ -122,11 +124,15 @@ private:
 
 extern CMenu* g_pMenu;
 
-static void ApplyModelMods(Pl0000* pEntity);
+// Not 'static': all three are defined with external linkage in Menu.cpp. Declaring them
+// static here gave every translation unit including this header an internal-linkage
+// declaration with no definition behind it - unreferenced-local-function warnings, and
+// unlinkable had anything outside Menu.cpp ever called one.
+void ApplyModelMods(Pl0000* pEntity);
 
-static const char* BlacklistItemCallback(void* data, int idx);
+const char* BlacklistItemCallback(void* data, int idx);
 
-static const char* ConfigCallback(void* data, int idx);
+const char* ConfigCallback(void* data, int idx);
 
 // NPC
 //Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);

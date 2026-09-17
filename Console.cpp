@@ -3,7 +3,8 @@
 CConsole* g_pConsole = new CConsole();
 
 CConsole::CConsole(void)
-	: m_uFlags(CONFLAGS_ENABLE_AUTOSCROLL | CONFLAGS_ENABLE_TIMESTAMPS), m_Items(), m_Commands()
+	: m_uFlags(CONFLAGS_ENABLE_AUTOSCROLL | CONFLAGS_ENABLE_TIMESTAMPS), m_Items(), m_Commands(),
+	m_flTrailingWidth(0.0f), m_flTrailingFontSize(-1.0f)
 {
 	ZeroMemory(m_szInput, sizeof(m_szInput));
 }
@@ -162,29 +163,42 @@ void CConsole::Draw(const char* szTitle, const ImVec2 WindowSize)
 	// The command box takes the default item width, which takes no account of what is
 	// placed beside it - adding the Timestamps toggle was enough to push Clear off the
 	// right edge. Measure the trailing controls and give the box whatever is left.
-	const ImGuiStyle& Style = ImGui::GetStyle();
-	const float flCheckbox = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x;
-	const float flTrailing =
-		flCheckbox + ImGui::CalcTextSize("Auto Scroll").x + Style.ItemSpacing.x +
-		flCheckbox + ImGui::CalcTextSize("Timestamps").x + Style.ItemSpacing.x +
-		ImGui::CalcTextSize("Clear").x + (Style.FramePadding.x * 2.0f) + Style.ItemSpacing.x +
-		ImGui::CalcTextSize("Command").x + Style.ItemInnerSpacing.x;
+	//
+	// Measure against the console child's width rather than the parent's content region:
+	// this row is emitted after EndChild, in the wider menu window, so sizing it to the
+	// available region would leave it overhanging the bordered console frame it belongs to.
+	const float flRowWidth = (WindowSize.x > 0.0f)
+		? WindowSize.x : ImGui::GetContentRegionAvail().x;
 
-	const float flAvailable = ImGui::GetContentRegionAvail().x - flTrailing;
+	const float flAvailable = flRowWidth - GetTrailingWidth();
 
-	InputBar((flAvailable < s_flMinInputWidth) ? s_flMinInputWidth : flAvailable);
+	// Floor derived from the frame height so it tracks font scaling, like every other term
+	// in the measurement.
+	const float flMinInput = ImGui::GetFrameHeight() * 4.0f;
+
+	InputBar((flAvailable < flMinInput) ? flMinInput : flAvailable);
+
+	// CheckboxFlags read-modify-writes the word it is given, so it cannot be pointed at
+	// m_uFlags directly - Append() sets CONFLAGS_SHOULD_AUTOSCROLL under the lock from the
+	// CRI log threads, and an unsynchronized write back here would drop it. Edit a
+	// snapshot, then merge only the user-driven bits.
+	uint32_t uFlags = GetFlags();
+	bool bFlagsChanged = false;
 
 	ImGui::SameLine();
 
-	ImGui::CheckboxFlags("Auto Scroll", &m_uFlags, (uint32_t)CONFLAGS_ENABLE_AUTOSCROLL);
+	bFlagsChanged |= ImGui::CheckboxFlags(s_szAutoScroll, &uFlags, (uint32_t)CONFLAGS_ENABLE_AUTOSCROLL);
 
 	ImGui::SameLine();
 
-	ImGui::CheckboxFlags("Timestamps", &m_uFlags, (uint32_t)CONFLAGS_ENABLE_TIMESTAMPS);
+	bFlagsChanged |= ImGui::CheckboxFlags(s_szTimestamps, &uFlags, (uint32_t)CONFLAGS_ENABLE_TIMESTAMPS);
+
+	if (bFlagsChanged)
+		SetUserFlags(uFlags);
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Clear"))
+	if (ImGui::Button(s_szClear))
 		Clear();
 
 	ImGui::Separator();
@@ -197,17 +211,55 @@ void CConsole::FilterBar(void)
 	ImGui::Separator();
 }
 
+uint32_t CConsole::GetFlags(void) const
+{
+	std::lock_guard<std::mutex> Lock(m_Mutex);
+
+	return m_uFlags;
+}
+
+void CConsole::SetUserFlags(uint32_t uFlags)
+{
+	std::lock_guard<std::mutex> Lock(m_Mutex);
+
+	// Merge only the user-driven bits so a concurrently set CONFLAGS_SHOULD_AUTOSCROLL
+	// survives the toggle.
+	m_uFlags = (m_uFlags & ~s_uUserFlags) | (uFlags & s_uUserFlags);
+}
+
+float CConsole::GetTrailingWidth(void)
+{
+	const float flFontSize = ImGui::GetFontSize();
+
+	// Only the style and font move these, so do not re-measure four string literals every
+	// frame - Draw runs once per presented frame from the Present hook.
+	if (m_flTrailingFontSize == flFontSize)
+		return m_flTrailingWidth;
+
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const float flCheckbox = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x;
+
+	m_flTrailingFontSize = flFontSize;
+	m_flTrailingWidth =
+		flCheckbox + ImGui::CalcTextSize(s_szAutoScroll).x + Style.ItemSpacing.x +
+		flCheckbox + ImGui::CalcTextSize(s_szTimestamps).x + Style.ItemSpacing.x +
+		ImGui::CalcTextSize(s_szClear).x + (Style.FramePadding.x * 2.0f) + Style.ItemSpacing.x +
+		ImGui::CalcTextSize(s_szCommand).x + Style.ItemInnerSpacing.x;
+
+	return m_flTrailingWidth;
+}
+
 void CConsole::InputBar(float flWidth)
 {
-	// SetKeyboardFocusHere(-1) has to be issued before the widget it refocuses is
-	// submitted, so the previous version - which set it after InputText had already run -
-	// never actually returned focus to the box after a command.
+	// Focus the box when the console first appears. Reclaiming focus after a submitted
+	// command is done below with SetKeyboardFocusHere(-1), which targets the previous item
+	// and so has to come after InputText.
 	if (ImGui::IsWindowAppearing())
 		ImGui::SetKeyboardFocusHere();
 
 	ImGui::SetNextItemWidth(flWidth);
 
-	if (ImGui::InputText("Command", m_szInput, ARRAYSIZE(m_szInput),
+	if (ImGui::InputText(s_szCommand, m_szInput, ARRAYSIZE(m_szInput),
 		ImGuiInputTextFlags_EnterReturnsTrue))
 	{
 		if (m_szInput[0])

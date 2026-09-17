@@ -58,12 +58,25 @@ public:
 	void Draw(const char* szTitle, const ImVec2 WindowSize = ImVec2(820, 400));
 private:
 
-	// Floor for the command box so it stays usable in a narrow window.
-	static constexpr float s_flMinInputWidth = 64.0f;
+	// Widget labels, shared by the layout measurement and the widgets themselves. Kept in
+	// one place so renaming one cannot silently shrink the measurement and push the row
+	// off the right edge again.
+	static constexpr const char* s_szAutoScroll = "Auto Scroll";
+	static constexpr const char* s_szTimestamps = "Timestamps";
+	static constexpr const char* s_szClear = "Clear";
+	static constexpr const char* s_szCommand = "Command";
+
+	// Bits the user drives from the UI, as opposed to CONFLAGS_SHOULD_AUTOSCROLL which
+	// writers set. Only these are copied back when a checkbox is toggled.
+	static constexpr uint32_t s_uUserFlags = CONFLAGS_ENABLE_AUTOSCROLL | CONFLAGS_ENABLE_TIMESTAMPS;
 
 	void FilterBar(void);
 	void InputBar(float flWidth);
 	void EnumConsoleData(void);
+
+	uint32_t GetFlags(void) const;
+	void SetUserFlags(uint32_t uFlags);
+	float GetTrailingWidth(void);
 
 	void WritePrefixed(const ImVec4& color, const char* szPrefix, const char* szFormat, va_list args);
 	void Append(const ImVec4& color, std::string&& Text);
@@ -81,17 +94,25 @@ private:
 	// deque, not vector: dropping the oldest entry is O(1) and never reallocates the rest.
 	std::deque<Entry>			m_Items;
 	std::unordered_map<std::string, ConCmd> m_Commands;
+
+	// Cached width of the controls trailing the command box. Only depends on the style and
+	// font, so it is recomputed when the font size changes rather than every frame - Draw
+	// runs from the Present hook.
+	float						m_flTrailingWidth;
+	float						m_flTrailingFontSize;
 };
 extern CConsole* g_pConsole;
 
 #ifdef _DEBUG
 #define CCONSOLE_DEBUG_LOG(color, szFormat, ...) g_pConsole->Log(color, szFormat, __VA_ARGS__)
-#define CCONSOLE_DEBUG_WARN(color, szFormat, ...) g_pConsole->Warn(color, szFormat, __VA_ARGS__)
-#define CCONSOLE_DEBUG_ERROR(color, szFormat, ...) g_pConsole->Error(color, szFormat, __VA_ARGS__)
+// Warn and Error carry their own colours, so unlike Log they take no colour argument.
+// These macros used to pass one anyway, which put an ImVec4 where the format string goes.
+#define CCONSOLE_DEBUG_WARN(szFormat, ...) g_pConsole->Warn(szFormat, __VA_ARGS__)
+#define CCONSOLE_DEBUG_ERROR(szFormat, ...) g_pConsole->Error(szFormat, __VA_ARGS__)
 #else
 #define CCONSOLE_DEBUG_LOG(color, szFormat, ...)
-#define CCONSOLE_DEBUG_WARN(color, szFormat, ...)
-#define CCONSOLE_DEBUG_ERROR(color, szFormat, ...)
+#define CCONSOLE_DEBUG_WARN(szFormat, ...)
+#define CCONSOLE_DEBUG_ERROR(szFormat, ...)
 #endif
 
 #include "Configuration.h"
