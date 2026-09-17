@@ -101,9 +101,11 @@ HRESULT CConfigItemXml<int32_t&>::Write(IXmlWriter* pWriter)
 	HRESULT hr = S_OK;
 	wchar_t szBuffer[33] = { 0 };
 
-	//swprintf_s(szBuffer, L"%i", m_Value);
-	_itow_s(m_Value, szBuffer, 16);
-	
+	// Base 10, not 16. SetValue below reads this back with _wtoi, which is decimal-only,
+	// so a hex write meant every signed int in the config came back as 0 (or as LONG_MAX
+	// via the two's-complement string for a negative value like a level tolerance).
+	_itow_s(m_Value, szBuffer, 10);
+
 	hr = pWriter->WriteElementString(NULL, m_szName, NULL, szBuffer);
 	// BUG: IDK where I was told to write this but this fucks with indentation
 	//hr = pWriter->WriteWhitespace(L"\r\n");
@@ -212,14 +214,19 @@ bool CConfigXml::CreateConfig(LPCWSTR szFilename)
 	if (!SetFilename(szFilename))
 		return false;
 
+	// Report whether the config was actually loaded/written. These results used to be
+	// discarded and the function always returned true, so a failed default-config write
+	// looked like success to the caller and left no file on disk to enumerate.
+	HRESULT hr;
+
 	if (FileExists(m_szFilename))
-		Load(szFilename);
+		hr = Load(szFilename);
 	else if (wcsstr(m_szFilename, _CRT_WIDE(CONFIG_DEFAULT_NAME)))
-		Save(szFilename);
+		hr = Save(szFilename);
 	else
 		return false;
 
-	return true;
+	return SUCCEEDED(hr);
 }
 
 void CConfigXml::PurgeConfig(void)
@@ -274,7 +281,11 @@ HRESULT CConfigXml::Load(LPCWSTR szFilename)
 
 	while (!m_pReader->IsEOF())
 	{
-		hr = m_pReader->Read(&NodeType);
+		// Read returns S_FALSE at end of input and leaves NodeType untouched on failure.
+		// Passing that stale node type to ReadNode meant acting on the previous node and,
+		// on malformed XML, spinning in this loop forever.
+		if (FAILED(hr = m_pReader->Read(&NodeType)) || hr == S_FALSE)
+			break;
 
 		hr = ReadNode(NodeType);
 	}
@@ -585,6 +596,11 @@ BOOL CConfigXml::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FI
 	if (!ppData)
 		return ERROR_INVALID_PARAMETER;
 
+	// Clear the caller's pointer up front. Several failure paths below used to return
+	// without ever writing *ppData, leaving the caller holding an uninitialized pointer
+	// that it would then happily dereference.
+	*ppData = NULL;
+
 	if (szDirectory)
 	{
 		_tcscpy_s(szSearchDirectory, szDirectory);
@@ -863,6 +879,9 @@ BOOL CConfig::EnumerateConfigs(OPTIONAL IN LPCTSTR szDirectory, OUT PWIN32_FIND_
 
 	if (!ppData)
 		return ERROR_INVALID_PARAMETER;
+
+	// Same as the CConfigXml overload: never leave *ppData uninitialized.
+	*ppData = NULL;
 
 	if (szDirectory)
 	{
