@@ -546,10 +546,17 @@ public:
 	}
 
 
-	// Global Write Stub
+	// Global Write Stub.
+	//
+	// Every type actually stored in a config has an explicit specialization of this (see
+	// the declarations at the bottom of this header, defined in Configuration.cpp). This
+	// body used to read "return CConfigItemXml<T>::Write(pWriter);", which is this exact
+	// function - an unconditional infinite recursion that stack overflows the moment it
+	// runs. It must never be reachable, so it now fails loudly instead of killing the
+	// process; MSVC flags the old form as C4717.
 	virtual HRESULT Write(IXmlWriter* pWriter) override
 	{
-		return CConfigItemXml<T>::Write(pWriter);
+		return E_NOTIMPL;
 	}
 
 	T& GetValue(void)
@@ -577,14 +584,17 @@ protected:
 	T m_Value;
 };
 
+// inline: this is an explicit specialization defined in a header included by several
+// translation units, so it needs to be inline to stay one definition.
 template<>
-HRESULT CConfigItemXml<ImColor&>::Write(IXmlWriter* pWriter)
+inline HRESULT CConfigItemXml<ImColor&>::Write(IXmlWriter* pWriter)
 {
 	HRESULT hr = S_OK;
 	wchar_t szBuffer[33] = { 0 };
 
-	//swprintf_s(szBuffer, L"%i", m_Value);
-	_itow_s(m_Value, szBuffer, 16);
+	// _ultow_s, not _itow_s: a packed ImU32 colour with a high alpha byte exceeds INT_MAX,
+	// and SetValue reads it back with wcstoul. Round-trip it as unsigned on both sides.
+	_ultow_s(m_Value, szBuffer, 16);
 
 	hr = pWriter->WriteElementString(NULL, m_szName, NULL, szBuffer);
 	// BUG: IDK where I was told to write this but this fucks with indentation
@@ -1365,4 +1375,27 @@ private:
 #include "Menu.h"
 #include "Variables.h"
 #include "Features.h"
+
+// Explicit specialization declarations for CConfigItemXml<T>::Write.
+//
+// Each of these is defined in Configuration.cpp. Without these declarations they were
+// invisible to every other translation unit, so those TUs implicitly instantiated the
+// primary template's Write() instead - the self-recursive stub above. That is an ODR
+// violation, which made the definition the linker actually picked arbitrary; the v143 ->
+// v145 toolset update flipped the pick to the recursive one. CMenu's constructor then
+// stack overflowed via CreateConfig -> Save -> Write, killing the Setup thread before
+// InitHooks() ran, so the D3D Present hook was never installed and no ImGui ever drew.
+//
+// These live after the Features.h include because the dynamic-keybind specializations
+// name Features:: members.
+template<> HRESULT CConfigItemXml<bool&>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<int32_t&>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<uint32_t&>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<float&>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindToggleable>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindFunctional<void>>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindFunctional<void, eTransformMatrix, float>>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindDynamicToggleable<decltype(&Features::GetModelGravity)>>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindDynamicIncremental<float>>::Write(IXmlWriter* pWriter);
+template<> HRESULT CConfigItemXml<CKeybindDynamicDecremental<float>>::Write(IXmlWriter* pWriter);
 
