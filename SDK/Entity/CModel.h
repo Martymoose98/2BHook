@@ -459,6 +459,23 @@ struct CMesh
 };
 VALIDATE_SIZE(CMesh, 0x50);
 
+
+// Red-Black Tree Node for CModelData
+// aka CRedBlackTreeNode<CModelData>
+// Size of struct 0x140 (320) bytes
+typedef CRedBlackTreeNode<CModelData> CModelDataNode;
+// 
+//struct CModelDataNode          // sizeof = 0x140
+//{
+//	int32_t         m_iColour;   // 0x00  RB colour / balance factor
+//	int32_t         pad04;
+//	CModelDataNode* m_pParent;   // 0x08  (inferred — zeroed here, set by the insert helper)
+//	CModelDataNode* m_pRight;    // 0x10  taken when node.key <  search key
+//	CModelDataNode* m_pLeft;     // 0x18  taken when node.key >  search key
+//	CModelData       m_Data;     // 0x20  (0x120 bytes)
+//};
+//
+
 // Red-Black Tree Node adds 0x20 to make it 0x140 (320) bytes
 // Size of struct 0x120 (288) bytes
 class CModelData
@@ -536,21 +553,6 @@ struct CModelDataList                                 // 0x40
 };
 VALIDATE_SIZE(CModelDataList, 0x40);
 
-// Red-Black Tree Node for CModelData
-// aka CRedBlackTreeNode<CModelData>
-// Size of struct 0x140 (320) bytes
-typedef CRedBlackTreeNode<CModelData> CModelDataNode;
-// 
-//struct CModelDataNode          // sizeof = 0x140
-//{
-//	int32_t         m_iColour;   // 0x00  RB colour / balance factor
-//	int32_t         pad04;
-//	CModelDataNode* m_pParent;   // 0x08  (inferred — zeroed here, set by the insert helper)
-//	CModelDataNode* m_pRight;    // 0x10  taken when node.key <  search key
-//	CModelDataNode* m_pLeft;     // 0x18  taken when node.key >  search key
-//	CModelData       m_Data;     // 0x20  (0x120 bytes)
-//};
-//
 
 // FIXME: wtf finish this unacceptable
 struct CCameraDevice
