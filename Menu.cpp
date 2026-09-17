@@ -61,6 +61,12 @@ CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
 	{
 		LERROR("Config theme is fully transparent - restoring default theme colours\n");
 
+		// Say so in the console too. This silently rewrites what the config asked for, so
+		// the user should be told rather than left wondering why their theme changed.
+		g_pConsole->Warn("Config theme was fully transparent (i_theme_fg/i_theme_bg were 0), "
+			"which hides the entire menu. Restored the default theme colours - "
+			"save your config to keep them.");
+
 		m_Primary = s_DefaultPrimary;
 		m_PrimaryBg = s_DefaultPrimaryBg;
 	}
@@ -865,7 +871,7 @@ void ApplyModelMods(Pl0000* pEntity)
 		return;
 
 	if (ImGui::Button("Wet Entity"))
-		Features::WetEntity(pEntity, 127);
+		Features::WetEntity(pEntity, 127U);
 
 	ImGui::SameLine();
 
@@ -963,12 +969,11 @@ void ApplyModelMods(Pl0000* pEntity)
 	ApplyPodMods(pEntity);
 }
 
-bool BlacklistItemCallback(void* data, int idx, const char** out_text)
+// ImGui 1.92 changed the ListBox getter from bool(void*, int, const char**) to
+// const char*(void*, int), signalling "no item" with NULL instead of false.
+const char* BlacklistItemCallback(void* data, int idx)
 {
-	if (out_text)
-		*out_text = ((std::string*)data)[idx].c_str();
-
-	return true;
+	return ((std::string*)data)[idx].c_str();
 }
 
 /*
@@ -977,16 +982,9 @@ this might be needed
 		if (!pEntry->m_pNext)
 			return false;
 */
-bool ConfigCallback(void* data, int idx, const char** out_text)
+const char* ConfigCallback(void* data, int idx)
 {
 	PWIN32_FIND_DATA_LIST pEntry = FindDataListNav((PCWIN32_FIND_DATA_LIST)data, idx);
 
-	if (pEntry)
-	{
-		if (out_text)
-			*out_text = pEntry->m_Data.cFileName;
-
-		return true;
-	}
-	else return false;
+	return (pEntry) ? pEntry->m_Data.cFileName : NULL;
 }

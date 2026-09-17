@@ -58,8 +58,11 @@ public:
 	void Draw(const char* szTitle, const ImVec2 WindowSize = ImVec2(820, 400));
 private:
 
+	// Floor for the command box so it stays usable in a narrow window.
+	static constexpr float s_flMinInputWidth = 64.0f;
+
 	void FilterBar(void);
-	void InputBar(void);
+	void InputBar(float flWidth);
 	void EnumConsoleData(void);
 
 	void WritePrefixed(const ImVec4& color, const char* szPrefix, const char* szFormat, va_list args);

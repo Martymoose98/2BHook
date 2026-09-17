@@ -159,7 +159,20 @@ void CConsole::Draw(const char* szTitle, const ImVec2 WindowSize)
 
 	ImGui::EndChild();
 
-	InputBar();
+	// The command box takes the default item width, which takes no account of what is
+	// placed beside it - adding the Timestamps toggle was enough to push Clear off the
+	// right edge. Measure the trailing controls and give the box whatever is left.
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const float flCheckbox = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x;
+	const float flTrailing =
+		flCheckbox + ImGui::CalcTextSize("Auto Scroll").x + Style.ItemSpacing.x +
+		flCheckbox + ImGui::CalcTextSize("Timestamps").x + Style.ItemSpacing.x +
+		ImGui::CalcTextSize("Clear").x + (Style.FramePadding.x * 2.0f) + Style.ItemSpacing.x +
+		ImGui::CalcTextSize("Command").x + Style.ItemInnerSpacing.x;
+
+	const float flAvailable = ImGui::GetContentRegionAvail().x - flTrailing;
+
+	InputBar((flAvailable < s_flMinInputWidth) ? s_flMinInputWidth : flAvailable);
 
 	ImGui::SameLine();
 
@@ -184,13 +197,15 @@ void CConsole::FilterBar(void)
 	ImGui::Separator();
 }
 
-void CConsole::InputBar(void)
+void CConsole::InputBar(float flWidth)
 {
 	// SetKeyboardFocusHere(-1) has to be issued before the widget it refocuses is
 	// submitted, so the previous version - which set it after InputText had already run -
 	// never actually returned focus to the box after a command.
 	if (ImGui::IsWindowAppearing())
 		ImGui::SetKeyboardFocusHere();
+
+	ImGui::SetNextItemWidth(flWidth);
 
 	if (ImGui::InputText("Command", m_szInput, ARRAYSIZE(m_szInput),
 		ImGuiInputTextFlags_EnterReturnsTrue))
