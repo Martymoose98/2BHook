@@ -219,7 +219,7 @@ public:
 		do {
 			GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
 			now = csbi.dwCursorPosition;
-			printf("%c", animations[iSequence++]);
+			putchar(animations[iSequence++]);
 			iSequence %= ARRAYSIZE(animations);
 			GotoXY(now.X, now.Y);
 			Sleep(dwTickrate);

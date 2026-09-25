@@ -837,6 +837,7 @@ void Setup(void)
 	// everything downstream still runs as if the overlay were alive.
 	HRESULT hrInitD3D11 = InitD3D11();
 
+	// FAILED(hrInitD3D11)
 	if (hrInitD3D11 != S_OK)
 		LERROR("InitD3D11 did not fully succeed (%08X) - ImGui cannot render!\n", hrInitD3D11);
 
