@@ -374,21 +374,16 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	Features::ApplyHealthMods();
 
-	if (Vars.Misc.bAntiFramerateCap)
-	{
-		PatchBytes(&bp_Framecap);
-		NopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
-	}
-	else
-	{
-		RestoreMemory(&bp_Framecap);
-		RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
-	}
-
 	if (Vars.Gameplay.bNoTutorialDialogs)
 		PatchBytes(&bp_NoTutorialDialogs);
 	else
 		RestoreMemory(&bp_NoTutorialDialogs);
+
+	// NOTE(Martin): doesn't work happens too late in the chain (after they check) and gets reset by the game.
+	if (Vars.Misc.bAntiFramerateCap)
+		*g_pGameFlags2 |= 4;
+	else
+		*g_pGameFlags2 &= ~4;
 
 	g_pOverlay->Render(true);
 

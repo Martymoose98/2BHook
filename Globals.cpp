@@ -67,6 +67,7 @@ CreateStub_t g_CreateCtx;
 uint32_t* g_pDebugFlags;
 uint32_t* g_pCameraFlags;
 uint32_t* g_pGameFlags;
+uint32_t* g_pGameFlags2;
 
 int32_t* g_piMoney;
 int32_t* g_piExperience;
@@ -155,7 +156,6 @@ BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
 NOP_MEMORY nop_HairColor;
 NOP_MEMORY nop_Health[2];
 NOP_MEMORY nop_neon_scenery;
-NOP_MEMORY nop_Framecap[2];
 HOOK_FUNC g_CreateEntityHook;
 HOOK_FUNC g_LoadWordBlacklist;
 HOOK_FUNC g_UserManagerSaveFileIO;

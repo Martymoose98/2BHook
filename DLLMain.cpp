@@ -1,4 +1,4 @@
-﻿#include <Windows.h>
+#include <Windows.h>
 #include <VersionHelpers.h>
 #include <d3d11.h>
 
@@ -156,7 +156,7 @@ void InitHooks(void)
 #ifdef DENUVO_STEAM_BUILD
 	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
 #else
-	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ?? ?? ?? ?? 44 89 6B 68"), 9);
+	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ? ? ? ? 44 89 6B 68"), 9);
 #endif
 	NopMemory(&nop_HairColor);
 }
@@ -743,6 +743,7 @@ void FindSteamOffsets(void)
 	g_pDebugFlags = (uint32_t*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
 	g_pCameraFlags = (uint32_t*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
 	g_pGameFlags = (uint32_t*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
+	g_pGameFlags2 = (uint32_t*)FindPatternPtr(NULL, "85 05 ? ? ? ? 75 ? 39 59 24", 2);
 
 	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24", 3);
 	g_pLocalPlayerHandle = (EntityHandle_t*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
@@ -863,8 +864,8 @@ void Setup(void)
 	//InitializeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
-	InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
-	InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
+	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
+	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
 	InitializeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
 	InitializeBytePatchMemory(&bp_NoTutorialDialogs, (void*)FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
@@ -879,9 +880,9 @@ void Setup(void)
 void Unhook(void)
 {
 	RestoreMemory(&bp_NoTutorialDialogs);
-	RestoreMemory(&bp_Framecap);
-	RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
-	RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
+	//RestoreMemory(&bp_Framecap);
+	//RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
+	//RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
 	RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 	RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 

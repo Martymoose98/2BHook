@@ -234,6 +234,8 @@ extern CreateStub_t g_CreateCtx;
 extern uint32_t* g_pDebugFlags;
 extern uint32_t* g_pCameraFlags;
 extern uint32_t* g_pGameFlags;
+extern uint32_t* g_pGameFlags2;
+
 
 extern int32_t* g_piMoney;
 extern int32_t* g_piExperience;
@@ -324,7 +326,6 @@ extern BYTE_PATCH_MEMORY bp_NoTutorialDialogs;
 extern NOP_MEMORY nop_HairColor;
 extern NOP_MEMORY nop_Health[2];
 extern NOP_MEMORY nop_neon_scenery;
-extern NOP_MEMORY nop_Framecap[2];
 extern HOOK_FUNC g_CreateEntityHook;
 extern HOOK_FUNC g_LoadWordBlacklist;
 extern HOOK_FUNC g_UserManagerSaveFileIO;

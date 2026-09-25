@@ -661,10 +661,11 @@ void CMenu::MiscTab(void)
 		Features::UnlockAllAchievements();
 
 	ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
-	ImGui::SameLine();
+	ImGui::InputInt("Frame Budget (3ms step)", &g_pGraphics->m_iFrameBudget);
 	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
 	ImGui::SameLine();
 	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
+	//ImGui::CheckboxFlagsT<uint32_t>("Anti-Framerate Cap", g_pGameFlags2, 0x04);
 	ImGui::SameLine();
 
 	if (ImGui::Button("Backup Save"))
@@ -709,6 +710,7 @@ void CMenu::MiscTab(void)
 	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 	ImGui::InputInt("Camera Flags", (int*)g_pCameraFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 	ImGui::InputInt("Game Flags", (int*)g_pGameFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
+	ImGui::InputInt("Game Flags2", (int*)g_pGameFlags2, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 }
 
 void CMenu::ConfigTab(void)

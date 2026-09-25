@@ -951,22 +951,27 @@ public:
 	char unk0x1C[4];						//0x0024
 	CGraphicContextDx11* m_pContext;		//0x0028
 	CDisplay m_Display;						//0x0030
-	char _0x00C0[504];						//0x00C0
+	//unsigned __int64 qwordB8;
+	unsigned __int64 qwordC0;
+	double m_FrameTimeHistogram[60];		//0x00C8
+	int32_t m_iHistogramIndex;				//0x0
+	double m_flFrameDebt;
 	CGraphicDeviceDx11* m_pGraphicalDevice;	//0x02B8
 	CHeapInfo* m_pHeapInfo;					//0x02C0 
 	CReadWriteLock m_Lock;					//0x02C8
 	QWORD qword2F8;							//0x02F8
-	QWORD qword300;							//0x0300
-	DWORD dword308;							//0x0308
+	double qword300;						//0x0300
+	int32_t m_iFrameBudget;					//0x0308
 	BYTE gap30C[4];							//0x030C
-	DWORD dword310;							//0x0310
-	BYTE gap314[4];							//0x0314
+	double m_FrameStart;					//0x0310
 	BOOL m_bUseDirectX11;					//0x0318
 };
 VALIDATE_OFFSET(CGraphics, m_pContext, 0x28);
 VALIDATE_OFFSET(CGraphics, m_Display, 0x30);
+VALIDATE_OFFSET(CGraphics, m_FrameTimeHistogram, 0xC8);
 VALIDATE_OFFSET(CGraphics, m_pGraphicalDevice, 0x2B8);
 VALIDATE_OFFSET(CGraphics, m_Lock, 0x2C8);
+VALIDATE_OFFSET(CGraphics, m_FrameStart, 0x310);
 VALIDATE_SIZE(CGraphics, 0x320);
 
 class CModelEntry;
