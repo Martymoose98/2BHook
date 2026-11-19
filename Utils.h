@@ -767,7 +767,9 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, uint32_t Objec
 			szObjectName[5] = HexChars[ObjectId & 0xF];
 			szObjectName[6] = 0; //null terminator
 
-			if (*ppConvert)
+			// ppConvert itself is what's optional; testing *ppConvert read the caller's
+			// uninitialised pointer (MyPreloadModel) and never set a NULL one
+			if (ppConvert)
 				*ppConvert = &Converts[i];
 
 			return TRUE;
@@ -782,7 +784,7 @@ static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, uint32_t Objec
 	else
 		strcpy_s(szObjectName, size, (ObjectId != 0x700000) ? "Unknow" : "Null");
 
-	if (*ppConvert)
+	if (ppConvert)
 		*ppConvert = NULL;
 
 	return FALSE;

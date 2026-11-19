@@ -53,7 +53,9 @@ typedef struct Variables_t
 		int iSelectedPodMesh;
 		int iAnimation;
 		Vector3Aligned vSpawnEntityScale;
-		int iSelectedEntityType;
+		uint32_t uSelectedSpawnId;	// the object id picked in the Spawn tab's list, 0 for none
+		char szSpawnSearch[64];
+		bool bSpawnLoadedOnly;
 		int iSelectedAnimation;
 		int iSelectedActorEntityHandle;
 		int iSelectedEntityHandle;
@@ -171,6 +173,10 @@ typedef struct Variables_t
 		uint32_t m_ObjectId;
 	};
 
+	// The old hand-made spawn list. The Spawn tab lists what the game's construction info table
+	// has (SpawnList.h); this only gives those ids its names and the entity name each was
+	// created with (m_szClass). NPC6, NPC7 and the two missiles (0x35000, 0x35001) have no row of
+	// their own there and are reached by typing their id.
 	constexpr static Spawn SpawnEntities[] =
 	{
 		{ "2B", "partner", 0x10000 },

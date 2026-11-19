@@ -78,6 +78,9 @@
     <ClInclude Include="MaterialTint.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SpawnList.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="cpk.h">
       <Filter>Header Files</Filter>
     </ClInclude>

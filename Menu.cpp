@@ -1,5 +1,6 @@
 #include "Menu.h"
 #include "MaterialTint.h"
+#include "SpawnList.h"
 
 CMenu* g_pMenu;
 
@@ -562,6 +563,308 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 	ApplyModelMods(static_cast<Pl0000*>(pCameraEnt));
 }
 
+// The Spawn list's marks: a fixed red and the amber the theme editor uses, both readable on the
+// dark presets and on YoRHa's beige
+static const ImVec4 SPAWN_BLOCKED_COLOR = ImVec4(0.80f, 0.15f, 0.10f, 1.00f);
+static const ImVec4 SPAWN_UNTESTED_COLOR = ImVec4(0.80f, 0.40f, 0.00f, 1.00f);
+
+static const char* const SPAWN_NOT_LOADED_TEXT = "Assets not loaded on this map. The game reads an object's files in "
+	"only where a map, scene or quest uses it, and Create Entity spawns only what is in memory.";
+
+static const char* const SPAWN_UNTESTED_TEXT = "Untested: not in the old hand-made spawn list. It may need a parent, "
+	"a quest or a scene that a free spawn doesn't give it.";
+
+// "2B (pl0000)" for the old list's entries, the game's own name for the id ("em1000") otherwise
+static const char* GetSpawnLabel(const SpawnList::Entry_t& Entry, char* szBuffer, size_t cchBuffer)
+{
+	if (!Entry.m_szName)
+		return (Entry.m_szObjectName[0]) ? Entry.m_szObjectName : "-";
+
+	if (!Entry.m_szObjectName[0])
+		return Entry.m_szName;
+
+	sprintf_s(szBuffer, cchBuffer, "%s (%s)", Entry.m_szName, Entry.m_szObjectName);
+
+	return szBuffer;
+}
+
+// Why Create Entity is off for the picked entry, or NULL when it can be spawned
+static const char* GetCantSpawnReason(const SpawnList::Entry_t* pEntry, DWORD dwSetType)
+{
+	if (!pEntry)
+		return "Pick an entity in the list first.";
+
+	if (pEntry->m_szBlocked)
+		return pEntry->m_szBlocked;
+
+	switch (SpawnList::CheckAssets(*pEntry, dwSetType))
+	{
+	case SpawnList::ASSETS_RESIDENT:
+		break;
+	case SpawnList::ASSETS_NOT_LOADED:
+		return SPAWN_NOT_LOADED_TEXT;
+	default:
+		return "The game's asset checks weren't found on this build, so nothing can be spawned.";
+	}
+
+	if (Features::g_PendingSpawn.m_lState != Features::SPAWN_IDLE)
+		return "The last entity is still being created.";
+
+	return NULL;
+}
+
+// "0x35000" in the search box: an id to offer even when no row of the table is its own
+static bool ParseTypedObjectId(const char* szText, uint32_t* pObjectId)
+{
+	while (*szText == ' ')
+		++szText;
+
+	if (szText[0] != '0' || (szText[1] != 'x' && szText[1] != 'X') || !isxdigit((unsigned char)szText[2]))
+		return false;
+
+	const char* pDigits = szText + 2;
+	char* pEnd = NULL;
+	const unsigned long uValue = strtoul(pDigits, &pEnd, 16);
+
+	if (pEnd - pDigits > 8)
+		return false;
+
+	while (*pEnd == ' ')
+		++pEnd;
+
+	if (*pEnd || !uValue)
+		return false;
+
+	*pObjectId = (uint32_t)uValue;
+
+	return true;
+}
+
+static void DrawSpawnTooltip(const SpawnList::Entry_t& Entry, SpawnList::Assets_t Assets)
+{
+	ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+
+	if (Entry.m_szName)
+		ImGui::TextUnformatted(Entry.m_szName);
+
+	ImGui::Text("%s  %s  ObjectId 0x%X", (Entry.m_szObjectName[0]) ? Entry.m_szObjectName : "-", Entry.m_szClass, Entry.m_ObjectId);
+	ImGui::Separator();
+
+	if (Entry.m_szBlocked)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_BLOCKED_COLOR);
+		ImGui::TextUnformatted(Entry.m_szBlocked);
+		ImGui::PopStyleColor();
+	}
+	else
+	{
+		switch (Assets)
+		{
+		case SpawnList::ASSETS_RESIDENT:
+			ImGui::TextUnformatted("Assets loaded: it can be spawned here.");
+			break;
+		case SpawnList::ASSETS_NOT_LOADED:
+			ImGui::TextUnformatted(SPAWN_NOT_LOADED_TEXT);
+			break;
+		case SpawnList::ASSETS_UNCHECKED:
+			ImGui::TextUnformatted("Checking its assets...");
+			break;
+		default:
+			ImGui::TextUnformatted("The game's asset checks weren't found on this build.");
+			break;
+		}
+
+		if (!Entry.m_szName)
+		{
+			ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_UNTESTED_COLOR);
+			ImGui::TextUnformatted(SPAWN_UNTESTED_TEXT);
+			ImGui::PopStyleColor();
+		}
+	}
+
+	if (!Entry.m_bOwnRow)
+		ImGui::Text("No row of its own in the construction table: the game builds it with the %s row for its id range.", Entry.m_szClass);
+
+	ImGui::PopTextWrapPos();
+}
+
+static void SetupSpawnColumns(void)
+{
+	const float flFont = ImGui::GetFontSize();
+
+	ImGui::TableSetupColumn("##Mark", ImGuiTableColumnFlags_WidthFixed, flFont * 1.5f);
+	ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthStretch);
+	ImGui::TableSetupColumn("Class", ImGuiTableColumnFlags_WidthFixed, flFont * 15.0f);
+	ImGui::TableSetupColumn("Id", ImGuiTableColumnFlags_WidthFixed, flFont * 4.5f);
+}
+
+// One row, its ID the object id. The mark: !! never spawned, -- its assets aren't here, ? untested
+// (not in the old hand-made list); rows that can't be spawned are greyed.
+static void DrawSpawnRow(const SpawnList::Entry_t& Entry, SpawnList::Assets_t Assets)
+{
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const bool bSpawnable = !Entry.m_szBlocked && Assets == SpawnList::ASSETS_RESIDENT;
+	const char* szMark = "";
+	ImVec4 vMark = Style.Colors[ImGuiCol_Text];
+	char szSelectable[16];
+	char szLabel[64];
+
+	if (Entry.m_szBlocked)
+	{
+		szMark = "!!";
+		vMark = SPAWN_BLOCKED_COLOR;
+	}
+	else if (!bSpawnable)
+	{
+		szMark = "--";
+		vMark = Style.Colors[ImGuiCol_TextDisabled];
+	}
+	else if (!Entry.m_szName)
+	{
+		szMark = "?";
+		vMark = SPAWN_UNTESTED_COLOR;
+	}
+
+	// ### so the mark, which changes with the asset checks, isn't part of the ID
+	sprintf_s(szSelectable, "%s###Row", szMark);
+
+	ImGui::PushID((int)Entry.m_ObjectId);
+	ImGui::TableNextRow();
+	ImGui::TableNextColumn();
+
+	ImGui::PushStyleColor(ImGuiCol_Text, vMark);
+
+	if (ImGui::Selectable(szSelectable, Vars.Gameplay.uSelectedSpawnId == Entry.m_ObjectId, ImGuiSelectableFlags_SpanAllColumns))
+		Vars.Gameplay.uSelectedSpawnId = Entry.m_ObjectId;
+
+	ImGui::PopStyleColor();
+
+	if (ImGui::BeginItemTooltip())
+	{
+		DrawSpawnTooltip(Entry, Assets);
+		ImGui::EndTooltip();
+	}
+
+	ImGui::PushStyleColor(ImGuiCol_Text, Style.Colors[(bSpawnable) ? ImGuiCol_Text : ImGuiCol_TextDisabled]);
+	ImGui::TableNextColumn();
+	ImGui::TextUnformatted(GetSpawnLabel(Entry, szLabel, sizeof(szLabel)));
+	ImGui::TableNextColumn();
+	ImGui::TextUnformatted(Entry.m_szClass);
+	ImGui::TableNextColumn();
+	ImGui::Text("0x%X", Entry.m_ObjectId);
+	ImGui::PopStyleColor();
+
+	ImGui::PopID();
+}
+
+// The Spawn tab's list: every object the game's construction info table has a row for, grouped by
+// id range, searchable by name, class, object name and hex id (SpawnList.h). The groups are tree
+// nodes and the rows clipped tables in one scrolling child; the list itself is built once.
+static void DrawSpawnList(DWORD dwSetType)
+{
+	if (!SpawnList::Update(dwSetType))
+	{
+		ImGui::TextDisabled("The game's construction info table wasn't found on this build, so there is nothing to spawn.");
+		return;
+	}
+
+	ImGui::SetNextItemWidth(ImGui::GetFontSize() * 18.0f);
+
+	const bool bSearchEdited = ImGui::InputTextWithHint("##SpawnSearch", "Search: 2B, em1000, Em1000, 0x21000",
+		Vars.Gameplay.szSpawnSearch, ARRAYSIZE(Vars.Gameplay.szSpawnSearch));
+
+	ImGui::SameLine();
+	ImGui::Checkbox("Loaded Only", &Vars.Gameplay.bSpawnLoadedOnly);
+	ImGui::SetItemTooltip("Only what can be spawned here: its assets are in memory on this map.");
+
+	SpawnList::SetFilter(Vars.Gameplay.szSpawnSearch, Vars.Gameplay.bSpawnLoadedOnly);
+
+	const bool bFiltered = Vars.Gameplay.szSpawnSearch[0] || Vars.Gameplay.bSpawnLoadedOnly;
+	uint32_t uTyped = 0;
+	const SpawnList::Entry_t* pTyped = (ParseTypedObjectId(Vars.Gameplay.szSpawnSearch, &uTyped) && !SpawnList::Find(uTyped)) ?
+		SpawnList::Lookup(uTyped) : NULL;
+
+	if (ImGui::BeginChild("##SpawnList", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 14.0f), ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY))
+	{
+		const ImGuiTableFlags TableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit | ImGuiTableFlags_NoSavedSettings;
+		bool bAnyRows = false;
+
+		if (pTyped)
+		{
+			bAnyRows = true;
+			ImGui::TextDisabled("Typed id (no row of its own):");
+
+			if (ImGui::BeginTable("##TypedRow", 4, TableFlags))
+			{
+				SetupSpawnColumns();
+				DrawSpawnRow(*pTyped, SpawnList::CheckAssets(*pTyped, dwSetType));
+				ImGui::EndTable();
+			}
+		}
+
+		for (int iGroup = 0; iGroup < SpawnList::GetGroupCount(); ++iGroup)
+		{
+			const std::vector<int>& Rows = SpawnList::GetGroupRows(iGroup);
+
+			if (Rows.empty())
+				continue;
+
+			bAnyRows = true;
+
+			// The counts change from frame to frame; the ### part keeps the node's ID
+			char szHeader[160];
+
+			if (bFiltered)
+			{
+				sprintf_s(szHeader, "%s  - %d of %d, %d loaded###SpawnGroup%d", SpawnList::GetGroupName(iGroup), (int)Rows.size(),
+					SpawnList::GetGroupSize(iGroup), SpawnList::GetGroupLoaded(iGroup), iGroup);
+			}
+			else
+			{
+				sprintf_s(szHeader, "%s  - %d, %d loaded###SpawnGroup%d", SpawnList::GetGroupName(iGroup),
+					SpawnList::GetGroupSize(iGroup), SpawnList::GetGroupLoaded(iGroup), iGroup);
+			}
+
+			// A new search opens the groups it matches in; they can still be closed while it stands
+			if (bSearchEdited && Vars.Gameplay.szSpawnSearch[0])
+				ImGui::SetNextItemOpen(true);
+
+			if (!ImGui::TreeNodeEx(szHeader, ImGuiTreeNodeFlags_SpanAvailWidth))
+				continue;
+
+			if (ImGui::BeginTable("##Rows", 4, TableFlags))
+			{
+				SetupSpawnColumns();
+
+				ImGuiListClipper Clipper;
+
+				Clipper.Begin((int)Rows.size());
+
+				while (Clipper.Step())
+				{
+					for (int i = Clipper.DisplayStart; i < Clipper.DisplayEnd; ++i)
+					{
+						const SpawnList::Entry_t& Entry = SpawnList::GetEntry(Rows[i]);
+
+						DrawSpawnRow(Entry, Entry.m_Assets);
+					}
+				}
+
+				ImGui::EndTable();
+			}
+
+			ImGui::TreePop();
+		}
+
+		if (!bAnyRows)
+			ImGui::TextDisabled(Vars.Gameplay.bSpawnLoadedOnly ? "Nothing that matches is loaded on this map." : "Nothing matches.");
+	}
+
+	ImGui::EndChild();
+
+	ImGui::TextDisabled("?  untested    --  assets not loaded here    !!  never spawned    (hover a row for why)");
+}
+
 void CMenu::SpawnTab(Pl0000* pCameraEnt)
 {
 	if (ImGui::Button("Spawn Pod A"))
@@ -587,11 +890,18 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 	if (!pCameraEnt)
 		return;
 
-	ImGui::ListBox("Entity", &Vars.Gameplay.iSelectedEntityType,
-		[](void* pUserData, int idx) -> const char* { return ((Variables_t::Spawn*)pUserData)[idx].m_szName; },
-		(void*)Vars.SpawnEntities, _ARRAYSIZE(Vars.SpawnEntities));
+	// The set type Create Entity spawns with (set_info.m_dwSetType). The list's asset checks ask
+	// about the same one, since it picks the dependency record they walk.
+	const DWORD dwSetType = 1;
+
+	DrawSpawnList(dwSetType);
 
 	ImGui::InputFloat3("Entity Scale", (float*)&Vars.Gameplay.vSpawnEntityScale);
+
+	const SpawnList::Entry_t* pSelected = (Vars.Gameplay.uSelectedSpawnId) ? SpawnList::Lookup(Vars.Gameplay.uSelectedSpawnId) : NULL;
+	const char* szCantSpawn = GetCantSpawnReason(pSelected, dwSetType);
+
+	ImGui::BeginDisabled(szCantSpawn != NULL);
 
 	if (ImGui::Button("Create Entity"))
 	{
@@ -606,35 +916,31 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 		set_info.m_i0x088 = 1;
 		set_info.m_iGroupId = -1;
 		set_info.m_i0x07C = 1; //flags
-		set_info.m_dwSetType = 1;
+		set_info.m_dwSetType = dwSetType;
 		set_info.m_dw0x74 = 0;
 		set_info.m_i0x078 = 0;
 
-		const char* szClass = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_szClass;
-		uint32_t ObjectId = Vars.SpawnEntities[Vars.Gameplay.iSelectedEntityType].m_ObjectId;
-
-		//CObjReadSystem::Work* pWork = FindObjectWork(ObjectId);
-
-		//if (!pWork)
-		//{
-		//	if (CreateWork(ObjectId))
-		//	{
-		//		static CObjReadSystem* pObjReadSystem = (CObjReadSystem*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 83 FA FF 74 4D", 2);
-		//		typedef __int64 (*CObjReadSystem_RequestStartFn)(CObjReadSystem* pThis, unsigned int uObjectId, int a3); // a3 usually 0
-		//		static CObjReadSystem_RequestStartFn RequestStart = (CObjReadSystem_RequestStartFn)FindPattern(NULL, "40 57 41 54 41 55 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 68 48 89 6C 24 70 48 89 74 24 78 41");
-		//		__int64 r = RequestStart(pObjReadSystem, ObjectId, 1); // bool return
-		//			
-		//		pWork = FindObjectWork(ObjectId);
-		//
-		//		typedef CObjReadSystem::Work* (*ReadWorkFn)(int ObjectId);
-		//		//static ReadWorkFn ReadWork = (ReadWorkFn)FindPattern(NULL, "48 89 5C 24 10 57 48 81 EC D0 00");
-		//		//pWork = ReadWork(ObjectId);
-		//	}
-		//}
-
 		// Only queued: the buddy, Emil or flight unit hookup is done by Features::ApplyCreatedEntity
 		// once the entity exists, a frame or more later
-		Features::CreateEntity(szClass, ObjectId, &set_info, pCameraEnt->m_pInfo->m_hEntity);
+		Features::CreateEntity(pSelected->m_szSpawnName, pSelected->m_ObjectId, &set_info, pCameraEnt->m_pInfo->m_hEntity);
+	}
+
+	ImGui::EndDisabled();
+
+	if (szCantSpawn)
+		ImGui::SetItemTooltip("%s", szCantSpawn);
+
+	ImGui::SameLine();
+
+	if (pSelected)
+	{
+		char szLabel[64];
+
+		ImGui::Text("%s  %s  0x%X", GetSpawnLabel(*pSelected, szLabel, sizeof(szLabel)), pSelected->m_szClass, pSelected->m_ObjectId);
+	}
+	else
+	{
+		ImGui::TextDisabled("Nothing picked");
 	}
 
 	ImGui::ListBox("Spawn Blacklist", &Vars.Gameplay.iSelectedBlacklistItem, BlacklistItemCallback, Vars.Gameplay.SpawnBlacklist.data(), (int)Vars.Gameplay.SpawnBlacklist.size());

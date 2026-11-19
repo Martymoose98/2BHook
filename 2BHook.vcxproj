@@ -193,6 +193,7 @@
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />
+    <ClInclude Include="SpawnList.h" />
     <ClInclude Include="SDK\CCamera.h" />
     <ClInclude Include="SDK\Common.h" />
     <ClInclude Include="SDK\CSaveDataDevice.h" />
