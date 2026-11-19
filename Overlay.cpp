@@ -35,15 +35,15 @@ void Overlay::RenderCollisions(OverlayDrawList* pList)
 		if (!pNode->m_Context.m_pColTree)
 			continue;
 
-		Vector3Aligned* pvMin = &pNode->m_Context.m_pColTree->m_vP1;
-		Vector3Aligned* pvMax = &pNode->m_Context.m_pColTree->m_vP2;
+		// The tree's root node is a centre and half extents, not two corners (Martin's IDA type
+		// CCollisionTreeNode {m_vCenter, m_vExtents}; the port builds a node's box as
+		// centre +/- extents x {+-1}, CollisionObject.cpp:1014). Reading them as min/max put the
+		// box at (centre + extents) / 2 with half the size.
+		const CCollisionTreeNode* pRoot = pNode->m_Context.m_pColTree;
 
-		// Dereference before subtracting: "pvMax - pvMin" was pointer arithmetic (the element
-		// distance between the two fields, i.e. 1), so the box origin came out as P1 + 0.5 on
-		// every axis instead of the centre of the box.
-		vOrigin = *pvMin + ((*pvMax - *pvMin) / 2.0f);
-		vMin = (*pvMax - *pvMin) / 2.0f;
-		vMax = (*pvMin - *pvMax) / 2.0f;
+		vOrigin = pRoot->m_vCenter;
+		vMin = pRoot->m_vExtents * -1.0f;
+		vMax = pRoot->m_vExtents;
 
 		mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), vOrigin);
 		pList->Add3DBox(vMin, vMax, mTrans, ImColor(222, 0, 222));
@@ -82,7 +82,9 @@ void Overlay::RenderCollisions2(OverlayDrawList* pList)
 
 		if (pObj) //dword30 = 0xff - trees
 		{
-			pInfo = g_pEntityList->m_pItems[pObj->m_uScenePropIndex].second;
+			// Only for the label. Bounds-checked: what m_uScenePropIndex indexes is unconfirmed,
+			// and past the list's end it read whatever followed the array.
+			pInfo = (pObj->m_uScenePropIndex < g_pEntityList->m_uSize) ? g_pEntityList->m_pItems[pObj->m_uScenePropIndex].second : NULL;
 			pObject = (pInfo) ? pInfo->m_pParent : NULL;
 
 			// draws a fuck ton with this idk if i like it it
@@ -108,23 +110,17 @@ void Overlay::RenderCollisions2(OverlayDrawList* pList)
 					mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), vOrigin);
 				}*/
 
-			if (pObject && !pObject->m_vPosition.IsZero())
-			{
-				vOrigin = pObject->m_vPosition;
-				vMax = (pObj->m_AABB.m_vMin - pObj->m_AABB.m_vMax) / 2.0f;
-				vMin = (pObj->m_AABB.m_vMax - pObj->m_AABB.m_vMin) / 2.0f;
-				mTrans = pObject->m_matTransform;
-				Color = ImColor(0, 255, 128);
-			}
-			else
-			{
-				vOrigin = pObj->m_AABB.m_vMin + ((pObj->m_AABB.m_vMax - pObj->m_AABB.m_vMin) / 2.0f);
-				vMax = (pObj->m_AABB.m_vMin - pObj->m_AABB.m_vMax) / 2.0f;
-				vMin = (pObj->m_AABB.m_vMax - pObj->m_AABB.m_vMin) / 2.0f;
-				Color = ImColor(0, 255, 222);
+			// m_AABB is already world space: CCollisionDataObject_Update (0x1401B98C0, port
+			// CollisionObject.cpp:851) rebuilds it every frame as the union of the live
+			// segments' boxes, which are built through the bone matrices. It used to be
+			// re-centred on the owning entity's position and turned by its rotation, which drew
+			// the box offset and spun with the entity. Draw it as it is, axis-aligned.
+			vOrigin = pObj->m_AABB.m_vMin + ((pObj->m_AABB.m_vMax - pObj->m_AABB.m_vMin) / 2.0f);
+			vMax = (pObj->m_AABB.m_vMax - pObj->m_AABB.m_vMin) / 2.0f;
+			vMin = vMax * -1.0f;
+			Color = pObject ? ImColor(0, 255, 128) : ImColor(0, 255, 222);
 
-				mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), vOrigin);
-			}
+			mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), vOrigin);
 
 			pList->Add3DBox(vMin, vMax, mTrans, Color);
 			//}

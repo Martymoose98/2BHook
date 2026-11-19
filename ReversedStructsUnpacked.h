@@ -482,8 +482,8 @@ struct CCollisionMesh
 
 struct CCollisionTreeNode
 {
-	Vector3Aligned m_vP1;
-	Vector3Aligned m_vP2;
+	Vector3Aligned m_vCenter;	// node box centre
+	Vector3Aligned m_vExtents;	// half extents (box = centre +/- extents)
 	uint16_t* m_pMeshIndices;
 	int32_t m_uMeshIndexCount;
 	int32_t m_iLeft;
