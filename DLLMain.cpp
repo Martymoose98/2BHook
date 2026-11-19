@@ -758,7 +758,12 @@ void FindSteamOffsets(void)
 	TextureResourceManager_FindResource = (CTextureResourceManager_FindResourceFn)FindPattern(NULL, "48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 33 FF 8B F1");
 
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0A");
-	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 79 0C");
+	// No Fall Damage NOPs the call that applies fall-recovery damage (10% of max HP) in
+	// Pl0000_ExecuteState10: mov r8d, 1 / mov rcx, rbx / <max HP * 0.1 into edx> / call
+	// Pl0000_TakeDamage (+28). It used to NOP the subtraction inside Pl0000_TakeDamage, which
+	// also blocked damage from failed hacks, self-destruct and other player states.
+	ULONG_PTR uFallRecoveryDamage = FindPattern(NULL, "41 B8 01 00 00 00 48 8B CB 66 0F 6E C0 0F 5B C0 F3 0F 59 05 ? ? ? ? F3 0F 2C D0 E8 ? ? ? ? FF 83");
+	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (uFallRecoveryDamage && uFallRecoveryDamage != (ULONG_PTR)-1) ? (byte*)uFallRecoveryDamage + 28 : NULL;
 	
 	g_pDebugFlags = (uint32_t*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
 	g_pCameraFlags = (uint32_t*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
@@ -947,7 +952,12 @@ void Setup(void)
 
 	//InitializeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08"), 5);
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
+#ifdef DENUVO_STEAM_BUILD
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
+#else
+	// The 5-byte call to Pl0000_TakeDamage in fall recovery (see FindSteamOffsets)
+	InitializeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 5);
+#endif
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 

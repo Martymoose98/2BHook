@@ -22,9 +22,8 @@ namespace Features
 		// - the Godmode debug bits below, which block both paths at once;
 		// - two game-state bits that also lock player input during events and menus
 		//   ([0x141029B10] & 0x200000 "not playable", [0x141029B00] & 0x100000 "event mode").
-		// Fall recovery (Pl0000_ExecuteState10) calls Pl0000_TakeDamage with no check of its own.
-		// The NOP_DAMAGE_WORLD NOP sits in Pl0000_TakeDamage, so it also stops damage from a failed
-		// hack and from self-destruct.
+		// Fall recovery (Pl0000_ExecuteState10) calls Pl0000_TakeDamage with no check of its own, so
+		// NOP_DAMAGE_WORLD NOPs that one call (failed hacks and self-destruct still hurt).
 		if (Vars.Gameplay.bNoEnemyDamage)
 			NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 		else
