@@ -1,5 +1,9 @@
 // Microsoft Visual C++ generated resource script.
 //
+// UTF-8 (no BOM). The pragma must stay above everything else, and the one in the language
+// block below must match it, or rc reads the file as ANSI and the (c) sign comes out wrong.
+#pragma code_page(65001)
+
 #include "resource.h"
 #include "Version.h"
 
@@ -18,7 +22,7 @@
 
 #if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
 LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
-#pragma code_page(1252)
+#pragma code_page(65001)
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -72,9 +76,9 @@ BEGIN
             VALUE "FileDescription", "A Mod Menu for NieR:Automata"
             VALUE "FileVersion", HOOK_VERSION_FILE_STRING
             VALUE "InternalName", "2BHook.dll"
-            VALUE "LegalCopyright", "Copyright (C) 2024"
+            VALUE "LegalCopyright", "© 2018-2026 Martin"
             VALUE "OriginalFilename", "2BHook.dll"
-            VALUE "ProductName", "2B Hook"
+            VALUE "ProductName", "2BHook"
             VALUE "ProductVersion", HOOK_VERSION_FILE_STRING
         END
     END
