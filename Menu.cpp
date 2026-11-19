@@ -733,7 +733,9 @@ void CMenu::MiscTab(void)
 
 	ImGui::Checkbox("Speedhack", &Vars.Gameplay.bSpeedhack);
 	ImGui::SameLine();
-	ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, -10.0f, 10.0f); // when the framerate is uncapped this can go higher, else x5 will freeze the game because the game thinks the frame rate is too high so it sleeps the threads
+	// Above 0: the game's QueryPerformanceCounter is scaled by it (hkQueryPerformanceCounter), and
+	// a counter that stands still or runs backwards stalls its frame pacing
+	ImGui::SliderFloat("Speed Multiplier", &Vars.Gameplay.flSpeedMultiplier, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
 	ImGui::Separator();
 	ImGui::InputText("Mount Custom Cpk", Vars.Misc.szCpkName, _ARRAYSIZE(Vars.Misc.szCpkName));
 

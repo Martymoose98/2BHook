@@ -220,17 +220,18 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	//g_pGraphics->m_iTimeStep = 0x100;
 
-	g_pQueryPerformanceCounterHook->Unhook();	//unhook cause it has the potential to fuck with imgui because it calls QueryPerformanceCounter, then rehook it
-
 	// Between frames: theme edits, config loads and UI scale changes take effect here
 	g_pMenu->UpdateStyle();
 
+	// The QueryPerformanceCounter hook used to be taken out around these, so that ImGui's frame
+	// timing saw the real counter. It never had to be: the hook is in NieRAutomata.exe's import
+	// table, and ImGui, in this DLL, already calls the real one through ours. Taking it out only
+	// let the game's other threads read the real counter meanwhile, which jumps from the
+	// speedhack's.
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 
 	ImGui::NewFrame();
-
-	g_pQueryPerformanceCounterHook->Rehook();
 
 	// FIXME: change when other Pl entity's are reversed
 	g_pLocalPlayer = static_cast<Pl0000*>(GetEntityFromHandle2(g_pLocalPlayerHandle));
@@ -1157,26 +1158,62 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 	Vars.Misc.bLoading = false;
 }
 
-// still shit
+// Speedhack: the game's counter runs flSpeedMultiplier times as fast as the real one. The old
+// formula, fake += cur + delta * mult, added the whole counter on every call, so the multiplier
+// hardly mattered, and switching it off jumped back to the real counter, running time backwards.
+// The game's counter is its own clock instead: seeded from the real one on the first call, it
+// advances by every real delta, scaled while the speedhack is on and 1:1 while it is off, so it
+// never jumps when it is switched either way (it stays ahead or behind the real counter by
+// whatever it gained or lost). Many threads call this, so it is locked, and the real counter is
+// read inside the lock so no thread can step the clock back with an older reading.
 BOOL hkQueryPerformanceCounter(LARGE_INTEGER* lpPerformanceCount)
 {
-	static LARGE_INTEGER liPreviousCount, liFakeCount;
-	LARGE_INTEGER liCurrentCount;
+	constexpr double MIN_SPEED_MULTIPLIER = 0.01;
+	static SRWLOCK s_Lock = SRWLOCK_INIT;
+	static bool s_bSeeded = false;
+	static LONGLONG s_llPrevious, s_llFake;
+	static double s_dFraction;	// the scaled ticks below one, carried to the next call
 
-	BOOL result = oQueryPerformanceCounter(&liCurrentCount);
+	if (!lpPerformanceCount)
+		return oQueryPerformanceCounter(lpPerformanceCount);
 
-	if (Vars.Gameplay.bSpeedhack)
+	LARGE_INTEGER liCurrent;
+
+	AcquireSRWLockExclusive(&s_Lock);
+
+	BOOL bResult = oQueryPerformanceCounter(&liCurrent);
+
+	if (bResult)
 	{
-		liFakeCount.QuadPart += liCurrentCount.QuadPart + (ULONGLONG)((double)(liCurrentCount.QuadPart - liPreviousCount.QuadPart) * Vars.Gameplay.flSpeedMultiplier);
-		lpPerformanceCount->QuadPart = liFakeCount.QuadPart;
-		liPreviousCount.QuadPart = liCurrentCount.QuadPart;
-	}
-	else
-	{
-		lpPerformanceCount->QuadPart = liCurrentCount.QuadPart;
+		if (!s_bSeeded)
+		{
+			s_llPrevious = s_llFake = liCurrent.QuadPart;
+			s_bSeeded = true;
+		}
+
+		const LONGLONG llDelta = liCurrent.QuadPart - s_llPrevious;
+
+		if (Vars.Gameplay.bSpeedhack)
+		{
+			const double dScaled = (double)llDelta * max((double)Vars.Gameplay.flSpeedMultiplier, MIN_SPEED_MULTIPLIER) + s_dFraction;
+			const LONGLONG llWhole = (LONGLONG)dScaled;
+
+			s_dFraction = dScaled - (double)llWhole;
+			s_llFake += llWhole;
+		}
+		else
+		{
+			s_dFraction = 0.0;
+			s_llFake += llDelta;
+		}
+
+		s_llPrevious = liCurrent.QuadPart;
+		lpPerformanceCount->QuadPart = s_llFake;
 	}
 
-	return result;
+	ReleaseSRWLockExclusive(&s_Lock);
+
+	return bResult;
 }
 
 LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER lpTopLevelExceptionFilter)
