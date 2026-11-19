@@ -94,11 +94,18 @@
 #define CATEGORY_KEYBINDS _CRT_WIDE("Keybinds")
 #define CATEGORY_MISC _CRT_WIDE("Misc")
 #define CATEGORY_MENU _CRT_WIDE("Menu")
-// Settings added after a category already shipped get their own category: CConfigXml::Load
-// reads a category's children by position, so a new item in the middle of an existing one
-// would shift every item after it when an older config is loaded.
+// Settings added after a section already shipped get a section of their own. This build's
+// loader matches items by name, but 2B Hook builds before config version 2 walk a section's
+// children by position, and a new item in the middle of an existing section would shift
+// every later item for them.
 #define CATEGORY_HACKING _CRT_WIDE("Hacking")
+#define CATEGORY_THEME _CRT_WIDE("Theme")
 #define CONFIG_EXTENSION TEXT(".xml")
+
+// Root version="" of configs this build writes.
+//  1 (no attribute): sections read by position; the theme was i_theme_fg / i_theme_bg only
+//  2: items read by name; <Theme> holds the preset, UI scale and colour overrides
+#define CONFIG_XML_VERSION 2
 #else
 #define CATEGORY_VISUALS "Visuals"
 #define CATEGORY_GAMEPLAY "Gameplay"
@@ -106,6 +113,7 @@
 #define CATEGORY_MISC "Misc"
 #define CATEGORY_MENU "Menu"
 #define CATEGORY_HACKING "Hacking"
+#define CATEGORY_THEME "Theme"
 
 #define CONFIG_EXTENSION TEXT(".ini")
 #endif // CONFIG_XML
@@ -476,7 +484,15 @@ private:
 class IConfigItemXml
 {
 public:
-	virtual HRESULT Read(IXmlReader* pReader) = 0;
+	virtual ~IConfigItemXml(void) = default;
+
+	// The element name this item is stored under, e.g. L"t_godmode"
+	virtual const wchar_t* GetName(void) const = 0;
+
+	// Takes the text of this item's element. CConfigXml::Load finds the item by its section
+	// and name, so items can be added, removed or reordered without breaking old configs.
+	virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) = 0;
+
 	virtual HRESULT Write(IXmlWriter* pWriter) = 0;
 
 	//template<typename T>
@@ -512,42 +528,14 @@ public:
 	{
 	}
 
-	// Global Read Stub
-	virtual HRESULT Read(IXmlReader* pReader) override
+	virtual const wchar_t* GetName(void) const override
 	{
-		HRESULT hr = S_OK;
+		return m_szName;
+	}
 
-		XmlNodeType NodeType;
-
-		LPCWSTR szPrefix;
-		uint32_t cchPrefix;
-
-		LPCWSTR szValue;
-		uint32_t cchValue;
-
-		LPCWSTR szName;
-		uint32_t cchLocalName;
-
-		//uint32_t nAttributes;
-
-		hr = pReader->GetPrefix(&szPrefix, &cchPrefix);
-
-		if (SUCCEEDED(hr = pReader->GetLocalName(&szName, &cchLocalName)))
-		{
-			if (szName && !wcscmp(m_szName, szName))
-			{
-				// Read Next Node (should be text)
-				if (SUCCEEDED(hr = pReader->Read(&NodeType)) && NodeType == XmlNodeType_Text)
-				{
-					if (SUCCEEDED(hr = pReader->GetValue(&szValue, &cchValue)))
-					{
-						CConfigItemXml<T>::SetValue(szValue, cchValue);
-					}
-				}
-			}
-		}
-
-		return hr;
+	virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) override
+	{
+		CConfigItemXml<T>::SetValue(szValue, cchValue);
 	}
 
 
@@ -611,16 +599,12 @@ inline HRESULT CConfigItemXml<ImColor&>::Write(IXmlWriter* pWriter)
 class CConfigItemXmlNamespace
 {
 public:
-	CConfigItemXmlNamespace(ComPtr<IXmlReader> pReader, const wchar_t* szName, uint32_t uChildrenCount)
-		: m_pReader(pReader), m_pWriter(nullptr), m_szName(szName), m_uChildrenCount(uChildrenCount)
+	// uVersion: written as a version="" attribute when non-zero (the root element only)
+	CConfigItemXmlNamespace(ComPtr<IXmlWriter> pWriter, const wchar_t* szName, uint32_t uChildrenCount,
+		uint32_t uVersion = 0)
+		: m_pWriter(pWriter), m_szName(szName), m_uChildrenCount(uChildrenCount)
 	{
-		Read();
-	}
-
-	CConfigItemXmlNamespace(ComPtr<IXmlWriter> pWriter, const wchar_t* szName, uint32_t uChildrenCount)
-		: m_pReader(nullptr), m_pWriter(pWriter), m_szName(szName), m_uChildrenCount(uChildrenCount)
-	{
-		BeginWrite();
+		BeginWrite(uVersion);
 	}
 
 	~CConfigItemXmlNamespace(void)
@@ -629,31 +613,28 @@ public:
 			EndWrite();
 	}
 
-	HRESULT Read(void)
-	{
-		HRESULT hr = S_OK;
-		XmlNodeType NodeType;
-		// TODO: Forgot still need to move even if we don't want to read anything
-		// Read whitespace
-		hr = m_pReader->Read(&NodeType);
-
-		return hr;
-	}
-
-	HRESULT BeginWrite(void)
+	HRESULT BeginWrite(uint32_t uVersion)
 	{
 		HRESULT hr = S_OK;
 
 		wchar_t szBuffer[33] = { 0 };
 
-		_ultow_s(m_uChildrenCount, szBuffer, 10);
+		if (FAILED(hr = m_pWriter->WriteStartElement(NULL, m_szName, NULL)))
+			return hr;
 
-		if (SUCCEEDED(hr = m_pWriter->WriteStartElement(NULL, m_szName, NULL)))
+		if (uVersion)
 		{
-			hr = m_pWriter->WriteAttributeString(NULL, L"num_children", NULL, szBuffer);
+			_ultow_s(uVersion, szBuffer, 10);
+
+			if (FAILED(hr = m_pWriter->WriteAttributeString(NULL, L"version", NULL, szBuffer)))
+				return hr;
 		}
 
-		return hr;
+		// Still written so older 2B Hook builds, whose loader walks sections by position,
+		// can read configs written by this one. The current loader ignores it.
+		_ultow_s(m_uChildrenCount, szBuffer, 10);
+
+		return m_pWriter->WriteAttributeString(NULL, L"num_children", NULL, szBuffer);
 	}
 
 	HRESULT EndWrite(void)
@@ -679,7 +660,6 @@ public:
 		return (wcscmp(m_szName, szName) == 0);
 	}
 
-	ComPtr<IXmlReader> m_pReader;
 	ComPtr<IXmlWriter> m_pWriter;
 	const wchar_t* m_szName;
 	volatile uint32_t m_uChildrenCount;
@@ -1287,11 +1267,11 @@ public:
 	virtual HRESULT Load(LPCWSTR szFilename) override;
 	virtual HRESULT Save(LPCWSTR szFilename) override;
 
-	HRESULT ReadNode(XmlNodeType Type);
 	HRESULT WriteNode(XmlNodeType Type);
 
-	HRESULT BeginReadElement(void);
-	HRESULT EndReadElement(void);
+	// The version="" of the last config Load read: CONFIG_XML_VERSION for current files, 1 for
+	// files written before versioning, 0 if nothing was loaded (no file yet, or it failed).
+	uint32_t GetLoadedVersion(void) const { return m_uLoadedVersion; }
 
 	std::pair<
 		std::multimap<std::wstring, IConfigItemXml*>::const_iterator,
@@ -1310,12 +1290,15 @@ private:
 	void InitializeConfig(void);
 	void PurgeConfig(void);
 
+	IConfigItemXml* FindItem(const std::wstring& Section, LPCWSTR szName) const;
+
 	static BOOL CConfigXml::FileExists(LPCWSTR szFilename);
 
 	WCHAR m_szFilename[MAX_PATH];
 	ComPtr<IXmlReader> m_pReader;
 	ComPtr<IXmlWriter> m_pWriter;
 	XmlNodeType m_CurrentNodeType;
+	uint32_t m_uLoadedVersion;
 
 	std::multimap<const std::wstring, IConfigItemXml*> m_Items;
 	//std::multimap<const wchar_t*, IConfigItemXml*> m_Items;
@@ -1404,3 +1387,18 @@ template<> HRESULT CConfigItemXml<CKeybindDynamicToggleable<decltype(&Features::
 template<> HRESULT CConfigItemXml<CKeybindDynamicIncremental<float>>::Write(IXmlWriter* pWriter);
 template<> HRESULT CConfigItemXml<CKeybindDynamicDecremental<float>>::Write(IXmlWriter* pWriter);
 
+
+// The SetValue specializations are defined in Configuration.cpp too. ReadValue() above calls
+// SetValue in every translation unit that creates one of these items, so declare them here
+// for the same reason as the Write ones.
+template<> void CConfigItemXml<bool&>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<int32_t&>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<uint32_t&>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<float&>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<ImColor&>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindToggleable>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindFunctional<void>>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindFunctional<void, eTransformMatrix, float>>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindDynamicToggleable<decltype(&Features::GetModelGravity)>>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindDynamicIncremental<float>>::SetValue(LPCWSTR szValue, uint32_t cchValue);
+template<> void CConfigItemXml<CKeybindDynamicDecremental<float>>::SetValue(LPCWSTR szValue, uint32_t cchValue);

@@ -198,6 +198,7 @@ HRESULT CConfigItemXml<CKeybindDynamicDecremental<float>>::Write(IXmlWriter* pWr
 }
 
 CConfigXml::CConfigXml(void)
+	: m_CurrentNodeType(XmlNodeType_None), m_uLoadedVersion(0)
 {
 	ZeroMemory(m_szFilename, MAX_PATH);
 
@@ -256,7 +257,8 @@ HRESULT CConfigXml::Load(LPCWSTR szFilename)
 	ComPtr<IStream> pStream;
 
 	XmlNodeType NodeType;
-	uint32_t nAttrCount;
+
+	m_uLoadedVersion = 0;
 
 	if (!SetFilename(szFilename))
 		return E_FAIL;
@@ -265,10 +267,6 @@ HRESULT CConfigXml::Load(LPCWSTR szFilename)
 	if (FAILED(hr = SHCreateStreamOnFileEx(m_szFilename, STGM_READWRITE, 
 		FILE_ATTRIBUTE_NORMAL, FALSE, NULL, &pStream)))
 		return hr;
-
-	//CreateXmlReaderInputWithEncodingName()
-
-	//CreateXmlReaderInputWithEncodingCodePage()
 
 	if (FAILED(hr = CreateXmlReader(IID_IXmlReader, (void**)&m_pReader, NULL)))
 		return hr;
@@ -279,18 +277,100 @@ HRESULT CConfigXml::Load(LPCWSTR szFilename)
 	if (FAILED(hr = m_pReader->SetInput(pStream.Get())))
 		return hr;
 
-	while (!m_pReader->IsEOF())
+	// Items are matched by section and element name, so a config with items missing, added
+	// or in another order still loads; missing items keep their current values and unknown
+	// ones are skipped. This used to walk each section's children by position, so one
+	// missing or extra item silently dropped every item after it in that section.
+	//
+	//	<Root version="2">				depth 0
+	//		<Gameplay>					depth 1, the section
+	//			<t_godmode>TRUE</...>	depth 2, an item; its text is at depth 3
+	std::wstring Section;
+	IConfigItemXml* pItem = NULL;
+	uint32_t uVersion = 1;	// files from before the version attribute
+
+	// Read returns S_FALSE at the end of the document
+	while ((hr = m_pReader->Read(&NodeType)) == S_OK)
 	{
-		// Read returns S_FALSE at end of input and leaves NodeType untouched on failure.
-		// Passing that stale node type to ReadNode meant acting on the previous node and,
-		// on malformed XML, spinning in this loop forever.
-		if (FAILED(hr = m_pReader->Read(&NodeType)) || hr == S_FALSE)
+		UINT uDepth = 0;
+
+		if (FAILED(hr = m_pReader->GetDepth(&uDepth)))
 			break;
 
-		hr = ReadNode(NodeType);
+		if (NodeType == XmlNodeType_Element)
+		{
+			LPCWSTR szName = NULL;
+
+			if (FAILED(hr = m_pReader->GetLocalName(&szName, NULL)) || !szName)
+				break;
+
+			// Has to be asked before moving to the attributes
+			const bool bEmpty = m_pReader->IsEmptyElement() != FALSE;
+
+			pItem = NULL;
+
+			if (uDepth == 0)
+			{
+				LPCWSTR szValue = NULL;
+
+				if (m_pReader->MoveToAttributeByName(L"version", NULL) == S_OK &&
+					SUCCEEDED(m_pReader->GetValue(&szValue, NULL)) && szValue)
+				{
+					uVersion = wcstoul(szValue, NULL, 10);
+				}
+
+				m_pReader->MoveToElement();
+			}
+			else if (uDepth == 1)
+			{
+				Section = szName;
+			}
+			else if (uDepth == 2 && !bEmpty)
+			{
+				pItem = FindItem(Section, szName);
+			}
+		}
+		else if (NodeType == XmlNodeType_Text)
+		{
+			LPCWSTR szValue = NULL;
+			UINT cchValue = 0;
+
+			if (pItem && uDepth == 3 && SUCCEEDED(m_pReader->GetValue(&szValue, &cchValue)) && szValue)
+				pItem->ReadValue(szValue, cchValue);
+
+			pItem = NULL;
+		}
+		else if (NodeType == XmlNodeType_EndElement)
+		{
+			pItem = NULL;
+
+			if (uDepth == 1)
+				Section.clear();
+		}
 	}
 
-	return hr;
+	// Release the reader now, not at the next Load, so it stops holding the file open
+	m_pReader.Reset();
+
+	if (FAILED(hr))
+		return hr;
+
+	m_uLoadedVersion = uVersion;
+
+	return S_OK;
+}
+
+IConfigItemXml* CConfigXml::FindItem(const std::wstring& Section, LPCWSTR szName) const
+{
+	auto Range = m_Items.equal_range(Section);
+
+	for (auto It = Range.first; It != Range.second; ++It)
+	{
+		if (It->second && !wcscmp(It->second->GetName(), szName))
+			return It->second;
+	}
+
+	return NULL;
 }
 
 HRESULT CConfigXml::Save(LPCWSTR szFilename)
@@ -319,7 +399,7 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 		return hr;
 
 	{
-		CConfigItemXmlNamespace RootNamespace(m_pWriter, L"Root", m_Items.size());
+		CConfigItemXmlNamespace RootNamespace(m_pWriter, L"Root", m_Items.size(), CONFIG_XML_VERSION);
 
 		for (auto& It = m_Items.begin(); It != m_Items.end();)
 		{
@@ -342,41 +422,9 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 
 	hr = m_pWriter->Flush();
 
-	return hr;
-}
+	// Close the file now rather than keeping it open until the next Save
+	m_pWriter.Reset();
 
-HRESULT CConfigXml::ReadNode(XmlNodeType Type)
-{
-	HRESULT hr = S_OK;
-	LPCWSTR szComment;
-	uint32_t chSize;
-
-	switch (Type)
-	{
-	case XmlNodeType_XmlDeclaration:
-		//m_pReader->
-		break;
-	case XmlNodeType_DocumentType:
-		break;
-	case XmlNodeType_Comment:
-		hr = m_pReader->GetValue(&szComment, &chSize);
-		break;
-	case XmlNodeType_Text:
-	case XmlNodeType_Whitespace:
-
-		break;
-	case XmlNodeType_Element:
-		hr = BeginReadElement();
-		break;
-	case XmlNodeType_EndElement:
-		hr = EndReadElement();
-		break;
-	case XmlNodeType_CDATA:
-		break;
-	case XmlNodeType_ProcessingInstruction:
-		break;
-
-	}
 	return hr;
 }
 
@@ -384,68 +432,6 @@ HRESULT CConfigXml::WriteNode(XmlNodeType Type)
 {
 	HRESULT hr = S_OK;
 
-	return E_NOTIMPL;
-}
-
-HRESULT CConfigXml::BeginReadElement(void)
-{
-	HRESULT hr = S_OK;
-
-	XmlNodeType NodeType;
-
-	LPCWSTR szPrefix;
-	uint32_t cchPrefix;
-
-	LPCWSTR szLocalName;
-	uint32_t cchLocalName;	// this is optional
-
-	uint32_t nAttributes;
-
-	if (m_pReader->IsEmptyElement())
-		return XmlError::WC_E_NDATA;
-
-	hr = m_pReader->GetPrefix(&szPrefix, &cchPrefix);
-
-	if (FAILED(hr = m_pReader->GetLocalName(&szLocalName, &cchLocalName)))
-		return hr;
-
-	if (!szLocalName)
-		return E_FAIL;
-
-	auto& It = m_Items.find(szLocalName);
-
-	if (It != m_Items.end())
-	{
-		uint32_t uChildren = m_Items.count(It->first);
-		CConfigItemXmlNamespace Namespace(m_pReader, It->first.c_str(), uChildren);
-
-		auto Sector = m_Items.equal_range(It->first);
-
-		for (auto i = Sector.first; i != Sector.second; ++i)
-		{
-			// Read Next Node
-			hr = m_pReader->Read(&NodeType);
-
-			hr = i->second->Read(m_pReader.Get());
-
-			// Read Whitespace Node
-			hr = m_pReader->Read(&NodeType);
-
-			// Read End Element Node
-			hr = m_pReader->Read(&NodeType);
-
-			// Read Next Node
-			ReadNode(NodeType);
-		}
-	}
-
-	hr = m_pReader->GetAttributeCount(&nAttributes);
-
-	return hr;
-}
-
-HRESULT CConfigXml::EndReadElement(void)
-{
 	return E_NOTIMPL;
 }
 
