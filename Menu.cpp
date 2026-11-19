@@ -1,4 +1,5 @@
 #include "Menu.h"
+#include "MaterialTint.h"
 
 CMenu* g_pMenu;
 
@@ -1156,6 +1157,71 @@ void ApplyPodMods(Pl0000* pOwner)
 	pPodMesh->m_bUpdate = TRUE;
 }
 
+// Issue #16: the mesh colour tints every material of a mesh at once (2B's "Body" mesh holds the
+// dress, tights, skin and boots), so each material can get its own colour here.
+static void MaterialTintEditor(Pl0000* pEntity, CMeshPart* pMesh)
+{
+	ImGui::SeparatorText("Material tint");
+
+	if (!MaterialTint::IsAvailable())
+	{
+		ImGui::TextDisabled("Not available on this game build.");
+		return;
+	}
+
+	if (!pMesh->m_pShaderInfo || pMesh->m_nShaderInfo <= 0 || !pEntity->m_Work.m_pModelShaders)
+	{
+		ImGui::TextDisabled("%s has no materials.", pMesh->m_szMeshName);
+		return;
+	}
+
+	ImGui::TextWrapped("A tint replaces the mesh colour wherever that material is used on this model "
+		"(W_Skin also covers the face, for example). Intensity above 1 brightens dark materials such as 2B's boots.");
+
+	for (int i = 0; i < pMesh->m_nShaderInfo; ++i)
+	{
+		const int iShader = pMesh->m_pShaderInfo[i].m_iShader;
+
+		if (iShader < 0 || iShader >= pEntity->m_Work.m_nMaterialShaders)
+			continue;
+
+		// The same pointer FindModelEntryData stores in each draw entry
+		const CModelShader* pShader = &pEntity->m_Work.m_pModelShaders[iShader];
+		const char* szMaterial = (pShader->m_pMaterial && pShader->m_pMaterial->m_szName)
+			? pShader->m_pMaterial->m_szName : "(unnamed)";
+
+		ImVec4 vColor(1.0f, 1.0f, 1.0f, 1.0f);
+		float flIntensity = 1.0f;
+		bool bTinted = MaterialTint::Get(pShader, vColor, flIntensity);
+
+		ImGui::PushID(i);
+
+		if (ImGui::Checkbox(szMaterial, &bTinted))
+		{
+			if (!bTinted)
+				MaterialTint::Clear(pShader);
+			else if (!MaterialTint::Set(pShader, vColor, flIntensity))
+				g_pConsole->Warn("Material tint: no free slots - clear another material first");
+		}
+
+		if (bTinted)
+		{
+			ImGui::SameLine();
+			bool bChanged = ImGui::ColorEdit3("##Colour", (float*)&vColor, ImGuiColorEditFlags_NoInputs);
+
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(ImGui::GetFontSize() * 8.0f);
+			bChanged |= ImGui::SliderFloat("##Intensity", &flIntensity, 0.0f, 50.0f, "x%.2f", ImGuiSliderFlags_Logarithmic);
+			ImGui::SetItemTooltip("Intensity");
+
+			if (bChanged)
+				MaterialTint::Set(pShader, vColor, flIntensity);
+		}
+
+		ImGui::PopID();
+	}
+}
+
 void ApplyModelMods(Pl0000* pEntity)
 {
 	char szModelPart[64];
@@ -1278,6 +1344,8 @@ void ApplyModelMods(Pl0000* pEntity)
 	}
 
 	ImGui::PopItemWidth();
+
+	MaterialTintEditor(pEntity, pSelectedMesh);
 
 	ApplyPodMods(pEntity);
 }

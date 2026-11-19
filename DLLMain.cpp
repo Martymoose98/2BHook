@@ -19,6 +19,7 @@
 #include "cpk.h"
 #include "mot.h"
 #include "Hooks.h"
+#include "MaterialTint.h"
 
 // temp
 NTSTATUS DumpModules(/*PEPROCESS pProcess, PKERNEL_MODULE_REQUEST pRequest*/);
@@ -164,6 +165,11 @@ void InitHooks(void)
 	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ? ? ? ? 44 89 6B 68"), 9);
 #endif
 	NopMemory(&nop_HairColor);
+
+#ifndef DENUVO_STEAM_BUILD
+	// Per-material colours (issue #16); disables itself if a signature is missing
+	MaterialTint::Init();
+#endif
 }
 
 HRESULT CreateRenderTarget(void)
@@ -986,6 +992,8 @@ void Unhook(void)
 	// never-initialized patch structs, ImGui has no backend and oWndProc is null.
 	if (!s_bSetupComplete)
 		return;
+
+	MaterialTint::Shutdown();
 
 	RestoreMemory(&bp_NoTutorialDialogs);
 	//RestoreMemory(&bp_Framecap);

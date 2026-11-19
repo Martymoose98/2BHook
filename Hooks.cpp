@@ -1,4 +1,5 @@
 #include "Hooks.h"
+#include "MaterialTint.h"
 
 
 PresentFn oPresent;
@@ -390,6 +391,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		Features::BuffEnemies();
 
 	Features::ApplyHealthMods();
+
+	MaterialTint::Update();
 
 	if (Vars.Gameplay.bNoTutorialDialogs)
 		PatchBytes(&bp_NoTutorialDialogs);

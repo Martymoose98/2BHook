@@ -33,6 +33,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - Pod Spawning: Spawn in any pod.
 - Model Affine Matrix Manipulation:
 - Model Parts Colour Manipulation:
+- Material Tint: Give each material of a mesh its own colour, e.g. 2B's boots or tights apart from her skin, with an intensity that can brighten dark materials.
 - Protagonist Switching: Freely switch between 
 - Airstuck: Float in the air.
 - Duplicate Buddy as NPC: Duplicate the current buddy as an NPC.
