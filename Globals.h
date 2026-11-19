@@ -194,6 +194,7 @@ extern CEntityInfo::DeleteFn EntityInfo_Delete;
 extern CSceneEntitySystem::CreateEntityFn SceneEntitySystem_CreateEntity;
 extern CSceneEntitySystem::FindSceneStateFn SceneEntitySystem_FindSceneState;
 extern CSceneEntitySystem::FindByObjectIdFn SceneEntitySystem_FindByObjectId;
+extern CSceneEntitySystem::RemoveNodeFn SceneEntitySystem_RemoveNode;
 extern CSceneStateSystem_SetFn SceneStateSystem_Set;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAt;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;

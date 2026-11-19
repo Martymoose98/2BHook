@@ -569,13 +569,18 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Spawn Pod B"))
+	// These set the game's own_podB / own_podC scene state, the pod's ownership flag; nothing is
+	// spawned, so they are labelled for what they do
+	if (ImGui::Button("Unlock Pod B"))
 		Features::AddPod(POD_B);
 
+	ImGui::SetItemTooltip("Marks Pod B as owned (scene state own_podB). Nothing is spawned.");
 	ImGui::SameLine();
 
-	if (ImGui::Button("Spawn Pod C"))
+	if (ImGui::Button("Unlock Pod C"))
 		Features::AddPod(POD_C);
+
+	ImGui::SetItemTooltip("Marks Pod C as owned (scene state own_podC). Nothing is spawned.");
 
 	DisplayEntityHandles();
 

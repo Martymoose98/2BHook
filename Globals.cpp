@@ -25,6 +25,7 @@ CEntityInfo::DeleteFn EntityInfo_Delete;
 CSceneEntitySystem::CreateEntityFn SceneEntitySystem_CreateEntity;
 CSceneEntitySystem::FindSceneStateFn SceneEntitySystem_FindSceneState;
 CSceneEntitySystem::FindByObjectIdFn SceneEntitySystem_FindByObjectId;
+CSceneEntitySystem::RemoveNodeFn SceneEntitySystem_RemoveNode;
 CSceneStateSystem_SetFn SceneStateSystem_Set;
 CCameraGame::SetLookAtFn CameraGame_SetLookAt;
 CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;

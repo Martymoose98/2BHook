@@ -509,6 +509,7 @@ void LogOffsets(void)
 	LOG_OFFSET("ChangePlayer", ChangePlayer);
 	LOG_OFFSET("FindSceneState", SceneEntitySystem_FindSceneState);
 	LOG_OFFSET("SetSceneEntity", SetSceneEntity);
+	LOG_OFFSET("CSceneEntitySystem::RemoveNode", SceneEntitySystem_RemoveNode);
 	LOG_OFFSET("SaveFileIO", SaveFileIO);
 	LOG_OFFSET("ReadSaveSlots", ReadSaveSlots);
 	LOG_OFFSET("ReadSaveData", ReadSaveData);
@@ -741,6 +742,9 @@ void FindSteamOffsets(void)
 	EntityInfo_Delete = (CEntityInfo::DeleteFn)FindPattern(NULL, "40 53 48 83 EC 20 8B 41 2C");
 	SceneEntitySystem_FindSceneState = (CSceneEntitySystem::FindSceneStateFn)FindPattern(NULL, "40 56 57 41 54 41 56 41 57 48 83 EC ? 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 4D 8B F1"); // [E8 ? ? ? ? 48 89 45 E0 + 1]
 	SceneEntitySystem_FindByObjectId = (CSceneEntitySystem::FindByObjectIdFn)FindPattern(NULL, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 83 79 48 00 48");
+	// CSceneEntitySystem::RemoveNode (0x140150C60, v1.02 0x140150B70), through its test of the
+	// scene-state tree's root (cmp byte ptr [rax+19h], 0)
+	SceneEntitySystem_RemoveNode = (CSceneEntitySystem::RemoveNodeFn)FindPatternOrNull("40 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 74 24 ? 48 8B F9 48 8B 19 48 85 DB 74 ? 48 8B 05 ? ? ? ? 80 78 19 00 75");
 	SceneEntitySystem_CreateEntity = (CSceneEntitySystem::CreateEntityFn)FindPattern(NULL, "48 8B C4 56 57 41 56 48 83 EC ? 48 C7 40 B8 ? ? ? ? 48 89 58 ? 48 89 68 ? 4C 8B F2 48 8B F1");
 	//(CSceneEntitySystem::UpdateFn)FindPattern(NULL, "40 56 57 41 56 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 58 48 89 6C 24 60 4C 8B F1");
 	SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 89 5C 24 ? 57 48 83 EC 20 48 8B 02 48 8B FA"); // [E8 ? ? ? ? EB 38 48 89 5C 24 ? + 1]

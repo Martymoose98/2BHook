@@ -1168,6 +1168,8 @@ public:
 	typedef CEntityInfo* (*CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 	typedef CEntityInfo* (*FindByObjectIdFn)(CSceneEntitySystem* pThis, uint32_t uObjectId, CEntityInfo* pInfo);
 	typedef void (*UpdateFn)(CSceneEntitySystem* pThis);
+	// Drops the reference *ppSlot holds (freeing the node on the last one) and clears the slot
+	typedef void (*RemoveNodeFn)(SceneState** ppSlot);
 
 	int32_t m_nInfoLists;
 	int32_t m_nMaxInfoLists;

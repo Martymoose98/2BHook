@@ -268,6 +268,17 @@ namespace Features
 
 	}
 
+	// CSceneStateSystem::Insert (0x140150E70, SceneEntitySystem_FindSceneState here) hands back the
+	// name's node with a reference taken, which the game drops once the state is set
+	// (ColosseumAction_Update, 0x14039F2AF: Insert, CSceneStateSystem::Set, then
+	// CSceneEntitySystem::RemoveNode). Without that, every press leaked a reference and the node
+	// could never be freed.
+	static void ReleaseSceneState(SceneState** ppScene)
+	{
+		if (SceneEntitySystem_RemoveNode)
+			SceneEntitySystem_RemoveNode(ppScene);
+	}
+
 	static void ChangeBuddy(int buddy)
 	{
 		// I don't know what this is. It appears to be related to scene entity system
@@ -296,6 +307,7 @@ namespace Features
 			return;
 		}
 		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
+		ReleaseSceneState(&pScene);
 		// old ver
 		//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &pScene);
 	}
@@ -707,6 +719,7 @@ namespace Features
 			return;
 		}
 		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
+		ReleaseSceneState(&pScene);
 	}
 
 	// The game passes g_ITEM_MANAGER (0x140F56120) as this to both: HapMiscState_AddItem
