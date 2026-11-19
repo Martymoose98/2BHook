@@ -1111,20 +1111,39 @@ void CMenu::DisplayEntityHandles(void)
 
 	ImGui::SeparatorEx(ImGuiSeparatorFlags_::ImGuiSeparatorFlags_Horizontal);
 
-	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, NULL, g_pEntityList->m_uSize);
+	// Every live slot of the entity list. This listed slots 0 to m_uSize - 1, but m_uSize (+4) is
+	// the live count (CEntityInfo::Release, 0x140745DB0, takes one off) and m_uItems (+0) the
+	// capacity that GetEntityInfoFromHandle (0x140745F20) bounds by. Slots are reused out of order
+	// (CSceneEntitySystem::CreateEntityInternal, 0x1407453C0, takes the next free one after a
+	// rolling index), so entities past the first gaps were missed and empty slots were listed.
+	// An entry counts as live the way GetEntityInfoFromHandle tests it.
+	std::vector<uint32_t> EntitySlots;
 
-	// Same as above: the entity list changes size under a selection made in an earlier frame.
+	for (uint32_t i = 0; i < g_pEntityList->m_uItems; ++i)
+	{
+		const CEntityInfo* pInfo = g_pEntityList->m_pItems[i].second;
+
+		if (pInfo && !(pInfo->m_Flags & 3))
+			EntitySlots.push_back(i);
+	}
+
+	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, &EntitySlots, (int)EntitySlots.size());
+
+	// Same as above: the entity list changes under a selection made in an earlier frame.
 	const bool bEntitySelected = (Vars.Gameplay.iSelectedEntityHandle >= 0 &&
-		(uint32_t)Vars.Gameplay.iSelectedEntityHandle < g_pEntityList->m_uSize);
+		Vars.Gameplay.iSelectedEntityHandle < (int)EntitySlots.size());
+
+	const EntityHandle_t hEntity = (bEntitySelected) ?
+		g_pEntityList->m_pItems[EntitySlots[Vars.Gameplay.iSelectedEntityHandle]].first : EntityHandle_t();
 
 	if (ImGui::Button("Delete Entity") && bEntitySelected)
-		Features::DeleteEntity(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
+		Features::DeleteEntity(hEntity);
 
 	ImGui::SameLine();
 
 	if (ImGui::Button("Set Player") && bEntitySelected)
 	{
-		Features::SetPlayer(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
+		Features::SetPlayer(hEntity);
 	}
 }
 

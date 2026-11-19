@@ -140,19 +140,25 @@ static const char* EntityHandlesCallback(void* user_data, int idx)
 	return s_Buffer;
 }
 
+// Entity View rows. user_data is CMenu::DisplayEntityHandles' list of the entity list slots that
+// are live this frame. A slot that had no entity used to return the previous row's text.
 static const char* EntityCallback(void* user_data, int idx)
 {
-	static char s_Buffer[1024];
+	static char s_Buffer[256];
+	const std::vector<uint32_t>* pSlots = (const std::vector<uint32_t>*)user_data;
 
-	CEntityInfo* pInfo = g_pEntityList->m_pItems[idx].second;
+	if (!pSlots || idx < 0 || idx >= (int)pSlots->size())
+		return nullptr;
 
-	if (pInfo)
-	{
-		sprintf_s(s_Buffer, "%s (ObjectId %x, SetType %x) Base %llx EHANDLE %08x\n",
-			(pInfo->m_szEntityType) ? pInfo->m_szEntityType : "EntityLayout",
-			pInfo->m_ObjectId, pInfo->m_uSetType, pInfo->m_pEntity, pInfo->m_hEntity);
-	}
+	const CEntityInfo* pInfo = g_pEntityList->m_pItems[(*pSlots)[idx]].second;
 
+	if (!pInfo)
+		return nullptr;
+
+	// m_szEntityType is a 32-character array, not a pointer, so it was never NULL
+	sprintf_s(s_Buffer, "%.32s (ObjectId %x, SetType %x) Base %p EHANDLE %08x",
+		pInfo->m_szEntityType[0] ? pInfo->m_szEntityType : "EntityLayout",
+		pInfo->m_ObjectId, pInfo->m_uSetType, (void*)pInfo->m_pEntity, pInfo->m_hEntity.m_uValue);
 
 	return s_Buffer;
 }
