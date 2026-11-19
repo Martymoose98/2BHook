@@ -430,11 +430,14 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	else
 		RestoreMemory(&bp_NoTutorialDialogs);
 
-	// NOTE(Martin): doesn't work happens too late in the chain (after they check) and gets reset by the game.
+	// Anti-Framerate Cap turns the frame limiter's jnz into a jmp (bp_Framecap, see Setup). This runs
+	// inside Graphics_LimitFrameAndPresent, which presents, already past that jnz, so the patch takes
+	// effect from the next frame; nothing else runs that function. It used to set g_uGameFlags bit 4
+	// here, after the limiter had run, and the game rebuilds that bit every window pump.
 	if (Vars.Misc.bAntiFramerateCap)
-		*g_pGameFlags2 |= 4;
+		PatchBytes(&bp_Framecap);
 	else
-		*g_pGameFlags2 &= ~4;
+		RestoreMemory(&bp_Framecap);
 
 	g_pOverlay->Render(true);
 

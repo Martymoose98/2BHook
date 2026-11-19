@@ -538,6 +538,7 @@ void LogOffsets(void)
 	LOG_OFFSET("DebugFlags", g_pDebugFlags);
 	LOG_OFFSET("CameraFlags", g_pCameraFlags);
 	LOG_OFFSET("GameFlags", g_pGameFlags);
+	LOG_OFFSET("FramerateCap", g_pAntiFramerateCap_Test4);
 
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Structure Pointers]");
 	LOG_OFFSET("CEntityList", g_pEntityList);
@@ -839,6 +840,15 @@ void FindSteamOffsets(void)
 	g_pGameFlags = (uint32_t*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
 	g_pGameFlags2 = (uint32_t*)FindPatternPtr(NULL, "85 05 ? ? ? ? 75 ? 39 59 24", 2);
 
+	// Anti-Framerate Cap. Graphics_LimitFrameAndPresent (0x14024A250, v1.02 0x14024A150) skips its
+	// Sleep and spin wait only while g_uGameFlags bit 4 is set: test byte ptr [g_uGameFlags], 4 /
+	// jnz <present> (0x14024A2B5). Setting that bit from Present did nothing: the limiter has
+	// already run by then, and Os_PumpWindows (0x14026E53E) rebuilds the bit from the window's
+	// state on every pump. So the jnz is patched into a jmp instead (Setup). Unique in both
+	// builds; this points at the jnz.
+	if (ULONG_PTR uFramecap = FindPatternOrNull("F6 05 ? ? ? ? 04 0F 85 ? ? ? ? 48 8D 8C 24 ? ? ? ? FF 15"))
+		g_pAntiFramerateCap_Test4 = (BYTE*)(uFramecap + 7);
+
 	g_pEntityList = (CEntityList*)FindPatternPtr(NULL, "44 8B 0D ? ? ? ? 44 39 0D ? ? ? ? 75 24", 3);
 	g_pLocalPlayerHandle = (EntityHandle_t*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 4C 24 ? E8 ? ? ? ? 48 8B D0 48 8D 4C 24 ? E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B C8 E8 ? ? ? ? 48 8B D0", 3);
 	g_pEmilHandle = (EntityHandle_t*)FindPatternPtr(NULL, "0F 84 ? ? ? ? 48 8D 15 ? ? ? ? 48 8D 4D 77", 9);
@@ -1033,7 +1043,25 @@ void Setup(void)
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
+#ifdef DENUVO_STEAM_BUILD
 	InitializeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
+#else
+	// The frame limiter's jnz rel32 (0F 85) becomes jmp rel32 (E9) + nop to the same place. The
+	// jmp is a byte shorter, so its displacement is one more. Nothing is patched unless the bytes
+	// there really are that jnz.
+	static BYTE s_JmpFramecap[6] = { 0xE9, 0x00, 0x00, 0x00, 0x00, 0x90 };
+	BYTE* pFramecapJnz = (g_pAntiFramerateCap_Test4 && g_pAntiFramerateCap_Test4[0] == 0x0F && g_pAntiFramerateCap_Test4[1] == 0x85) ?
+		g_pAntiFramerateCap_Test4 : NULL;
+
+	if (pFramecapJnz)
+	{
+		const LONG lDisplacement = *(LONG*)(pFramecapJnz + 2) + 1;
+
+		memcpy(&s_JmpFramecap[1], &lDisplacement, sizeof(lDisplacement));
+	}
+
+	InitializeBytePatchMemory(&bp_Framecap, pFramecapJnz, s_JmpFramecap, sizeof(s_JmpFramecap));
+#endif
 	// Pl0000_CallDialogTutorial, the script command that opens tutorial dialogs: lea eax, [rdx-1] /
 	// mov r8d, edx / cmp eax, 0Ch / ja <ret> / ... / jmp Tutorial_Open. Turning the ja (+9) into
 	// a jmp makes it always return. The old "77 07 8B CA" was from the Denuvo build and matched
@@ -1062,7 +1090,7 @@ void Unhook(void)
 	MaterialTint::Shutdown();
 
 	RestoreMemory(&bp_NoTutorialDialogs);
-	//RestoreMemory(&bp_Framecap);
+	RestoreMemory(&bp_Framecap);
 	//RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
 	//RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK]);
 	RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);

@@ -732,8 +732,14 @@ void CMenu::MiscTab(void)
 	ImGui::InputInt("Frame Budget (1/3 ms, 50 = 60 FPS)", &g_pGraphics->m_iFrameBudget);
 	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
 	ImGui::SameLine();
+	// Patches the frame limiter out (bp_Framecap); off when its jnz wasn't found
+	ImGui::BeginDisabled(!bp_Framecap.Address);
 	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
-	//ImGui::CheckboxFlagsT<uint32_t>("Anti-Framerate Cap", g_pGameFlags2, 0x04);
+	ImGui::EndDisabled();
+
+	ImGui::SetItemTooltip(bp_Framecap.Address ?
+		"Removes the game's 60 FPS frame limiter.\nWarning: the game's logic is tied to the frame rate, so above 60 FPS the whole game runs faster." :
+		"Not available on this game build.");
 	ImGui::SameLine();
 
 	// The slot Backup Save copies. Loading a save also moves it to that slot (hkSaveFileIO),
