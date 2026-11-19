@@ -1,21 +1,49 @@
-.vs
-Build
-*.tlog
-*.log
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.VC.db
+*.VC.VC.opendb
+*.opensdf
+*.sdf
+*.ipch
+ipch/
+
+# Build output (all configurations and platforms)
+[Bb]uild/
+[Dd]ebug/
+[Dd]ebug (Denuvo)/
+[Rr]elease/
+[Rr]elease (Denuvo)/
+x64/
+x86/
+2BHook/x64/
+
+# MSVC intermediate and binary files
 *.obj
-*.enc
+*.pch
 *.pdb
 *.idb
-*.user
-*.vcxproj
-*.filters
-/2butterfly
-*.dds
+*.ilk
 *.iobj
 *.ipdb
+*.exp
+*.lib
+*.dll
+*.exe
 *.res
 *.aps
+*.tlog
+*.lastbuildstate
 *.recipe
-*.ilk
+*.enc
+*FileListAbsolute.txt
+*.log
+
+# 2B Hook runtime files (textures dumped by the mod and its XML config)
+*.dds
+!Hair.dds
 *.xml
-/x64/Debug
+/2butterfly
