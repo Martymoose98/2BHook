@@ -315,84 +315,67 @@ namespace Features
 			UnlockAchievement(0, 0, id);
 	}
 
-	//WIP: head mesh comes back on animations this needs to be fixed
-	// also camera should rotate with bone
-	// NOTE: hides the hair through its alpha, which Rainbow Hair leaves alone
-	static void Firstperson(CBehavior* pEntity)
+	// First person's head hiding (the camera itself is placed in hkCCameraGameSetViewAngles).
+	// The meshes the port hides in first person (ExcitedDelirium FirstPerson.cpp) get alpha 0,
+	// which the engine skips when drawing - every frame, because some animations and face
+	// swaps turn them back on (the old version set them once on entering, so they came back,
+	// and it covered four of them). Leaving first person, or the camera moving to another
+	// entity, puts back the alphas they had. Alpha 0 also drops the head's shadow; the port
+	// avoids that by skipping the meshes in the main view only, which needs a draw hook.
+	// Rainbow Hair only changes the colour, so the two work together.
+	inline void UpdateFirstPersonHead(CBehaviorAppBase* pEntity)
 	{
-		if (pEntity &&
-			(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
-			!(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
+		static const char* const s_szHeadMeshes[] =
 		{
-			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
-			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
-			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
-			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
+			"Hair", "Eyelash", "Eyelash_serious", "Eyemask", "facial_normal", "facial_serious",
+			"Feather", "Armor_Head", "Face"
+		};
 
-			if (pFaceNorm)
+		static CBehaviorAppBase* s_pHidden = NULL;
+		static float s_flSavedAlpha[ARRAYSIZE(s_szHeadMeshes)];
+
+		if (s_pHidden && s_pHidden != pEntity)
+		{
+			// Only restored while that entity is still the one the camera shows; a pointer
+			// from an earlier frame may be gone
+			if (g_pCamera && g_pCamera->m_pCamEntity == s_pHidden)
 			{
-				pFaceNorm->m_vColor.w = 0.0f;
-				pFaceNorm->m_bUpdate = TRUE;
+				for (size_t i = 0; i < ARRAYSIZE(s_szHeadMeshes); ++i)
+				{
+					CMeshPart* pMesh = GetModelMesh(&s_pHidden->m_Work, s_szHeadMeshes[i]);
+
+					if (pMesh)
+					{
+						pMesh->m_vColor.w = s_flSavedAlpha[i];
+						pMesh->m_bUpdate = TRUE;
+					}
+				}
 			}
 
-			if (pFaceSerious)
-			{
-				pFaceSerious->m_vColor.w = 0.0f;
-				pFaceSerious->m_bUpdate = TRUE;
-			}
+			s_pHidden = NULL;
+		}
 
-			if (pMask)
-			{
-				pMask->m_vColor.w = 0.0f;
-				pMask->m_bUpdate = TRUE;
-			}
+		if (!pEntity)
+			return;
 
-			if (pHair)
+		for (size_t i = 0; i < ARRAYSIZE(s_szHeadMeshes); ++i)
+		{
+			CMeshPart* pMesh = GetModelMesh(&pEntity->m_Work, s_szHeadMeshes[i]);
+
+			if (!pMesh)
+				continue;
+
+			if (s_pHidden != pEntity)
+				s_flSavedAlpha[i] = pMesh->m_vColor.w;
+
+			if (pMesh->m_vColor.w != 0.0f)
 			{
-				pHair->m_vColor.w = 0.0f;
-				pHair->m_bUpdate = TRUE;
+				pMesh->m_vColor.w = 0.0f;
+				pMesh->m_bUpdate = TRUE;
 			}
 		}
-	}
 
-
-	//WIP: head mesh comes back on animations this needs to be fixed
-	// also camera should rotate with bone
-	static void Thirdperson(CBehavior* pEntity)
-	{
-		if (pEntity &&
-			!(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
-			(Vars.Misc.bCameraFlagsOld & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
-		{
-			CMeshPart* pFaceNorm = GetModelMesh(&pEntity->m_Work, "facial_normal");
-			CMeshPart* pFaceSerious = GetModelMesh(&pEntity->m_Work, "facial_serious");
-			CMeshPart* pMask = GetModelMesh(&pEntity->m_Work, "Eyemask");
-			CMeshPart* pHair = GetModelMesh(&pEntity->m_Work, "Hair");
-
-			if (pFaceNorm)
-			{
-				pFaceNorm->m_vColor.w = 1.0f;
-				pFaceNorm->m_bUpdate = TRUE;
-			}
-
-			if (pFaceSerious)
-			{
-				pFaceSerious->m_vColor.w = 0.0f;
-				pFaceSerious->m_bUpdate = TRUE;
-			}
-
-			if (pMask)
-			{
-				pMask->m_vColor.w = 1.0f;
-				pMask->m_bUpdate = TRUE;
-			}
-
-			if (pHair)
-			{
-				pHair->m_vColor.w = 1.0f;
-				pHair->m_bUpdate = TRUE;
-			}
-		}
+		s_pHidden = pEntity;
 	}
 
 	// Maybe for perma wet we can call WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); then, set the wet level manually

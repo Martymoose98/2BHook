@@ -687,38 +687,67 @@ return TRUE;*/
 
 	pThis->m_flFov = DEGTORAD(Vars.Visuals.flFov);
 
-	// TODO: CLAMP ANGLES
-	if (pThis->m_pCamEntity && (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON))
+	// First person, after the port's CFirstPerson (ExcitedDelirium FirstPerson.cpp). The game
+	// has already moved its live pose (m_vPosition/m_vTarget2/m_vUp2, CCameraGame::m_Pose at
+	// 0xF0) this frame; only the published eye and target are replaced, from the head, looking
+	// the way the normal camera looks. The camera's own angles are left alone, so the mouse,
+	// the stick and movement relative to the camera all work as usual. Only for the default
+	// follow camera on the local player: events, lock-on rigs and other camera types keep
+	// their own view. The old version aimed from m_vViewangles with a broken clamp and indexed
+	// the bones with an unchecked head index.
+	// The first-person keybind (kb_firstperson_camera) toggles Vars.Misc.bFirstperson, which
+	// nothing read; the camera goes by the CAMERA_FIRSTPERSON flag the menu checkbox sets. Each
+	// press of the key now flips that flag.
+	if (Vars.Misc.bFirstperson != Vars.Misc.bFirstpersonOld)
 	{
-		Features::Firstperson(pThis->m_pCamEntity);
-
-		Math::AngleVectors(pThis->m_vViewangles, &vForward);
-
-		float theta = Math::GetFov(vForward, pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD),
-			pThis->m_pCamEntity->m_matTransform.GetAxis(RIGHT));
-
-		if (fabsf(theta) > 90.0f)
-		{
-			pThis->m_vViewangles.y += 90.0f - theta;
-		}
-
-		if (fabsf(theta) < 0.0f)
-		{
-			pThis->m_vViewangles.y += 90.0f - theta;
-		}
-
-		Math::AngleVectors(pThis->m_vViewangles, &vForward);
-
-		short sHead = GetBoneIndex(pThis->m_pCamEntity->m_Work.m_pModelData, BONE_HEAD);
-
-		Vector3Aligned& vHeadPos = pThis->m_pCamEntity->m_pBones[sHead].m_vPosition;
-
-		pThis->m_vSource = vHeadPos + pThis->m_pCamEntity->m_matTransform.GetAxis(FORWARD) * 0.05f;
-		pThis->m_vTarget = vHeadPos + vForward * 4.f;
-
-		CameraGame_SetLookAt(pThis);
+		Vars.Misc.uCameraFlags ^= Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON;
+		Vars.Misc.bFirstpersonOld = Vars.Misc.bFirstperson;
 	}
-	else if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+
+	CBehaviorAppBase* pCamEntity = pThis->m_pCamEntity;
+	const bool bFirstPerson = (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+		pCamEntity && pCamEntity == g_pLocalPlayer && pThis->m_CamType == CAM_DEFAULT;
+
+	Features::UpdateFirstPersonHead(bFirstPerson ? pCamEntity : NULL);
+
+	if (bFirstPerson)
+	{
+		Vector3Aligned vLook = pThis->m_vTarget2 - pThis->m_vPosition;
+
+		if (vLook.LengthSqr() > 1e-6f)
+		{
+			vLook.Normalize();
+
+			// Head bone 5, 8 cm up; with no head bone, 1.5 m above the feet (the port's fallback)
+			const int16_t sHead = GetBoneIndex(pCamEntity->m_Work.m_pModelData, BONE_HEAD);
+			Vector3Aligned vHead = (sHead >= 0 && sHead < pCamEntity->m_nBones) ?
+				pCamEntity->m_pBones[sHead].m_vPosition + Vector3(0.0f, 0.08f, 0.0f) :
+				pCamEntity->m_vPosition + Vector3(0.0f, 1.5f, 0.0f);
+
+			// The eye height eases (0.35 a frame) so footsteps don't shake the view
+			static float s_flEyeHeight = 0.0f;
+			static const CBehaviorAppBase* s_pEyeOwner = NULL;
+
+			if (s_pEyeOwner != pCamEntity)
+				s_flEyeHeight = vHead.y;
+
+			s_pEyeOwner = pCamEntity;
+			s_flEyeHeight += (vHead.y - s_flEyeHeight) * 0.35f;
+			vHead.y = s_flEyeHeight;
+
+			// 12 cm forward clears the inside of the head, which UpdateFirstPersonHead hides
+			pThis->m_vSource = vHead + vLook * 0.12f;
+			pThis->m_vTarget = pThis->m_vSource + vLook;
+			pThis->m_vUp = pThis->m_vUp2;
+
+			CameraGame_SetLookAt(pThis);
+
+			Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
+			return TRUE;
+		}
+	}
+
+	if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
 	{
 		Math::AngleVectors(pThis->m_vViewangles, &vForward, &vRight, &vUp);
 
@@ -763,14 +792,12 @@ return TRUE;*/
 		//pThis->m_pInstance->m_ViewProjection = pThis->m_pInstance->m_View * pThis->m_pInstance->m_Projection;
 		// NOTE: set vTarget2 and return false
 	}
-	else
-	{
-		Features::Thirdperson(pThis->m_pCamEntity);
-	}
 
 	Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
 
-	return (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_ALT_MASK) ?
+	// First person returned above when it applied; otherwise (an event or other camera type)
+	// the game's own view goes through instead of being skipped.
+	return (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE) ?
 		TRUE : oCCameraGameSetViewAngles(pThis);
 }
 
