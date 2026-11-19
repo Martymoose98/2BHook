@@ -199,7 +199,7 @@ namespace Features
 
 	//WIP: head mesh comes back on animations this needs to be fixed
 	// also camera should rotate with bone
-	// NOTE: rainbow hair is not compatible with this feature
+	// NOTE: hides the hair through its alpha, which Rainbow Hair leaves alone
 	static void Firstperson(CBehavior* pEntity)
 	{
 		if (pEntity &&

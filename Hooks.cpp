@@ -357,6 +357,27 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (pCameraEnt)
 	{
+		// This ran in hkPl0000Update until 90c09d7, but that hook is only installed in Debug
+		// builds with EXP_ENT_HOOK defined, which it never is - so Rainbow Hair did nothing.
+		if (Vars.Gameplay.bRainbowHair)
+		{
+			Vars.Gameplay.flModelTintHue += 0.005f;
+
+			if (Vars.Gameplay.flModelTintHue > 1.f)
+				Vars.Gameplay.flModelTintHue = 0.0f;
+
+			CMeshPart* pHair = GetModelMesh(&pCameraEnt->m_Work, "Hair");
+
+			if (pHair)
+			{
+				// Only the colour: the alpha is how first person hides the hair, and the mesh
+				// "Enabled" checkbox owns m_bShow (forcing it every frame undid hiding the hair).
+				Vector4 vHue = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
+
+				pHair->m_vColor = Vector4(vHue.x, vHue.y, vHue.z, pHair->m_vColor.w);
+				pHair->m_bUpdate = TRUE;
+			}
+		}
 
 		if (Vars.Gameplay.bRainbowPod)
 		{
@@ -886,23 +907,6 @@ void hkPl0000Update(Pl0000* pThis)
 	{
 		pThis->m_Work.m_pMeshes[i].m_bShow = pHook->m_bMeshShow[i];
 		pThis->m_Work.m_pMeshes[i].m_bUpdate = TRUE;
-	}
-
-	if (Vars.Gameplay.bRainbowHair)
-	{
-		Vars.Gameplay.flModelTintHue += 0.005f;
-
-		if (Vars.Gameplay.flModelTintHue > 1.f)
-			Vars.Gameplay.flModelTintHue = 0.0f;
-
-		CMeshPart* pHair = GetModelMesh(&pThis->m_Work, "Hair");
-
-		if (pHair)
-		{
-			pHair->m_vColor = Color::FromHSB(Vars.Gameplay.flModelTintHue, 1.f, 1.f);
-			pHair->m_bUpdate = TRUE;
-			pHair->m_bShow = TRUE;
-		}
 	}
 }
 
