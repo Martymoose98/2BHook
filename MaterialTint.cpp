@@ -63,8 +63,10 @@ namespace
 
 	constexpr int MAX_TINTS = 32;
 
-	// The cb4 buffers one material is drawn with: one per mesh that uses it (and more for
-	// instanced or double-buffered models). Draws past this many fall back to the plain tint.
+	// The cb4 buffers one material is drawn with. CModelWork_PublishLodWeights hands out one
+	// per run of meshes with the same colour, per draw slot (twice over when the work is
+	// double-buffered), so a buffer can stand for several meshes. Draws past this many fall
+	// back to the plain tint.
 	constexpr int MAX_SOURCES = 16;
 
 	struct Source
@@ -92,9 +94,11 @@ namespace
 		Source m_Sources[MAX_SOURCES];
 	};
 
-	// The colour the engine last uploaded into a mesh's cb4 buffer, i.e. that mesh's
-	// CMeshPart::m_vColor: Rainbow Hair, the mesh colour picker, first person's alpha.
-	// Only called while the engine is building a draw with this buffer, so it is alive.
+	// The colour the engine last uploaded into a cb4 buffer: the mesh's CMeshPart::m_vColor,
+	// which CModelWork_Prepare copies to m_vColorReadOnly when m_bUpdate is set and
+	// CModelWork_PublishLodWeights uploads with its alpha times the LOD fade - so Rainbow Hair,
+	// the mesh colour picker and first person's alpha. Only called while the engine is
+	// building a draw with this buffer, so it is alive.
 	ImVec4 ReadMeshColor(const CSamplerParam* pHandle)
 	{
 		const ImVec4 vWhite(1.0f, 1.0f, 1.0f, 1.0f);

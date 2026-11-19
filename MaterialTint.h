@@ -10,13 +10,14 @@ class CModelShader;
 //
 // A mesh's colour (CMeshPart::m_vColor) multiplies the whole mesh, and 2B's "Body" mesh holds
 // the dress, tights, skin and boots as separate materials. The engine uploads that colour into
-// one 16-byte constant buffer per mesh (the pixel shader's cb4, g_MeshColor), and
-// CModelWork::FindModelEntryData copies a pointer to it into every draw entry it builds
-// (CModelEntryData+0x30). Detouring that function and pointing the entries of one material at
+// a 16-byte constant buffer (the pixel shader's cb4, g_MeshColor; CModelWork::m_pSamplerParams,
+// shared by consecutive meshes of the same colour), and CModelWork::FindModelEntryData copies
+// a pointer to it into every draw entry it builds (CModelEntryData::m_pSamplerParam, +0x30).
+// Detouring that function and pointing the entries of one material at
 // our own buffer gives that material its own colour without touching the rest of the mesh.
-// The tint stacks with the mesh colour: each mesh drawn with the material gets a buffer of
-// its own holding mesh colour x tint, with the mesh's alpha, so Rainbow Hair, the mesh colour
-// picker and first person's hiding still show through a tinted material.
+// The tint stacks with the mesh colour: each engine colour buffer the material is drawn with
+// gets a buffer of ours holding that colour x tint, with its alpha, so Rainbow Hair, the mesh
+// colour picker and first person's hiding still show through a tinted material.
 namespace MaterialTint
 {
 	// Finds the engine functions and installs the detour. False (and the feature stays off)
