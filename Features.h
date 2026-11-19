@@ -263,6 +263,61 @@ namespace Features
 		pInfo->m_uFlags |= MODELINFO_FLAG_TINT_DIRTY;
 	}
 
+	// Hide Pod holds the model alpha of the pod the camera entity has out at 0. It used to be set
+	// from the Visuals tab, on whichever pod was out while the tab was drawn, and unticking showed
+	// only that one again: a pod switched away from while ticked stayed hidden for good. Now
+	// hkPresent calls this every frame. Every pod it hides is kept, by handle, with the alpha it
+	// had; they are all held hidden while ticked, and unticking puts each one's alpha back. They
+	// are looked up again through their handles every frame, never kept as pointers, since a pod
+	// can be gone by the next frame: GetEntityInfoFromHandle (0x140745F20) rejects a handle whose
+	// list slot is free or has been reused (the handle's tag no longer matches), and a pod that is
+	// gone is dropped.
+	struct HiddenPod
+	{
+		EntityHandle_t m_hPod;
+		float m_flAlpha;		// what it had before Hide Pod set it to 0
+	};
+
+	inline void ApplyHidePod(CBehaviorAppBase* pCameraEnt)
+	{
+		static HiddenPod s_HiddenPods[8];	// four pod slots a player, for two players
+		static int s_nHiddenPods = 0;
+
+		// The pod that is out, m_hPods[m_iActivePod] (Pl0000 +0x10810, +0x10820), picked the way
+		// Pl0000_GetActivePod (0x14033C2D0) does, once GetPl0000 confirms the camera entity is a Pl0000
+		Pl0000* pOwner = Vars.Gameplay.bHidePod ? GetPl0000(pCameraEnt) : NULL;
+
+		if (pOwner && pOwner->m_iActivePod >= 0 && pOwner->m_iActivePod < (int32_t)ARRAYSIZE(pOwner->m_hPods))
+		{
+			EntityHandle_t hPod = pOwner->m_hPods[pOwner->m_iActivePod];
+			CBehaviorAppBase* pPod = GetEntityFromHandleGlobal(&hPod);
+			bool bTracked = false;
+
+			for (int i = 0; i < s_nHiddenPods; ++i)
+				bTracked |= (s_HiddenPods[i].m_hPod.m_uValue == hPod.m_uValue);
+
+			if (pPod && pPod->m_pModelInfo && !bTracked && s_nHiddenPods < (int)ARRAYSIZE(s_HiddenPods))
+				s_HiddenPods[s_nHiddenPods++] = { hPod, pPod->m_pModelInfo->m_vTint.w };
+		}
+
+		for (int i = 0; i < s_nHiddenPods; )
+		{
+			CBehaviorAppBase* pPod = GetEntityFromHandleGlobal(&s_HiddenPods[i].m_hPod);
+
+			if (pPod && Vars.Gameplay.bHidePod)
+			{
+				SetModelAlpha(pPod, 0.0f);
+				++i;
+				continue;
+			}
+
+			if (pPod)
+				SetModelAlpha(pPod, s_HiddenPods[i].m_flAlpha);
+
+			s_HiddenPods[i] = s_HiddenPods[--s_nHiddenPods];
+		}
+	}
+
 	static void AddEntityToBlackList()
 	{
 

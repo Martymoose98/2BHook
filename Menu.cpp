@@ -1140,10 +1140,9 @@ void ApplyPodMods(Pl0000* pOwner)
 
 	ImGui::Checkbox("Rainbow Pod", &Vars.Gameplay.bRainbowPod);
 	ImGui::SameLine();
-	// Held hidden while ticked; unticking shows it again once, rather than forcing alpha 1 over the
-	// game's every frame this tab is open
-	if (ImGui::Checkbox("Hide Pod", &Vars.Gameplay.bHidePod) || Vars.Gameplay.bHidePod)
-		Features::SetModelAlpha(pPod, Vars.Gameplay.bHidePod ? 0.f : 1.f);
+	// Applied every frame from hkPresent (Features::ApplyHidePod), which shows every pod it hid again
+	// on untick, not only the one out now
+	ImGui::Checkbox("Hide Pod", &Vars.Gameplay.bHidePod);
 
 	if (pPod->m_Work.m_nMeshes <= 0)
 		return;
