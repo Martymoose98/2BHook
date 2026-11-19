@@ -127,19 +127,18 @@ Turn it off for one build with `-p:PostBuildEventUseInBuild=false`. It is off au
 
 2BHook is a DLL, so something has to load it into the game. Use one of these:
 
-- **A proxy DLL loader** (recommended): a DLL the game loads by itself that then loads the DLLs from a `mods` folder.
+- **The 2B Hook Launcher** (recommended): the official launcher, currently v1.4. It's open source, and you can get it from the Files tab of the [2B Hook Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10?tab=files) or from GitHub at [Martymoose98/2B-Mod-Launcher](https://github.com/Martymoose98/2B-Mod-Launcher).
+  1. Put `2BHook.dll` in the `mods` folder next to `NieRAutomata.exe`. The launcher creates that folder the first time it runs if it's missing.
+  2. Run the launcher. It finds the game, starts it (or attaches to it if it's already running), and loads every DLL in `mods`.
+- **A proxy DLL loader**: a DLL the game loads by itself, which then loads the DLLs from a `mods` folder.
   1. Put the loader in the game folder.
   2. Put `2BHook.dll` in `<game folder>\mods\`.
   3. Start the game.
-
-  The author's own loader, 2B Mod Loader, is built as `xinput1_4.dll` and isn't part of this repository. Any proxy loader that loads DLLs from a folder works.
 - **A DLL injector** (e.g. Xenos or Extreme Injector).
   1. Start the game and wait for the main menu.
-  2. Inject `2BHook.dll`.
+  2. Inject `2BHook.dll`. Injecting earlier can fail.
 
-  Injecting earlier can fail.
-
-Prebuilt releases are on the [Releases](https://github.com/Martymoose98/2BHook/releases) page: `2BHook-<version>.zip` (the DLL and this README) plus the matching `.pdb`. They are also on Nexus Mods once that is set up (see [Releasing](#releasing)). Otherwise, build from source as above.
+Prebuilt releases are on the [Releases](https://github.com/Martymoose98/2BHook/releases) page: `2BHook-<version>.zip` (the DLL and this README) plus the matching `.pdb`. They're also on the [Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10). Otherwise, build from source as above.
 
 2BHook can run alongside other DLL mods. Mods with hard-coded addresses for an older game build, such as old builds of NASA, can crash the game on build 26534214, so update them first.
 
@@ -198,11 +197,17 @@ CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 20
   4. creates the GitHub release with both files;
   5. uploads the zip to Nexus Mods, if that is configured.
 
-To cut a release, push Fluorine first if it has new commits, then 2BHook, then the tag:
-```
-git tag v1.2.0
-git push origin v1.2.0
-```
+To cut a release:
+1. Set the version in `Version.h`. It's the only place it's set: the DLL's version resource, the menu title and the log all read it.
+2. Optionally, add hand-written notes as `.github/release-notes/v<version>.md`.
+3. Commit, then push Fluorine first if it has new commits, then 2BHook.
+4. Push the matching tag:
+   ```
+   git tag v1.2.0
+   git push origin v1.2.0
+   ```
+
+The Release workflow refuses a tag that doesn't match `Version.h`.
 To release an existing tag again (for example after fixing the workflow), run **Release** from the Actions tab with that tag. It replaces the release's files and notes.
 
 ### Repository secrets and variables
