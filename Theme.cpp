@@ -92,6 +92,96 @@ namespace
 		return ImVec4(((uRGB >> 16) & 0xFF) / 255.0f, ((uRGB >> 8) & 0xFF) / 255.0f, (uRGB & 0xFF) / 255.0f, flAlpha);
 	}
 
+	// WCAG 2's relative luminance and contrast ratio (1:1 to 21:1) of sRGB colours
+	float LinearChannel(float flChannel)
+	{
+		return (flChannel <= 0.04045f) ? flChannel / 12.92f : powf((flChannel + 0.055f) / 1.055f, 2.4f);
+	}
+
+	float RelativeLuminance(const ImVec4& Color)
+	{
+		return 0.2126f * LinearChannel(Color.x) + 0.7152f * LinearChannel(Color.y) + 0.0722f * LinearChannel(Color.z);
+	}
+
+	float ContrastRatio(const ImVec4& A, const ImVec4& B)
+	{
+		const float flA = RelativeLuminance(A);
+		const float flB = RelativeLuminance(B);
+
+		return (ImMax(flA, flB) + 0.05f) / (ImMin(flA, flB) + 0.05f);
+	}
+
+	// Top drawn over an opaque Bottom: what ends up on screen
+	ImVec4 Over(const ImVec4& Top, const ImVec4& Bottom)
+	{
+		return ImVec4(ImLerp(Bottom.x, Top.x, Top.w), ImLerp(Bottom.y, Top.y, Top.w), ImLerp(Bottom.z, Top.z, Top.w), 1.0f);
+	}
+
+	// Color (opaque) as it is if it has at least flMinRatio contrast with Against, otherwise
+	// brightened or darkened until it does, whichever needs the smaller change in luminance.
+	// Brightening raises the HSV value first and only then mixes in white, so an accent keeps
+	// its hue as long as it can. If neither way gets there, the better of white and black.
+	ImVec4 EnsureContrast(const ImVec4& Color, const ImVec4& Against, float flMinRatio)
+	{
+		constexpr int STEPS = 64;
+		const ImVec4 White(1.0f, 1.0f, 1.0f, 1.0f);
+		const ImVec4 Black(0.0f, 0.0f, 0.0f, 1.0f);
+
+		if (ContrastRatio(Color, Against) >= flMinRatio)
+			return Color;
+
+		float h, s, v;
+		ImGui::ColorConvertRGBtoHSV(Color.x, Color.y, Color.z, h, s, v);
+
+		const float flStart = RelativeLuminance(Color);
+		ImVec4 Best = (ContrastRatio(White, Against) >= ContrastRatio(Black, Against)) ? White : Black;
+		float flBestChange = FLT_MAX;
+
+		// True once Candidate is far enough; keeps it if it is the smallest change so far
+		auto Consider = [&](const ImVec4& Candidate)
+		{
+			if (ContrastRatio(Candidate, Against) < flMinRatio)
+				return false;
+
+			const float flChange = fabsf(RelativeLuminance(Candidate) - flStart);
+
+			if (flChange < flBestChange)
+			{
+				Best = Candidate;
+				flBestChange = flChange;
+			}
+
+			return true;
+		};
+
+		ImVec4 FullValue = Black;
+		ImGui::ColorConvertHSVtoRGB(h, s, 1.0f, FullValue.x, FullValue.y, FullValue.z);
+
+		for (int i = 1; i <= 2 * STEPS; ++i)
+		{
+			ImVec4 Candidate = Black;
+
+			if (i <= STEPS)
+				ImGui::ColorConvertHSVtoRGB(h, s, ImLerp(v, 1.0f, i / (float)STEPS), Candidate.x, Candidate.y, Candidate.z);
+			else
+				Candidate = ImLerp(FullValue, White, (i - STEPS) / (float)STEPS);
+
+			if (Consider(Candidate))
+				break;
+		}
+
+		for (int i = 1; i <= STEPS; ++i)
+		{
+			ImVec4 Candidate = Black;
+			ImGui::ColorConvertHSVtoRGB(h, s, ImLerp(v, 0.0f, i / (float)STEPS), Candidate.x, Candidate.y, Candidate.z);
+
+			if (Consider(Candidate))
+				break;
+		}
+
+		return Best;
+	}
+
 	// The classic 2B Hook palette, built from two colours: the accent for interactive items
 	// and the window background. Text and the neutral greys follow the background's
 	// brightness, so a light background gets dark text instead of light grey on beige.
@@ -130,8 +220,6 @@ namespace
 		Colors[ImGuiCol_ScrollbarGrab] = WithAlpha(Text, 0.30f);
 		Colors[ImGuiCol_ScrollbarGrabHovered] = WithAlpha(Text, 0.40f);
 		Colors[ImGuiCol_ScrollbarGrabActive] = WithAlpha(Text, 0.50f);
-		Colors[ImGuiCol_CheckMark] = Opaque(AccentBright);
-		Colors[ImGuiCol_CheckboxSelectedBg] = ImLerp(Colors[ImGuiCol_FrameBg], Colors[ImGuiCol_FrameBgHovered], 0.65f);
 		Colors[ImGuiCol_SliderGrab] = Opaque(Tertiary);
 		Colors[ImGuiCol_SliderGrabActive] = Opaque(Accent);
 		Colors[ImGuiCol_Button] = WithAlpha(Accent, 0.40f);
@@ -147,6 +235,30 @@ namespace
 		Colors[ImGuiCol_ResizeGripHovered] = WithAlpha(Accent, 0.67f);
 		Colors[ImGuiCol_ResizeGripActive] = WithAlpha(Accent, 0.95f);
 		Colors[ImGuiCol_InputTextCursor] = Text;
+
+		// Checkboxes. ImGui draws an unchecked box in FrameBg and a checked one in
+		// CheckboxSelectedBg, straight on the window with no border in this palette, the tick
+		// in CheckMark, and a hovered or held box in FrameBgHovered/Active. Built from the
+		// accents alone these were dark on dark (the default tick was dark green on dark
+		// blue), so each is pushed to a minimum contrast with what it sits on: the checked box
+		// 3:1 with the window (WCAG's minimum for UI parts), the unchecked one 2:1 (FrameBg is
+		// every input's and slider's background too, so it stays quieter), the tick 4.5:1
+		// with the checked box and 3:1 with the hover colours.
+		const ImVec4 WindowBg = Opaque(AccentBg);
+
+		if (ContrastRatio(Over(Colors[ImGuiCol_FrameBg], WindowBg), WindowBg) < 2.0f)
+			Colors[ImGuiCol_FrameBg] = EnsureContrast(Over(Colors[ImGuiCol_FrameBg], WindowBg), WindowBg, 2.0f);
+
+		Colors[ImGuiCol_CheckboxSelectedBg] = EnsureContrast(Opaque(Accent), WindowBg, 3.0f);
+		Colors[ImGuiCol_CheckMark] = EnsureContrast(Text, Colors[ImGuiCol_CheckboxSelectedBg], 4.5f);
+
+		const ImGuiCol Hovers[] = { ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive };
+
+		for (ImGuiCol Hover : Hovers)
+		{
+			if (ContrastRatio(Over(Colors[Hover], WindowBg), Colors[ImGuiCol_CheckMark]) < 3.0f)
+				Colors[Hover] = EnsureContrast(Over(Colors[Hover], WindowBg), Colors[ImGuiCol_CheckMark], 3.0f);
+		}
 
 		Colors[ImGuiCol_Tab] = ImLerp(Colors[ImGuiCol_Header], Colors[ImGuiCol_TitleBgActive], 0.80f);
 		Colors[ImGuiCol_TabHovered] = Colors[ImGuiCol_HeaderHovered];
@@ -212,8 +324,13 @@ namespace
 		Colors[ImGuiCol_ScrollbarGrab] = Shade;
 		Colors[ImGuiCol_ScrollbarGrabHovered] = WithAlpha(Ink, 0.70f);
 		Colors[ImGuiCol_ScrollbarGrabActive] = Ink;
-		Colors[ImGuiCol_CheckMark] = Ink;
-		Colors[ImGuiCol_CheckboxSelectedBg] = PaperDim;
+		// Checkboxes: the box always has the 1 px ink border (FrameBorderSize below), which is
+		// what sets it off from the paper, so the border is kept at 3:1 with the window; a
+		// checked box is filled with the shade and an unchecked one with the dim paper, and
+		// the tick is the ink, darkened just enough for 4.5:1 on the shade (plain ink is 4:1).
+		Colors[ImGuiCol_Border] = EnsureContrast(Over(Colors[ImGuiCol_Border], Paper), Paper, 3.0f);
+		Colors[ImGuiCol_CheckMark] = EnsureContrast(Ink, Shade, 4.5f);
+		Colors[ImGuiCol_CheckboxSelectedBg] = Shade;
 		Colors[ImGuiCol_SliderGrab] = WithAlpha(Ink, 0.80f);
 		Colors[ImGuiCol_SliderGrabActive] = Ink;
 		Colors[ImGuiCol_Button] = PaperDim;
