@@ -353,10 +353,24 @@ namespace Features
 		pEntity->m_HorizontalCollision.m_vMin = pEntity->m_vPosition;
 	}
 
+	// UnlockAchievement is only resolved for the Denuvo build; on v1.02 and build 26534214 it stayed
+	// NULL, so this called address 0. CUserManager::GiveAchievement (0x1409C7250) takes the id,
+	// locks the achievement device and hands it to CAchievementDevice::GiveAchievement for user 0,
+	// which ignores ids past CAchievementDevice::m_nAchievements (+0x60), the bound used here.
 	static void UnlockAllAchievements(void)
 	{
+		if (!g_pUserManager || !g_pUserManager->m_pAchivementDevice)
+			return;
+
 		for (uint32_t id = 0; id < g_pUserManager->m_pAchivementDevice->m_uMaxAchievement; ++id)
+		{
+#ifdef DENUVO_STEAM_BUILD
 			UnlockAchievement(0, 0, id);
+#else
+			if (UserManager_GiveAchievement)
+				UserManager_GiveAchievement(id);
+#endif
+		}
 	}
 
 	// First person's head hiding (the camera itself is placed in hkCCameraGameSetViewAngles).

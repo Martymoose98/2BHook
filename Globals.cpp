@@ -31,6 +31,7 @@ CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;
 GetConstructorFn GetConstructionInfo;
 HashStringCRC32Fn HashStringCRC32;
 UnlockAchievementFn UnlockAchievement;
+CUserManager_GiveAchievementFn UserManager_GiveAchievement;
 FNV1HashFn FNV1Hash;
 PlaySoundFn ExecuteSound;
 QueryHeapFn QueryHeap;

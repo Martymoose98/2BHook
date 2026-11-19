@@ -504,6 +504,7 @@ void LogOffsets(void)
 	LOG_OFFSET("GetItemIdByName", ItemManager_GetItemIdByName);
 	LOG_OFFSET("SetLocalPlayer", SetLocalPlayer);
 	LOG_OFFSET("UnlockAchievement", UnlockAchievement);
+	LOG_OFFSET("CUserManager::GiveAchievement", UserManager_GiveAchievement);
 	LOG_OFFSET("ResetCamera", ResetCamera);
 	LOG_OFFSET("ChangePlayer", ChangePlayer);
 	LOG_OFFSET("FindSceneState", SceneEntitySystem_FindSceneState);
@@ -692,6 +693,15 @@ static T ReadGamePtr(ULONG_PTR uAddress)
 	return uAddress ? *(T*)uAddress : T{};
 }
 
+// FindPattern returns 0 when the signature misses and -1 when it couldn't read the module;
+// either way there is nothing to use, and the callers check for NULL.
+static ULONG_PTR FindPatternOrNull(const char* szPattern)
+{
+	ULONG_PTR uAddress = FindPattern(NULL, szPattern);
+
+	return (uAddress == (ULONG_PTR)-1) ? 0 : uAddress;
+}
+
 void FindSteamOffsets(void)
 {
 	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
@@ -728,6 +738,11 @@ void FindSteamOffsets(void)
 	HashStringCRC32 = (HashStringCRC32Fn)FindPattern(NULL, "48 85 C9 0F 85 ? ? ? ? 33 C0 C3 CC CC CC CC 48 89 5C 24");
 
 	CreateUIFromId = (CreateUIFromIdFn)FindPattern(NULL, "40 53 48 83 EC 20 44 8B 0D");
+
+	// CUserManager::GiveAchievement (0x1409C7250; v1.02 0x1409C6910), the head up to its
+	// "jz/jns" user-index check, which is where UserManager_AdvanceAchievement (0x1409C3310),
+	// otherwise identical, has "jz/js".
+	UserManager_GiveAchievement = (CUserManager_GiveAchievementFn)FindPatternOrNull("40 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 8B D9 48 8D 3D ? ? ? ? 48 89 7C 24 ? 83 3D ? ? ? ? ? 74 ? 48 8B CF FF 15 ? ? ? ? 90 8B 05 ? ? ? ? 85 C0 74 ? 79");
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.

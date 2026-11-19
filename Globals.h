@@ -85,6 +85,7 @@ typedef bool(*CItemManager_UseItemByIdFn)(CItemManager* pThis, int item_id);
 typedef void(*ChangePlayerFn)(CBehaviorAppBase* pEntity);
 typedef __int64(*SetLocalPlayerFn)(EntityHandle_t* pHandle);
 typedef BOOL(*UnlockAchievementFn)(__int64, __int64, unsigned int uAchievement);
+typedef uint32_t(*CUserManager_GiveAchievementFn)(uint32_t uAchievement);
 typedef bool(*DestroyBuddyFn)(CBehaviorAppBase* pBuddy);
 typedef __int64(*NPC_ChangeSetTypeFollowFn)(CBehaviorAppBase* pNPC);
 typedef __int64(*NPC_ChangeSetTypeIdleFn)(CBehaviorAppBase* pNPC);
@@ -195,6 +196,7 @@ extern GetConstructorFn GetConstructionInfo;
 
 extern HashStringCRC32Fn HashStringCRC32;
 extern UnlockAchievementFn UnlockAchievement;
+extern CUserManager_GiveAchievementFn UserManager_GiveAchievement;
 extern FNV1HashFn FNV1Hash;
 extern PlaySoundFn ExecuteSound;
 extern QueryHeapFn QueryHeap;
