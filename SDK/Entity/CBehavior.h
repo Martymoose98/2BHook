@@ -349,7 +349,12 @@ public:
 	virtual void Hurt(int32_t iDamage, BOOL bKeepAlive) = 0;
 	virtual void Heal(int32_t iHealAmount) = 0;
 	virtual int32_t GetLevel() = 0;
-	virtual bool IsValid() = 0;
+	// Slot 87, BehaviorAppBase_IsDead (0x140416AB0): no entity info, an invalid one, or no health
+	// left; EmBase overrides it (0x1405E8F80). It needs a name of its own: this was declared as a
+	// second IsValid(), which overrode CBehavior::IsValid (slot 29) instead of adding slot 87, so
+	// every virtual below sat one slot low and SetLevel called slot 103 (EmBase_DeleteUnlessDriven,
+	// 0x140601EC0) instead of 104 (EmBase_SetLevel, 0x140631700; Em0090 vtable 0x140C53890).
+	virtual BOOL IsDeadOrInvalid() = 0;
 	virtual void function88() = 0;
 	virtual void function89() = 0;
 	virtual void function90() = 0;

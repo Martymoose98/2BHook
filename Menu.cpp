@@ -1058,8 +1058,12 @@ void CMenu::DisplayEntityHandles(void)
 
 	ImGui::SameLine();
 
+	// The game's SetLevel takes the level itself (1..99), not level - 1
 	if (ImGui::Button("Set Level") && bActorSelected)
-		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&hActor), Vars.Gameplay.iSelectedEntityLevel - 1, Vars.Gameplay.iSelectedEntityLevel - 1);
+	{
+		Vars.Gameplay.iSelectedEntityLevel = min(MAX_LEVELS, max(MIN_LEVELS, Vars.Gameplay.iSelectedEntityLevel));
+		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&hActor), Vars.Gameplay.iSelectedEntityLevel, Vars.Gameplay.iSelectedEntityLevel);
+	}
 
 	ImGui::PopItemWidth();
 

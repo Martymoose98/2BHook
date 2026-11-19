@@ -569,57 +569,47 @@ namespace Features
 		PlayAnimationEx(g_pCamera->m_pCamEntity);
 	}
 
-	static void SetEnemyLevel(void* pEnemy, int iLevel)
-	{
-		if (!pEnemy)
-			return;
-
-		ExExpInfo* pInfo = MakePtr(ExExpInfo*, pEnemy, 0x6378);
-		int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-
-		if ((*pLevel) != iLevel && iLevel > 0 && iLevel <= pInfo->m_nLevels)
-		{
-			int* pHealth = MakePtr(int*, pEnemy, 0x858);
-			int* pMaxHealth = MakePtr(int*, pEnemy, 0x85C);
-			Level_t* pProperLevel = &pInfo->m_levels[iLevel - 1];
-			*pLevel = pProperLevel->m_iLevel;
-			*pHealth = pProperLevel->m_iHealth;
-			*pMaxHealth = pProperLevel->m_iHealth;
-		}
-	}
-
+	// The level goes through the entity's own SetLevel (vtable slot 104; EmBase_SetLevel 0x140631700
+	// for enemies), which is 1-based, clamps to 1..99 and also sets the difficulty-scaled HP, the stun
+	// gauge and the XP reward, so the levels passed here are levels, not indices.
 	static void BalanceEnemyLevel(CBehaviorAppBase* pEnemy, int iMinLevel, int iMaxLevel)
 	{
 		if (!pEnemy)
 			return;
 
 		int iLevel = pEnemy->GetLevel();
-		//int* pLevel = MakePtr(int*, pEnemy, 0x28030);
-		//if ((*pLevel) > iMaxLevel || (*pLevel) < iMinLevel)
+
 		if (iLevel > iMaxLevel || iLevel < iMinLevel)
 		{
 			pEnemy->SetLevel(_RandomInt(iMinLevel, iMaxLevel));
-			//SetEnemyLevel(pEnemy, _RandomInt(iMinLevel, iMaxLevel));
 
 			CCONSOLE_DEBUG_LOG(ImColor(0xff8f20d4), "Enemy lvl [cur: %i, min: %i, max %i]", iLevel, iMinLevel, iMaxLevel);
 		}
 	}
 
+	// Absolute Level used to write the level and HP into the enemy directly, which skipped the
+	// difficulty HP scaling, the stun gauge and the XP reward that EmBase_SetLevel sets up.
 	static void BuffEnemiesAbsolute(void)
 	{
+		const int iLevel = min(MAX_LEVELS, max(MIN_LEVELS, Vars.Gameplay.iEnemyLevel));
+
 		for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
-			SetEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), Vars.Gameplay.iEnemyLevel);
+			BalanceEnemyLevel(GetEntityFromHandleGlobal(&g_pEnemyManager->m_handles.m_pItems[i]), iLevel, iLevel);
 	}
 
 	static void BuffEnemiesTolerance(void)
 	{
-		Pl0000* pLocal = (Pl0000*)GetEntityFromHandleGlobal(g_pLocalPlayerHandle);
+		// m_iLevel is a Pl0000 field, and the local player can be set to any entity (Set Player).
+		// GetEntityFromHandle2 (0x1403877A0) only returns Pl0000s (CEntityInfo::GetPl0000).
+		Pl0000* pLocal = static_cast<Pl0000*>(GetEntityFromHandle2(g_pLocalPlayerHandle));
 
 		if (!pLocal)
 			return;
 
 		int iAbsLevelTolerance = labs(Vars.Gameplay.iEnemyLevelTolerance);
-		int iMinLevel = max(0, (Vars.Gameplay.bExclusivelyPositiveTolerance) ? pLocal->m_iLevel : pLocal->m_iLevel - iAbsLevelTolerance);
+		// Level 1 is the lowest there is (EmBase_SetLevel clamps to 1..99). A minimum of 0 let the
+		// random pick land on 0, out of range.
+		int iMinLevel = max(MIN_LEVELS, (Vars.Gameplay.bExclusivelyPositiveTolerance) ? pLocal->m_iLevel : pLocal->m_iLevel - iAbsLevelTolerance);
 		int iMaxLevel = min(MAX_LEVELS, pLocal->m_iLevel + iAbsLevelTolerance);
 
 		for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
