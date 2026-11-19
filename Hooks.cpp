@@ -786,10 +786,25 @@ if (iTarget != -1)
 	((void(*)(CCameraGame*))(0x140832210))(pThis);
 }
 return TRUE;*/
+	// Camera Fov. CCameraGame_Update (0x14073DC40) has already eased m_Pose.m_flFov toward
+	// m_GoalPose.m_flFov and handed it to the camera (CCameraInstance::SetFov, 0x14073E36D) by the
+	// time it calls this (0x14073E4BB), and next frame CCameraGame::Move resets the goal FOV from
+	// the camera rig (CCameraGame__ApplyRig, 0x1407279C7) before the next ease. So with only the
+	// live pose written here, what reached the camera was a frame late and mixed with the rig's FOV.
+	// The game's own FOV override goes in before that ease: while m_flFovOverrideTime is above 0
+	// (Move counts it down first, 0x1407224D5), every camera type's Move ends by setting the goal
+	// FOV to m_flFovOverride (CCameraGame__NormalCameraMove at 0x14073179C), the way
+	// CCameraGame_SetFovOverride (0x140728D10) sets it for scripts. The time is in seconds (Move
+	// takes the camera entity's tick coefficient / 60 off it), held half a second ahead so a slow
+	// frame doesn't let it lapse. The goal is written too, for the rest of this frame. Below 180
+	// degrees, where the projection's tan(fov / 2) blows up.
 	if (Vars.Visuals.flFov == 0.0f)
 		Vars.Visuals.flFov = RADTODEG(pThis->m_flFov);
 
-	pThis->m_flFov = DEGTORAD(Vars.Visuals.flFov);
+	const float flFov = DEGTORAD(min(max(Vars.Visuals.flFov, 1.0f), 179.0f));
+
+	pThis->m_flFov = pThis->m_flGoalFov = pThis->m_flFovOverride = flFov;
+	pThis->m_flFovOverrideTime = 0.5f;
 
 	// First person, after the port's CFirstPerson (ExcitedDelirium FirstPerson.cpp). The game
 	// has already moved its live pose (m_vPosition/m_vTarget2/m_vUp2, CCameraGame::m_Pose at

@@ -154,7 +154,7 @@ public:
 	Vector3Aligned m_vUp2;								//0x0120
 	float m_flRotationZ;								//0x0130
 	float m_flDistance;									//0x0134
-	float m_flFov;										//0x0138
+	float m_flFov;										//0x0138 | m_Pose.m_flFov, radians
 	char _0x13C[4];										//0x013C
 	Vector3Aligned m_vPositionOffset;					//0x0140 | Debug Build: target1
 	Vector3Aligned m_vTargetOffset;						//0x0150 | Debug Build: pos1
@@ -162,7 +162,7 @@ public:
 	Vector3Aligned m_vGlobalUp;							//0x0170
 	float m_flRotationZ2;								//0x0180
 	float m_flDistance2;								//0x0184
-	float m_flFov2;										//0x0188
+	float m_flGoalFov;									//0x0188 | m_GoalPose.m_flFov, what m_flFov eases toward
 	float m_flUnk;										//0x018C
 	BOOL m_bCameraShake;								//0x0190
 	char _0x0194[12];									//0x0194
@@ -182,7 +182,10 @@ public:
 	Vector3 m_vViewangles;								//0x03F0 | radians (p, y, r) / m_target_ang
 	char pad3FC[44];									//0x03FC
 	StaticArray<NormalCameraFloatOffset, 2> m_Offsets;	//0x0428 | lib::StaticArray<NormalCameraFloatOffset,2,4>::`vftable'
-	char pad450[33788];									//0x0450
+	char pad450[32928];									//0x0450
+	float m_flFovOverride;								//0x84F0 | CCameraGame_SetFovOverride (0x140728D10)
+	float m_flFovOverrideTime;							//0x84F4 | counted down by Move; while > 0, each camera type's Move sets m_flGoalFov = m_flFovOverride
+	char pad84F8[852];									//0x84F8
 	//0x04AC | affects viewangle pitch
 	//0x04B0 | affects viewangle yaw
 	float m_flUnknown2;									//0x884C
@@ -195,11 +198,14 @@ VALIDATE_OFFSET(CCameraGame, m_v0x70, 0x70);
 VALIDATE_OFFSET(CCameraGame, m_pLocalPlayer, 0xA8);
 VALIDATE_OFFSET(CCameraGame, m_hEntity, 0xD0);
 VALIDATE_OFFSET(CCameraGame, m_vPosition, 0xF0);
+VALIDATE_OFFSET(CCameraGame, m_flFov, 0x138);
+VALIDATE_OFFSET(CCameraGame, m_flGoalFov, 0x188);
 VALIDATE_OFFSET(CCameraGame, m_bCameraShake, 0x190);
 VALIDATE_OFFSET(CCameraGame, m_vShake, 0x1A0);
 VALIDATE_OFFSET(CCameraGame, m_Frustrum, 0x0280);
 VALIDATE_OFFSET(CCameraGame, m_pCamEntity, 0x0370);
 VALIDATE_OFFSET(CCameraGame, m_CamType, 0x390);
 VALIDATE_OFFSET(CCameraGame, m_vViewangles, 0x3F0);
+VALIDATE_OFFSET(CCameraGame, m_flFovOverride, 0x84F0);
 VALIDATE_OFFSET(CCameraGame, m_flUnknown2, 0x884C);
 VALIDATE_OFFSET(CCameraGame, m_flUnknown, 0x88F0);

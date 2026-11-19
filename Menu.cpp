@@ -551,7 +551,8 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 
 	ImGui::Separator();
 
-	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 300.0f);
+	// Degrees, below 180 (hkCCameraGameSetViewAngles clamps a config's value the same way)
+	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 179.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
 
 	ImGui::Separator();
 	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
