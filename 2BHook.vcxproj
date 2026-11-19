@@ -70,6 +70,15 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <!-- Where the post-build step copies the DLL: the author's game folder by default. Override it
+       per machine with -p:ModsDir=<game>\mods, or a ModsDir environment variable. CI has no game
+       folder, so the copy is off there (GitHub Actions sets CI=true). -->
+  <PropertyGroup>
+    <ModsDir Condition="'$(ModsDir)' == ''">Z:\NieRAutomata\mods</ModsDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(CI)' == 'true'">
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release (Denuvo)|x64'" />
@@ -90,7 +99,7 @@
       <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <PostBuildEvent>
-      <Command>xcopy /y "$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)$(TargetExt)" "Z:\NieRAutomata\mods\$(ProjectName)$(TargetExt)" </Command>
+      <Command>xcopy /y "$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)$(TargetExt)" "$(ModsDir)\$(ProjectName)$(TargetExt)" </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -117,7 +126,7 @@
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
-      <Command>xcopy /y "$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)$(TargetExt)" "Z:\NieRAutomata\mods\$(ProjectName)$(TargetExt)" </Command>
+      <Command>xcopy /y "$(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)$(TargetExt)" "$(ModsDir)\$(ProjectName)$(TargetExt)" </Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release (Denuvo)|x64'">
