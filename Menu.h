@@ -11,54 +11,10 @@
 #include "Variables.h"
 
 #include "SDK/Entity/CObj.h"
+#include "Theme.h"
 
 
 class CConfig;
-
-struct ImColorScheme : public ImColor
-{
-	//constexpr ImColorScheme(ImColor& Color, float flAlpha)
-	//{
-	//	this->Value = Color.Value;
-	//	this->Value.w = flAlpha;
-	//}
-
-	// Slightly Skewed for alpha blending
-	static void Analogous(ImColor& Color, ImColor& Secondary, ImColor& Tertiary, float flVariance)
-	{
-		WORD H, L, S;
-
-		//WORD Alpha = 0xFF;
-		WORD Alpha = (WORD)((1.0f - sinf(M_PI_F * flVariance)) * 255.f);
-
-		ColorRGBToHLS(Color, &H, &L, &S);
-		Secondary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 255, flVariance), L, S);
-		Tertiary = (Alpha << IM_COL32_A_SHIFT) | ColorHLSToRGB(ImLerp<WORD>(H, 0, -flVariance), L, S);
-	}
-
-	static ImColor AlphaModulate(ImColor& Color, float flAlpha)
-	{
-		ImColor ColorOut = Color;
-
-		ColorOut.Value.w *= flAlpha;
-
-		return ColorOut;
-	}
-
-	static ImColor Secondary(ImColor& Color)
-	{
-		float h = 0.0f, s = 0.0f, v = 0.0f;
-		float r = 0.0f, g = 0.0f, b = 0.0f;
-
-
-		ImGui::ColorConvertRGBtoHSV(Color.Value.x, Color.Value.y, Color.Value.z, h, s, v);
-		ImGui::ColorConvertHSVtoRGB(h, s, v * 0.60f, r, g, b);
-
-		return ImColor(r, g, b, Color.Value.w * (1.0f - v));
-	}
-
-	//static constexpr ImColor ()
-};
 
 class CMenu
 {
@@ -74,8 +30,10 @@ public:
 
 	bool IsOpen(void) const;
 
-	ImGuiStyle* ApplyStyle(ImColor& Primary = ImColor(7, 74, 25, 255),
-		ImColor& PrimaryBg = ImColor(7, 17, 74, 220));
+	// Rebuilds the ImGui style when the theme or the UI scale changed. Call it between
+	// frames (before ImGui::NewFrame): the editor only marks the style dirty, so a change
+	// made while a frame is being built never swaps the style under it.
+	void UpdateStyle(void);
 
 	void LoadConfig(LPCWSTR szConfig);
 	void SaveConfig(LPCWSTR szConfig);
@@ -86,10 +44,13 @@ private:
 	void SpawnTab(Pl0000* pCameraEnt);
 	void MiscTab(void);
 	void ConfigTab(void);
+	void ThemeEditor(void);
 
 	void DisplayEntityHandles(void);
 
-	void RepairTransparentTheme(void);
+	// Migrates a pre-version-2 theme, repairs invisible colours and resets the "unsaved"
+	// baseline after a config is loaded.
+	void OnConfigLoaded(void);
 
 	bool m_bOpened;
 	bool m_bIgnoreInputWhenOpened;
@@ -101,12 +62,14 @@ private:
 	DIMOUSESTATE2 MouseState;			// c_dfDIMouse2
 	DIMOUSESTATE2 OldMouseState;
 
-	// Theme defaults, matching the colours documented in ApplyStyle.
-	static const ImColor s_DefaultPrimary;
-	static const ImColor s_DefaultPrimaryBg;
-
-	ImColor m_Primary;
-	ImColor m_PrimaryBg;
+	ThemeSettings m_Theme;
+	ThemeSettings m_SavedTheme;		// as last loaded or saved, for the "not saved yet" notice
+	bool m_bStyleDirty;
+	float m_flStyleScale;			// UI scale the current style was built with, 0 before the first build
+	float m_flWindowRescale;		// pending menu window resize after a scale change, 0 for none
+	ImVec2 m_vWindowSize;
+	float m_flEditScale;			// the manual scale slider's value while it is being dragged
+	bool m_bEditingScale;
 
 	// TODO: 
 	// IConfig* m_pConfig;

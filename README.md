@@ -45,6 +45,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - 🧪 No Tutorial Dialogs: 
 - 🧪 Save Backup: Makes a copy of the loaded save.
 - Wireframe: Render the scene as a wireframe.
+- Menu themes: Default, YoRHa (the game's own menu colours) or Custom, with per-colour overrides, a resizable menu and UI scaling that follows DPI and resolution.
 
 
 ## Supported Game Versions

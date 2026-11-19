@@ -2,16 +2,90 @@
 
 CMenu* g_pMenu;
 
-const ImColor CMenu::s_DefaultPrimary = ImColor(7, 74, 25, 255);
-const ImColor CMenu::s_DefaultPrimaryBg = ImColor(7, 17, 74, 255);
+namespace
+{
+	// <Theme><preset>yorha</preset>: the theme preset by name
+	class CThemePresetItem : public IConfigItemXml
+	{
+	public:
+		explicit CThemePresetItem(ThemePreset& Preset)
+			: m_Preset(Preset)
+		{
+		}
+
+		virtual const wchar_t* GetName(void) const override
+		{
+			return L"preset";
+		}
+
+		virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) override
+		{
+			m_Preset = Theme::PresetFromKey(szValue);
+		}
+
+		virtual HRESULT Write(IXmlWriter* pWriter) override
+		{
+			return pWriter->WriteElementString(NULL, GetName(), NULL, Theme::GetPresetKey(m_Preset));
+		}
+
+	private:
+		ThemePreset& m_Preset;
+	};
+
+	// <Theme><WindowBg>#DAD4BBF7</WindowBg>: one per ImGuiCol, named after it. Only
+	// overridden colours are written; anything absent uses the preset's colour.
+	class CThemeColorItem : public IConfigItemXml
+	{
+	public:
+		CThemeColorItem(ImGuiCol Col, ThemeSettings& Settings)
+			: m_Col(Col), m_Settings(Settings)
+		{
+			MultiByteToWideChar(CP_UTF8, 0, ImGui::GetStyleColorName(Col), -1, m_szName, ARRAYSIZE(m_szName));
+		}
+
+		virtual const wchar_t* GetName(void) const override
+		{
+			return m_szName;
+		}
+
+		virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) override
+		{
+			ImVec4 Color;
+
+			if (Theme::ParseColor(szValue, Color))
+			{
+				m_Settings.m_Overrides[m_Col] = Color;
+				m_Settings.m_bOverride[m_Col] = true;
+			}
+		}
+
+		virtual HRESULT Write(IXmlWriter* pWriter) override
+		{
+			if (!m_Settings.m_bOverride[m_Col])
+				return S_OK;
+
+			wchar_t szColor[16];
+
+			Theme::FormatColor(m_Settings.m_Overrides[m_Col], szColor);
+
+			return pWriter->WriteElementString(NULL, m_szName, NULL, szColor);
+		}
+
+	private:
+		ImGuiCol m_Col;
+		ThemeSettings& m_Settings;
+		wchar_t m_szName[64];
+	};
+}
 
 CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
-	// m_Primary/m_PrimaryBg were left out of this list, so ImColor default-constructed them
-	// to a fully transparent (0,0,0,0). The first Save() wrote that pair out as 0, and
-	// every Load() since restored it - which is how default.xml ended up with
-	// i_theme_fg/i_theme_bg of 0 where the older backup had real colours.
+	// The theme's accent colours used to be left out of this list, so ImColor
+	// default-constructed them to a fully transparent (0,0,0,0). The first Save() wrote that
+	// pair out as 0, and every Load() since restored it - which is how default.xml ended up
+	// with i_theme_fg/i_theme_bg of 0. ThemeSettings now initializes them itself.
 	: m_bOpened(false), m_bIgnoreInputWhenOpened(true),
-	m_Primary(s_DefaultPrimary), m_PrimaryBg(s_DefaultPrimaryBg),
+	m_bStyleDirty(true), m_flStyleScale(0.0f), m_flWindowRescale(0.0f), m_vWindowSize(0.0f, 0.0f),
+	m_flEditScale(1.0f), m_bEditingScale(false),
 	m_pConfig(new CConfigXml())
 {
 	//no ini file
@@ -28,8 +102,17 @@ CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
 		CKeybindToggleable(L"kb_open_menu", DIK_INSERT, &m_bOpened)));
 
 	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"b_ignore_input", m_bIgnoreInputWhenOpened));
-	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_fg", m_Primary));
-	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_bg", m_PrimaryBg));
+	// The Custom preset's two colours stay where the whole theme used to live, so configs from
+	// before the presets (and older 2B Hook builds) keep reading them.
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_fg", m_Theme.m_Accent));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MENU, L"i_theme_bg", m_Theme.m_AccentBg));
+
+	m_pConfig->m_Items.emplace(CATEGORY_THEME, new CThemePresetItem(m_Theme.m_Preset));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_THEME, L"b_auto_scale", m_Theme.m_bAutoScale));
+	m_pConfig->m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_THEME, L"fl_ui_scale", m_Theme.m_flScale));
+
+	for (int i = 0; i < ImGuiCol_COUNT; ++i)
+		m_pConfig->m_Items.emplace(CATEGORY_THEME, new CThemeColorItem(i, m_Theme));
 
 	if (!m_pConfig->CreateConfig(NULL))
 		LERROR("CreateConfig failed - no config was loaded or written!\n");
@@ -54,9 +137,10 @@ CMenu::CMenu(const CAdapterOutputPair& AdapterOutput)
 		LERROR("EnumerateConfigs found no config files - defaulting to %s\n", Config.szName);
 	}
 
-	RepairTransparentTheme();
+	OnConfigLoaded();
 
-	ApplyStyle(m_Primary, m_PrimaryBg);
+	// The Present hook isn't installed yet, so no frame can be in flight
+	UpdateStyle();
 }
 
 CMenu::~CMenu(void)
@@ -66,37 +150,60 @@ CMenu::~CMenu(void)
 	delete m_pConfig;
 }
 
-// Repair a fully transparent theme colour loaded from a config. Zero alpha is never a
-// deliberate choice - it builds the whole style out of transparent black and hides the
-// menu completely - and configs written before the constructor initialized these members
-// contain exactly that.
-//
-// Only the component that is actually transparent is replaced: the two are independent,
-// and clobbering both would throw away a colour the user did choose. Runs on every config
-// load, not just construction, because LoadConfig overwrites these the same way.
-void CMenu::RepairTransparentTheme(void)
+void CMenu::OnConfigLoaded(void)
 {
-	const bool bPrimary = (m_Primary.Value.w <= 0.0f);
-	const bool bPrimaryBg = (m_PrimaryBg.Value.w <= 0.0f);
+	// Version 1 configs only had the two accent colours. Keep their look: the Custom preset
+	// built from them, or Default when they are the stock colours.
+	if (m_pConfig->GetLoadedVersion() == 1)
+	{
+		const bool bStock = !memcmp(&m_Theme.m_Accent.Value, &Theme::s_DefaultAccent.Value, sizeof(ImVec4)) &&
+			!memcmp(&m_Theme.m_AccentBg.Value, &Theme::s_DefaultAccentBg.Value, sizeof(ImVec4));
 
-	if (!bPrimary && !bPrimaryBg)
+		m_Theme.m_Preset = bStock ? THEME_DEFAULT : THEME_CUSTOM;
+	}
+
+	// What's on disk, before any repair below - so a repaired theme shows as not saved yet
+	m_SavedTheme = m_Theme;
+
+	// A (nearly) transparent text, background or accent colour hides the whole menu, with no
+	// way to fix it, since the menu is what you'd use. Configs written before the constructor
+	// initialized the accents contain exactly that.
+	if (const char* szRepaired = Theme::Sanitize(m_Theme))
+	{
+		LERROR("Config theme colours were (nearly) transparent (%s) - restored the defaults\n", szRepaired);
+
+		// Say so in the console too. This silently rewrites what the config asked for, so the
+		// user should be told rather than left wondering why their theme changed.
+		g_pConsole->Warn("Config theme colours were (nearly) transparent (%s), which hides the menu. "
+			"Restored the defaults - save your config to keep them.", szRepaired);
+	}
+
+	m_bStyleDirty = true;
+}
+
+void CMenu::UpdateStyle(void)
+{
+	const float flScale = Theme::GetTargetScale(m_Theme, g_hWnd);
+
+	if (!m_bStyleDirty && flScale == m_flStyleScale)
 		return;
 
-	const char* szWhich = (bPrimary && bPrimaryBg) ? "i_theme_fg and i_theme_bg were both"
-		: (bPrimary) ? "i_theme_fg was" : "i_theme_bg was";
+	// Keep the menu window the same size relative to its contents when the scale changes.
+	// Accumulated, because the window may be closed through several changes.
+	if (m_flStyleScale > 0.0f && flScale != m_flStyleScale)
+		m_flWindowRescale = ((m_flWindowRescale > 0.0f) ? m_flWindowRescale : 1.0f) * (flScale / m_flStyleScale);
 
-	LERROR("Config theme is transparent (%s 0) - restoring default\n", szWhich);
+	// Built from scratch every time, so ScaleAllSizes never compounds
+	ImGuiStyle Style;
 
-	// Say so in the console too. This silently rewrites what the config asked for, so the
-	// user should be told rather than left wondering why their theme changed.
-	g_pConsole->Warn("Config theme was transparent (%s 0), which hides the menu. "
-		"Restored the default - save your config to keep it.", szWhich);
+	Theme::Build(m_Theme, Style);
+	Style.ScaleAllSizes(flScale);
+	Style.FontScaleDpi = flScale;
 
-	if (bPrimary)
-		m_Primary = s_DefaultPrimary;
+	ImGui::GetStyle() = Style;
 
-	if (bPrimaryBg)
-		m_PrimaryBg = s_DefaultPrimaryBg;
+	m_flStyleScale = flScale;
+	m_bStyleDirty = false;
 }
 
 void CMenu::Draw(const ImVec2 vSize)
@@ -104,7 +211,17 @@ void CMenu::Draw(const ImVec2 vSize)
 	if (!m_bOpened)
 		return;
 
-	ImGui::SetNextWindowSize(vSize, ImGuiCond_FirstUseEver);
+	const float flScale = (m_flStyleScale > 0.0f) ? m_flStyleScale : 1.0f;
+
+	if (m_flWindowRescale > 0.0f && m_vWindowSize.x > 0.0f)
+		ImGui::SetNextWindowSize(ImVec2(m_vWindowSize.x * m_flWindowRescale, m_vWindowSize.y * m_flWindowRescale), ImGuiCond_Always);
+	else
+		ImGui::SetNextWindowSize(ImVec2(vSize.x * flScale, vSize.y * flScale), ImGuiCond_FirstUseEver);
+
+	m_flWindowRescale = 0.0f;
+
+	// Resizable now; just don't let it shrink past usable
+	ImGui::SetNextWindowSizeConstraints(ImVec2(480.0f * flScale, 320.0f * flScale), ImVec2(FLT_MAX, FLT_MAX));
 
 	//static size_t title_off = 0;
 	//static size_t last_move = 0;
@@ -118,8 +235,10 @@ void CMenu::Draw(const ImVec2 vSize)
 	//	++title_off %= title.size() - 1;
 	//}
 
-	if (ImGui::Begin(s_MenuTitle, &m_bOpened, ImGuiWindowFlags_NoResize))
+	if (ImGui::Begin(s_MenuTitle, &m_bOpened))
 	{
+		m_vWindowSize = ImGui::GetWindowSize();
+
 		ImGui::Text("%s (%s)\tAverage %.3f ms / frame(%.1f FPS)", m_szAdapterUtf8, m_szOutputUtf8, 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 		CBehaviorAppBase* pCameraEnt = g_pCamera->m_pCamEntity;
@@ -150,7 +269,8 @@ void CMenu::Draw(const ImVec2 vSize)
 				ImGui::EndTabItem();
 			}
 
-			if (ImGui::BeginTabItem("Config"))
+			// The tab shows ImGui's unsaved-document dot while the theme differs from the config
+			if (ImGui::BeginTabItem("Config", NULL, (m_Theme != m_SavedTheme) ? ImGuiTabItemFlags_UnsavedDocument : 0))
 			{
 				ConfigTab();
 				ImGui::EndTabItem();
@@ -224,106 +344,32 @@ bool CMenu::IsOpen(void) const
 	return m_bOpened;
 }
 
-// https://www.htmlcsscolor.com/hex/B3C4D8
-ImGuiStyle* CMenu::ApplyStyle(ImColor& Primary, ImColor& PrimaryBg)
-{
-	ImGuiStyle* pStyle = &ImGui::GetStyle(); // IM_NEW(ImGuiStyle)();
-
-	pStyle->WindowRounding = 5.0f;
-	pStyle->ChildRounding = 3.0f;
-
-	ImVec4* colors = pStyle->Colors;
-
-	// Greeen
-	//ImColor Primary = ImColor(7, 74, 25, 255);		// ImColor(0.26f, 0.59f, 0.98f);
-	//ImColor PrimaryBg = ImColor(7, 17, 74, 255);	// ImColor(0.16f, 0.29f, 0.48f);
-	ImColor Secondary, Tertiary;
-	ImColor SecondaryBg, TertiaryBg;
-
-	ImColorScheme::Analogous(Primary, Secondary, Tertiary, 0.85f);
-	ImColorScheme::Analogous(PrimaryBg, SecondaryBg, TertiaryBg, 0.75f);
-
-
-	colors[ImGuiCol_Text] = ImColor(0.86f, 0.86f, 0.86f, 1.0f);
-	colors[ImGuiCol_TextDisabled] = ImColor(0.66f, 0.66f, 0.66f, 1.0f);
-	colors[ImGuiCol_WindowBg] = PrimaryBg;		// ImColor(0.06f, 0.06f, 0.06f, 0.94f);
-	colors[ImGuiCol_ChildBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-	colors[ImGuiCol_PopupBg] = ImVec4(0.08f, 0.08f, 0.08f, 0.94f);
-	colors[ImGuiCol_Border] = ImVec4(0.43f, 0.43f, 0.50f, 0.50f);
-	colors[ImGuiCol_BorderShadow] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-	colors[ImGuiCol_FrameBg] = ImColorScheme::AlphaModulate(SecondaryBg, 0.54f);		// ImVec4(0.16f, 0.29f, 0.48f, 0.54f);
-	colors[ImGuiCol_FrameBgHovered] = ImColorScheme::AlphaModulate(Primary, 0.40f);		// ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
-	colors[ImGuiCol_FrameBgActive] = ImColorScheme::AlphaModulate(Primary, 0.67f);		// ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-	colors[ImGuiCol_TitleBg] = ImVec4(0.04f, 0.04f, 0.04f, 1.00f);
-	colors[ImGuiCol_TitleBgActive] = ImColorScheme::AlphaModulate(SecondaryBg, 1.00f);	// ImVec4(0.16f, 0.29f, 0.48f, 1.00f);
-	colors[ImGuiCol_TitleBgCollapsed] = ImVec4(0.00f, 0.00f, 0.00f, 0.51f);
-	colors[ImGuiCol_MenuBarBg] = ImVec4(0.14f, 0.14f, 0.14f, 1.00f);
-	colors[ImGuiCol_ScrollbarBg] = ImVec4(0.02f, 0.02f, 0.02f, 0.53f);
-	colors[ImGuiCol_ScrollbarGrab] = ImVec4(0.31f, 0.31f, 0.31f, 1.00f);
-	colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.41f, 0.41f, 0.41f, 1.00f);
-	colors[ImGuiCol_ScrollbarGrabActive] = ImVec4(0.51f, 0.51f, 0.51f, 1.00f);
-	colors[ImGuiCol_CheckMark] = ImColorScheme::AlphaModulate(Primary, 1.00f);			// ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	colors[ImGuiCol_SliderGrab] = ImVec4(0.24f, 0.52f, 0.88f, 1.00f);
-	colors[ImGuiCol_SliderGrabActive] = ImColorScheme::AlphaModulate(Primary, 1.00f);	// ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	colors[ImGuiCol_Button] = ImColorScheme::AlphaModulate(Primary, 0.40f);				// ImVec4(0.26f, 0.59f, 0.98f, 0.40f);
-	colors[ImGuiCol_ButtonHovered] = ImColorScheme::AlphaModulate(Primary, 1.00f);		// ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	colors[ImGuiCol_ButtonActive] = ImVec4(0.06f, 0.53f, 0.98f, 1.00f);
-	colors[ImGuiCol_Header] = ImColorScheme::AlphaModulate(Primary, 0.31f);				// ImVec4(0.26f, 0.59f, 0.98f, 0.31f);
-	colors[ImGuiCol_HeaderHovered] = ImColorScheme::AlphaModulate(Primary, 0.80f);		// ImVec4(0.26f, 0.59f, 0.98f, 0.80f);
-	colors[ImGuiCol_HeaderActive] = ImColorScheme::AlphaModulate(Primary, 1.00f);		// ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	colors[ImGuiCol_Separator] = colors[ImGuiCol_Border];
-	colors[ImGuiCol_SeparatorHovered] = ImVec4(0.10f, 0.40f, 0.75f, 0.78f);
-	colors[ImGuiCol_SeparatorActive] = ImVec4(0.10f, 0.40f, 0.75f, 1.00f);
-	colors[ImGuiCol_ResizeGrip] = ImColorScheme::AlphaModulate(Primary, 0.20f);			// ImVec4(0.26f, 0.59f, 0.98f, 0.20f);
-	colors[ImGuiCol_ResizeGripHovered] = ImColorScheme::AlphaModulate(Primary, 0.67f);	// ImVec4(0.26f, 0.59f, 0.98f, 0.67f);
-	colors[ImGuiCol_ResizeGripActive] = ImColorScheme::AlphaModulate(Primary, 0.95f);	// ImVec4(0.26f, 0.59f, 0.98f, 0.95f);
-
-	colors[ImGuiCol_Tab] = ImLerp(colors[ImGuiCol_Header], colors[ImGuiCol_TitleBgActive], 0.80f);
-	colors[ImGuiCol_TabHovered] = colors[ImGuiCol_HeaderHovered];
-	colors[ImGuiCol_TabActive] = ImLerp(colors[ImGuiCol_HeaderActive], colors[ImGuiCol_TitleBgActive], 0.60f);
-	colors[ImGuiCol_TabUnfocused] = ImLerp(colors[ImGuiCol_Tab], colors[ImGuiCol_TitleBg], 0.80f);
-	colors[ImGuiCol_TabUnfocusedActive] = ImLerp(colors[ImGuiCol_TabActive], colors[ImGuiCol_TitleBg], 0.40f);
-
-	colors[ImGuiCol_PlotLines] = ImVec4(0.61f, 0.61f, 0.61f, 1.00f);
-	colors[ImGuiCol_PlotLinesHovered] = ImVec4(1.00f, 0.43f, 0.35f, 1.00f);
-	colors[ImGuiCol_PlotHistogram] = ImVec4(0.90f, 0.70f, 0.00f, 1.00f);
-	colors[ImGuiCol_PlotHistogramHovered] = ImVec4(1.00f, 0.60f, 0.00f, 1.00f);
-
-	colors[ImGuiCol_TableHeaderBg] = ImVec4(0.19f, 0.19f, 0.20f, 1.00f);
-	colors[ImGuiCol_TableBorderStrong] = ImVec4(0.31f, 0.31f, 0.35f, 1.00f);   // Prefer using Alpha=1.0 here
-	colors[ImGuiCol_TableBorderLight] = ImVec4(0.23f, 0.23f, 0.25f, 1.00f);   // Prefer using Alpha=1.0 here
-	colors[ImGuiCol_TableRowBg] = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-	colors[ImGuiCol_TableRowBgAlt] = ImVec4(1.00f, 1.00f, 1.00f, 0.06f);
-
-	colors[ImGuiCol_TextSelectedBg] = ImColorScheme::AlphaModulate(Primary, 0.35f);		// ImVec4(0.26f, 0.59f, 0.98f, 0.35f);
-	colors[ImGuiCol_DragDropTarget] = ImVec4(1.00f, 1.00f, 0.00f, 0.90f);
-
-	colors[ImGuiCol_NavHighlight] = ImColorScheme::AlphaModulate(Primary, 1.00f);		//ImVec4(0.26f, 0.59f, 0.98f, 1.00f);
-	colors[ImGuiCol_NavWindowingHighlight] = ImVec4(1.00f, 1.00f, 1.00f, 0.70f);
-	colors[ImGuiCol_NavWindowingDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.20f);
-
-	colors[ImGuiCol_ModalWindowDimBg] = ImVec4(0.80f, 0.80f, 0.80f, 0.35f);
-
-	return pStyle;
-}
-
 void CMenu::LoadConfig(LPCWSTR szConfig)
 {
-	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Loading config. (%s)", szConfig);
-	m_pConfig->Load(szConfig);
+	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Loading config. (%ls)", szConfig);
 
-	// Load overwrites the theme straight from the file, so a config holding zeroed colours
-	// would rebuild the whole style as transparent black and make the menu vanish - with no
-	// way to get it back, since the menu is what you would use to fix it.
-	RepairTransparentTheme();
+	// Loading only sets the items the file has, and an absent colour override means "use the
+	// preset's colour" - not "keep the previous config's override".
+	memset(m_Theme.m_bOverride, 0, sizeof(m_Theme.m_bOverride));
 
-	ApplyStyle(m_Primary, m_PrimaryBg);
+	HRESULT hr = m_pConfig->Load(szConfig);
+
+	if (FAILED(hr))
+		g_pConsole->Warn("Loading config %ls failed (%08X)", szConfig, hr);
+
+	// Applied by UpdateStyle before the next frame, not in the middle of this one
+	OnConfigLoaded();
 }
 
 void CMenu::SaveConfig(LPCWSTR szConfig)
 {
-	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving config. (%s)", szConfig);
-	m_pConfig->Save(szConfig);
+	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving config. (%ls)", szConfig);
+	HRESULT hr = m_pConfig->Save(szConfig);
+
+	if (SUCCEEDED(hr))
+		m_SavedTheme = m_Theme;
+	else
+		g_pConsole->Warn("Saving config %ls failed (%08X)", szConfig, hr);
 }
 
 // 40 53 48 83 EC 20 48 8B 91 80 72 - pl0000::SetStateMosaic
@@ -772,16 +818,9 @@ void CMenu::ConfigTab(void)
 		}
 	}
 
-	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
+	ThemeEditor();
 
-	ImGui::ColorPicker4("ThemePrimary", (float*)&m_Primary.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
-	ImGui::SameLine();
-	ImGui::ColorPicker4("ThemePrimaryBg", (float*)&m_PrimaryBg.Value, ImGuiColorEditFlags_PickerHueWheel | ImGuiColorEditFlags_AlphaBar);
-
-	ImGui::PopItemWidth();
-
-	if (ImGui::Button("Apply Theme"))
-		ApplyStyle(m_Primary, m_PrimaryBg);
+	ImGui::SeparatorText("Configs");
 
 	ImGui::ListBox("Configs", &Config.iSelectedConfig, ConfigCallback, Config.pHead, (INT)FindDataListCount(Config.pHead));
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.5f);
@@ -823,8 +862,137 @@ void CMenu::ConfigTab(void)
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Save"))
+	// "###Save" keeps the button's ID stable while its label changes
+	if (ImGui::Button((m_Theme != m_SavedTheme) ? "Save *###Save" : "Save###Save"))
 		SaveConfig(cfgname);
+}
+
+void CMenu::ThemeEditor(void)
+{
+	bool bChanged = false;
+
+	ImGui::SeparatorText("Theme");
+
+	int iPreset = (int)m_Theme.m_Preset;
+
+	ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+
+	if (ImGui::Combo("Preset", &iPreset, "Default\0YoRHa\0Custom\0"))
+	{
+		m_Theme.m_Preset = (ThemePreset)iPreset;
+		bChanged = true;
+	}
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Reset"))
+	{
+		m_Theme.Reset();
+		bChanged = true;
+	}
+
+	ImGui::SetItemTooltip((m_Theme.m_Preset == THEME_CUSTOM)
+		? "Clear the colour overrides and put the Custom colours back to the default"
+		: "Clear the colour overrides");
+
+	if (m_Theme.m_Preset == THEME_CUSTOM)
+	{
+		const ImGuiColorEditFlags Flags = ImGuiColorEditFlags_AlphaBar | ImGuiColorEditFlags_AlphaPreviewHalf;
+
+		ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16.0f);
+		bChanged |= ImGui::ColorEdit4("Accent", (float*)&m_Theme.m_Accent.Value, Flags);
+		ImGui::SetNextItemWidth(ImGui::GetFontSize() * 16.0f);
+		bChanged |= ImGui::ColorEdit4("Background", (float*)&m_Theme.m_AccentBg.Value, Flags);
+	}
+
+	bChanged |= ImGui::Checkbox("Auto UI scale", &m_Theme.m_bAutoScale);
+	ImGui::SetItemTooltip("Follow the display's DPI and the game's resolution (1080p = 1x)");
+	ImGui::SameLine();
+
+	if (m_Theme.m_bAutoScale)
+	{
+		ImGui::TextDisabled("%.2fx", m_flStyleScale);
+	}
+	else
+	{
+		// Applied when the slider is let go. Rescaling while dragging would move the slider
+		// out from under the mouse.
+		if (!m_bEditingScale)
+			m_flEditScale = m_Theme.m_flScale;
+
+		ImGui::SetNextItemWidth(ImGui::GetFontSize() * 9.0f);
+		ImGui::SliderFloat("UI scale", &m_flEditScale, Theme::MIN_SCALE, 3.0f, "%.2fx", ImGuiSliderFlags_AlwaysClamp);
+		m_bEditingScale = ImGui::IsItemActive();
+
+		if (ImGui::IsItemDeactivatedAfterEdit())
+		{
+			m_Theme.m_flScale = m_flEditScale;
+			bChanged = true;
+		}
+	}
+
+	if (ImGui::TreeNode("Colours"))
+	{
+		ImGui::TextDisabled("Pick a colour to override the preset's. x puts it back.");
+
+		const ImGuiStyle& Style = ImGui::GetStyle();
+		const ImGuiColorEditFlags Flags = ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_AlphaBar |
+			ImGuiColorEditFlags_AlphaPreviewHalf;
+
+		if (ImGui::BeginChild("##ThemeColours", ImVec2(0.0f, ImGui::GetFontSize() * 16.0f), ImGuiChildFlags_Borders))
+		{
+			for (int i = 0; i < ImGuiCol_COUNT; ++i)
+			{
+				ImGui::PushID(i);
+
+				// The live style already has this colour, override included
+				ImVec4 Color = m_Theme.m_bOverride[i] ? m_Theme.m_Overrides[i] : Style.Colors[i];
+
+				if (ImGui::ColorEdit4("##Colour", (float*)&Color, Flags))
+				{
+					m_Theme.m_Overrides[i] = Color;
+					m_Theme.m_bOverride[i] = true;
+					bChanged = true;
+				}
+
+				ImGui::SameLine();
+
+				if (m_Theme.m_bOverride[i])
+				{
+					if (ImGui::SmallButton("x"))
+					{
+						m_Theme.m_bOverride[i] = false;
+						bChanged = true;
+					}
+
+					ImGui::SetItemTooltip("Use the preset's colour again");
+					ImGui::SameLine();
+					ImGui::Text("%s *", ImGui::GetStyleColorName(i));
+				}
+				else
+				{
+					ImGui::TextUnformatted(ImGui::GetStyleColorName(i));
+				}
+
+				ImGui::PopID();
+			}
+		}
+
+		ImGui::EndChild();
+		ImGui::TreePop();
+	}
+
+	// Live preview: rebuilt before the next frame
+	if (bChanged)
+		m_bStyleDirty = true;
+
+	if (m_Theme != m_SavedTheme)
+	{
+		// A fixed amber that reads on both the dark presets and YoRHa's beige
+		ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.80f, 0.40f, 0.00f, 1.00f));
+		ImGui::TextWrapped("Theme changes are live but not saved. Press Save below to keep them.");
+		ImGui::PopStyleColor();
+	}
 }
 
 void CMenu::DisplayEntityHandles(void)

@@ -184,6 +184,7 @@
     <ClInclude Include="Matrix4x4.h" />
     <ClInclude Include="MemoryDeviceHook.h" />
     <ClInclude Include="Menu.h" />
+    <ClInclude Include="Theme.h" />
     <ClInclude Include="mot.h" />
     <ClInclude Include="Overlay.h" />
     <ClInclude Include="Renderer.h" />
@@ -229,6 +230,7 @@
     <ClCompile Include="Matrix4x4.cpp" />
     <ClCompile Include="MemoryDeviceHook.cpp" />
     <ClCompile Include="Menu.cpp" />
+    <ClCompile Include="Theme.cpp" />
     <ClCompile Include="mot.cpp" />
     <ClCompile Include="Overlay.cpp" />
     <ClCompile Include="Renderer.cpp" />
