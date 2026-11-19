@@ -597,6 +597,10 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 	if (ImGui::Button("Add Item"))
 	{
 		Vars.Gameplay.SpawnBlacklist.emplace_back(Vars.Gameplay.szBlacklistName);
+
+		// Select the new row so Delete Item works on it straight away. Otherwise, after the
+		// last row was deleted, the selection stayed at -1 and Delete did nothing.
+		Vars.Gameplay.iSelectedBlacklistItem = (int)Vars.Gameplay.SpawnBlacklist.size() - 1;
 	}
 
 	ImGui::SameLine();
@@ -680,6 +684,12 @@ void CMenu::MiscTab(void)
 	ImGui::SameLine();
 	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);
 	//ImGui::CheckboxFlagsT<uint32_t>("Anti-Framerate Cap", g_pGameFlags2, 0x04);
+	ImGui::SameLine();
+
+	// The slot Backup Save copies. Loading a save also moves it to that slot (hkSaveFileIO),
+	// but injecting after the load used to leave it on slot 0 with no way to change it.
+	ImGui::SetNextItemWidth(ImGui::GetFontSize() * 7.0f);
+	ImGui::SliderInt("##BackupSlot", &Vars.Misc.nSlot, 0, 2, "SlotData_%d", ImGuiSliderFlags_AlwaysClamp);
 	ImGui::SameLine();
 
 	if (ImGui::Button("Backup Save"))

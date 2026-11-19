@@ -374,9 +374,10 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 				if (idx != -1)
 				{
+					// Only tint. Visibility belongs to the pod mesh "Enabled" checkbox; forcing
+					// m_bShow here every frame undid hiding the Body mesh.
 					pPod->m_Work.m_pMeshes[idx].m_vColor = Color::FromHSB(Vars.Gameplay.flPodTintHue, 1.f, 1.f);
 					pPod->m_Work.m_pMeshes[idx].m_bUpdate = TRUE;
-					pPod->m_Work.m_pMeshes[idx].m_bShow = TRUE;
 				}
 			}
 		}
@@ -1083,7 +1084,11 @@ void hkSaveFileIO(CSaveDataDevice* pSavedata)
 	case SAVE_FLAGS_READ:
 		Vars.Misc.bLoading = true;
 		ReadSaveData(pSavedata);
-		Vars.Misc.nSlot = pSavedata->m_nSlot;
+
+		// Follow the slot being played, for the Backup Save slot picker. GameData and
+		// SystemData reads (negative slots) aren't something Backup Save can copy.
+		if (IS_SAVE_SLOTDATA(pSavedata->m_nSlot))
+			Vars.Misc.nSlot = pSavedata->m_nSlot;
 		return;
 	case SAVE_FLAGS_WRITE:
 		WriteSaveData(pSavedata);
