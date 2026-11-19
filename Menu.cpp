@@ -945,7 +945,9 @@ void ApplyPodMods(Pl0000* pOwner)
 	// "###" keeps the widget ID fixed while the mesh name in the label changes. Otherwise the
 	// ID changes with every step and a drag stops after moving one mesh. AlwaysClamp because
 	// Ctrl+Click text entry is otherwise allowed past the bounds, straight into m_pMeshes.
-	sprintf_s(szModelPart, "Pod Mesh: (%s)###PodMesh", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
+	// %.40s keeps a long mesh name from overflowing the buffer (sprintf_s would hit the
+	// invalid parameter handler) and from cutting off the ### ID.
+	sprintf_s(szModelPart, "Pod Mesh: (%.40s)###PodMesh", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
 	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodMesh, 0, pPod->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 	CMeshPart* pPodMesh = &pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh];
@@ -1031,7 +1033,8 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	// "###" keeps the widget ID fixed while the mesh name in the label changes, so a drag
 	// isn't dropped after one step; AlwaysClamp stops Ctrl+Click entry going out of range.
-	sprintf_s(szModelPart, "Mesh: %s###ModelMesh", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
+	// %.40s: see the pod mesh slider above.
+	sprintf_s(szModelPart, "Mesh: %.40s###ModelMesh", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
 
 	if (ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp))
 	{
