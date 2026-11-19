@@ -139,6 +139,50 @@ namespace Features
 		s_bDebugGodmode = Vars.Gameplay.bGodmode;
 	}
 
+	// Freecamera turns on the game's own debug free camera. DBG word 0 (0x141029B80) bit 31 makes
+	// CAM_THINK_UPDATE run CCameraGame_Freecam instead of the camera's Move, skips the update's
+	// pose blend and shake, stops platforms carrying the camera, and locks the player's gamepad.
+	// DBG word 3 bit 28 picks its fly mode (CameraFreeControl_MoveFly) over orbiting a target
+	// (port Camera.cpp:10817-10882, 11424-11509; nothing in the game itself sets either bit).
+	// Re-asserted every frame like Godmode's bits; switching off clears only the bits this set,
+	// and the game eases back from where the free camera left the pose.
+	inline void ApplyFreeCamFlags(bool bUnloading = false)
+	{
+		constexpr uint32_t DBG0_FREECAM = 0x80000000;
+		constexpr uint32_t DBG3_FREECAM_FLY = 0x10000000;
+		static bool s_bApplied = false;
+		static uint32_t s_uFreecamBefore = 0, s_uFlyBefore = 0;
+
+		if (!g_pCameraFlags)
+			return;
+
+		volatile LONG* pWord0 = (volatile LONG*)&g_pCameraFlags[0];
+		volatile LONG* pWord3 = (volatile LONG*)&g_pCameraFlags[3];
+		const bool bWanted = !bUnloading && (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE);
+
+		if (bWanted)
+		{
+			if (!s_bApplied)
+			{
+				s_uFreecamBefore = g_pCameraFlags[0] & DBG0_FREECAM;
+				s_uFlyBefore = g_pCameraFlags[3] & DBG3_FREECAM_FLY;
+			}
+
+			if (!(g_pCameraFlags[3] & DBG3_FREECAM_FLY))
+				InterlockedOr(pWord3, DBG3_FREECAM_FLY);
+
+			if (!(g_pCameraFlags[0] & DBG0_FREECAM))
+				InterlockedOr(pWord0, (LONG)DBG0_FREECAM);
+		}
+		else if (s_bApplied)
+		{
+			InterlockedAnd(pWord0, ~(LONG)(DBG0_FREECAM & ~s_uFreecamBefore));
+			InterlockedAnd(pWord3, ~(LONG)(DBG3_FREECAM_FLY & ~s_uFlyBefore));
+		}
+
+		s_bApplied = bWanted;
+	}
+
 	// The model menu's mesh "Enabled" checkbox. It used to take effect only through
 	// hkPl0000Update, a vtable hook that is installed only in Debug builds with EXP_ENT_HOOK
 	// defined - which it never is - so the checkbox did nothing. A mesh unticked there is hidden

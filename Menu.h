@@ -30,6 +30,10 @@ public:
 
 	bool IsOpen(void) const;
 
+	// The real keyboard state from the last DirectInput poll (DIK_ codes), even while the game
+	// is being fed an empty one (menu open, or the free camera flying)
+	bool IsKeyDown(BYTE uDik) const { return (m_KeyboardState[uDik] & 0x80) != 0; }
+
 	// Rebuilds the ImGui style when the theme or the UI scale changed. Call it between
 	// frames (before ImGui::NewFrame): the editor only marks the style dirty, so a change
 	// made while a frame is being built never swaps the style under it.

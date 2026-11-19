@@ -769,7 +769,14 @@ void FindSteamOffsets(void)
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (uFallRecoveryDamage && uFallRecoveryDamage != (ULONG_PTR)-1) ? (byte*)uFallRecoveryDamage + 28 : NULL;
 	
 	g_pDebugFlags = (uint32_t*)FindPatternPtr(NULL, "8B 05 ? ? ? ? 0F BA E0 0E 73 07", 2);
-	g_pCameraFlags = (uint32_t*)FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
+	// "or dword ptr [rip+disp32], imm32": rip-relative from the end of the instruction, which is
+	// 4 bytes past the end of the displacement because of the immediate. Without the +4 this was
+	// 0x141029B7C, an unreferenced dword, instead of DBG word 0 at 0x141029B80 (bit 31 is the
+	// game's debug free camera, which Freecamera now uses).
+	{
+		ULONG_PTR uCameraFlags = FindPatternPtr(NULL, "81 0D ? ? ? ? ? ? ? ? B9 01 00 00 00 81 0D", 2);
+		g_pCameraFlags = uCameraFlags ? (uint32_t*)(uCameraFlags + sizeof(uint32_t)) : NULL;
+	}
 	g_pGameFlags = (uint32_t*)FindPatternPtr(NULL, "0F B6 05 ? ? ? ? F6 D0", 3);
 	g_pGameFlags2 = (uint32_t*)FindPatternPtr(NULL, "85 05 ? ? ? ? 75 ? 39 59 24", 2);
 
@@ -1029,6 +1036,7 @@ void Unhook(void)
 	Vars.Gameplay.bNoWorldDamage = false;
 
 	Features::ApplyHealthMods(true);
+	Features::ApplyFreeCamFlags(true);
 
 	ImGui_ImplDX11_Shutdown();
 

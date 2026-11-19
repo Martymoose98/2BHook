@@ -327,7 +327,23 @@ HRESULT CMenu::KeyboardHandler(HRESULT Result, LPVOID lpvData, DWORD cbData)
 	//	}
 	//}
 
-	return (m_bOpened && m_bIgnoreInputWhenOpened) ? DIERR_INPUTLOST : Result;
+	if (m_bOpened && m_bIgnoreInputWhenOpened)
+		return DIERR_INPUTLOST;
+
+	// The free camera flies on these keys (FreeCamKeyboardMouse); the game would walk 2B with
+	// them, since it only locks her gamepad. Escape still goes through, so the game can pause.
+	if (SUCCEEDED(Result) && (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE) && lpvData)
+	{
+		BYTE* pKeys = (BYTE*)lpvData;
+		const BYTE uEscape = (cbData > DIK_ESCAPE) ? pKeys[DIK_ESCAPE] : 0;
+
+		memset(pKeys, 0, cbData);
+
+		if (cbData > DIK_ESCAPE)
+			pKeys[DIK_ESCAPE] = uEscape;
+	}
+
+	return Result;
 }
 
 HRESULT CMenu::MouseHandler(LPVOID lpvData, DWORD cbData)

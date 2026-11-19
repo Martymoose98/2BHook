@@ -414,6 +414,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		Features::BuffEnemies();
 
 	Features::ApplyHealthMods();
+	Features::ApplyFreeCamFlags();
 
 	MaterialTint::Update();
 
@@ -621,8 +622,21 @@ HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID 
 
 	LPDIMOUSESTATE2 pState = (LPDIMOUSESTATE2)lpvData;
 
-	Vars.Misc.flDeltaX = pState->lX;
-	Vars.Misc.flDeltaY = pState->lY;
+	if (SUCCEEDED(hr) && pState && (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
+	{
+		// The free camera looks with these (FreeCamKeyboardMouse consumes them once a camera
+		// update, so polls in between add up), and the game gets a still mouse with no buttons
+		// so 2B doesn't turn or attack.
+		Vars.Misc.flDeltaX += pState->lX;
+		Vars.Misc.flDeltaY += pState->lY;
+
+		memset(pState, 0, min(cbData, (DWORD)sizeof(DIMOUSESTATE2)));
+	}
+	else if (pState)
+	{
+		Vars.Misc.flDeltaX = pState->lX;
+		Vars.Misc.flDeltaY = pState->lY;
+	}
 
 	g_pMouseHook->Rehook();
 
@@ -646,6 +660,92 @@ bool hkMRubyLoadScript(MrubyImpl* pThis, MrubyScript* pScript)
 }
 
 // ORIG FUNCTION SIG: 40 53 48 81 EC ? ? ? ? F6 05
+// Keyboard and mouse for the game's free camera, which reads only the gamepad
+// (CameraFreeControl_MoveFly, g_MergedPadState). Called from CCameraGame::Update's tail, after
+// CCameraGame_Freecam moved the camera with the pad and published it; the pose is written back
+// too, so the next frame's Freecam starts from here. While the free camera is on, CMenu's
+// keyboard handler and hkMouseGetDeviceState keep these keys and the mouse away from the game,
+// so 2B doesn't walk or turn (the game itself only locks her gamepad).
+//   W/S forward/back, A/D strafe, Space/Left Ctrl up/down, Left Shift x4, Left Alt x0.25,
+//   mouse to look (pitch stops 5 degrees short of straight up or down, like the game's).
+static void FreeCamKeyboardMouse(CCameraGame* pThis)
+{
+	// The camera shouldn't move while the menu is up and the keys are typing into it
+	const bool bInput = !g_pMenu->IsOpen();
+	const float flMouseX = bInput ? Vars.Misc.flDeltaX : 0.0f;
+	const float flMouseY = bInput ? Vars.Misc.flDeltaY : 0.0f;
+
+	// Consumed: hkMouseGetDeviceState accumulates them while the free camera is on
+	Vars.Misc.flDeltaX = 0.0f;
+	Vars.Misc.flDeltaY = 0.0f;
+
+	Vector3 vLook = pThis->m_vTarget - pThis->m_vSource;
+
+	if (vLook.LengthSqr() < 1e-8f)
+		return;
+
+	vLook.Normalize();
+
+	const Vector3 vUp(0.0f, 1.0f, 0.0f);
+	constexpr float SENSITIVITY = 0.0025f;	// radians per mouse count
+
+	// Yaw about the world up axis
+	const float flYaw = -flMouseX * SENSITIVITY;
+	const float flCosYaw = cosf(flYaw), flSinYaw = sinf(flYaw);
+
+	vLook = Vector3(vLook.x * flCosYaw + vLook.z * flSinYaw, vLook.y, -vLook.x * flSinYaw + vLook.z * flCosYaw);
+
+	// Pitch about the view's right axis (Rodrigues; the axis is perpendicular to the look)
+	Vector3 vRight = vLook.Cross(vUp);
+
+	if (vRight.LengthSqr() > 1e-8f)
+	{
+		vRight.Normalize();
+
+		const float flPitch = -flMouseY * SENSITIVITY;
+		const Vector3 vPitched = vLook * cosf(flPitch) + vRight.Cross(vLook) * sinf(flPitch);
+		const float flCosToUp = vPitched.Dot(vUp);
+
+		if (fabsf(flCosToUp) < cosf(DEGTORAD(5.0f)))
+			vLook = vPitched;
+
+		vRight = vLook.Cross(vUp);
+		vRight.Normalize();
+	}
+
+	Vector3 vMove(0.0f, 0.0f, 0.0f);
+
+	if (bInput)
+	{
+		if (g_pMenu->IsKeyDown(DIK_W)) vMove += vLook;
+		if (g_pMenu->IsKeyDown(DIK_S)) vMove -= vLook;
+		if (g_pMenu->IsKeyDown(DIK_D)) vMove += vRight;
+		if (g_pMenu->IsKeyDown(DIK_A)) vMove -= vRight;
+		if (g_pMenu->IsKeyDown(DIK_SPACE)) vMove += vUp;
+		if (g_pMenu->IsKeyDown(DIK_LCONTROL)) vMove -= vUp;
+	}
+
+	float flSpeed = 0.1f;	// metres per frame, close to the game's own full-stick speed
+
+	if (g_pMenu->IsKeyDown(DIK_LSHIFT))
+		flSpeed *= 4.0f;
+
+	if (g_pMenu->IsKeyDown(DIK_LMENU))
+		flSpeed *= 0.25f;
+
+	const Vector3 vSource = Vector3(pThis->m_vSource) + vMove * flSpeed;
+
+	pThis->m_vSource = vSource;
+	pThis->m_vTarget = vSource + vLook;
+	pThis->m_vUp = vUp;
+
+	CameraGame_SetLookAt(pThis);
+
+	// The live pose, which CCameraGame_Freecam copies into the camera at the start of its next run
+	pThis->m_vPosition = pThis->m_vSource;
+	pThis->m_vTarget2 = pThis->m_vTarget;
+}
+
 BOOL hkCCameraGameSetViewAngles(CCameraGame* pThis)
 {
 	Vector3Aligned vForward, vRight, vUp, vRotX, vRotY;
@@ -706,6 +806,7 @@ return TRUE;*/
 
 	CBehaviorAppBase* pCamEntity = pThis->m_pCamEntity;
 	const bool bFirstPerson = (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
+		!(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE) &&
 		pCamEntity && pCamEntity == g_pLocalPlayer && pThis->m_CamType == CAM_DEFAULT;
 
 	Features::UpdateFirstPersonHead(bFirstPerson ? pCamEntity : NULL);
@@ -747,51 +848,11 @@ return TRUE;*/
 		}
 	}
 
+	// Freecamera: the game's own debug free camera runs instead of Move (Features::ApplyFreeCamFlags
+	// sets its flag) and reads only the gamepad; keyboard and mouse fly it from here, in
+	// CCameraGame::Update's tail, after CCameraGame_Freecam has applied the pad.
 	if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
-	{
-		Math::AngleVectors(pThis->m_vViewangles, &vForward, &vRight, &vUp);
-
-		// probs can do it this way too
-/*		Matrix4x4 RotationX, RotationY, RotationXY;
-
-		RotationX.InitAxisAngle(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaY * 0.004f);
-		RotationY.InitAxisAngle(pThis->m_vUp, Vars.Misc.flDeltaX * 0.004f);
-
-		RotationXY = RotationX * RotationY;
-
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);
-
-		vRight.Normalize();
-		vUp.Normalize();
-		vForward.Normalize()*/;
-
-		//pThis->m_pInstance->m_World.GetAxis(RIGHT) = vRight.Normalize();
-		//pThis->m_pInstance->m_World.GetAxis(UP) = vUp.Normalize();
-		//pThis->m_pInstance->m_World.GetAxis(FORWARD) = vForward.Normalize();
-
-		/*RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);*/
-
-		//pThis->m_pInstance->m_World = pThis->m_pInstance->m_World * RotationX * RotationY;
-		//pThis->m_pInstance->m_World.GetAxis(POSITION) = pThis->m_vSource;
-		//pThis->m_pInstance->m_World.Rotate(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaX, vRotX);
-
-		//pThis->m_pInstance->m_World.Rotate(pThis->m_vUp, Vars.Misc.flDeltaY, vRotY);
-
-		//pThis->m_pCamEntity->m_bUnkCam800 &= ~CAMERA_FLAGS_LOCK;
-
-		pThis->m_vTarget = pThis->m_vSource + vForward * 4.0f;
-		//pThis->m_vTarget2 = vForward;
-
-		CameraGame_SetLookAt(pThis);
-
-		//pThis->m_pInstance->m_View = Matrix4x4::PointTo(pThis->m_vSource, vForward, vUp);
-		//pThis->m_pInstance->m_ViewProjection = pThis->m_pInstance->m_View * pThis->m_pInstance->m_Projection;
-		// NOTE: set vTarget2 and return false
-	}
+		FreeCamKeyboardMouse(pThis);
 
 	Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
 
@@ -805,57 +866,11 @@ return TRUE;*/
 // move happens before setviewangles it seems
 void* hkCCameraGameMove(CCameraGame* pThis)
 {
-	static void (*CCameraGame_FREECAM_sub_14073AAE0)(CCameraGame * pThis, int edx0, int a3) =
-		(decltype(CCameraGame_FREECAM_sub_14073AAE0))FindPattern(NULL,
-			"48 89 5C 24 18 55 56 57 41 54 41 55 41 56 41 57 48 83 EC 60 83");
-
-	if ((Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE))
-	{
-		Vector3Aligned vDir;
-		Vector3Aligned vForward, vRight, vUp, vRotX, vRotY;
-
-		Matrix4x4 RotationX, RotationY, RotationXY;
-
-		if (GetAsyncKeyState('W') & 0x8000)
-		{
-			vDir += pThis->m_pInstance->m_World.GetAxis(FORWARD);
-		}
-
-		if (GetAsyncKeyState('A') & 0x8000)
-		{
-			vDir -= pThis->m_pInstance->m_World.GetAxis(RIGHT);
-		}
-
-		if (GetAsyncKeyState('S') & 0x8000)
-		{
-			vDir -= pThis->m_pInstance->m_World.GetAxis(FORWARD);
-		}
-
-		if (GetAsyncKeyState('D') & 0x8000)
-		{
-			vDir += pThis->m_pInstance->m_World.GetAxis(RIGHT);
-		}
-
-		pThis->m_vSource += vDir * 1.5f; // accel
-
-		RotationX.InitAxisAngle(pThis->m_pInstance->m_World.GetAxis(RIGHT), Vars.Misc.flDeltaY * 0.004f);
-		RotationY.InitAxisAngle(pThis->m_vUp, Vars.Misc.flDeltaX * -0.004f);
-
-		RotationXY = RotationX * RotationY;
-
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(RIGHT), vRight);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(UP), vUp);
-		RotationXY.Transform(pThis->m_pInstance->m_World.GetAxis(FORWARD), vForward);
-
-		pThis->m_pInstance->m_World.GetAxis(RIGHT) = vRight.Normalize();
-		pThis->m_pInstance->m_World.GetAxis(UP) = vUp.Normalize();
-		pThis->m_pInstance->m_World.GetAxis(FORWARD) = vForward.Normalize();
-
-		CCameraGame_FREECAM_sub_14073AAE0(pThis, 2, 0);
-	}
-
-	//pThis->m_CamType = (CameraType)<debug counter in Overlay::Render>; // not Vars.Misc.nSlot - that's the save slot
-
+	// Free camera used to be done here: 2BHook rotated m_pInstance->m_World by hand, called
+	// CCameraGame_Freecam and then the original Move anyway, so the game's normal camera update
+	// overwrote the free camera every frame. With the game's free-camera flag set, the game calls
+	// CCameraGame_Freecam instead of Move (port Camera.cpp:10817, CAM_THINK_UPDATE), so nothing is
+	// needed here.
 	return oCCameraGameMove(pThis);
 }
 
