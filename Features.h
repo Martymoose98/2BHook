@@ -17,33 +17,44 @@ namespace Features
 	// inline (not static) so the Godmode state below is shared by DLLMain.cpp and Hooks.cpp
 	inline void ApplyHealthMods(void)
 	{
-		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
+		if (Vars.Gameplay.bNoEnemyDamage)
 			NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
-
-		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoWorldDamage)
-			NopMemory(&nop_Health[NOP_DAMAGE_WORLD]);
-
-		if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoEnemyDamage)
+		else
 			RestoreMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
 
-		if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoWorldDamage)
+		if (Vars.Gameplay.bNoWorldDamage)
+			NopMemory(&nop_Health[NOP_DAMAGE_WORLD]);
+		else
 			RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 
-		// The game's own debug invincibility bits: 0x8000 is DBG_PLAYER_NO_DAMAGE and 0x4000 (unnamed)
-		// also blocks damage. They cover the flight unit and hacking modes, which the NOPs above miss (issue #14).
-		// Only touch the bits when Godmode changes, so manual edits in the Debug Flags box still work.
+		// Godmode uses the game's own debug invincibility bits, not the NOPs above. With 0x4000
+		// Pl0000::CalculateDamage returns before doing anything, 0x8000 (DBG_PLAYER_NO_DAMAGE)
+		// zeroes the damage, and Pl0000_TakeDamage does nothing if either is set - so both NOP
+		// sites are covered, plus the flight unit and hacking, which the NOPs miss (issue #14).
 		constexpr uint32_t DBG_FLAG_INVINCIBLE = 0x4000 | 0x8000;
 		static bool s_bDebugGodmode = false;
+		static uint32_t s_uBitsSetBeforeGodmode = 0;
 
-		if (g_pDebugFlags && Vars.Gameplay.bGodmode != s_bDebugGodmode)
+		if (!g_pDebugFlags)
+			return;
+
+		if (Vars.Gameplay.bGodmode)
 		{
-			if (Vars.Gameplay.bGodmode)
-				*g_pDebugFlags |= DBG_FLAG_INVINCIBLE;
-			else
-				*g_pDebugFlags &= ~DBG_FLAG_INVINCIBLE;
+			if (!s_bDebugGodmode)
+				s_uBitsSetBeforeGodmode = *g_pDebugFlags & DBG_FLAG_INVINCIBLE;
 
-			s_bDebugGodmode = Vars.Gameplay.bGodmode;
+			// Re-assert every frame rather than once: the game rewrites the whole flag block in
+			// places (the post-clear debug menu), and that would quietly switch Godmode off.
+			if ((*g_pDebugFlags & DBG_FLAG_INVINCIBLE) != DBG_FLAG_INVINCIBLE)
+				InterlockedOr((volatile LONG*)g_pDebugFlags, DBG_FLAG_INVINCIBLE);
 		}
+		else if (s_bDebugGodmode)
+		{
+			// Clear only the bits Godmode set, so ones set by hand in the Debug Flags box survive.
+			InterlockedAnd((volatile LONG*)g_pDebugFlags, ~(LONG)(DBG_FLAG_INVINCIBLE & ~s_uBitsSetBeforeGodmode));
+		}
+
+		s_bDebugGodmode = Vars.Gameplay.bGodmode;
 	}
 
 	static void AddEntityToBlackList()
