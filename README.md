@@ -191,15 +191,15 @@ CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 20
 
 - **Build** (`.github/workflows/build.yml`) runs on every push and pull request to `master`. It builds Release x64 and keeps the DLL and PDB as a workflow artifact for 14 days. It never releases.
 - **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. It:
-  1. builds Release x64;
-  2. packages `2BHook-<tag>.zip` (the DLL and README) and `2BHook-<tag>.pdb`;
-  3. takes the release notes from `.github/release-notes/<tag>.md` if the tagged commit has that file, or otherwise writes a changelog from the commits since the previous `v*` tag;
-  4. creates the GitHub release with both files;
-  5. uploads the zip to Nexus Mods, if that is configured.
+  1. takes the release notes from `.github/release-notes/<tag>.md` if the tagged commit has that file, or otherwise writes a changelog from the commits since the previous `v*` tag. It also checks the notes' Nexus summary (see below), before building, so bad notes fail in seconds;
+  2. builds Release x64;
+  3. packages `2BHook-<tag>.zip` (the DLL and README) and `2BHook-<tag>.pdb`;
+  4. creates the GitHub release with both files and the notes;
+  5. uploads the zip to Nexus Mods, if that is configured. It's uploaded as a new version of the main file, with the name `2BHook <tag>`, the version from the tag (`v1.2.0` becomes `1.2.0`), and the summary as its description. The mod page's version is set to match, and the changes are added to the mod's changelog as plain text.
 
 To cut a release:
 1. Set the version in `Version.h`. It's the only place it's set: the DLL's version resource, the menu title and the log all read it.
-2. Optionally, add hand-written notes as `.github/release-notes/v<version>.md`.
+2. Optionally, add hand-written notes as `.github/release-notes/v<version>.md`, with a Nexus summary (see below).
 3. Commit, then push Fluorine first if it has new commits, then 2BHook.
 4. Push the matching tag:
    ```
@@ -208,7 +208,23 @@ To cut a release:
    ```
 
 The Release workflow refuses a tag that doesn't match `Version.h`.
-To release an existing tag again (for example after fixing the workflow), run **Release** from the Actions tab with that tag. It replaces the release's files and notes.
+To release an existing tag again (for example after fixing the workflow), run **Release** from the Actions tab with that tag. It replaces the GitHub release's files and notes, but on Nexus it adds another version of the file, so delete the duplicate there, or delete the `NEXUSMODS_FILE_ID` variable first to skip the Nexus step.
+
+#### The Nexus summary
+
+Nexus shows a short description under each file, at most 255 characters. Put it in the notes file in a `nexus-summary` block. The block can go anywhere in the file, and its lines are joined with spaces:
+
+````markdown
+## 2BHook v1.2.0
+
+```nexus-summary
+November 2026 Update. Supports the new Steam build and v1.02 unpacked.
+```
+
+The rest of the notes...
+````
+
+The block is taken out of the GitHub release notes. The job fails before building if the summary is over 255 characters (counted the way the Nexus API counts them), if it's empty or not closed, or if there's more than one block. Without a block, the summary is the notes' opening paragraph (the first text that isn't a heading), shortened to 255 characters at a word boundary. For a release with no notes file, that's the first few commit subjects.
 
 ### Repository secrets and variables
 

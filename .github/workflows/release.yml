@@ -1,8 +1,8 @@
-# Cuts a release when a v* tag is pushed (or for an existing tag, from the Actions tab):
-# builds Release x64, packages 2BHook-<tag>.zip (DLL + README) and 2BHook-<tag>.pdb, takes the
-# notes from .github/release-notes/<tag>.md (or the commits since the previous v* tag when there
-# is no such file), creates or updates the GitHub release,
-# and uploads the zip to Nexus Mods when the Nexus settings are present.
+# Cuts a release when a v* tag is pushed (or for an existing tag, from the Actions tab): takes
+# the notes from .github/release-notes/<tag>.md (or the commits since the previous v* tag when
+# there is no such file) and their Nexus summary, builds Release x64, packages 2BHook-<tag>.zip
+# (DLL + README) and 2BHook-<tag>.pdb, creates or updates the GitHub release, and uploads the zip
+# to Nexus Mods when the Nexus settings are present.
 name: Release
 
 on:
@@ -57,21 +57,9 @@ jobs:
           [ "$file" = "$numbers.$(num HOOK_VERSION_HOTFIX)" ] || { echo "::error::Version.h: HOOK_VERSION_FILE_STRING $file doesn't match the numbers"; exit 1; }
           [ "$TAG" = "v$version" ] || { echo "::error::Tag $TAG doesn't match Version.h (v$version)"; exit 1; }
 
-      - uses: microsoft/setup-msbuild@v2
-
-      - name: Build Release x64
-        run: msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m -nologo -v:minimal
-
-      - name: Package
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path x64/Release/2BHook.dll, README.md -DestinationPath "dist/2BHook-$env:TAG.zip"
-          Copy-Item x64/Release/2BHook.pdb "dist/2BHook-$env:TAG.pdb"
-
       # Hand-written notes in .github/release-notes/<tag>.md win when the tagged commit has them.
       # Otherwise: the commits since the previous v* tag (all of them if this is the first),
-      # newest first, merges left out.
+      # newest first, merges left out. These run before the build so bad notes fail fast.
       - name: Changelog
         id: changelog
         shell: bash
@@ -87,23 +75,30 @@ jobs:
               git log --no-merges --pretty='- %s (%h)' "${prev:+$prev..}$TAG"
             } > CHANGELOG.md
           fi
-          cat CHANGELOG.md
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-          {
-            echo 'text<<CHANGELOG_EOF'
-            cat CHANGELOG.md
-            echo 'CHANGELOG_EOF'
-          } >> "$GITHUB_OUTPUT"
-          # Nexus shows its changelog as plain text: just the changes (not the known issues or the
-          # install steps), with the Markdown stripped, and a link to the full notes.
-          {
-            echo 'nexus<<NEXUS_EOF'
-            awk '/^#+ /{ skip = ($0 ~ /^#+ (Known issues|Install)/); next }
-                 !skip && /^- /{ print substr($0, 3) }' CHANGELOG.md |
-              sed -e 's/\*\*//g' -e 's/`//g' -e 's/\[\([^]]*\)\]([^)]*)/\1/g'
-            echo "Full release notes: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
-            echo 'NEXUS_EOF'
-          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Takes the optional nexus-summary block out of CHANGELOG.md and fails if it's over 255
+      # characters. Outputs summary (the Nexus file description; made from the notes' opening
+      # paragraph when there's no block) and nexus (the plain-text Nexus changelog).
+      - name: Release notes and Nexus summary
+        id: notes
+        run: python .github/scripts/release_notes.py
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release x64
+        run: msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m -nologo -v:minimal
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path x64/Release/2BHook.dll, README.md -DestinationPath "dist/2BHook-$env:TAG.zip"
+          Copy-Item x64/Release/2BHook.pdb "dist/2BHook-$env:TAG.pdb"
 
       # Created on the first run for a tag; a re-run from the Actions tab replaces the assets and
       # the notes instead of failing.
@@ -146,8 +141,9 @@ jobs:
           mod_id: ${{ vars.NEXUSMODS_MOD_ID }}
           file_id: ${{ vars.NEXUSMODS_FILE_ID }}
           filename: dist/2BHook-${{ env.TAG }}.zip
-          version: ${{ steps.changelog.outputs.version }}
-          display_name: 2BHook ${{ env.TAG }}
+          version: ${{ steps.changelog.outputs.version }}           # v1.2.0 -> 1.2.0
+          display_name: 2BHook ${{ env.TAG }}                         # "2BHook v1.2.0"
+          description: ${{ steps.notes.outputs.summary }}
           category: main
           update_mod_version: true          # the mod page's version follows the release
-          changelog: ${{ steps.changelog.outputs.nexus }}
+          changelog: ${{ steps.notes.outputs.nexus }}
