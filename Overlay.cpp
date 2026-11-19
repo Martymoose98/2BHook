@@ -83,8 +83,9 @@ void Overlay::RenderCollisions2(OverlayDrawList* pList)
 		if (pObj) //dword30 = 0xff - trees
 		{
 			// Only for the label. Bounds-checked: what m_uScenePropIndex indexes is unconfirmed,
-			// and past the list's end it read whatever followed the array.
-			pInfo = (pObj->m_uScenePropIndex < g_pEntityList->m_uSize) ? g_pEntityList->m_pItems[pObj->m_uScenePropIndex].second : NULL;
+			// and past the list's end it read whatever followed the array. m_uItems is the capacity;
+			// m_uSize is the live count, and slots are not compacted.
+			pInfo = (pObj->m_uScenePropIndex < g_pEntityList->m_uItems) ? g_pEntityList->m_pItems[pObj->m_uScenePropIndex].second : NULL;
 			pObject = (pInfo) ? pInfo->m_pParent : NULL;
 
 			// draws a fuck ton with this idk if i like it it

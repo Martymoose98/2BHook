@@ -190,7 +190,7 @@ struct CEntityList
 		{
 			++m_hIterator;
 
-			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uSize)
+			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uItems)
 				m_hIterator = INVALID_EHANDLE;
 
 			return m_hIterator;
@@ -200,7 +200,7 @@ struct CEntityList
 		{
 			++m_hIterator;
 
-			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uSize)
+			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uItems)
 				m_hIterator = INVALID_EHANDLE;
 			
 			return m_hIterator;
@@ -222,7 +222,7 @@ struct CEntityList
 		{
 			++m_hIterator;
 
-			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uSize)
+			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uItems)
 			{
 				m_hIterator = INVALID_EHANDLE;
 				return m_hIterator;
@@ -247,7 +247,7 @@ struct CEntityList
 		{
 			++m_hIterator;
 
-			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uSize)
+			if (m_hIterator.GetEntIndex() >= g_pEntityList->m_uItems)
 			{
 				m_hIterator = INVALID_EHANDLE;
 				return m_hIterator;
@@ -271,8 +271,8 @@ struct CEntityList
 		const char* m_szClassname;
 	};
 
-	uint32_t m_uItems;								//0x0000
-	uint32_t m_uSize;								//0x0004
+	uint32_t m_uItems;								//0x0000 | capacity: slots in m_pItems; iterate to this
+	uint32_t m_uSize;								//0x0004 | live count (CEntityInfo::Release 0x140745DB0 takes one off); slots are not compacted, so not a bound
 	uint32_t m_uBase;								//0x0008 | What the indices start at for handles
 	uint32_t m_uSector;								//0x000C | Which group of 256
 	std::pair<EntityHandle_t, CEntityInfo*>* m_pItems;//0x0010
