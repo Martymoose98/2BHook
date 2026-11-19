@@ -94,6 +94,16 @@ jobs:
             cat CHANGELOG.md
             echo 'CHANGELOG_EOF'
           } >> "$GITHUB_OUTPUT"
+          # Nexus shows its changelog as plain text: just the changes (not the known issues or the
+          # install steps), with the Markdown stripped, and a link to the full notes.
+          {
+            echo 'nexus<<NEXUS_EOF'
+            awk '/^#+ /{ skip = ($0 ~ /^#+ (Known issues|Install)/); next }
+                 !skip && /^- /{ print substr($0, 3) }' CHANGELOG.md |
+              sed -e 's/\*\*//g' -e 's/`//g' -e 's/\[\([^]]*\)\]([^)]*)/\1/g'
+            echo "Full release notes: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo 'NEXUS_EOF'
+          } >> "$GITHUB_OUTPUT"
 
       # Created on the first run for a tag; a re-run from the Actions tab replaces the assets and
       # the notes instead of failing.
@@ -139,4 +149,5 @@ jobs:
           version: ${{ steps.changelog.outputs.version }}
           display_name: 2BHook ${{ env.TAG }}
           category: main
-          changelog: ${{ steps.changelog.outputs.text }}
+          update_mod_version: true          # the mod page's version follows the release
+          changelog: ${{ steps.changelog.outputs.nexus }}
