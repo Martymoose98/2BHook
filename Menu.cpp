@@ -1285,13 +1285,7 @@ void ApplyModelMods(Pl0000* pEntity)
 	// %.40s: see the pod mesh slider above.
 	sprintf_s(szModelPart, "Mesh: %.40s###ModelMesh", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
 
-	if (ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp))
-	{
-		// bSelectedMeshEnable is a single flag, and the entity hook writes it into whichever
-		// mesh is selected every frame. Load the newly selected mesh's real state, otherwise
-		// moving the slider stamps the previous mesh's visibility onto every mesh it passes.
-		Vars.Gameplay.bSelectedMeshEnable = (pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow != FALSE);
-	}
+	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
 
 	// Taken after the slider, so the rest of this frame edits the mesh the slider now shows
 	// rather than the one it showed before it moved.
@@ -1299,7 +1293,11 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
 
-	ImGui::Checkbox("Enabled", &Vars.Gameplay.bSelectedMeshEnable);
+	// Shows the mesh's real visibility, which the game changes too. See Features::SetMeshHidden.
+	bool bMeshShown = pSelectedMesh->m_bShow != FALSE;
+
+	if (ImGui::Checkbox("Enabled", &bMeshShown))
+		Features::SetMeshHidden(&pEntity->m_Work, Vars.Gameplay.iSelectedModelMesh, !bMeshShown);
 
 #if defined(_DEBUG)
 	ImGui::InputText("Custom Texture (DDS)", Vars.Gameplay.szModelTextureName, MAX_PATH);

@@ -86,6 +86,71 @@ namespace Features
 		s_bDebugGodmode = Vars.Gameplay.bGodmode;
 	}
 
+	// The model menu's mesh "Enabled" checkbox. It used to take effect only through
+	// hkPl0000Update, a vtable hook that is installed only in Debug builds with EXP_ENT_HOOK
+	// defined - which it never is - so the checkbox did nothing. A mesh unticked there is hidden
+	// again every frame, since the game turns some meshes back on by itself (the face meshes on
+	// some animations); ticking it again hands the mesh back to the game.
+	struct HiddenMesh
+	{
+		const CModelWork* m_pWork;
+		int32_t m_iMesh;
+	};
+
+	inline HiddenMesh g_HiddenMeshes[32];
+	inline int g_nHiddenMeshes = 0;
+
+	inline void SetMeshHidden(CModelWork* pWork, int32_t iMesh, bool bHidden)
+	{
+		if (!pWork || iMesh < 0 || iMesh >= pWork->m_nMeshes)
+			return;
+
+		int iFound = -1;
+
+		for (int i = 0; i < g_nHiddenMeshes; ++i)
+		{
+			if (g_HiddenMeshes[i].m_pWork == pWork && g_HiddenMeshes[i].m_iMesh == iMesh)
+				iFound = i;
+		}
+
+		if (bHidden && iFound == -1)
+		{
+			if (g_nHiddenMeshes == ARRAYSIZE(g_HiddenMeshes))
+				return;
+
+			g_HiddenMeshes[g_nHiddenMeshes++] = { pWork, iMesh };
+		}
+		else if (!bHidden && iFound != -1)
+		{
+			g_HiddenMeshes[iFound] = g_HiddenMeshes[--g_nHiddenMeshes];
+		}
+
+		pWork->m_pMeshes[iMesh].m_bShow = bHidden ? FALSE : TRUE;
+		pWork->m_pMeshes[iMesh].m_bUpdate = TRUE;
+	}
+
+	// Called every frame with the camera entity's model; entries for other models wait until
+	// the camera is back on them, since their pointers may be stale meanwhile.
+	inline void ApplyHiddenMeshes(CModelWork* pWork)
+	{
+		if (!pWork)
+			return;
+
+		for (int i = 0; i < g_nHiddenMeshes; ++i)
+		{
+			if (g_HiddenMeshes[i].m_pWork != pWork || g_HiddenMeshes[i].m_iMesh >= pWork->m_nMeshes)
+				continue;
+
+			CMeshPart* pMesh = &pWork->m_pMeshes[g_HiddenMeshes[i].m_iMesh];
+
+			if (pMesh->m_bShow)
+			{
+				pMesh->m_bShow = FALSE;
+				pMesh->m_bUpdate = TRUE;
+			}
+		}
+	}
+
 	static void AddEntityToBlackList()
 	{
 

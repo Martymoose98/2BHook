@@ -357,6 +357,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 	if (pCameraEnt)
 	{
+		Features::ApplyHiddenMeshes(&pCameraEnt->m_Work);
+
 		// This ran in hkPl0000Update until 90c09d7, but that hook is only installed in Debug
 		// builds with EXP_ENT_HOOK defined, which it never is - so Rainbow Hair did nothing.
 		if (Vars.Gameplay.bRainbowHair)
