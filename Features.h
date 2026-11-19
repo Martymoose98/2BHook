@@ -38,22 +38,72 @@ namespace Features
 		// Pl0000_HitStep skips both ship-hit paths while the ship's own i-frame flag is set, and
 		// Pl0000_TakeEndRollShipHit has no debug-flag check of its own, so keep the game's i-frames
 		// running instead of patching code. Pl0000_ExecuteState66/70 count the timer down and clear
-		// the flag at zero, so with both toggles off it ends within a second by itself, and neither
-		// toggle can switch the other off. Godmode's debug bit 0x4000 already makes HitStep skip
+		// the flag at zero; when both toggles go off, the i-frames are released below straight
+		// away, and neither toggle can switch the other off. Godmode's debug bit 0x4000 already makes HitStep skip
 		// ship hits; doing this for Godmode too keeps the ship safe if the game rewrites the debug
 		// flags.
 		Pl0000* pPlayer = g_pLocalPlayer;
+		const bool bInShip = pPlayer && (pPlayer->m_ObjectId & 0xFFFFF000) == 0x10000 &&
+			(pPlayer->m_iAnimationId == PL_STATE_HACKING_SHIP || pPlayer->m_iAnimationId == PL_STATE_ENDROLL_SHIP);
 
-		if ((Vars.Gameplay.bGodmode || Vars.Gameplay.bInvincibleHackingShip) && pPlayer &&
-			(pPlayer->m_ObjectId & 0xFFFFF000) == 0x10000 &&
-			(pPlayer->m_iAnimationId == PL_STATE_HACKING_SHIP || pPlayer->m_iAnimationId == PL_STATE_ENDROLL_SHIP))
+		// The player whose ship i-frames are being held, so they can be released the moment
+		// both toggles are off instead of when the game's countdown runs out (up to a second).
+		// Only released while still flying that ship: Pl0000_EnterState66 clears the flag, the
+		// timer and the hits taken at the start of every hack anyway, and a player pointer
+		// from an earlier frame may be gone.
+		static Pl0000* s_pShipHeld = NULL;
+
+		if ((Vars.Gameplay.bGodmode || Vars.Gameplay.bInvincibleHackingShip) && bInShip)
 		{
 			if (!(pPlayer->m_uHackingFlags & HACKING_FLAG_INVINCIBLE))
 				InterlockedOr((volatile LONG*)&pPlayer->m_uHackingFlags, HACKING_FLAG_INVINCIBLE);
 
 			if (pPlayer->m_flHackingInvincibleTime < 1.0f)
 				pPlayer->m_flHackingInvincibleTime = 1.0f;
+
+			s_pShipHeld = pPlayer;
 		}
+		else if (s_pShipHeld)
+		{
+			if (bInShip && pPlayer == s_pShipHeld)
+			{
+				InterlockedAnd((volatile LONG*)&pPlayer->m_uHackingFlags, ~(LONG)HACKING_FLAG_INVINCIBLE);
+				pPlayer->m_flHackingInvincibleTime = 0.0f;
+			}
+
+			s_pShipHeld = NULL;
+		}
+
+		// One log line when a ship flight starts or ends, and whenever the ship's hits left or
+		// i-frame flag change, so a ship that won't die shows in 2BHook.log which of the three
+		// things that stop ship damage was set: the i-frame flag (Pl0000_HitStep skips the
+		// hit), debug bit 0x4000 (HitStep skips every hit) or debug bit 0x8000
+		// (Pl0000_TakeHackingShipHit takes no life). A vanilla hack starts with flags 0,
+		// i-frames 0, 3 hits left and debug flags 0.
+		static bool s_bWasInShip = false;
+		static int32_t s_iLastShipLife = 0;
+		static uint32_t s_uLastShipFlag = 0;
+
+		if (bInShip)
+		{
+			const uint32_t uFlag = pPlayer->m_uHackingFlags & HACKING_FLAG_INVINCIBLE;
+
+			if (!s_bWasInShip || pPlayer->m_iHackingShipLife != s_iLastShipLife || uFlag != s_uLastShipFlag)
+			{
+				Log::Log("Hacking ship", "state %d, hits left %d, flags %08X, i-frames %.2f, debug flags %08X, Godmode %d, Invincible Hacking Ship %d\n",
+					pPlayer->m_iAnimationId, pPlayer->m_iHackingShipLife, pPlayer->m_uHackingFlags, pPlayer->m_flHackingInvincibleTime,
+					g_pDebugFlags ? *g_pDebugFlags : 0, Vars.Gameplay.bGodmode, Vars.Gameplay.bInvincibleHackingShip);
+			}
+
+			s_iLastShipLife = pPlayer->m_iHackingShipLife;
+			s_uLastShipFlag = uFlag;
+		}
+		else if (s_bWasInShip)
+		{
+			Log::Log("Hacking ship", "left the ship\n");
+		}
+
+		s_bWasInShip = bInShip;
 
 		// Godmode uses the game's own debug invincibility bits, not the NOPs above. With 0x4000
 		// Pl0000::CalculateDamage returns before doing anything, 0x8000 (DBG_PLAYER_NO_DAMAGE)
