@@ -49,29 +49,26 @@ void InitHooks(void)
 	g_pSwapChainHook = new VirtualTableHook((ULONG_PTR**)g_pSwapChain);
 	g_pDeviceContextHook = new VirtualTableHook((ULONG_PTR**)g_pDeviceContext);
 
-	// Take ownership of the internal CDIDev's critical section to stop crashes
-	IDirectInputDevice_Lock(g_pKeyboard->pDevice);
+	{
+		// Hold the internal CDIDev's critical section while the keyboard's vtable hook is
+		// built, to stop crashes. Released at the end of this scope, before Rehook().
+		CDirectInputDeviceLock KeyboardLock(g_pKeyboard->pDevice);
 
-	// Initialize a virtual table hook for the keyboard
-	g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice);
+		g_pKeyboardHook = new VirtualTableHook((ULONG_PTR**)g_pKeyboard->pDevice);
 
-	g_pKeyboardHook->Unhook();
-
-	// Release ownership of the internal CDIDev's critical section
-	IDirectInputDevice_Unlock(g_pKeyboard->pDevice);
+		g_pKeyboardHook->Unhook();
+	}
 
 	g_pKeyboardHook->Rehook();
 
-	// Take ownership of the internal CDIDev's critical section to stop crashes
-	IDirectInputDevice_Lock(g_pMouse->pDevice);
+	{
+		// Same for the mouse
+		CDirectInputDeviceLock MouseLock(g_pMouse->pDevice);
 
-	// Initialize a virtual table hook for the mouse
-	g_pMouseHook = new VirtualTableHook((ULONG_PTR**)g_pMouse->pDevice);
+		g_pMouseHook = new VirtualTableHook((ULONG_PTR**)g_pMouse->pDevice);
 
-	g_pMouseHook->Unhook();
-
-	// Release ownership of the internal CDIDev's critical section
-	IDirectInputDevice_Unlock(g_pMouse->pDevice);
+		g_pMouseHook->Unhook();
+	}
 
 	g_pMouseHook->Rehook();
 

@@ -472,8 +472,8 @@ VALIDATE_SIZE(CWrapMouseDevice8, 0x48);
 #pragma endregion gameoverlayrenderer64
 
 // The DirectInput helpers below are inline rather than static so their one-time state (the
-// resolved module, what was logged, which devices are locked) is shared by every translation
-// unit instead of copied into each. They call Log:: directly rather than through LOG/WARN,
+// resolved module, what was logged) is shared by every translation unit instead of copied
+// into each. They call Log:: directly rather than through LOG/WARN,
 // which expand differently per translation unit (and to nothing in Release).
 
 // Reads a pointer out of memory laid out by someone else's hook, where it may not be valid
@@ -603,62 +603,32 @@ inline CDirectInputDevice8A* ResolveDirectInputDevice(IDirectInputDevice8A* pDev
 	return NULL;
 }
 
-// The devices currently locked, with what Lock resolved for them. Unlock uses the same
-// answer even if the device's vtable has changed in between (a hook being installed).
-struct DirectInputDeviceLock
+// Holds a DirectInput device's CDIDev critical section for the guard's lifetime, so its vtable
+// can be swapped without racing DirectInput's own calls on it. Locks nothing when
+// ResolveDirectInputDevice can't find dinput8.dll's device behind it (see there). The release
+// uses the device resolved here, so it can't disagree with the lock even if the vtable changes.
+class CDirectInputDeviceLock
 {
-	IDirectInputDevice8A* m_pDevice;
+public:
+	explicit CDirectInputDeviceLock(IDirectInputDevice8A* pDevice)
+		: m_pImpl(ResolveDirectInputDevice(pDevice))
+	{
+		if (m_pImpl)
+			EnterCriticalSection(&m_pImpl->m_CriticalSection);
+	}
+
+	~CDirectInputDeviceLock(void)
+	{
+		if (m_pImpl)
+			LeaveCriticalSection(&m_pImpl->m_CriticalSection);
+	}
+
+	CDirectInputDeviceLock(const CDirectInputDeviceLock&) = delete;
+	CDirectInputDeviceLock& operator=(const CDirectInputDeviceLock&) = delete;
+
+private:
 	CDirectInputDevice8A* m_pImpl;
 };
-
-inline DirectInputDeviceLock* GetDirectInputDeviceLocks(void)
-{
-	static DirectInputDeviceLock s_Locks[4] = {};
-
-	return s_Locks;
-}
-
-inline void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
-{
-	CDirectInputDevice8A* pImpl = ResolveDirectInputDevice(pDevice);
-
-	if (!pImpl)
-		return;
-
-	DirectInputDeviceLock* pLocks = GetDirectInputDeviceLocks();
-
-	for (int i = 0; i < 4; ++i)
-	{
-		if (!pLocks[i].m_pDevice)
-		{
-			EnterCriticalSection(&pImpl->m_CriticalSection);
-			pLocks[i].m_pDevice = pDevice;
-			pLocks[i].m_pImpl = pImpl;
-			return;
-		}
-	}
-
-	// No room to remember it, so it couldn't be unlocked reliably either: don't lock
-	Log::Warn(__FUNCSIG__, "DirectInput: too many devices locked at once, hooking %p without the device lock\n", pDevice);
-}
-
-inline void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
-{
-	DirectInputDeviceLock* pLocks = GetDirectInputDeviceLocks();
-
-	for (int i = 0; i < 4; ++i)
-	{
-		if (pLocks[i].m_pDevice == pDevice)
-		{
-			LeaveCriticalSection(&pLocks[i].m_pImpl->m_CriticalSection);
-			pLocks[i].m_pDevice = NULL;
-			pLocks[i].m_pImpl = NULL;
-			return;
-		}
-	}
-
-	// Lock didn't lock it (not dinput8.dll's device), so there is nothing to release
-}
 
 // https://stackoverflow.com/questions/46182845/field-of-view-aspect-ratio-view-matrix-from-projection-matrix-hmd-ost-calib
 static float GetFovFromProjectionMatrix(void)
