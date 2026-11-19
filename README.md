@@ -217,8 +217,8 @@ Set these under **Settings > Secrets and variables > Actions**. The GitHub relea
 | Name | Kind | Value |
 |---|---|---|
 | `NEXUSMODS_API_KEY` | Secret | A Nexus Mods API key, from your account's API key settings (Site Preferences, API Keys). |
-| `NEXUSMODS_MOD_ID` | Variable | The mod's id: the number in the mod page URL (`nexusmods.com/<game>/mods/<id>`). It is also shown under **Advanced** on the mod's Files tab. |
-| `NEXUSMODS_FILE_ID` | Variable | The id of the existing file that each release adds a new version to. It is shown under **Advanced** on the mod's Files tab, or in that file's edit menu on the Manage Files page. |
+| `NEXUSMODS_MOD_ID` | Variable | The mod's v3 API id. This is not the number in the mod page URL: look it up with `curl -H "apikey: <key>" https://api.nexusmods.com/v3/games/<game>/mods/<url number>` and take `data.id` (2B Hook: `8375186227210`). |
+| `NEXUSMODS_FILE_ID` | Variable | The v3 id of the file that each release adds a new version to. This is not the file id in download links: list them with `curl -H "apikey: <key>" https://api.nexusmods.com/v3/mods/<mod id>/files` and take the active file's `id` (2B Hook: `820696`). |
 
 The upload goes through `Nexus-Mods/upload-action`, which uses Nexus Mods' v3 Upload API (currently in open beta). It adds a new version to an existing file, so upload the first file to the mod page by hand.
 
