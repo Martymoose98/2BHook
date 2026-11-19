@@ -960,6 +960,43 @@ namespace Features
 		ReleaseSemaphore(pNext->m_hTaskSemaphore, 1, NULL);
 	}
 
+	enum SpawnAssets_t
+	{
+		SPAWN_ASSETS_UNCHECKABLE,	// the game's checks weren't found on this build
+		SPAWN_ASSETS_NOT_LOADED,
+		SPAWN_ASSETS_RESIDENT,
+	};
+
+	// Whether an object's files, and those of every object its dependency record names, are in
+	// memory, asked the way the game asks before a free spawn: ModelSetSpawnList_Update
+	// (0x14082B190) spawns its "FreeEnemy" only once both of these answer 1 for the id and set type
+	// (see FindSteamOffsets). They only look, under the read system's locks.
+	//
+	// Spawning without it isn't a clean failure. CreateEntityInternal (0x1407453C0) gets the files
+	// from CObjReadSystem::GetDataAtSet (0x14084E1F0), which for files that aren't in memory calls
+	// RequestStart and ObjRead_BeginLoadingData (0x14075EDE0): that sets g_bOBJREAD_LoadingData,
+	// which stops MainUpdateExec drawing the world (0x14075EFCA), and pauses task 1 of the game's
+	// job manager (CJobManager::PauseTask).
+	// The read then reserves the files' memory from the object's heap, and when the map has no
+	// room for them CObjReadWorkDesc_Tick raises the fatal out-of-memory box (0x14019B1AD).
+	inline SpawnAssets_t GetSpawnAssets(uint32_t ObjectId, DWORD dwSetType)
+	{
+		if (!g_pObjReadSystem || !ObjReadSystem_RequestStartAsscessory || !ObjReadSystem_RequestStartFilter)
+			return SPAWN_ASSETS_UNCHECKABLE;
+
+		return (ObjReadSystem_RequestStartAsscessory(g_pObjReadSystem, ObjectId, (int32_t)dwSetType) &&
+			ObjReadSystem_RequestStartFilter(g_pObjReadSystem, ObjectId, (int32_t)dwSetType)) ?
+			SPAWN_ASSETS_RESIDENT : SPAWN_ASSETS_NOT_LOADED;
+	}
+
+	// The set type CreateEntityInternal creates with (0x140745551): the set info's, else Create_t's.
+	// It picks the dependency record GetSpawnAssets walks (CObjReadSystem_GetDependencies,
+	// 0x14084E070).
+	inline DWORD GetCreateSetType(const Create_t* pCreate)
+	{
+		return pCreate->m_pSetInfo ? pCreate->m_pSetInfo->m_dwSetType : pCreate->m_dwSetType;
+	}
+
 	// Create Entity's result. JobManager_CreateTask (CJobManager::CreateTask, 0x140270140) only links
 	// CreateEntityStub into the job manager's run list and returns, so the entity is made later, when
 	// that task runs. CreateEntity used to return g_CreateCtx.pInfo straight away - the previous
@@ -978,6 +1015,12 @@ namespace Features
 		uint32_t m_ObjectId = 0;
 		EntityHandle_t m_hOwner;	// the camera entity when Create Entity was pressed
 		EntityHandle_t m_hEntity;
+		bool m_bAssetsGone = false;	// the stub found the files gone from memory and didn't create it
+		// Create_t::m_szName until the task has run. CreateEntityInternal copies it with
+		// strcpy_s(m_szEntityType, 0x20, ...) (0x14074543E), which raises the invalid parameter
+		// handler at 32 characters or more, and a class name can be that long
+		// (BehaviorFunnelSkillExecutionSpear, row 0x34000, has 33), so it is cut to 31.
+		char m_szName[32] = {};
 	};
 
 	inline PendingSpawn_t g_PendingSpawn;
@@ -993,7 +1036,17 @@ namespace Features
 		// Stops the SceneTask thread from running
 		//JobManager_PauseTask(g_pJobManager, 1); 
 
-		pParams->pInfo = SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &pParams->Create);
+		// Asked again here, where it is created: the files can leave memory between the menu's
+		// frame and this task, and then GetDataAtSet would start reading them
+		if (GetSpawnAssets(pParams->Create.m_ObjectIds[0], GetCreateSetType(&pParams->Create)) == SPAWN_ASSETS_RESIDENT)
+		{
+			pParams->pInfo = SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &pParams->Create);
+		}
+		else
+		{
+			pParams->pInfo = NULL;
+			g_PendingSpawn.m_bAssetsGone = true;
+		}
 
 		// The handle rather than the info, which may be gone by the time hkPresent looks at it
 		g_PendingSpawn.m_hEntity.m_uValue = (pParams->pInfo) ? pParams->pInfo->m_hEntity.m_uValue : 0;
@@ -1017,7 +1070,8 @@ namespace Features
 	// Queues the spawn and returns whether it was queued; ApplyCreatedEntity finishes it. One at a
 	// time, since the task reads g_CreateCtx when it runs. CJobManager::CreateTask takes a task off
 	// m_pFreeTasks (+0x18) and raises the fatal error g_szTaskIsOutOfWork when there is none, so
-	// an exhausted pool is checked for first and the spawn refused.
+	// an exhausted pool is checked for first and the spawn refused. So is an object whose assets
+	// aren't in memory (GetSpawnAssets).
 	static bool CreateEntity(const char* szName, uint32_t ObjectId, OPTIONAL set_info_t* pSetInfo, EntityHandle_t hOwner)
 	{
 		static CJobManager* pJobMgrAlt = (CJobManager*)
@@ -1039,8 +1093,12 @@ namespace Features
 		g_PendingSpawn.m_ObjectId = ObjectId;
 		g_PendingSpawn.m_hOwner = hOwner;
 		g_PendingSpawn.m_hEntity.m_uValue = 0;
+		g_PendingSpawn.m_bAssetsGone = false;
 
-		g_CreateCtx.Create.m_szName = szName;
+		if (szName)
+			strncpy_s(g_PendingSpawn.m_szName, szName, _TRUNCATE);
+
+		g_CreateCtx.Create.m_szName = (szName) ? g_PendingSpawn.m_szName : NULL;
 		g_CreateCtx.Create.m_ObjectIds[0] = ObjectId;
 		g_CreateCtx.Create.m_ObjectIds[1] = ObjectId;
 		g_CreateCtx.Create.m_iGenerateMode = 1;
@@ -1050,6 +1108,22 @@ namespace Features
 			g_CreateCtx.SetInfo = *pSetInfo;
 			g_CreateCtx.Create.m_pSetInfo = &g_CreateCtx.SetInfo;
 			g_CreateCtx.Create.m_iGenerateMode = pSetInfo->m_i0x088;
+		}
+
+		// Only what is in memory already (see GetSpawnAssets): the game's free spawner requests an
+		// object's files and waits for them, this doesn't
+		switch (GetSpawnAssets(ObjectId, GetCreateSetType(&g_CreateCtx.Create)))
+		{
+		case SPAWN_ASSETS_RESIDENT:
+			break;
+		case SPAWN_ASSETS_NOT_LOADED:
+			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+			g_pConsole->Warn("Create Entity: ObjectId %x's assets aren't loaded on this map", ObjectId);
+			return false;
+		default:
+			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+			g_pConsole->Warn("Create Entity: can't check ObjectId %x's assets on this game build", ObjectId);
+			return false;
 		}
 
 		static CJobManager::FindAndDestoryTaskFn FindDestroyTsk = (CJobManager::FindAndDestoryTaskFn)
@@ -1102,11 +1176,16 @@ namespace Features
 		EntityHandle_t hOwner = g_PendingSpawn.m_hOwner;
 		const uint32_t ObjectId = g_PendingSpawn.m_ObjectId;
 
+		const bool bAssetsGone = g_PendingSpawn.m_bAssetsGone;
+
 		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
 
 		if (!GetEntityInfoFromHandle(&hEntity))
 		{
-			g_pConsole->Warn("Create Entity: ObjectId %x wasn't created", ObjectId);
+			if (bAssetsGone)
+				g_pConsole->Warn("Create Entity: ObjectId %x wasn't created, its assets left memory before it could be", ObjectId);
+			else
+				g_pConsole->Warn("Create Entity: ObjectId %x wasn't created", ObjectId);
 			return;
 		}
 
