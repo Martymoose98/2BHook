@@ -194,7 +194,7 @@ CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 20
 - **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. It:
   1. builds Release x64;
   2. packages `2BHook-<tag>.zip` (the DLL and README) and `2BHook-<tag>.pdb`;
-  3. writes a changelog from the commits since the previous `v*` tag;
+  3. takes the release notes from `.github/release-notes/<tag>.md` if the tagged commit has that file, or otherwise writes a changelog from the commits since the previous `v*` tag;
   4. creates the GitHub release with both files;
   5. uploads the zip to Nexus Mods, if that is configured.
 

@@ -1,6 +1,7 @@
 # Cuts a release when a v* tag is pushed (or for an existing tag, from the Actions tab):
-# builds Release x64, packages 2BHook-<tag>.zip (DLL + README) and 2BHook-<tag>.pdb, writes a
-# changelog from the commits since the previous v* tag, creates or updates the GitHub release,
+# builds Release x64, packages 2BHook-<tag>.zip (DLL + README) and 2BHook-<tag>.pdb, takes the
+# notes from .github/release-notes/<tag>.md (or the commits since the previous v* tag when there
+# is no such file), creates or updates the GitHub release,
 # and uploads the zip to Nexus Mods when the Nexus settings are present.
 name: Release
 
@@ -54,18 +55,24 @@ jobs:
           Compress-Archive -Path x64/Release/2BHook.dll, README.md -DestinationPath "dist/2BHook-$env:TAG.zip"
           Copy-Item x64/Release/2BHook.pdb "dist/2BHook-$env:TAG.pdb"
 
-      # The commits since the previous v* tag (all of them if this is the first), newest first,
-      # merges left out.
+      # Hand-written notes in .github/release-notes/<tag>.md win when the tagged commit has them.
+      # Otherwise: the commits since the previous v* tag (all of them if this is the first),
+      # newest first, merges left out.
       - name: Changelog
         id: changelog
         shell: bash
         run: |
-          prev=$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)
-          {
-            echo "## Changes${prev:+ since $prev}"
-            echo
-            git log --no-merges --pretty='- %s (%h)' "${prev:+$prev..}$TAG"
-          } > CHANGELOG.md
+          notes=".github/release-notes/$TAG.md"
+          if [ -f "$notes" ]; then
+            cp "$notes" CHANGELOG.md
+          else
+            prev=$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)
+            {
+              echo "## Changes${prev:+ since $prev}"
+              echo
+              git log --no-merges --pretty='- %s (%h)' "${prev:+$prev..}$TAG"
+            } > CHANGELOG.md
+          fi
           cat CHANGELOG.md
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           {
