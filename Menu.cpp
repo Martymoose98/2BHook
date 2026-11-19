@@ -334,6 +334,11 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 	ImGui::Checkbox("No Fall Damage", &Vars.Gameplay.bNoWorldDamage);
 	ImGui::SameLine();
 	ImGui::Checkbox("No Enemy Damage", &Vars.Gameplay.bNoEnemyDamage);
+	ImGui::SameLine();
+	ImGui::Checkbox("Invincible Hacking Ship", &Vars.Gameplay.bInvincibleHackingShip);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("The ship in hacking and in the Ending E credits shooter takes no hits. Godmode covers this too.");
 
 	if (!pCameraEnt)
 		return;

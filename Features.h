@@ -34,10 +34,32 @@ namespace Features
 		else
 			RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
 
+		// The hacking ship: the hacking minigame and the Ending E credits shooter (issue #14).
+		// Pl0000_HitStep skips both ship-hit paths while the ship's own i-frame flag is set, and
+		// Pl0000_TakeEndRollShipHit has no debug-flag check of its own, so keep the game's i-frames
+		// running instead of patching code. Pl0000_ExecuteState66/70 count the timer down and clear
+		// the flag at zero, so with both toggles off it ends within a second by itself, and neither
+		// toggle can switch the other off. Godmode's debug bit 0x4000 already makes HitStep skip
+		// ship hits; doing this for Godmode too keeps the ship safe if the game rewrites the debug
+		// flags.
+		Pl0000* pPlayer = g_pLocalPlayer;
+
+		if ((Vars.Gameplay.bGodmode || Vars.Gameplay.bInvincibleHackingShip) && pPlayer &&
+			(pPlayer->m_ObjectId & 0xFFFFF000) == 0x10000 &&
+			(pPlayer->m_iAnimationId == PL_STATE_HACKING_SHIP || pPlayer->m_iAnimationId == PL_STATE_ENDROLL_SHIP))
+		{
+			if (!(pPlayer->m_uHackingFlags & HACKING_FLAG_INVINCIBLE))
+				InterlockedOr((volatile LONG*)&pPlayer->m_uHackingFlags, HACKING_FLAG_INVINCIBLE);
+
+			if (pPlayer->m_flHackingInvincibleTime < 1.0f)
+				pPlayer->m_flHackingInvincibleTime = 1.0f;
+		}
+
 		// Godmode uses the game's own debug invincibility bits, not the NOPs above. With 0x4000
 		// Pl0000::CalculateDamage returns before doing anything, 0x8000 (DBG_PLAYER_NO_DAMAGE)
 		// zeroes the damage, and Pl0000_TakeDamage does nothing if either is set - so both NOP
-		// sites are covered, plus the flight unit and hacking, which the NOPs miss (issue #14).
+		// sites are covered. 0x4000 also makes Pl0000_HitStep skip a hit before it reaches the
+		// flight unit, hacking ship or Ending E ship code (every path to them passes that test).
 		constexpr uint32_t DBG_FLAG_INVINCIBLE = 0x4000 | 0x8000;
 		static bool s_bDebugGodmode = false;
 		static uint32_t s_uBitsSetBeforeGodmode = 0;

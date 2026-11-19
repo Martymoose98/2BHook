@@ -27,6 +27,7 @@ typedef struct Variables_t
 		bool bGodmode;
 		bool bNoEnemyDamage;
 		bool bNoWorldDamage;
+		bool bInvincibleHackingShip;
 		bool bNoCollision;
 		int iLevel;
 		bool bBalanceEnemyLevels;

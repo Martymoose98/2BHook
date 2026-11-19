@@ -94,6 +94,10 @@
 #define CATEGORY_KEYBINDS _CRT_WIDE("Keybinds")
 #define CATEGORY_MISC _CRT_WIDE("Misc")
 #define CATEGORY_MENU _CRT_WIDE("Menu")
+// Settings added after a category already shipped get their own category: CConfigXml::Load
+// reads a category's children by position, so a new item in the middle of an existing one
+// would shift every item after it when an older config is loaded.
+#define CATEGORY_HACKING _CRT_WIDE("Hacking")
 #define CONFIG_EXTENSION TEXT(".xml")
 #else
 #define CATEGORY_VISUALS "Visuals"
@@ -101,6 +105,7 @@
 #define CATEGORY_KEYBINDS "Keybinds"
 #define CATEGORY_MISC "Misc"
 #define CATEGORY_MENU "Menu"
+#define CATEGORY_HACKING "Hacking"
 
 #define CONFIG_EXTENSION TEXT(".ini")
 #endif // CONFIG_XML

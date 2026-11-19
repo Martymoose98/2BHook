@@ -472,6 +472,7 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_godmode", Vars.Gameplay.bGodmode));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_no_enemy_damage", Vars.Gameplay.bNoEnemyDamage));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_no_world_damage", Vars.Gameplay.bNoWorldDamage));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_HACKING, L"t_invincible_hacking_ship", Vars.Gameplay.bInvincibleHackingShip));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_no_collision", Vars.Gameplay.bNoCollision));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_instant_equip", Vars.Gameplay.bInstantEquip));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_GAMEPLAY, L"t_no_tutorial_dialogs", Vars.Gameplay.bNoTutorialDialogs));
@@ -796,6 +797,7 @@ void CConfig::InitializeConfig()
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_godmode", Vars.Gameplay.bGodmode));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_enemy_damage", Vars.Gameplay.bNoEnemyDamage));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_world_damage", Vars.Gameplay.bNoWorldDamage));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_HACKING, "t_invincible_hacking_ship", Vars.Gameplay.bInvincibleHackingShip));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_collision", Vars.Gameplay.bNoCollision));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_instant_equip", Vars.Gameplay.bInstantEquip));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_GAMEPLAY, "t_no_tutorial_dialogs", Vars.Gameplay.bNoTutorialDialogs));

@@ -4,6 +4,14 @@
 
 #include "CBehavior.h"
 
+// Pl0000::m_uHackingFlags bits (v1.02 and build 26534214)
+#define HACKING_FLAG_SHOCKWAVE	0x08000000	// Pl0000_SetHackingShockwave
+#define HACKING_FLAG_INVINCIBLE	0x10000000	// Pl0000_SetHackingInvincible; Pl0000_HitStep skips ship hits while set
+
+// Pl0000::m_iAnimationId while flying a hacking ship
+#define PL_STATE_HACKING_SHIP	66	// hacking minigame (Pl0000_ExecuteState66)
+#define PL_STATE_ENDROLL_SHIP	70	// Ending E credits shooter (Pl0000_ExecuteState70)
+
 /*
 NieR:Automata's Entity class idk if it's the right name (actual Pl0000). Just started to
 reverse this and this structure is fucking huge!
@@ -60,7 +68,13 @@ public:
 	EntityHandle_t m_hUnk2;					//0x10814
 	char _0x10818[844];						//0x10818
 	BOOL m_bUnkCamera;						//0x10B64 | Camera boolean
-	char _0x10B68[9048];					//0x10B68
+	char _0x10B68[7556];					//0x10B68
+	int32_t m_iHackingShipLife;				//0x128EC | hacking minigame / Ending E ship hits left
+	char _0x128F0[24];						//0x128F0
+	float m_flHackingInvincibleTime;		//0x12908 | ship i-frames; states 66/70 count it down
+	char _0x1290C[68];						//0x1290C
+	uint32_t m_uHackingFlags;				//0x12950 | HACKING_FLAG_*
+	char _0x12954[1388];					//0x12954
 	StaticArray<CObj*, 64> m_pObjects;		//0x12EC0
 	char _0x130E0[10880];					//0x130E0
 	BOOL m_bFlightSuit;						//0x15B50
@@ -115,6 +129,9 @@ VALIDATE_OFFSET(Pl0000, m_LevelsContainer, 0x2078);
 VALIDATE_OFFSET(Pl0000, m_VerticalCollision, 0x1790);
 VALIDATE_OFFSET(Pl0000, m_HorizontalCollision, 0x18C0);
 VALIDATE_OFFSET(Pl0000, m_bUnkCamera, 0x10B64);
+VALIDATE_OFFSET(Pl0000, m_iHackingShipLife, 0x128EC);
+VALIDATE_OFFSET(Pl0000, m_flHackingInvincibleTime, 0x12908);
+VALIDATE_OFFSET(Pl0000, m_uHackingFlags, 0x12950);
 VALIDATE_OFFSET(Pl0000, m_pObjects, 0x12EC0);
 VALIDATE_OFFSET(Pl0000, m_hFlightSuit, 0x15B64);
 VALIDATE_OFFSET(Pl0000, m_hBuddy, 0x1647C);

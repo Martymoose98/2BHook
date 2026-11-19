@@ -26,6 +26,7 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - Godmode: Take no damage.
 - No Fall Damage: No fall damage.
 - No Enemy Damage: No damage from enemies.
+- Invincible Hacking Ship: The ship takes no hits in hacking and in the Ending E credits shooter. Godmode covers this too.
 - Level Manipulation: Configures enemy levels and local player level.
 - Buddy Spawning: Spawn in the buddy of your choice.
 - Item Spawning: Spawn in items by id or name.
