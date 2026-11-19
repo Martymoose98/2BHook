@@ -1,0 +1,121 @@
+# Cuts a release when a v* tag is pushed (or for an existing tag, from the Actions tab):
+# builds Release x64, packages 2BHook-<tag>.zip (DLL + README) and 2BHook-<tag>.pdb, writes a
+# changelog from the commits since the previous v* tag, creates or updates the GitHub release,
+# and uploads the zip to Nexus Mods when the Nexus settings are present.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release again, e.g. v1.2.0
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    # See build.yml: Visual Studio 2026 (MSVC v145), named explicitly
+    runs-on: windows-2025-vs2026
+
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0        # the whole history and its tags, for the changelog
+          submodules: false
+
+      # See build.yml: Fluorine's SSH URL rewritten to HTTPS for the runner
+      - name: Fetch submodules over HTTPS
+        shell: bash
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build Release x64
+        run: msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m -nologo -v:minimal
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path x64/Release/2BHook.dll, README.md -DestinationPath "dist/2BHook-$env:TAG.zip"
+          Copy-Item x64/Release/2BHook.pdb "dist/2BHook-$env:TAG.pdb"
+
+      # The commits since the previous v* tag (all of them if this is the first), newest first,
+      # merges left out.
+      - name: Changelog
+        id: changelog
+        shell: bash
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)
+          {
+            echo "## Changes${prev:+ since $prev}"
+            echo
+            git log --no-merges --pretty='- %s (%h)' "${prev:+$prev..}$TAG"
+          } > CHANGELOG.md
+          cat CHANGELOG.md
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          {
+            echo 'text<<CHANGELOG_EOF'
+            cat CHANGELOG.md
+            echo 'CHANGELOG_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      # Created on the first run for a tag; a re-run from the Actions tab replaces the assets and
+      # the notes instead of failing.
+      - name: GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+            gh release edit "$TAG" --notes-file CHANGELOG.md
+          else
+            gh release create "$TAG" dist/* --verify-tag --title "2BHook $TAG" --notes-file CHANGELOG.md
+          fi
+
+      # Secrets can't be tested in an if:, so this step decides. Without the API key secret and
+      # both IDs the upload is skipped with a notice, and the release above still stands.
+      - name: Check Nexus Mods settings
+        id: nexus
+        shell: bash
+        env:
+          API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+          MOD_ID: ${{ vars.NEXUSMODS_MOD_ID }}
+          FILE_ID: ${{ vars.NEXUSMODS_FILE_ID }}
+        run: |
+          if [ -n "$API_KEY" ] && [ -n "$MOD_ID" ] && [ -n "$FILE_ID" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Nexus Mods upload skipped: set the NEXUSMODS_API_KEY secret and the NEXUSMODS_MOD_ID and NEXUSMODS_FILE_ID variables to enable it."
+          fi
+
+      # Uploads a new version of the existing Nexus file NEXUSMODS_FILE_ID (v3 Upload API, in
+      # open beta; the action is pinned to its latest beta tag). The changelog needs the mod id.
+      - name: Upload to Nexus Mods
+        if: steps.nexus.outputs.enabled == 'true'
+        uses: Nexus-Mods/upload-action@v1.0.0-beta.11
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          mod_id: ${{ vars.NEXUSMODS_MOD_ID }}
+          file_id: ${{ vars.NEXUSMODS_FILE_ID }}
+          filename: dist/2BHook-${{ env.TAG }}.zip
+          version: ${{ steps.changelog.outputs.version }}
+          display_name: 2BHook ${{ env.TAG }}
+          category: main
+          changelog: ${{ steps.changelog.outputs.text }}

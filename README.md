@@ -13,6 +13,7 @@ visual, spawning and debugging tools.
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
+- [Releasing](#releasing)
 - [Todo](#todo)
 - [Contact](#contact)
 
@@ -114,10 +115,11 @@ msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -m
 ```
 The DLL lands in `x64\<Configuration>\2BHook.dll`.
 
-**Post-build copy:** a post-build step copies the DLL to `Z:\NieRAutomata\mods\`, the author's game folder. Change the path in the project's Post-Build Event to your own game's `mods` folder, or turn it off for a build:
+**Post-build copy:** a post-build step copies the DLL into a `mods` folder, by default `Z:\NieRAutomata\mods\` (the author's game folder). Point it at your own game with the `ModsDir` property, or an environment variable of the same name:
 ```
-msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false
+msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:ModsDir="C:\Games\NieRAutomata\mods"
 ```
+Turn it off for one build with `-p:PostBuildEventUseInBuild=false`. It is off automatically in CI, where the `CI` environment variable is `true`.
 
 `Debug` builds add a few debug-only menu controls.
 
@@ -137,7 +139,7 @@ msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUs
 
   Injecting earlier can fail.
 
-Prebuilt DLLs are published on the [Releases](https://github.com/Martymoose98/2BHook/releases) page when available; otherwise build from source as above.
+Prebuilt releases are on the [Releases](https://github.com/Martymoose98/2BHook/releases) page: `2BHook-<version>.zip` (the DLL and this README) plus the matching `.pdb`. They are also on Nexus Mods once that is set up (see [Releasing](#releasing)). Otherwise, build from source as above.
 
 2BHook can run alongside other DLL mods. Mods with hard-coded addresses for an older game build, such as old builds of NASA, can crash the game on build 26534214, so update them first.
 
@@ -183,6 +185,37 @@ Settings are saved as XML next to the DLL. `default.xml` loads at startup, and t
 - **Log:** `2BHook.log` in the game folder records the detected game build and runtime messages; check it first if a feature does nothing.
 - **Crash dumps:** they're written to the game folder as `NieRAutomata_<date>_<time>.dmp`. Attach the dump and the log to a [GitHub issue](https://github.com/Martymoose98/2BHook/issues). A dump may not be written if you close the "has stopped working" dialog too early.
 - **Wrong game version:** if the log says the build isn't recognised, see [Supported Game Versions](#supported-game-versions).
+
+## Releasing
+
+CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 2026, MSVC v145):
+
+- **Build** (`.github/workflows/build.yml`) runs on every push and pull request to `master`. It builds Release x64 and keeps the DLL and PDB as a workflow artifact for 14 days. It never releases.
+- **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. It:
+  1. builds Release x64;
+  2. packages `2BHook-<tag>.zip` (the DLL and README) and `2BHook-<tag>.pdb`;
+  3. writes a changelog from the commits since the previous `v*` tag;
+  4. creates the GitHub release with both files;
+  5. uploads the zip to Nexus Mods, if that is configured.
+
+To cut a release, push Fluorine first if it has new commits, then 2BHook, then the tag:
+```
+git tag v1.2.0
+git push origin v1.2.0
+```
+To release an existing tag again (for example after fixing the workflow), run **Release** from the Actions tab with that tag. It replaces the release's files and notes.
+
+### Repository secrets and variables
+
+Set these under **Settings > Secrets and variables > Actions**. The GitHub release needs none of them; it uses the workflow's own token. Without all three, the Nexus Mods step is skipped with a notice.
+
+| Name | Kind | Value |
+|---|---|---|
+| `NEXUSMODS_API_KEY` | Secret | A Nexus Mods API key, from your account's API key settings (Site Preferences, API Keys). |
+| `NEXUSMODS_MOD_ID` | Variable | The mod's id: the number in the mod page URL (`nexusmods.com/<game>/mods/<id>`). It is also shown under **Advanced** on the mod's Files tab. |
+| `NEXUSMODS_FILE_ID` | Variable | The id of the existing file that each release adds a new version to. It is shown under **Advanced** on the mod's Files tab, or in that file's edit menu on the Manage Files page. |
+
+The upload goes through `Nexus-Mods/upload-action`, which uses Nexus Mods' v3 Upload API (currently in open beta). It adds a new version to an existing file, so upload the first file to the mod page by hand.
 
 ## Todo
 

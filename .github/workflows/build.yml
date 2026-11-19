@@ -1,0 +1,53 @@
+# Builds 2BHook (Release x64) on every push and pull request to master. It doesn't release; the
+# DLL and PDB are kept as a workflow artifact for a few days.
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Windows Server 2025 with Visual Studio 2026, whose MSVC toolset is v145, the toolset the
+    # projects target. Named explicitly rather than windows-latest, so a future image change can't
+    # silently swap the compiler.
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      # .gitmodules points Fluorine at its SSH URL for local use. The runner has no SSH key, and
+      # Fluorine is public, so fetch the submodules over HTTPS without touching .gitmodules.
+      - name: Fetch submodules over HTTPS
+        shell: bash
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          git submodule update --init --recursive
+
+      - uses: microsoft/setup-msbuild@v2
+
+      # PostBuildEventUseInBuild=false is belt and braces: the project already skips its copy to
+      # the local game folder when CI=true, which GitHub Actions sets.
+      - name: Build Release x64
+        run: msbuild 2BHook.slnx -p:Configuration=Release -p:Platform=x64 -p:PostBuildEventUseInBuild=false -m -nologo -v:minimal
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 2BHook-${{ github.sha }}
+          path: |
+            x64/Release/2BHook.dll
+            x64/Release/2BHook.pdb
+          if-no-files-found: error
+          retention-days: 14
