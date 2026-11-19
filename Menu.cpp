@@ -1175,8 +1175,9 @@ static void MaterialTintEditor(Pl0000* pEntity, CMeshPart* pMesh)
 		return;
 	}
 
-	ImGui::TextWrapped("A tint replaces the mesh colour wherever that material is used on this model "
-		"(W_Skin also covers the face, for example). Intensity above 1 brightens dark materials such as 2B's boots.");
+	ImGui::TextWrapped("A tint multiplies the mesh colour wherever that material is used on this model "
+		"(W_Skin also covers the face, for example), so mesh colours and Rainbow Hair still show through. "
+		"Intensity above 1 brightens dark materials such as 2B's boots.");
 
 	for (int i = 0; i < pMesh->m_nShaderInfo; ++i)
 	{

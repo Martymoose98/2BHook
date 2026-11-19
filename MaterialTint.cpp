@@ -51,19 +51,107 @@ namespace
 	BeginUpdateFn s_BeginUpdate;
 	EndUpdateFn s_EndUpdate;
 
+	// CConstantBuffer, from CConstantBufferHolder_BeginUpdate (0x1402469D0) and its commit
+	// (0x140246830) in build 26534214: a ring of CPU-side slots that the render thread
+	// uploads from. The commit records the slot it published, and the engine compares the
+	// next update against that slot to skip unchanged ones, so it keeps the last colour.
+	constexpr size_t CB_SLOTS = 0x28;			// BYTE*, the first slot
+	constexpr size_t CB_SLOT_STRIDE = 0x30;		// size_t
+	constexpr size_t CB_SLOT_COUNT = 0x48;		// int
+	constexpr size_t CB_CREATED = 0x4C;			// int, 0 until the buffer exists
+	constexpr size_t CB_LAST_SLOT = 0x58;		// int, the slot committed last, -1 before the first
+
 	constexpr int MAX_TINTS = 32;
+
+	// The cb4 buffers one material is drawn with: one per mesh that uses it (and more for
+	// instanced or double-buffered models). Draws past this many fall back to the plain tint.
+	constexpr int MAX_SOURCES = 16;
+
+	struct Source
+	{
+		// The engine's cb4 buffer these draws had; claimed by the detour, which also keeps
+		// m_vMeshColor up to date. m_Buffer holds m_vMeshColor x the tint once m_bReady.
+		const CSamplerParam* volatile m_pMeshBuffer;
+		ImVec4 m_vMeshColor;
+		volatile LONG m_bHaveMeshColor;	// set after the first m_vMeshColor, so Update never uploads a claim's empty colour
+		CSamplerParam m_Buffer;			// ours; kept for the session, since queued draws may still use it
+		ImVec4 m_vUploaded;
+		volatile LONG m_bReady;
+	};
 
 	struct Tint
 	{
 		// Read by the draw threads through the detour; written only by Update/Set/Clear.
-		// m_pShader is the key and is published last, after the buffer holds a colour.
+		// m_pShader is the key and is published last, after the plain buffer holds a colour.
 		const CModelShader* volatile m_pShader;
-		CSamplerParam m_Buffer;			// ours; kept for the session, since queued draws may still use it
+		CSamplerParam m_Buffer;			// the plain tint, for draws past MAX_SOURCES
 		const CModelShader* m_pPending;	// the material this slot is being set up for
 		ImVec4 m_vColor;
 		float m_flIntensity;
-		bool m_bDirty;
+		bool m_bDirty;					// m_Buffer needs the new colour
+		Source m_Sources[MAX_SOURCES];
 	};
+
+	// The colour the engine last uploaded into a mesh's cb4 buffer, i.e. that mesh's
+	// CMeshPart::m_vColor: Rainbow Hair, the mesh colour picker, first person's alpha.
+	// Only called while the engine is building a draw with this buffer, so it is alive.
+	ImVec4 ReadMeshColor(const CSamplerParam* pHandle)
+	{
+		const ImVec4 vWhite(1.0f, 1.0f, 1.0f, 1.0f);
+		const BYTE* pBuffer = pHandle ? (const BYTE*)pHandle->m_pBuffer : NULL;
+
+		if (!pBuffer || !*(const int*)(pBuffer + CB_CREATED))
+			return vWhite;
+
+		const BYTE* pSlots = *(const BYTE* const*)(pBuffer + CB_SLOTS);
+		const int iSlot = *(const int*)(pBuffer + CB_LAST_SLOT);
+
+		if (!pSlots || iSlot < 0 || iSlot >= *(const int*)(pBuffer + CB_SLOT_COUNT))
+			return vWhite;
+
+		ImVec4 vColor;
+		memcpy(&vColor, pSlots + iSlot * *(const size_t*)(pBuffer + CB_SLOT_STRIDE), sizeof(vColor));
+
+		return vColor;
+	}
+
+	// The source standing in for pMeshBuffer, claiming a free one the first time. Several
+	// draw threads may get here at once; at worst one buffer ends up with two sources.
+	Source* FindSource(Tint& Entry, const CSamplerParam* pMeshBuffer)
+	{
+		for (Source& Src : Entry.m_Sources)
+		{
+			if (Src.m_pMeshBuffer == pMeshBuffer)
+				return &Src;
+		}
+
+		for (Source& Src : Entry.m_Sources)
+		{
+			if (!Src.m_pMeshBuffer &&
+				!InterlockedCompareExchangePointer((PVOID volatile*)&Src.m_pMeshBuffer, (PVOID)pMeshBuffer, NULL))
+				return &Src;
+		}
+
+		return NULL;
+	}
+
+	// Uploads vColor into a buffer of ours, creating it on first use. False if the engine
+	// refused this frame (an earlier colour is still waiting to be uploaded).
+	bool Upload(CSamplerParam& Buffer, const ImVec4& vColor)
+	{
+		if (!Buffer.m_pBuffer && !s_Acquire(NULL, &Buffer, sizeof(ImVec4)))
+			return false;
+
+		void* pData = NULL;
+
+		if (!s_BeginUpdate(&Buffer, &pData, sizeof(ImVec4)) || !pData)
+			return false;
+
+		memcpy(pData, &vColor, sizeof(vColor));
+		s_EndUpdate(&Buffer, 0);
+
+		return true;
+	}
 
 	Tint s_Tints[MAX_TINTS];
 	volatile LONG s_nActive;
@@ -180,7 +268,25 @@ namespace
 		{
 			if (s_Tints[i].m_pShader == pShader)
 			{
-				*(CSamplerParam**)(pEntry + ENTRY_MESH_COLOR) = &s_Tints[i].m_Buffer;
+				// Stack with the mesh colour rather than replace it: swap in a buffer holding
+				// this draw's mesh colour x the tint. Until Update has filled one for this
+				// mesh (a frame), the draw keeps the engine's buffer, untinted.
+				CSamplerParam** ppBuffer = (CSamplerParam**)(pEntry + ENTRY_MESH_COLOR);
+				Source* pSource = FindSource(s_Tints[i], *ppBuffer);
+
+				if (!pSource)
+				{
+					*ppBuffer = &s_Tints[i].m_Buffer;
+					break;
+				}
+
+				pSource->m_vMeshColor = ReadMeshColor(*ppBuffer);
+				MemoryBarrier();
+				pSource->m_bHaveMeshColor = 1;
+
+				if (pSource->m_bReady)
+					*ppBuffer = &pSource->m_Buffer;
+
 				break;
 			}
 		}
@@ -277,6 +383,15 @@ bool MaterialTint::Set(const CModelShader* pShader, const ImVec4& vColor, float 
 		if (!pTint)
 			return false;
 
+		// The slot is unpublished, so the detour no longer touches its sources. Their
+		// buffers are kept for reuse.
+		for (Source& Src : pTint->m_Sources)
+		{
+			Src.m_bReady = 0;
+			Src.m_bHaveMeshColor = 0;
+			Src.m_pMeshBuffer = NULL;
+		}
+
 		pTint->m_pPending = pShader;
 		InterlockedIncrement(&s_nActive);
 	}
@@ -322,29 +437,47 @@ void MaterialTint::Update(void)
 	{
 		Tint& Entry = s_Tints[i];
 
-		if (!Entry.m_pPending || !Entry.m_bDirty)
+		if (!Entry.m_pPending)
 			continue;
 
-		if (!Entry.m_Buffer.m_pBuffer && !s_Acquire(NULL, &Entry.m_Buffer, sizeof(ImVec4)))
-			continue;
-
-		void* pData = NULL;
-
-		// Refused while the previous colour is still waiting to be uploaded; try next frame
-		if (!s_BeginUpdate(&Entry.m_Buffer, &pData, sizeof(ImVec4)) || !pData)
-			continue;
-
-		// cb4 is float4 g_MeshColor. Alpha stays 1: the shaders discard (dither out) below it.
-		const ImVec4 vColor(Entry.m_vColor.x * Entry.m_flIntensity, Entry.m_vColor.y * Entry.m_flIntensity,
+		// cb4 is float4 g_MeshColor
+		const ImVec4 vTint(Entry.m_vColor.x * Entry.m_flIntensity, Entry.m_vColor.y * Entry.m_flIntensity,
 			Entry.m_vColor.z * Entry.m_flIntensity, 1.0f);
 
-		memcpy(pData, &vColor, sizeof(vColor));
-		s_EndUpdate(&Entry.m_Buffer, 0);
+		// The plain tint, for draws past MAX_SOURCES. Alpha 1: the shaders discard (dither
+		// out) below it. Refused while the previous colour is still waiting to be uploaded;
+		// try next frame.
+		if (Entry.m_bDirty && Upload(Entry.m_Buffer, vTint))
+		{
+			Entry.m_bDirty = false;
 
-		Entry.m_bDirty = false;
+			// The buffer holds a colour now, so the detour may start using it
+			MemoryBarrier();
+			Entry.m_pShader = Entry.m_pPending;
+		}
 
-		// The buffer holds a colour now, so the detour may start using it
-		MemoryBarrier();
-		Entry.m_pShader = Entry.m_pPending;
+		// The stacked colours: each mesh's own colour (and alpha, which first person and
+		// fades use) times the tint, re-uploaded whenever either changes
+		for (Source& Src : Entry.m_Sources)
+		{
+			if (!Src.m_pMeshBuffer || !Src.m_bHaveMeshColor)
+				continue;
+
+			MemoryBarrier();
+
+			const ImVec4 vMesh = Src.m_vMeshColor;
+			const ImVec4 vColor(vMesh.x * vTint.x, vMesh.y * vTint.y, vMesh.z * vTint.z, vMesh.w);
+
+			if (Src.m_bReady && !memcmp(&vColor, &Src.m_vUploaded, sizeof(vColor)))
+				continue;
+
+			if (!Upload(Src.m_Buffer, vColor))
+				continue;
+
+			Src.m_vUploaded = vColor;
+
+			MemoryBarrier();
+			Src.m_bReady = 1;
+		}
 	}
 }

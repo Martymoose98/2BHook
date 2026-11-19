@@ -14,6 +14,9 @@ class CModelShader;
 // CModelWork::FindModelEntryData copies a pointer to it into every draw entry it builds
 // (CModelEntryData+0x30). Detouring that function and pointing the entries of one material at
 // our own buffer gives that material its own colour without touching the rest of the mesh.
+// The tint stacks with the mesh colour: each mesh drawn with the material gets a buffer of
+// its own holding mesh colour x tint, with the mesh's alpha, so Rainbow Hair, the mesh colour
+// picker and first person's hiding still show through a tinted material.
 namespace MaterialTint
 {
 	// Finds the engine functions and installs the detour. False (and the feature stays off)
@@ -24,8 +27,9 @@ namespace MaterialTint
 	bool IsAvailable(void);
 
 	// pShader is the material's CModelShader in its model's CModelWork::m_pModelShaders, the
-	// same pointer the engine stores at CModelEntryData+0x00. The final colour is
-	// vColor * flIntensity with alpha 1; an intensity above 1 can lift near-black materials.
+	// same pointer the engine stores at CModelEntryData+0x00. The final colour is the mesh
+	// colour * vColor * flIntensity with the mesh's alpha; an intensity above 1 can lift
+	// near-black materials.
 	bool Get(const CModelShader* pShader, ImVec4& vColor, float& flIntensity);
 	bool Set(const CModelShader* pShader, const ImVec4& vColor, float flIntensity);
 	void Clear(const CModelShader* pShader);
