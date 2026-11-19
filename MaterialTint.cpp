@@ -160,100 +160,10 @@ namespace
 	Tint s_Tints[MAX_TINTS];
 	volatile LONG s_nActive;
 
-	// A 14-byte jmp [rip+0] / dq target, written over the first bytes of a function, and a
-	// trampoline holding the bytes it replaced followed by a jump back.
-	struct InlineDetour
-	{
-		BYTE* m_pTarget;
-		BYTE m_Saved[32];
-		size_t m_cbPrologue;
-		BYTE* m_pTrampoline;
-	};
-
-	InlineDetour s_Detour;
+	// Fluorine's HookFunc64 in trampoline mode: a jump over the prologue, which it only patches
+	// when the bytes match FIND_MODEL_ENTRY_DATA_PROLOGUE, and a trampoline to the original.
+	HOOK_FUNC s_Hook;
 	FindModelEntryDataFn s_oFindModelEntryData;
-
-	void WriteAbsoluteJump(BYTE* pAt, const void* pTo)
-	{
-		// jmp qword ptr [rip+0]
-		pAt[0] = 0xFF;
-		pAt[1] = 0x25;
-		*(DWORD*)&pAt[2] = 0;
-		*(const void**)&pAt[6] = pTo;
-	}
-
-	// *ppOriginal gets the trampoline before the target is patched, so the hook can never run
-	// with it unset.
-	bool InstallDetour(InlineDetour& Detour, BYTE* pTarget, const void* pHook, const BYTE* pPrologue, size_t cbPrologue,
-		void** ppOriginal)
-	{
-		constexpr size_t JUMP_SIZE = 14;
-
-		if (!pTarget || cbPrologue < JUMP_SIZE || cbPrologue > sizeof(Detour.m_Saved))
-			return false;
-
-		// Only patch the exact bytes the trampoline is built for
-		if (memcmp(pTarget, pPrologue, cbPrologue))
-			return false;
-
-		BYTE* pTrampoline = (BYTE*)VirtualAlloc(NULL, 64, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
-		if (!pTrampoline)
-			return false;
-
-		memcpy(pTrampoline, pTarget, cbPrologue);
-		WriteAbsoluteJump(pTrampoline + cbPrologue, pTarget + cbPrologue);
-		FlushInstructionCache(GetCurrentProcess(), pTrampoline, 64);
-
-		BYTE Patch[sizeof(Detour.m_Saved)];
-
-		WriteAbsoluteJump(Patch, pHook);
-		memset(Patch + JUMP_SIZE, 0xCC, cbPrologue - JUMP_SIZE);
-
-		DWORD dwOldProtect;
-
-		if (!VirtualProtect(pTarget, cbPrologue, PAGE_EXECUTE_READWRITE, &dwOldProtect))
-		{
-			VirtualFree(pTrampoline, 0, MEM_RELEASE);
-			return false;
-		}
-
-		memcpy(Detour.m_Saved, pTarget, cbPrologue);
-
-		*ppOriginal = pTrampoline;
-		MemoryBarrier();
-
-		// Not atomic, like the other inline hooks here: a thread inside these 18 bytes at this
-		// exact moment would fault. The window is a few instructions long.
-		memcpy(pTarget, Patch, cbPrologue);
-
-		VirtualProtect(pTarget, cbPrologue, dwOldProtect, &dwOldProtect);
-		FlushInstructionCache(GetCurrentProcess(), pTarget, cbPrologue);
-
-		Detour.m_pTarget = pTarget;
-		Detour.m_cbPrologue = cbPrologue;
-		Detour.m_pTrampoline = pTrampoline;
-
-		return true;
-	}
-
-	void RemoveDetour(InlineDetour& Detour)
-	{
-		if (!Detour.m_pTarget)
-			return;
-
-		DWORD dwOldProtect;
-
-		if (VirtualProtect(Detour.m_pTarget, Detour.m_cbPrologue, PAGE_EXECUTE_READWRITE, &dwOldProtect))
-		{
-			memcpy(Detour.m_pTarget, Detour.m_Saved, Detour.m_cbPrologue);
-			VirtualProtect(Detour.m_pTarget, Detour.m_cbPrologue, dwOldProtect, &dwOldProtect);
-			FlushInstructionCache(GetCurrentProcess(), Detour.m_pTarget, Detour.m_cbPrologue);
-		}
-
-		// The trampoline is left allocated: a draw thread may still be running through it
-		Detour.m_pTarget = NULL;
-	}
 
 	BYTE* __fastcall hkFindModelEntryData(void* pWork, const void* pSlotKey, const void* pBatchKey)
 	{
@@ -334,16 +244,12 @@ bool MaterialTint::Init(void)
 		return false;
 	}
 
-	InlineDetour Detour = {};
-
-	if (!InstallDetour(Detour, pFindModelEntryData, (const void*)&hkFindModelEntryData,
-		FIND_MODEL_ENTRY_DATA_PROLOGUE, sizeof(FIND_MODEL_ENTRY_DATA_PROLOGUE), (void**)&s_oFindModelEntryData))
+	if (!HookFunc64(pFindModelEntryData, (LPVOID)&hkFindModelEntryData, sizeof(FIND_MODEL_ENTRY_DATA_PROLOGUE),
+		&s_Hook, FIND_MODEL_ENTRY_DATA_PROLOGUE, (LPVOID*)&s_oFindModelEntryData))
 	{
 		WARN("MaterialTint: FindModelEntryData doesn't start with the expected bytes, material tint is disabled\n");
 		return false;
 	}
-
-	s_Detour = Detour;
 
 	return true;
 }
@@ -351,12 +257,12 @@ bool MaterialTint::Init(void)
 void MaterialTint::Shutdown(void)
 {
 	s_nActive = 0;
-	RemoveDetour(s_Detour);
+	UnhookFunc(&s_Hook);
 }
 
 bool MaterialTint::IsAvailable(void)
 {
-	return s_Detour.m_pTarget != NULL;
+	return s_Hook.m_bHooked != FALSE;
 }
 
 bool MaterialTint::Get(const CModelShader* pShader, ImVec4& vColor, float& flIntensity)
