@@ -528,6 +528,10 @@ void LogOffsets(void)
 	LOG_OFFSET("HashStringCRC32", HashStringCRC32);
 	LOG_OFFSET("GetConstructionInfo", GetConstructionInfo);
 	LOG_OFFSET("ExCollision::GetOBBMax", ExCollision_GetOBBMax);
+	LOG_OFFSET("HashLowercaseStringNoLenCRC32", HashLowercaseStringNoLenCRC32);
+	LOG_OFFSET("DialogUI::System::GetText", DialogUI_System_GetText);
+	LOG_OFFSET("DialogUI::System::CreateBlackBanner", DialogUI_System_CreateBlackBanner);
+	LOG_OFFSET("Pl0000::SetFlightUnit", Pl0000_SetFlightUnit);
 
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Flag Pointers]");
 	LOG_OFFSET("DebugFlags", g_pDebugFlags);
@@ -542,6 +546,8 @@ void LogOffsets(void)
 	LOG_OFFSET("CNPCManager", g_pNPCManager);
 	LOG_OFFSET("CEnemyManager", g_pEnemyManager);
 	LOG_OFFSET("CUserManager", g_pUserManager);
+	LOG_OFFSET("UiFileSlots", g_pUiFileSlots);
+	LOG_OFFSET("DialogUISystem", g_pDialogUISystem);
 	LOG_OFFSET("CWetObjectManager", g_pWetObjectManager);
 	LOG_OFFSET("CCollisionDataObjectManager", g_pCollisionDataObjectManager);
 	LOG_OFFSET("CTextureResourceManager", g_pTextureResourceManager);
@@ -702,6 +708,13 @@ static ULONG_PTR FindPatternOrNull(const char* szPattern)
 	return (uAddress == (ULONG_PTR)-1) ? 0 : uAddress;
 }
 
+// The target of the rel32 at uOffset in a match, resolved the way FindPatternPtr does it, for
+// signatures that hold more than one
+static ULONG_PTR ResolveRel32(ULONG_PTR uMatch, UINT uOffset)
+{
+	return uMatch + uOffset + sizeof(LONG) + *(LONG*)(uMatch + uOffset);
+}
+
 void FindSteamOffsets(void)
 {
 	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
@@ -743,6 +756,31 @@ void FindSteamOffsets(void)
 	// "jz/jns" user-index check, which is where UserManager_AdvanceAchievement (0x1409C3310),
 	// otherwise identical, has "jz/js".
 	UserManager_GiveAchievement = (CUserManager_GiveAchievementFn)FindPatternOrNull("40 57 48 83 EC 30 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 8B D9 48 8D 3D ? ? ? ? 48 89 7C 24 ? 83 3D ? ? ? ? ? 74 ? 48 8B CF FF 15 ? ? ? ? 90 8B 05 ? ? ? ? 85 C0 74 ? 79");
+
+	// Create UI Element used v1.02 RVAs, which land mid-function on build 26534214. Both of these
+	// are unique in v1.02 and build 26534214 and resolve to the same functions in each.
+	// UnitDataList_GetCategoryText (0x1407DC940) looks a game text up the way the button does:
+	// lea rcx, [rsp+20h] / call HashLowercaseStringNoLenCRC32 (0x14014C5B0) / mov edx, eax /
+	// lea rcx, g_UiFileSlots (0x141420B10) / mov r8d, ebx / call DialogUI::System::GetText (0x1409BD770).
+	if (ULONG_PTR uGetText = FindPatternOrNull("48 8D 4C 24 20 E8 ? ? ? ? 8B D0 48 8D 0D ? ? ? ? 44 8B C3 E8"))
+	{
+		HashLowercaseStringNoLenCRC32 = (HashLowercaseStringNoLenCRC32Fn)ResolveRel32(uGetText, 6);
+		g_pUiFileSlots = (void*)ResolveRel32(uGetText, 15);
+		DialogUI_System_GetText = (DialogUI_System_GetTextFn)ResolveRel32(uGetText, 23);
+	}
+
+	// DialogUI::System::CreateBlackBannerDialog (0x1402F49A0): lea rcx, g_DialogUISystem (0x140F04018)
+	// ... call DialogUI::System::CreateBlackBanner (0x1402F5140)
+	if (ULONG_PTR uBlackBanner = FindPatternOrNull("48 8D 0D ? ? ? ? 44 89 5C 24 30 44 89 44 24 28 44 8B C2 4C 89 4C 24 20 8B D7 4C 8B CB E8"))
+	{
+		g_pDialogUISystem = (void*)ResolveRel32(uBlackBanner, 3);
+		DialogUI_System_CreateBlackBanner = (DialogUI_System_CreateBlackBannerFn)ResolveRel32(uBlackBanner, 31);
+	}
+
+	// Pl0000::SetFlightUnit (0x1404F8400, v1.02 0x1404F8300), for Create Entity's flight unit. Its
+	// head through lea rdx, [rcx+15B64h] (&m_hFlightSuit); the old RVA 0x4F8300 is now
+	// Pl0000_EnterFighterForm+0x40.
+	Pl0000_SetFlightUnit = (Pl0000_SetFlightUnitFn)FindPatternOrNull("48 8B C4 55 57 41 54 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 C7 45 ? FE FF FF FF 48 89 58 10 48 89 70 18 0F 29 70 C8 0F 29 78 B8 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 48 8B F1 48 8D 91 64 5B 01 00");
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.

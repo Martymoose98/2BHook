@@ -649,11 +649,13 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 				*g_pEmilHandle = pInfo->m_hEntity;
 				break;
 			case 0x10010:
-				typedef void (*Pl_ChangeFlightSuitFn)(void* pEnt);
-				//pCameraEnt->m_bFlightSuit = TRUE;
-				pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
-				((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4F8300))(pCameraEnt); /*0x4E9DB0*/
-				//((Pl_ChangeFlightSuitFn)((ULONG_PTR)GetModuleHandle(NULL) + 0x4E0340))(pCameraEnt);
+				// Pl0000::SetFlightUnit (0x1404F8400) puts the player in the flight unit m_hFlightSuit
+				// names. It was called at v1.02's RVA, Pl0000_EnterFighterForm+0x40 on build 26534214.
+				if (Pl0000_SetFlightUnit)
+				{
+					pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
+					Pl0000_SetFlightUnit(pCameraEnt);
+				}
 				break;
 			}
 		}
@@ -773,30 +775,28 @@ void CMenu::MiscTab(void)
 	ImGui::InputInt3("UI Id", ui_ids);
 	ImGui::SameLine();
 
+	// The game text CORE_QUEST_EMP_TXT_MONEY from UI file slot 24, in a black banner with the type,
+	// style and kind above. These were v1.02 RVAs that land mid-function on build 26534214, so they
+	// are found by signature now (FindSteamOffsets), and without them the button is off.
+	const bool bUIElementAvailable = HashLowercaseStringNoLenCRC32 && DialogUI_System_GetText && g_pUiFileSlots &&
+		DialogUI_System_CreateBlackBanner && g_pDialogUISystem;
+
+	ImGui::BeginDisabled(!bUIElementAvailable);
+
 	if (ImGui::Button("Create UI Element"))
 	{
-		// TODO: Move function typedefs to globals!
-		typedef unsigned int (*HashLowercaseStringCRC32Fn)(const char* szString);
-		// Retreives game text from crc32
-		typedef wchar_t* (*DialogUI_System_GetTextFn)(void* pThis, int crc32, unsigned int index);
-		// Creates a white dialog
-		typedef __int64(*DialogUI_System_CreateYesNoDialogFn)(wchar_t* szMessage);
-		// Creates a white dialog w/ options
-		typedef __int64(*DialogUI_System_CreateDialogFn)(void* pThis, wchar_t* szMessage, int bWhiteDialog, DialogUIWhiteType type, int darkness);
-		// Creates a black banner
-		typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int a1, int crc32, wchar_t* szMessage, wchar_t* szText, DialogUIBlackType type, unsigned int a8, int darkness);
+		uint32_t uNameHash = HashLowercaseStringNoLenCRC32("CORE_QUEST_EMP_TXT_MONEY");
+		const wchar_t* szMsg = DialogUI_System_GetText(g_pUiFileSlots, (int)uNameHash, 24);
 
-
-		ULONG_PTR uNier = (ULONG_PTR)GetModuleHandle(NULL);
-
-		unsigned int crc = ((HashLowercaseStringCRC32Fn)(uNier + 0x14C4C0))("CORE_QUEST_EMP_TXT_MONEY");// CORE_MAP_VOICECNG_01
-		wchar_t* szMsg = ((DialogUI_System_GetTextFn)(uNier + 0x9BD090))((void*)(uNier + 0x14207A0), crc, 24);
-		// e8a92ebf crc32 | CORE_ITEM_NAME_935
-		//((DialogUI_System_CreateDialogFn)(uNier + 0x2F4F60))((void*)(uNier + 0xF04018), L"Cazzone", (DialogUIWhiteType)ui_ids[0], ui_ids[1], ui_ids[2]);
-		((DialogUI_System_CreateBlackBannerFn)(uNier + 0x2F5040))((void*)(uNier + 0xF04018), -1, 0, szMsg, L"It wasn't supposed to be like this!\nCazzone", (DialogUIBlackType)ui_ids[0], ui_ids[1], ui_ids[2]);
-		//((DialogUI_System_CreateYesNoDialogFn)(uNier + 0x2F4760))(L"Bad News!");
-		//CreateUIFromId(ui_ids[0]);
+		// The banner keeps the pointer, so a text that isn't loaded gets an empty string, not NULL
+		DialogUI_System_CreateBlackBanner(g_pDialogUISystem, -1, 0, szMsg ? szMsg : L"",
+			L"It wasn't supposed to be like this!\nCazzone", ui_ids[0], ui_ids[1], ui_ids[2]);
 	}
+
+	ImGui::EndDisabled();
+
+	if (!bUIElementAvailable)
+		ImGui::SetItemTooltip("Not available on this game build.");
 
 	// new test shit
 	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);

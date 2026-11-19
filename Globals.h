@@ -112,6 +112,13 @@ typedef CGraphicCommand*(*COtManager_GetGraphicCommandFn)(__int64 uIndex);
 
 typedef __int64(*CreateUIFromIdFn)(int id);
 
+// Create UI Element: a game text by name hash, shown in a black banner dialog
+typedef uint32_t(*HashLowercaseStringNoLenCRC32Fn)(const char* szString);
+typedef const wchar_t*(*DialogUI_System_GetTextFn)(void* pFileSlots, int iNameHash, uint32_t uSlotIndex);
+typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int iOwner, int iNameHash, const wchar_t* szMessage, const wchar_t* szText, int iType, int iStyle, int iKind);
+
+typedef void(*Pl0000_SetFlightUnitFn)(Pl0000* pThis);
+
 typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CTextureDescription *pDesc);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
@@ -221,6 +228,10 @@ extern COtManager_GetGraphicCommandFn GetGraphicCommand;
 extern CreateTextureFn CreateTexture;
 extern CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
 extern CreateUIFromIdFn CreateUIFromId;
+extern HashLowercaseStringNoLenCRC32Fn HashLowercaseStringNoLenCRC32;
+extern DialogUI_System_GetTextFn DialogUI_System_GetText;
+extern DialogUI_System_CreateBlackBannerFn DialogUI_System_CreateBlackBanner;
+extern Pl0000_SetFlightUnitFn Pl0000_SetFlightUnit;
 extern CpkMountFn CpkMount;
 extern CRILogCallbackFn CRILogCallback;
 
@@ -265,6 +276,8 @@ extern CYorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern CNPCManager* g_pNPCManager;
 extern CEmBaseManager* g_pEnemyManager;
+extern void* g_pUiFileSlots;		// g_UiFileSlots, what DialogUI::System::GetText looks texts up in
+extern void* g_pDialogUISystem;		// g_DialogUISystem, the dialog system CreateBlackBanner works on
 extern CWetObjManager* g_pWetObjectManager;
 extern CCollisionDataObjectManager* g_pCollisionDataObjectManager;
 extern CTextureResourceManager* g_pTextureResourceManager;
