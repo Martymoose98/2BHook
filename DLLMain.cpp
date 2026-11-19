@@ -528,6 +528,8 @@ void LogOffsets(void)
 	LOG_OFFSET("FNV1Hash", FNV1Hash);
 	LOG_OFFSET("HashStringCRC32", HashStringCRC32);
 	LOG_OFFSET("GetConstructionInfo", GetConstructionInfo);
+	LOG_OFFSET("CObjReadSystem::RequestStartAsscessory", ObjReadSystem_RequestStartAsscessory);
+	LOG_OFFSET("CObjReadSystem::RequestStartFilter", ObjReadSystem_RequestStartFilter);
 	LOG_OFFSET("ExCollision::GetOBBMax", ExCollision_GetOBBMax);
 	LOG_OFFSET("HashLowercaseStringNoLenCRC32", HashLowercaseStringNoLenCRC32);
 	LOG_OFFSET("DialogUI::System::GetText", DialogUI_System_GetText);
@@ -558,6 +560,9 @@ void LogOffsets(void)
 	LOG_OFFSET("CCollisionDataObjectManager", g_pCollisionDataObjectManager);
 	LOG_OFFSET("CTextureResourceManager", g_pTextureResourceManager);
 	LOG_OFFSET("CSceneEntitySystem", g_pSceneEntitySystem);
+	LOG_OFFSET("CObjReadSystem", g_pObjReadSystem);
+	LOG_OFFSET("ConstructionInfoList", g_pConstructionInfoList);
+	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "ConstructionInfoList rows: %u", g_uConstructionInfoRows);
 	LOG_OFFSET("CSceneStateSystem", g_pSceneStateSystem);
 	LOG_OFFSET("COtManager", g_pOtManager);
 	LOG_OFFSET("CModelManager", g_pModelManager);
@@ -728,6 +733,19 @@ void FindSteamOffsets(void)
 
 	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10", 1);
 	GetConstructionInfo = (GetConstructorFn)FindPattern(NULL, "33 D2 48 8D 05 ? ? ? ? 44 8B C2");
+
+	// The table GetConstructionInfo (0x14048F760, v1.02 0x14048F660) searches, and how many of its
+	// rows the whole-id pass covers: lea rax, g_ConstructionInfoList at +2, then add rax, 28h /
+	// cmp r8d, <rows> at +0x1C. Both builds have 1135 such rows of 0x28 bytes, at 0x140F456A0
+	// (v1.02 0x140F45690). The ten rows after them are its patterns for whole id ranges (id &
+	// 0xFFF00, id & 0xFF000, seven per-category rows and a catch-all), not objects of their own.
+	if (GetConstructionInfo && (ULONG_PTR)GetConstructionInfo != (ULONG_PTR)-1 &&
+		!memcmp((const BYTE*)GetConstructionInfo + 0x1C, "\x48\x83\xC0\x28\x41\x81\xF8", 7))
+	{
+		g_pConstructionInfoList = (CConstructionInfo<void>*)ResolveRel32((ULONG_PTR)GetConstructionInfo, 5);
+		g_uConstructionInfoRows = *(const uint32_t*)((const BYTE*)GetConstructionInfo + 0x23);
+	}
+
 	CreateWork = (CreateWorkFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 8B F9 E8 ? ? ? ? 48 8B D8 48 85 C0 0F");
 	FindObjectWork = (CObjReadSystem_FindObjectWorkFn)FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 8B F9 48 8B 0D");
 
@@ -798,6 +816,19 @@ void FindSteamOffsets(void)
 	// CCameraInstance_SetZNear (0x14027ADA0, v1.02 0x14027ACA0), the whole function: store the near
 	// plane at +0x268 and raise the projection dirty flag at +0x284
 	CameraInstance_SetZNear = (CCameraInstance_SetZNearFn)FindPatternOrNull("48 8B 01 F3 0F 11 88 68 02 00 00 C7 80 84 02 00 00 01 00 00 00 C3");
+
+	// The checks the game makes before a free spawn, for Create Entity. ModelSetSpawnList_Update
+	// (0x14082B190, v1.02 0x14082AD70) spawns its "FreeEnemy" only once both answer 1:
+	// mov r8d, edi / lea rcx, g_ObjReadSystem / mov edx, ebx / call CObjReadSystem::RequestStartAsscessory /
+	// test eax, eax / jz, the same for CObjReadSystem::RequestStartFilter, then movsxd rax, [rsi+0E60h].
+	// Unique in both builds: 0x14084E950 and 0x14084EB30 on 0x1413ECC38 (v1.02 0x14084E530 and
+	// 0x14084E710 on 0x1413EC8B8).
+	if (ULONG_PTR uFreeSpawn = FindPatternOrNull("44 8B C7 48 8D 0D ? ? ? ? 8B D3 E8 ? ? ? ? 85 C0 0F 84 ? ? ? ? 44 8B C7 48 8D 0D ? ? ? ? 8B D3 E8 ? ? ? ? 85 C0 0F 84 ? ? ? ? 48 63 86"))
+	{
+		g_pObjReadSystem = (CObjReadSystem*)ResolveRel32(uFreeSpawn, 6);
+		ObjReadSystem_RequestStartAsscessory = (CObjReadSystem_IsObjectReadyFn)ResolveRel32(uFreeSpawn, 13);
+		ObjReadSystem_RequestStartFilter = (CObjReadSystem_IsObjectReadyFn)ResolveRel32(uFreeSpawn, 38);
+	}
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.

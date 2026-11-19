@@ -137,6 +137,9 @@ typedef CObjReadSystem::Work* (*CObjReadSystem_FindObjectWorkFn)(int ObjectId);
 typedef CObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, CObjReadSystem::Work* pWork);
 typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int ObjectId);
 typedef BOOL(*ObjReadSystem_PreloadModelFn)(CObjReadSystem::Work* pWork);
+// CObjReadSystem::RequestStartAsscessory and ::RequestStartFilter (the IDB's names): despite the
+// names both only look, and answer 1 when an object and its dependencies are ready
+typedef int(*CObjReadSystem_IsObjectReadyFn)(CObjReadSystem* pThis, uint32_t uObjectId, int32_t iSetType);
 // HwRofsFst_MountCpk: true if the archive is bound and ready. (The Denuvo build's version at
 // 0x140956D70 returned the CpkEntry* instead.)
 typedef bool(*CpkMountFn)(int iLoadOrder, const char* szPath);
@@ -229,6 +232,8 @@ extern CObjReadSystem_FindObjectWorkFn FindObjectWork;
 extern PreloadFileFn PreloadFile;
 extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;
+extern CObjReadSystem_IsObjectReadyFn ObjReadSystem_RequestStartAsscessory;
+extern CObjReadSystem_IsObjectReadyFn ObjReadSystem_RequestStartFilter;
 extern COtManager_GetGraphicCommandFn GetGraphicCommand;
 extern CreateTextureFn CreateTexture;
 extern CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;
@@ -297,6 +302,9 @@ extern VMatrix* g_pViewMatrix;
 extern CJobManager* g_pJobManager;
 extern CSceneStateSystem* g_pSceneStateSystem;
 extern CSceneEntitySystem* g_pSceneEntitySystem;
+extern CObjReadSystem* g_pObjReadSystem;						// g_ObjReadSystem, what the two checks above take
+extern CConstructionInfo<void>* g_pConstructionInfoList;	// g_ConstructionInfoList, one row per object id
+extern uint32_t g_uConstructionInfoRows;					// the rows GetConstructionInfo matches whole ids over
 extern CNetworkDevice* g_pNetworkDevice;
 extern CMemoryDevice* g_pMemoryDevice;
 extern BYTE* g_pDecreaseHealth[2];
