@@ -43,6 +43,20 @@ jobs:
           git config --global url."https://github.com/".insteadOf "git@github.com:"
           git submodule update --init --recursive
 
+      # Version.h is the one place the version is set. Refuse a tag that doesn't match it, and a
+      # Version.h whose strings and numbers disagree, before anything is built or published.
+      - name: Check the tag against Version.h
+        shell: bash
+        run: |
+          num() { sed -n "s/^#define $1[[:space:]]*\([0-9]*\).*/\1/p" Version.h; }
+          str() { sed -n "s/^#define $1[[:space:]]*\"\([^\"]*\)\".*/\1/p" Version.h; }
+          numbers="$(num HOOK_VERSION_MAJOR).$(num HOOK_VERSION_MINOR).$(num HOOK_VERSION_PATCH)"
+          version=$(str HOOK_VERSION_STRING)
+          file=$(str HOOK_VERSION_FILE_STRING)
+          [ "$version" = "$numbers" ] || { echo "::error::Version.h: HOOK_VERSION_STRING $version doesn't match the numbers $numbers"; exit 1; }
+          [ "$file" = "$numbers.$(num HOOK_VERSION_HOTFIX)" ] || { echo "::error::Version.h: HOOK_VERSION_FILE_STRING $file doesn't match the numbers"; exit 1; }
+          [ "$TAG" = "v$version" ] || { echo "::error::Tag $TAG doesn't match Version.h (v$version)"; exit 1; }
+
       - uses: microsoft/setup-msbuild@v2
 
       - name: Build Release x64

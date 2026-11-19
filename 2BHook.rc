@@ -1,6 +1,7 @@
 // Microsoft Visual C++ generated resource script.
 //
 #include "resource.h"
+#include "Version.h"
 
 #define APSTUDIO_READONLY_SYMBOLS
 /////////////////////////////////////////////////////////////////////////////
@@ -51,8 +52,8 @@ END
 //
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1,2,0,0
- PRODUCTVERSION 1,2,0,0
+ FILEVERSION HOOK_VERSION_MAJOR,HOOK_VERSION_MINOR,HOOK_VERSION_PATCH,HOOK_VERSION_HOTFIX
+ PRODUCTVERSION HOOK_VERSION_MAJOR,HOOK_VERSION_MINOR,HOOK_VERSION_PATCH,HOOK_VERSION_HOTFIX
  FILEFLAGSMASK 0x3fL
 #ifdef _DEBUG
  FILEFLAGS 0x1L
@@ -69,12 +70,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Martin"
             VALUE "FileDescription", "A Mod Menu for NieR:Automata"
-            VALUE "FileVersion", "1.2.0.0"
+            VALUE "FileVersion", HOOK_VERSION_FILE_STRING
             VALUE "InternalName", "2BHook.dll"
             VALUE "LegalCopyright", "Copyright (C) 2024"
             VALUE "OriginalFilename", "2BHook.dll"
             VALUE "ProductName", "2B Hook"
-            VALUE "ProductVersion", "1.2.0.0"
+            VALUE "ProductVersion", HOOK_VERSION_FILE_STRING
         END
     END
     BLOCK "VarFileInfo"

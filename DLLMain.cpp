@@ -20,6 +20,7 @@
 #include "mot.h"
 #include "Hooks.h"
 #include "MaterialTint.h"
+#include "Version.h"
 
 // temp
 NTSTATUS DumpModules(/*PEPROCESS pProcess, PKERNEL_MODULE_REQUEST pRequest*/);
@@ -1116,9 +1117,9 @@ void Setup(void)
 
 	s_bSetupComplete = TRUE;
 
-	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initialization Complete! GLHF");
+	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook v" HOOK_VERSION_STRING " Initialization Complete! GLHF");
 
-	LOG("2B Hook Initialization Complete!\n");
+	LOG("2B Hook v" HOOK_VERSION_STRING " Initialization Complete!\n");
 }
 
 void Unhook(void)

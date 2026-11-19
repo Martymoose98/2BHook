@@ -199,6 +199,7 @@
     <ClInclude Include="Overlay.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="Version.h" />
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />

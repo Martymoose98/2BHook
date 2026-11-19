@@ -12,6 +12,7 @@
 
 #include "SDK/Entity/CObj.h"
 #include "Theme.h"
+#include "Version.h"
 
 
 class CConfig;
@@ -86,7 +87,8 @@ private:
 		TCHAR szName[MAX_PATH];
 	} Config;
 
-	constexpr static const char* s_MenuTitle = "2B Hook! ~ 2B Owns Me and All :^)";
+	// "###2BHook" keeps the window ID (and its saved position) the same whatever the version
+	constexpr static const char* s_MenuTitle = "2B Hook v" HOOK_VERSION_STRING " ~ 2B Owns Me and All :^)###2BHook";
 };
 
 extern CMenu* g_pMenu;
