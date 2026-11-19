@@ -174,7 +174,7 @@ void Overlay::Render(const char* szParentWndName)
 void Overlay::Render(OverlayDrawList* pList)
 {
 	Vector2 vMin2D, vMax2D, vStart2D, vEnd2D;
-	Vector3Aligned vStart, vEnd, vMin, vMax;
+	Vector3Aligned vStart, vEnd;
 	int iTarget = -1;
 	float best = FLT_MAX;
 
@@ -187,20 +187,6 @@ void Overlay::Render(OverlayDrawList* pList)
 
 		if (pCameraEntity)
 		{
-			// FIXME: hack until we figure out the other classes
-			ExCollision* pVertCollision = &((Pl0000*)pCameraEntity)->m_VerticalCollision;
-			ExCollision* pHorCollision = &((Pl0000*)pCameraEntity)->m_HorizontalCollision;
-
-			vMin = pCameraEntity->m_vPosition;
-
-			/* Alternative to GetOBBMax
-			__m128 v1 = *(__m128*) & pCollision->v0xA0;
-			vMax = _mm_add_ps(pCameraEntity->m_vPosition, _mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0xAA), pCameraEntity->m_matCol.m2),
-				_mm_add_ps(_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0x55), pCameraEntity->m_matCol.m1),
-					_mm_mul_ps(_mm_shuffle_ps(v1, v1, 0), pCameraEntity->m_matCol.m0))));*/
-
-			ExCollision_GetOBBMax(pVertCollision, &vMax);
-
 			for (int i = 0; i < pCameraEntity->m_Work.m_nMeshes; ++i)
 			{/*
 				CMesh2* pMesh = &pCameraEntity->m_Work.m_pMeshes[i];
@@ -213,32 +199,60 @@ void Overlay::Render(OverlayDrawList* pList)
 				*/
 			}
 
-			if (Vars.Visuals.bEspBox && WorldToScreen(vMin, vMin2D) && WorldToScreen(vMax, vMax2D))
+			if (Vars.Visuals.bEspBox && pCameraEntity->m_pBones && pCameraEntity->m_nBones > 0)
 			{
-				ImRect Rect;
+				// The box fits the skeleton. It used to be a fixed 1 x 1.5 x 1 m box (shorter than
+				// 2B, so it stopped at her shoulders), with the health bar sized from the feet to
+				// the vertical collision's OBB top. Now every bone in front of the camera is
+				// projected, and their screen-space min and max place the 2D box, the label and
+				// the health bar. The 3D box uses the same bones' extents along the entity's own
+				// axes (m_matTransform rows 0-2, origin row 3, as Matrix4x4::Transform applies it).
+				Matrix4x4& mTransform = pCameraEntity->m_matTransform;
+				Vector3 vOrigin = mTransform.GetAxis(3);
+				Vector3 vAxes[3] = { mTransform.GetAxis(0), mTransform.GetAxis(1), mTransform.GetAxis(2) };
+				float flAxisLengthSqr[3] = { vAxes[0].LengthSqr(), vAxes[1].LengthSqr(), vAxes[2].LengthSqr() };
+				Vector3 vLocalMin(FLT_MAX, FLT_MAX, FLT_MAX), vLocalMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+				ImRect Rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+				int nProjected = 0;
 
-				int h = (int)(vMin2D.y - vMax2D.y);
-				int w = h / 2;	
-
-				const char* szObject = (pCameraEntity->m_ObjectId == OBJECTID_2B) ? "2B" :
-					(pCameraEntity->m_ObjectId == OBJECTID_A2) ? "A2" :
-					(pCameraEntity->m_ObjectId == OBJECTID_9S) ? "9S" : "Unknown";
-
-				if (Vars.Visuals.b2DEspBox)
+				for (int i = 0; i < pCameraEntity->m_nBones; ++i)
 				{
-					pList->Add2DBox(Vector3(-0.3f, 0, -0.2f), Vector3(0.3f, 1.5f, 0.2f), pCameraEntity->m_matTransform,
-						5, ImColor(23, 128, 150), Rect);
+					const Vector3 vBone = pCameraEntity->m_pBones[i].m_vPosition;
+					Vector3 vDelta = vBone - vOrigin;
 
-					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
+					for (int a = 0; a < 3; ++a)
+					{
+						float flLocal = (flAxisLengthSqr[a] > 0.0f) ? vDelta.Dot(vAxes[a]) / flAxisLengthSqr[a] : 0.0f;
 
-					pList->AddHealthBar((int)(vMin2D.x + 20.0f + (Rect.GetWidth() * 0.5f)),
-						Rect.Min.y, Rect.GetHeight(), pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
+						vLocalMin[a] = min(vLocalMin[a], flLocal);
+						vLocalMax[a] = max(vLocalMax[a], flLocal);
+					}
+
+					if (WorldToScreen(vBone, vMin2D))
+					{
+						Rect.Add(ImVec2(vMin2D.x, vMin2D.y));
+						++nProjected;
+					}
 				}
-				else
+
+				if (nProjected >= 2)
 				{
-					pList->Add3DBox(Vector3(-0.5f, 0, -0.5f), Vector3(0.5f, 1.5f, 0.5f), pCameraEntity->m_matTransform, ImColor(23, 128, 150));
-					pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
-					pList->AddHealthBar((int)vMin2D.x + 30 + (w / 2), (int)(vMin2D.y - h), h, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
+					// Bones sit inside the body, the hair and the shoe soles reach past them
+					Rect.Expand(Rect.GetHeight() * 0.04f);
+
+					const char* szObject = (pCameraEntity->m_ObjectId == OBJECTID_2B) ? "2B" :
+						(pCameraEntity->m_ObjectId == OBJECTID_A2) ? "A2" :
+						(pCameraEntity->m_ObjectId == OBJECTID_9S) ? "9S" : "Unknown";
+
+					if (Vars.Visuals.b2DEspBox)
+						pList->AddRectCorners((int)Rect.Min.x, (int)Rect.Min.y, (int)Rect.GetWidth(), (int)Rect.GetHeight(), 5, ImColor(23, 128, 150));
+					else
+						pList->Add3DBox(vLocalMin, vLocalMax, mTransform, ImColor(23, 128, 150));
+
+					ImVec2 vLabel(Rect.GetCenter().x, Rect.Max.y + 2.0f);
+
+					pList->AddTextArgs(vLabel, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
+					pList->AddHealthBar((int)Rect.Max.x + 10, (int)Rect.Min.y, (int)Rect.GetHeight(), pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
 				}
 			}
 
