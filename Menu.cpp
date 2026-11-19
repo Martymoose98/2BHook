@@ -1124,10 +1124,11 @@ void CMenu::DisplayEntityHandles(void)
 
 void ApplyPodMods(Pl0000* pOwner)
 {
-	if (!pOwner)
-		return;
-
-	CBehaviorAppBase* pPod = GetEntityFromHandle(&pOwner->m_hPod);
+	// pOwner is the camera entity, cast without a check, so it is tested before its pod slots are
+	// read. The pod used to come from GetEntityFromHandle (0x140491240), which ends in
+	// CEntityInfo_GetEmBase (0x140308550) and so only returns enemies, never a pod; and it was
+	// always slot 0, not the pod that is out.
+	CBehaviorAppBase* pPod = GetActivePod(GetPl0000(pOwner));
 
 	if (!pPod)
 		return;

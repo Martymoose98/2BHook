@@ -383,7 +383,10 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 
 		if (Vars.Gameplay.bRainbowPod)
 		{
-			Pl0000* pPod = static_cast<Pl0000*>(GetEntityFromHandle(&pCameraEnt->m_hPod));
+			// The active pod of the camera entity, if that is a Pl0000. GetEntityFromHandle only
+			// returns enemies (it ends in CEntityInfo_GetEmBase, 0x140308550), so this never found
+			// the pod, and it always read pod slot 0.
+			CBehaviorAppBase* pPod = GetActivePod(GetPl0000(pCameraEnt));
 
 			if (pPod)
 			{

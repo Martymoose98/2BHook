@@ -348,23 +348,27 @@ void Overlay::Render(OverlayDrawList* pList)
 	RenderCollisions(pList);
 	RenderCollisions2(pList);
 
+	// GetEntityFromHandle (0x140491240) only returns enemies (it ends in CEntityInfo_GetEmBase,
+	// 0x140308550), so no NPC and never Emil was shown. The untyped lookup can return any
+	// behaviour, so the health comes from CBehavior's own GetHealth/GetMaxHealth (vtable slots
+	// 31/30) rather than BehaviorAppBase's fields.
 	if (Vars.Visuals.bNPCInfo)
 	{
 		for (size_t i = 0; i < g_pNPCManager->m_handles.m_Count; ++i)
 		{
-			CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pNPCManager->m_handles.m_pItems[i]);
+			CBehaviorAppBase* pCur = GetEntityFromHandleGlobal(&g_pNPCManager->m_handles.m_pItems[i]);
 
 			if (pCur && WorldToScreen(pCur->m_vPosition, vMin2D))
 			{
-				pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->m_iHealth, pCur->m_iMaxHealth);
+				pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "NPC: %s HP: %i/%i", pCur->m_pInfo->m_szEntityType, pCur->GetHealth(), pCur->GetMaxHealth());
 			}
 		}
 
-		CBehaviorAppBase* pEmil = GetEntityFromHandle(g_pEmilHandle);
+		CBehaviorAppBase* pEmil = g_pEmilHandle ? GetEntityFromHandleGlobal(g_pEmilHandle) : NULL;
 
 		if (pEmil && WorldToScreen(pEmil->m_vPosition, vMin2D))
 		{
-			pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Emil: %s HP: %i/%i", pEmil->m_pInfo->m_szEntityType, pEmil->m_iHealth, pEmil->m_iMaxHealth);
+			pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Emil: %s HP: %i/%i", pEmil->m_pInfo->m_szEntityType, pEmil->GetHealth(), pEmil->GetMaxHealth());
 		}
 	}
 }

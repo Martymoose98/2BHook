@@ -64,9 +64,9 @@ public:
 	char _0x02B70[56056];					//0x02B70
 	int32_t m_iHealth2;						//0x10668									
 	char _0x1066C[420];						//0x1066C
-	EntityHandle_t m_hPod;					//0x10810
-	EntityHandle_t m_hUnk2;					//0x10814
-	char _0x10818[844];						//0x10818
+	EntityHandle_t m_hPods[4];				//0x10810 | Pl0000_GetActivePod (0x14033C2D0) picks m_hPods[m_iActivePod]
+	int32_t m_iActivePod;					//0x10820
+	char _0x10824[832];						//0x10824
 	BOOL m_bUnkCamera;						//0x10B64 | Camera boolean
 	char _0x10B68[7556];					//0x10B68
 	int32_t m_iHackingShipLife;				//0x128EC | hacking minigame / Ending E ship hits left
@@ -128,6 +128,8 @@ VALIDATE_OFFSET(Pl0000, m_pCObjHitVtable, 0x14F0);
 VALIDATE_OFFSET(Pl0000, m_LevelsContainer, 0x2078);
 VALIDATE_OFFSET(Pl0000, m_VerticalCollision, 0x1790);
 VALIDATE_OFFSET(Pl0000, m_HorizontalCollision, 0x18C0);
+VALIDATE_OFFSET(Pl0000, m_hPods, 0x10810);
+VALIDATE_OFFSET(Pl0000, m_iActivePod, 0x10820);
 VALIDATE_OFFSET(Pl0000, m_bUnkCamera, 0x10B64);
 VALIDATE_OFFSET(Pl0000, m_iHackingShipLife, 0x128EC);
 VALIDATE_OFFSET(Pl0000, m_flHackingInvincibleTime, 0x12908);

@@ -473,9 +473,12 @@ namespace Features
 		EntityInfo_Delete(pEntity->m_pInfo);
 	}
 
+	// GetEntityFromHandle (0x140491240) ends in CEntityInfo_GetEmBase (0x140308550), so it only ever
+	// returns enemies; Set Player and the teleports work on any entity and only use what every
+	// entity has (m_pInfo, the position and transform), so they take the untyped lookup.
 	static void SetPlayer(EntityHandle_t hEntity)
 	{
-		CBehaviorAppBase* pEntity = GetEntityFromHandle(&hEntity);
+		CBehaviorAppBase* pEntity = GetEntityFromHandleGlobal(&hEntity);
 
 		if (!pEntity)
 			return;
@@ -521,8 +524,8 @@ namespace Features
 
 	static void TeleportEntityToOther(EntityHandle_t hTeleporter, EntityHandle_t hTeleportee)
 	{
-		CBehavior* pTeleporter = GetEntityFromHandle(&hTeleporter);
-		CBehavior* pTeleportee = GetEntityFromHandle(&hTeleportee);
+		CBehavior* pTeleporter = GetEntityFromHandleGlobal(&hTeleporter);
+		CBehavior* pTeleportee = GetEntityFromHandleGlobal(&hTeleportee);
 
 		if (pTeleportee && pTeleporter)
 			pTeleportee->m_vPosition = pTeleporter->m_vPosition + pTeleporter->m_matTransform.GetAxis(FORWARD) * 4.f;

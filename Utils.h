@@ -725,6 +725,27 @@ static CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity)
 	return pEntityInfo ? pEntityInfo->m_pParent : NULL;
 }
 
+// pEntity as a Pl0000, or NULL when it isn't one: the camera entity and entities looked up by
+// handle can be anything. GetEntityFromHandle2 (0x1403877A0) is the game's Pl0000-only lookup,
+// GetEntityInfoFromHandle and then CEntityInfo::GetPl0000 (0x1403085C0), which tests the type info.
+static Pl0000* GetPl0000(CBehaviorAppBase* pEntity)
+{
+	if (!pEntity || !pEntity->m_pInfo || !GetEntityFromHandle2)
+		return NULL;
+
+	return (GetEntityFromHandle2(&pEntity->m_pInfo->m_hEntity) == pEntity) ? static_cast<Pl0000*>(pEntity) : NULL;
+}
+
+// The pod pOwner has out, picked the way Pl0000_GetActivePod (0x14033C2D0) does:
+// m_hPods[m_iActivePod]. Callers only touch the pod's model, which every entity has.
+static CBehaviorAppBase* GetActivePod(Pl0000* pOwner)
+{
+	if (!pOwner || pOwner->m_iActivePod < 0 || pOwner->m_iActivePod >= (int32_t)ARRAYSIZE(pOwner->m_hPods))
+		return NULL;
+
+	return GetEntityFromHandleGlobal(&pOwner->m_hPods[pOwner->m_iActivePod]);
+}
+
 // Rebuilt from binary with added functionality
 static BOOL ObjectIdToObjectName(char* szObjectName, size_t size, uint32_t ObjectId, ObjectIdConvert** ppConvert)
 {
