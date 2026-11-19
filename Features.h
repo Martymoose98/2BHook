@@ -248,6 +248,20 @@ namespace Features
 		}
 	}
 
+	// The model's alpha, set the way CModelInfo_SetColor (0x140198C00) sets its colour: only when it
+	// changes, and with MODELINFO_FLAG_TINT_DIRTY, which CModelWork_Update (0x140196620) tests to
+	// mark the model's draw entries for update. Without the flag the new alpha wasn't picked up.
+	inline void SetModelAlpha(CModel* pModel, float flAlpha)
+	{
+		CModelInfo* pInfo = pModel ? pModel->m_pModelInfo : NULL;
+
+		if (!pInfo || pInfo->m_vTint.w == flAlpha)
+			return;
+
+		pInfo->m_vTint.w = flAlpha;
+		pInfo->m_uFlags |= MODELINFO_FLAG_TINT_DIRTY;
+	}
+
 	static void AddEntityToBlackList()
 	{
 

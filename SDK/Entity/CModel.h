@@ -606,11 +606,17 @@ struct CModelDataManager
 	CModelDataList m_ModelDataList;
 };
 
+// CModelInstance in Martin's IDA types; CModel::m_ModelInfo.m_pInstance (+0x540) points at it
+#define MODELINFO_FLAG_TINT_DIRTY	0x40	// CModelInfo_SetColor (0x140198C00) sets it when m_vTint changes
+
 struct CModelInfo
 {
-	Vector4 m_vTint;			//0x0000
+	Vector4 m_vTint;			//0x0000 | w is the model's alpha (CModelInfo_GetAlpha, 0x140198C70)
 	CModelData* m_pData;		//0x0010
+	char _0x0018[184];			//0x0018
+	uint32_t m_uFlags;			//0x00D0 | MODELINFO_FLAG_*
 };
+VALIDATE_OFFSET(CModelInfo, m_uFlags, 0xD0);
 
 struct CModelLOD
 {
