@@ -603,7 +603,21 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 
 	if (ImGui::Button("Delete Item"))
 	{
-		Vars.Gameplay.SpawnBlacklist.erase(std::find(Vars.Gameplay.SpawnBlacklist.cbegin(), Vars.Gameplay.SpawnBlacklist.cend(), Vars.Gameplay.SpawnBlacklist.data()[Vars.Gameplay.iSelectedBlacklistItem]));
+		std::vector<std::string>& Blacklist = Vars.Gameplay.SpawnBlacklist;
+		int& iSelected = Vars.Gameplay.iSelectedBlacklistItem;
+
+		// Erase by position. This used to read data()[iSelected] unchecked - null with an
+		// empty list, past the end once the last row had been deleted - and then erase
+		// whatever std::find returned, which is end() when nothing matched and the *first*
+		// duplicate rather than the selected row when something did.
+		if (iSelected >= 0 && iSelected < (int)Blacklist.size())
+		{
+			Blacklist.erase(Blacklist.begin() + iSelected);
+
+			// Keep the selection on a row that still exists.
+			if (iSelected >= (int)Blacklist.size())
+				iSelected = (int)Blacklist.size() - 1;
+		}
 	}
 }
 
@@ -800,14 +814,43 @@ void CMenu::ConfigTab(void)
 
 void CMenu::DisplayEntityHandles(void)
 {
-	if (!g_pNPCManager)
+	if (!g_pNPCManager || !g_pEnemyManager || !g_pYorhaManager)
 		return;
 
-	int count = (int)(g_pNPCManager->m_handles.m_Count + g_pYorhaManager->m_handles.m_Count + g_pEnemyManager->m_handles.m_Count);
-	EntityHandle_t* pHandles = new EntityHandle_t[count];
+	const int nYorha = (int)g_pYorhaManager->m_handles.m_Count;
+
+	EntityHandleSnapshot_t Snapshot;
+	Snapshot.m_nNPC = (int)g_pNPCManager->m_handles.m_Count;
+	Snapshot.m_nEnemy = (int)g_pEnemyManager->m_handles.m_Count;
+	Snapshot.m_nCount = Snapshot.m_nNPC + Snapshot.m_nEnemy + nYorha;
+
+	// Filled here, in full, in the NPC / Enemy / YoRHa order the ListBox labels. This used to
+	// be filled by the ListBox getter as a side effect, but ImGui only calls the getter for
+	// rows that are on screen, so a selection scrolled out of view was never written and the
+	// buttons below acted on an invalid handle.
+	std::vector<EntityHandle_t> Handles(Snapshot.m_nCount);
+	int i = 0;
+
+	for (int j = 0; j < Snapshot.m_nNPC; ++j)
+		Handles[i++] = g_pNPCManager->m_handles.m_pItems[j];
+
+	for (int j = 0; j < Snapshot.m_nEnemy; ++j)
+		Handles[i++] = g_pEnemyManager->m_handles.m_pItems[j];
+
+	for (int j = 0; j < nYorha; ++j)
+		Handles[i++] = g_pYorhaManager->m_handles.m_pItems[j];
+
+	Snapshot.m_pHandles = Handles.data();
 
 	ImGui::ListBox("NPC, Yorha & Enemy Handles", &Vars.Gameplay.iSelectedActorEntityHandle,
-		&EntityHandlesCallback, pHandles, count);
+		&EntityHandlesCallback, &Snapshot, Snapshot.m_nCount);
+
+	// The lists shrink as entities die and despawn, which leaves the selection past the end
+	// (and with nothing listed at all, index 0 is already out of range).
+	const bool bActorSelected = (Vars.Gameplay.iSelectedActorEntityHandle >= 0 &&
+		Vars.Gameplay.iSelectedActorEntityHandle < Snapshot.m_nCount);
+
+	EntityHandle_t hActor = (bActorSelected) ? Handles[Vars.Gameplay.iSelectedActorEntityHandle] : EntityHandle_t();
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.25f);
 
@@ -815,16 +858,16 @@ void CMenu::DisplayEntityHandles(void)
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Set Level"))
-		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]), Vars.Gameplay.iSelectedEntityLevel - 1, Vars.Gameplay.iSelectedEntityLevel - 1);
+	if (ImGui::Button("Set Level") && bActorSelected)
+		Features::BalanceEnemyLevel(GetEntityFromHandleGlobal(&hActor), Vars.Gameplay.iSelectedEntityLevel - 1, Vars.Gameplay.iSelectedEntityLevel - 1);
 
 	ImGui::PopItemWidth();
 
 #if 0
 	//FIXME: DEFO CRASH
-	if (ImGui::Button("Set NPC Follow"))
+	if (ImGui::Button("Set NPC Follow") && bActorSelected)
 	{
-		CBehaviorAppBase* pNPC = GetEntityFromHandle(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+		CBehaviorAppBase* pNPC = GetEntityFromHandle(&hActor);
 
 		if (pNPC)
 			((NPC_ChangeSetTypeFollowFn)(0x1404B2770))(pNPC);
@@ -833,39 +876,43 @@ void CMenu::DisplayEntityHandles(void)
 	ImGui::SameLine();
 
 	//FIXME: DEFO CRASH
-	if (ImGui::Button("Set NPC Idle"))
+	if (ImGui::Button("Set NPC Idle") && bActorSelected)
 	{
-		CBehaviorAppBase* pNPC = GetEntityFromHandle(&pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+		CBehaviorAppBase* pNPC = GetEntityFromHandle(&hActor);
 
 		if (pNPC)
 			((NPC_ChangeSetTypeIdleFn)(0x1404B2770))(pNPC);
 	}
 #endif
 
-	if (ImGui::Button("Delete"))
-		Features::DeleteEntity(pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+	if (ImGui::Button("Delete") && bActorSelected)
+		Features::DeleteEntity(hActor);
 
 #ifdef  _DEBUG
 	ImGui::SameLine();
 
-	if (ImGui::Button("Set Player"))
+	// "##Actor": the Entity View below has its own "Set Player" button in the same window,
+	// and two widgets with one ID means only one of them ever responds.
+	if (ImGui::Button("Set Player##Actor") && bActorSelected)
 	{
-		Features::SetPlayer(pHandles[Vars.Gameplay.iSelectedActorEntityHandle]);
+		Features::SetPlayer(hActor);
 	}
 #endif
-
-	delete[] pHandles;
 
 	ImGui::SeparatorEx(ImGuiSeparatorFlags_::ImGuiSeparatorFlags_Horizontal);
 
 	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, NULL, g_pEntityList->m_uSize);
 
-	if (ImGui::Button("Delete Entity"))
+	// Same as above: the entity list changes size under a selection made in an earlier frame.
+	const bool bEntitySelected = (Vars.Gameplay.iSelectedEntityHandle >= 0 &&
+		(uint32_t)Vars.Gameplay.iSelectedEntityHandle < g_pEntityList->m_uSize);
+
+	if (ImGui::Button("Delete Entity") && bEntitySelected)
 		Features::DeleteEntity(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
 
 	ImGui::SameLine();
 
-	if (ImGui::Button("Set Player"))
+	if (ImGui::Button("Set Player") && bEntitySelected)
 	{
 		Features::SetPlayer(g_pEntityList->m_pItems[Vars.Gameplay.iSelectedEntityHandle].first);
 	}
@@ -887,23 +934,41 @@ void ApplyPodMods(Pl0000* pOwner)
 
 	pPod->m_pModelInfo->m_vTint.w = Vars.Gameplay.bHidePod ? 0.f : 1.f;
 
+	if (pPod->m_Work.m_nMeshes <= 0)
+		return;
+
+	// The selection outlives the pod it was made on (pods get swapped and respawned), so pull
+	// it back into this pod's range before it is used to index m_pMeshes below.
+	Vars.Gameplay.iSelectedPodMesh = min(max(Vars.Gameplay.iSelectedPodMesh, 0), pPod->m_Work.m_nMeshes - 1);
+
 	char szModelPart[64];
-	sprintf_s(szModelPart, "Pod Mesh: (%s)", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
-	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodMesh, 0, pPod->m_Work.m_nMeshes - 1);
+	// "###" keeps the widget ID fixed while the mesh name in the label changes. Otherwise the
+	// ID changes with every step and a drag stops after moving one mesh. AlwaysClamp because
+	// Ctrl+Click text entry is otherwise allowed past the bounds, straight into m_pMeshes.
+	sprintf_s(szModelPart, "Pod Mesh: (%s)###PodMesh", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
+	ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedPodMesh, 0, pPod->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp);
 
-	sprintf_s(szModelPart, "Pod Mesh Color: (%s)", pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_szMeshName);
+	CMeshPart* pPodMesh = &pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh];
 
-	if (ImGui::Checkbox("Enabled", (bool*)&pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_bShow))
-		pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_bUpdate = TRUE;
+	sprintf_s(szModelPart, "Pod Mesh Color: (%s)", pPodMesh->m_szMeshName);
+
+	// Needs its own ID: ApplyModelMods draws an "Enabled" checkbox in the same window just
+	// above this one, and the duplicate ID made this one swallow clicks.
+	if (ImGui::Checkbox("Enabled##PodMesh", (bool*)&pPodMesh->m_bShow))
+		pPodMesh->m_bUpdate = TRUE;
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	ImGui::ColorPicker4(szModelPart, (float*)&pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedPodMesh].m_vColor);
+	ImGui::ColorPicker4(szModelPart, (float*)&pPodMesh->m_vColor);
 
 	ImGui::PopItemWidth();
 
-	pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bUpdate = TRUE;
-	pPod->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow = TRUE;
+	// Push the colour edit through. This used to index the pod's meshes with the *player's*
+	// mesh selection (iSelectedModelMesh) - another model's index - so it touched an unrelated
+	// pod mesh, or wrote past the end of the pod's much shorter mesh array. It also forced
+	// that mesh visible every frame; pointed at the right mesh, that would undo the Enabled
+	// checkbox above as soon as it was unticked, so only the update flag is set now.
+	pPodMesh->m_bUpdate = TRUE;
 }
 
 void ApplyModelMods(Pl0000* pEntity)
@@ -952,18 +1017,35 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::Checkbox("Rainbow Hair", &Vars.Gameplay.bRainbowHair);
 
-	//Vars.Gameplay.iSelectedModelMesh &= (pEntity->m_Work.m_nMeshes - 1);
-
-	CMeshPart* pSelectedMesh = &pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
-
-	if (pSelectedMesh)
+	if (pEntity->m_Work.m_nMeshes <= 0)
 	{
-		sprintf_s(szModelPart, "Mesh: %s", pSelectedMesh->m_szMeshName);
-		ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1);
-
-		sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
+		ApplyPodMods(pEntity);
+		return;
 	}
 
+	// The selection outlives the model it was made on - the camera moves between 2B, 9S, A2
+	// and anything spawned - so pull it back into this model's range before it indexes
+	// m_pMeshes. (The old commented-out "&= m_nMeshes - 1" only worked for power-of-two
+	// mesh counts.)
+	Vars.Gameplay.iSelectedModelMesh = min(max(Vars.Gameplay.iSelectedModelMesh, 0), pEntity->m_Work.m_nMeshes - 1);
+
+	// "###" keeps the widget ID fixed while the mesh name in the label changes, so a drag
+	// isn't dropped after one step; AlwaysClamp stops Ctrl+Click entry going out of range.
+	sprintf_s(szModelPart, "Mesh: %s###ModelMesh", pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_szMeshName);
+
+	if (ImGui::SliderInt(szModelPart, &Vars.Gameplay.iSelectedModelMesh, 0, pEntity->m_Work.m_nMeshes - 1, "%d", ImGuiSliderFlags_AlwaysClamp))
+	{
+		// bSelectedMeshEnable is a single flag, and the entity hook writes it into whichever
+		// mesh is selected every frame. Load the newly selected mesh's real state, otherwise
+		// moving the slider stamps the previous mesh's visibility onto every mesh it passes.
+		Vars.Gameplay.bSelectedMeshEnable = (pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh].m_bShow != FALSE);
+	}
+
+	// Taken after the slider, so the rest of this frame edits the mesh the slider now shows
+	// rather than the one it showed before it moved.
+	CMeshPart* pSelectedMesh = &pEntity->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
+
+	sprintf_s(szModelPart, "Mesh %s Color", pSelectedMesh->m_szMeshName);
 
 	ImGui::Checkbox("Enabled", &Vars.Gameplay.bSelectedMeshEnable);
 
@@ -978,7 +1060,9 @@ void ApplyModelMods(Pl0000* pEntity)
 
 		if (pTexture)
 		{
-			CMeshPart* pMesh = &g_pLocalPlayer->m_Work.m_pMeshes[Vars.Gameplay.iSelectedModelMesh];
+			// The selection indexes pEntity's mesh list. This used g_pLocalPlayer's, which is a
+			// different model whenever the camera isn't on the local player.
+			CMeshPart* pMesh = pSelectedMesh;
 
 			for (int i = 0; i < pMesh->m_nShaderInfo; ++i)
 			{

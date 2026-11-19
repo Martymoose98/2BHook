@@ -569,7 +569,7 @@ void LogOffsets(void)
 */
 void FindDenuvoSteamOffsets(void)
 {
-	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D ? ? ? ?", 10);
+	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D", 10);
 	CRILogCallback = CRILogCallbackConsole; // CRILogCallbackWinConsole
 
 	CalculateLevel = (CalculateLevelFn)FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
@@ -587,8 +587,8 @@ void FindDenuvoSteamOffsets(void)
 
 	SaveFileIO = (CSaveDataDevice::SaveFileIOFn)FindPattern(NULL, "8B 51 30 FF CA");
 	ReadSaveSlots = (CSaveDataDevice::ReadSaveSlotsFn)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8B AE ? ? ? ? 48 85 ED 74 38", 1);
-	ReadSaveData = (CSaveDataDevice::ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ?", 1);
-	WriteSaveData = (CSaveDataDevice::WriteSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 0C E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE ? ? ? ? ", 1);
+	ReadSaveData = (CSaveDataDevice::ReadSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE", 1);
+	WriteSaveData = (CSaveDataDevice::WriteSaveDataFn)FindPatternPtr(NULL, "E8 ? ? ? ? EB 0C E8 ? ? ? ? EB 05 E8 ? ? ? ? 48 8B AE", 1);
 	DeleteSaveData = (CSaveDataDevice::DeleteSaveDataFn)FindPattern(NULL, "40 53 48 81 EC ? ? ? ? 48 8B 05 ? ? ? ? 48 33 C4 48 89 84 24 ? ? ? ? 48 8B D9 8B 49 34");
 
 	SceneEntitySystem_CreateEntity = (CSceneEntitySystem::CreateEntityFn)0x1404F9AA0; // TODO: Sig but low priority!
@@ -629,17 +629,17 @@ void FindDenuvoSteamOffsets(void)
 	g_piExperience = (int*)FindPatternPtr(NULL, "8B 15 ? ? ? ? 75 06", 2);
 	g_pItemManager = (CItemManager*)0x14133B510; // TODO: Sig but low priority!
 	g_pYorhaManager = *(CYorhaManager**)FindPatternPtr(NULL, "48 8B D1 48 8B 0D ? ? ? ? 48 8B 01", 6);
-	g_pNPCManager = *(CNPCManager**)FindPatternPtr(NULL, "75 B9 48 8B 0D ? ? ? ?", 5);
+	g_pNPCManager = *(CNPCManager**)FindPatternPtr(NULL, "75 B9 48 8B 0D", 5);
 	g_pEnemyManager = *(CEmBaseManager**)FindPatternPtr(NULL, "4C 89 A3 ? ? ? ? 48 8B 0D", 10);
 	g_pUserManager = *(CUserManager**)FindPatternPtr(NULL, "74 1D 48 8B 0D ? ? ? ? 48 85 C9", 5);
 	g_pWetObjectManager = (CWetObjManager*)(ReadPtr(FindPatternPtr(NULL, "E8 ? ? ? ? 44 89 AF ? ? ? ? 48 C7 87", 1) + 0x1B, 3));
-	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)FindPatternPtr(NULL, "0F 45 C7 48 8B 3D ? ? ? ?", 6);
+	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)FindPatternPtr(NULL, "0F 45 C7 48 8B 3D", 6);
 	g_pTextureResourceManager = *(CTextureResourceManager**)FindPatternPtr(NULL, "48 8B D1 48 8D 0D ? ? ? ? 4C 89 44 24", 6);
 	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 89 44 24 ? 48 8D 05", 15);
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "4C 8D 05 ? ? ? ? 4C 89 D1", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 EB 52", 3);
-	g_pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24 ?", 3);
-	g_pMemoryDevice = (CMemoryDevice*)FindPatternPtr(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8 ? ? ? ?", 6);
+	g_pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 35 ? ? ? ? 4C 8D 35 ? ? ? ? 48 8D 54 24", 3);
+	g_pMemoryDevice = (CMemoryDevice*)FindPatternPtr(NULL, "48 8B DA 48 8D 0D ? ? ? ? E8", 6);
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
 
@@ -653,6 +653,10 @@ void FindDenuvoSteamOffsets(void)
 	g_pModelManager = (CModelManager*)FindPatternPtr(NULL, "48 8B C7 48 89 05", 6);
 	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "0F 29 02 0F 28 2D", 6);
 	//g_pSwapChain = *(IDXGISwapChain**)((*(byte**)FindPatternPtr64(NULL, "48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 ? ? ? ? ? ? ? ? 48 89 35 ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 85 C9 74 ? 39 35 ? ? ? ? 74 ? 48 8B 01 BA ? ? ? ? FF 10 48 8B 0D ? ? ? ? 48 89 35 ? ? ? ? C7 05 D8", 3)) + 0xE0);
+	// Without CGraphics there's no swapchain to hook, so stop here; Setup() bails out on the nulls
+	if (!g_pGraphics || !g_pGraphics->m_Display.m_pWindowedSwapChain)
+		return;
+
 	g_pSwapChain = g_pGraphics->m_Display.m_pWindowedSwapChain->m_pSwapChain;
 	g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
 
@@ -662,7 +666,7 @@ void FindDenuvoSteamOffsets(void)
 	g_pAntiVSync = (byte*)FindPattern(NULL, "0F 94 D2 45 31 C0 FF 50 40"); //unused
 	g_pAntiFramerateCap_Sleep = (byte*)FindPattern(NULL, "8B CA FF 15 ? ? ? ? 48 8D 4C 24") + 2;
 	g_pAntiFramerateCap_Spinlock = g_pAntiFramerateCap_Sleep + 0x48;
-	g_pAntiFramerateCap_Test4 = (byte*)FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24 ?");
+	g_pAntiFramerateCap_Test4 = (byte*)FindPattern(NULL, "F6 05 ? ? ? ? ? 0F 29 74 24");
 	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 85 C0 0F 84 ? ? ? ? 0F 57 C0", 3);
 
 	for (const MrubyImpl* pVM = *(MrubyImpl**)FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 89 81", 3); pVM; pVM = pVM->m_pNext)
@@ -757,7 +761,7 @@ void FindSteamOffsets(void)
 	g_pWetObjectManager = (CWetObjManager*)FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B", 6);
 	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 83 C4 58 C3", 3);
 	g_pTextureResourceManager = (CTextureResourceManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 4B 10 48 85 C9", 3);
-	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 8D 4D E7 48 8D 05 ? ? ? ?", 7);
+	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 8D 4D E7 48 8D 05", 7);
 	g_pItemManager = (CItemManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? 8B 94 87 ? ? ? ? E8 ? ? ? ? 85 C0 74 4F", 3);
 	g_pYorhaManager = *(CYorhaManager**)FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91", 3);
 	g_pNPCManager = *(CNPCManager**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3);
@@ -767,18 +771,23 @@ void FindSteamOffsets(void)
 	g_pMemoryDevice = (CMemoryDevice*)FindPatternPtr(NULL, "4C 89 64 24 ? 48 8D 0D ? ? ? ? 4C 89 7C 24", 8);
 
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
-	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15 ? ? ? ?", 7);
+	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15", 7);
 	g_szCRILogBuffer = (CHAR*)FindPatternPtr(NULL, "4C 8D 35 ? ? ? ? BD 00 01 00 00", 3);
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8B CF FF 15", 3);
 	g_pDirectInput8 = *(IDirectInput8A**)FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D", 9);
 	g_pKeyboard = (Keyboard_t*)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA", 3);
 	g_pMouse = (Mouse_t*)FindPatternPtr(NULL, "B8 ? ? ? ? 48 89 0D ? ? ? ? C7 05", 8);
 	g_pOtManager = *(COtManager**)FindPatternPtr(NULL, "4C 8B C1 48 8B 0D ? ? ? ? 48 85 C9", 6);
-	g_pModelManager = *(CModelManager**)FindPatternPtr(NULL, "48 8B F9 48 8B 35 ? ? ? ?", 6);
+	g_pModelManager = *(CModelManager**)FindPatternPtr(NULL, "48 8B F9 48 8B 35", 6);
 	g_pGraphics = *(CGraphics**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
-	g_pSwapChain = g_pGraphics->m_Display.m_pWindowedSwapChain->m_pSwapChain;
-	//g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
-	g_pGraphicDevice = g_pGraphics->m_pGraphicalDevice;
+
+	// Without CGraphics there's no swapchain to hook (issue #13: crashed here on unknown builds)
+	if (g_pGraphics && g_pGraphics->m_Display.m_pWindowedSwapChain)
+	{
+		g_pSwapChain = g_pGraphics->m_Display.m_pWindowedSwapChain->m_pSwapChain;
+		//g_pGraphicDevice = g_pGraphics->m_Display.m_pGraphicDevice;
+		g_pGraphicDevice = g_pGraphics->m_pGraphicalDevice;
+	}
 
 	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
 }
@@ -808,9 +817,16 @@ void Setup(void)
 	NierVersionInfo* pVersion = QueryNierBinaryVersion();
 	SHA256DigestStr SHA256Hash;
 
-	SHA256_PrintDigest((SHA256Digest*)pVersion->m_pHash, &SHA256Hash);
-
-	LOG("SHA256: %32s\n", SHA256Hash);
+	// The hash can be missing if the game binary couldn't be read or hashed
+	if (pVersion->m_pHash)
+	{
+		SHA256_PrintDigest((SHA256Digest*)pVersion->m_pHash, &SHA256Hash);
+		LOG("SHA256: %s\n", SHA256Hash.Hash);
+	}
+	else
+	{
+		LOG("SHA256: (unavailable, couldn't hash the game binary)\n");
+	}
 
 	LOG("Detected %s\n", pVersion->m_szVersion);
 
@@ -828,6 +844,16 @@ void Setup(void)
 	FindOffsets();
 
 	LogOffsets();
+
+	// These are required for the overlay. If a signature didn't match (an unknown or
+	// updated game build), stop cleanly instead of crashing later (issue #13).
+	if (!g_pGraphics || !g_pSwapChain || !g_pGraphicDevice || !g_hWnd)
+	{
+		LERROR("2B Hook Failed Initialization!\nRequired game offsets weren't found, so this game version isn't supported yet. "
+			"Please report it with the SHA256 above. (CGraphics %p, SwapChain %p, GraphicDevice %p, hWnd %p)\n",
+			g_pGraphics, g_pSwapChain, g_pGraphicDevice, g_hWnd);
+		return;
+	}
 
 	ExposeHiddenXInputFunctions();
 
@@ -862,7 +888,7 @@ void Setup(void)
 		return;
 	}
 
-	//InitializeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08 ?"), 5);
+	//InitializeNopMemory(nop_neon_scenery, FindPattern(NULL, "45 8B FC 0F 29 44 08"), 5);
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_ENEMY], g_pDecreaseHealth[NOP_DAMAGE_ENEMY], 6);
 	InitializeNopMemory(&nop_Health[NOP_DAMAGE_WORLD], g_pDecreaseHealth[NOP_DAMAGE_WORLD], 6);
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP], g_pAntiFramerateCap_Sleep, 6);

@@ -134,41 +134,41 @@ const char* BlacklistItemCallback(void* data, int idx);
 
 const char* ConfigCallback(void* data, int idx);
 
+// NPC, Enemy and YoRHa manager handles, concatenated in that order. CMenu::DisplayEntityHandles
+// fills one per frame and hands it to the handle ListBox as its user data.
+struct EntityHandleSnapshot_t
+{
+	const EntityHandle_t* m_pHandles;
+	int m_nNPC;		// [0, m_nNPC) are NPCs
+	int m_nEnemy;	// [m_nNPC, m_nNPC + m_nEnemy) are enemies, the rest are YoRHa
+	int m_nCount;
+};
+
 // NPC
 //Pl0000* pCurrent = (Pl0000*)GetEntityFromHandleGlobal(&hCurrent);
+//
+// This used to pull the handle out of the managers itself, indexing g_pEnemyManager and
+// g_pYorhaManager with the *combined* list index instead of subtracting the rows before
+// them. Enemy rows showed the wrong enemy (shifted by the NPC count, off the end once that
+// passed the enemy count), YoRHa rows were shifted by NPCs + enemies and read past the end
+// of the YoRHa list, and the handle it wrote back for Set Level / Delete / Set Player was
+// that same wrong entity. It now only labels the snapshot, so the ordering is decided in
+// one place.
 static const char* EntityHandlesCallback(void* user_data, int idx)
 {
 	static char s_Buffer[64];
-	EntityHandle_t hCurrent = {};
-	CBehaviorAppBase* pCurrent = nullptr;
-	const char* szType = "Unknown";
+	const EntityHandleSnapshot_t* pSnapshot = (const EntityHandleSnapshot_t*)user_data;
 
-	if (idx < 0)
+	if (!pSnapshot || idx < 0 || idx >= pSnapshot->m_nCount)
 		return nullptr;
 
-	if (idx < g_pNPCManager->m_handles.m_Count)
-	{
-		hCurrent = g_pNPCManager->m_handles[idx];
-		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
-		szType = "NPC";
-	}
-	else if (idx < g_pNPCManager->m_handles.m_Count + g_pEnemyManager->m_handles.m_Count)
-	{
-		hCurrent = g_pEnemyManager->m_handles[idx];
-		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
-		szType = "Enemy";
-	}
-	else
-	{
-		hCurrent = g_pYorhaManager->m_handles[idx];
-		pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
-		szType = "Yorha";
-	}
-
-	((EntityHandle*)(user_data))[idx] = hCurrent;
+	EntityHandle_t hCurrent = pSnapshot->m_pHandles[idx];
+	CBehaviorAppBase* pCurrent = g_pEntityList->GetEntity<CBehaviorAppBase>(hCurrent);
+	const char* szType = (idx < pSnapshot->m_nNPC) ? "NPC"
+		: (idx < pSnapshot->m_nNPC + pSnapshot->m_nEnemy) ? "Enemy" : "Yorha";
 
 	sprintf_s(s_Buffer, "%s: %s | Handle: %x | ObjectId: %x", szType,
-		pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent, pCurrent ? pCurrent->m_ObjectId : 0);
+		pCurrent ? pCurrent->m_pInfo->m_szEntityType : 0, hCurrent.m_uValue, pCurrent ? pCurrent->m_ObjectId : 0);
 
 	return s_Buffer;
 }

@@ -135,7 +135,7 @@ struct NierVersionInfo
 	}
 
 	NierVersionInfo(NierVersion Version, const char* Hash)
-		: m_pHash((BYTE*)Hash), m_uHashSize(strlen(Hash)), m_Version(Version)
+		: m_pHash((BYTE*)Hash), m_uHashSize(32), m_Version(Version) // SHA-256 digests are binary and can contain zero bytes, so strlen can't size them
 	{
 		Init();
 	}
@@ -188,6 +188,41 @@ struct NierVersionInfo
 	TCHAR* m_szVersion;
 };
 
+// Hashes a buffer with SHA-256. Opens a real algorithm provider instead of using the
+// BCRYPT_SHA256_ALG_HANDLE pseudo-handle, which Wine/Proton doesn't support (issue #13).
+static NTSTATUS HashBufferSHA256(const BYTE* pData, DWORD cbData, BYTE*& pHash, ULONG& uHashSize)
+{
+	BCRYPT_ALG_HANDLE hAlgorithm = NULL;
+	NTSTATUS Status = BCryptOpenAlgorithmProvider(&hAlgorithm, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+
+	if (!BCRYPT_SUCCESS(Status))
+		return Status;
+
+	ULONG uHashLengthSize;
+
+	// Query the hash length
+	Status = BCryptGetProperty(hAlgorithm, BCRYPT_HASH_LENGTH, (PUCHAR)&uHashSize, sizeof(ULONG), &uHashLengthSize, 0);
+
+	if (BCRYPT_SUCCESS(Status))
+	{
+		// Allocate the memory for hash
+		pHash = new BYTE[uHashSize];
+
+		// Create the hash
+		Status = BCryptHash(hAlgorithm, NULL, 0, (PUCHAR)pData, cbData, pHash, uHashSize);
+
+		if (!BCRYPT_SUCCESS(Status))
+		{
+			delete[] pHash;
+			pHash = NULL;
+		}
+	}
+
+	BCryptCloseAlgorithmProvider(hAlgorithm, 0);
+
+	return Status;
+}
+
 static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 {
 	//	TCHAR szFileName[MAX_PATH];
@@ -234,22 +269,11 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 		return STATUS_PARTIAL_COPY;
 	}
 
-	ULONG uHashLengthSize;
+	ULONG uHashSize = 0;
 
-	// Query the hash length
-	Status = BCryptGetProperty(BCRYPT_SHA256_ALG_HANDLE, BCRYPT_HASH_LENGTH, (PUCHAR)&Version.m_uHashSize, sizeof(ULONG), &uHashLengthSize, 0);
-
-	if (SUCCEEDED(Status))
-	{
-		// Allocate the memory for hash
-		Version.m_pHash = new BYTE[Version.m_uHashSize];
-
-		// Create the hash
-		ULONG uBlockSize = (ULONG) Version.m_uHashSize;
-
-		// Files bigger than 0xFFFFFFFF are unsupported and invoke UB
-		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, Version.m_pHash, (ULONG)Version.m_uHashSize);	
-	}
+	// Files bigger than 0xFFFFFFFF are unsupported and invoke UB
+	Status = HashBufferSHA256(pBinary, dwFileSize, Version.m_pHash, uHashSize);
+	Version.m_uHashSize = uHashSize;
 
 	// Free the binary from memory
 	delete[] pBinary;
@@ -303,19 +327,7 @@ static NTSTATUS QueryNierBinaryHash(BYTE*& pHash, ULONG& uHashSize)
 		return STATUS_PARTIAL_COPY;
 	}
 
-	ULONG uHashLengthSize;
-
-	// Query the hash length
-	Status = BCryptGetProperty(BCRYPT_SHA256_ALG_HANDLE, BCRYPT_HASH_LENGTH, (PUCHAR)&uHashSize, sizeof(ULONG), &uHashLengthSize, 0);
-
-	if (SUCCEEDED(Status))
-	{
-		// Allocate the memory for hash
-		pHash = new BYTE[uHashSize];
-
-		// Create the hash
-		Status = BCryptHash(BCRYPT_SHA256_ALG_HANDLE, NULL, 0, pBinary, dwFileSize, pHash, uHashSize);
-	}
+	Status = HashBufferSHA256(pBinary, dwFileSize, pHash, uHashSize);
 
 	// Free the binary from memory
 	delete[] pBinary;
@@ -349,6 +361,17 @@ static NierVersionInfo* QueryNierBinaryVersion(void)
 	for (; pVersion->m_Version != NIERVER_UNKNOWN; ++pVersion)
 		if (*pVersion == pHash)
 			break;
+
+	// For an unknown build, keep the hash we computed so it can still be logged
+	// and reported (issue #13), instead of leaving the entry's hash null.
+	if (pVersion->m_Version == NIERVER_UNKNOWN && uHashSize == 32)
+	{
+		static BYTE s_UnknownHash[32];
+
+		memcpy(s_UnknownHash, pHash, sizeof(s_UnknownHash));
+		pVersion->m_pHash = s_UnknownHash;
+		pVersion->m_uHashSize = sizeof(s_UnknownHash);
+	}
 
 	// Free the hash memory
 	delete[] pHash;
@@ -1011,7 +1034,7 @@ static CTargetTexture* CreateTextureR(const char* szFile, CTextureDescription& D
 				// old: 0x140E9FA38 | base + 0xE9FA38
 				// new sig: 48 89 58 50 48 8D 05 ? ? ? ? 
 				// new: 0x140DB1DE8 | base + 0xDB1DE8
-				pTexture->m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
+				pTexture->m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05", 7);
 
 				// old: 0x140934FE0
 				// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
@@ -1064,7 +1087,7 @@ static void CreateMaterial(
 		// old: 0x140E9FA38 | base + 0xE9FA38
 		// new sig: 48 89 58 50 48 8D 05 ? ? ? ? 
 		// new: 0x140DB1DE8 | base + 0xDB1DE8
-		Textures[i].m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05 ? ? ? ?", 7);
+		Textures[i].m_vtbl = (void*)FindPatternPtr(NULL, "48 89 58 50 48 8D 05", 7);
 
 		// old sig: 48 89 5C 24 ? 48 89 6C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 02 48 8B CA 49 8B F0 48 8B FA FF 50 08 48 83 3D 95 ? ? ? ?
 		// new sig: 48 89 5C 24 ? 48 89 74 24 ? 57 48 83 EC ? 48 8B 44 24 ? 33 F6

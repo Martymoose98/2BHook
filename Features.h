@@ -14,7 +14,8 @@ int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 
 namespace Features
 {
-	static void ApplyHealthMods(void)
+	// inline (not static) so the Godmode state below is shared by DLLMain.cpp and Hooks.cpp
+	inline void ApplyHealthMods(void)
 	{
 		if (Vars.Gameplay.bGodmode || Vars.Gameplay.bNoEnemyDamage)
 			NopMemory(&nop_Health[NOP_DAMAGE_ENEMY]);
@@ -27,6 +28,22 @@ namespace Features
 
 		if (!Vars.Gameplay.bGodmode && !Vars.Gameplay.bNoWorldDamage)
 			RestoreMemory(&nop_Health[NOP_DAMAGE_WORLD]);
+
+		// The game's own debug invincibility bits: 0x8000 is DBG_PLAYER_NO_DAMAGE and 0x4000 (unnamed)
+		// also blocks damage. They cover the flight unit and hacking modes, which the NOPs above miss (issue #14).
+		// Only touch the bits when Godmode changes, so manual edits in the Debug Flags box still work.
+		constexpr uint32_t DBG_FLAG_INVINCIBLE = 0x4000 | 0x8000;
+		static bool s_bDebugGodmode = false;
+
+		if (g_pDebugFlags && Vars.Gameplay.bGodmode != s_bDebugGodmode)
+		{
+			if (Vars.Gameplay.bGodmode)
+				*g_pDebugFlags |= DBG_FLAG_INVINCIBLE;
+			else
+				*g_pDebugFlags &= ~DBG_FLAG_INVINCIBLE;
+
+			s_bDebugGodmode = Vars.Gameplay.bGodmode;
+		}
 	}
 
 	static void AddEntityToBlackList()
@@ -462,7 +479,7 @@ namespace Features
 	static void AddItem(int id, int quantity)
 	{
 		// I don't know what this is. I just know it's related to the item manager
-		static CItemManager* pItemManager = (CItemManager*)FindPatternPtr(NULL, "7E CA 48 8D 15 ? ? ? ?", 5);
+		static CItemManager* pItemManager = (CItemManager*)FindPatternPtr(NULL, "7E CA 48 8D 15", 5);
 
 		ItemManager_AddItem(pItemManager, id, quantity);
 

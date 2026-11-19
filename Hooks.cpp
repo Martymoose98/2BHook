@@ -37,13 +37,16 @@ void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData);
 class CPl0000Hook
 {
 public:
+	// Visibility is tracked per mesh in a fixed-size array; meshes past this are left alone.
+	static constexpr int MAX_TRACKED_MESHES = 32;
+
 	CPl0000Hook(CObj* pEntity)
-		: m_Hook((ULONG_PTR**)pEntity)
+		: m_Hook((ULONG_PTR**)pEntity), m_pShaderHooks{}
 	{
 		if (pEntity->m_pModelInfo)
 			m_vTint = pEntity->m_pModelInfo->m_vTint;
 
-		for (int i = 0; i < pEntity->m_Work.m_nMeshes - 1; ++i)
+		for (int i = 0; i < TrackedMeshes(&pEntity->m_Work); ++i)
 		{
 			m_bMeshShow[i] = pEntity->m_Work.m_pMeshes[i].m_bShow;
 		}
@@ -63,10 +66,18 @@ public:
 	{
 	}
 
+	// The mesh loops used to run to m_nMeshes - 1, which skipped the last mesh - the one the
+	// menu's mesh slider can still select - and ran past m_bMeshShow on models with more
+	// than MAX_TRACKED_MESHES + 1 meshes.
+	static int TrackedMeshes(const CModelWork* pWork)
+	{
+		return min(pWork->m_nMeshes, MAX_TRACKED_MESHES);
+	}
+
 	VirtualTableHook m_Hook;
 	VirtualTableHook* m_pShaderHooks[MAX_MATERIAL_TEXTURES];
 	Vector4 m_vTint;
-	bool m_bMeshShow[32];
+	bool m_bMeshShow[MAX_TRACKED_MESHES];
 
 };
 
@@ -337,11 +348,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 #endif
 
 	//bool bDerived = RTTI::DerivesFrom(pCameraEnt, typeid(Pl0000));
-	if (GetAsyncKeyState(VK_HOME) & 0x1)
-		Vars.Misc.nSlot++;
-
-	if (GetAsyncKeyState(VK_END) & 0x1)
-		Vars.Misc.nSlot--;
+	// (The Home/End camera type counter that used to be here stepped Vars.Misc.nSlot, the save
+	// slot "Backup Save" copies. It now lives in Overlay::Render's debug readout.)
 
 	if (pCameraEnt)
 	{
@@ -357,7 +365,12 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 				if (Vars.Gameplay.flPodTintHue > 1.f)
 					Vars.Gameplay.flPodTintHue = 0.0f;
 
-				int idx = GetModelMeshIndex(&pCameraEnt->m_Work, "Hair");
+				// Look the mesh up on the pod's own model. This used to search the camera
+				// entity's model for "Hair" and then index the pod's mesh array with the
+				// result - an index into a different, much larger mesh list. It tinted
+				// whichever pod mesh happened to share 2B's hair slot, or wrote past the end
+				// of the pod's meshes when that slot didn't exist on the pod.
+				int idx = GetModelMeshIndex(&pPod->m_Work, "Body");
 
 				if (idx != -1)
 				{
@@ -784,7 +797,7 @@ void* hkCCameraGameMove(CCameraGame* pThis)
 		CCameraGame_FREECAM_sub_14073AAE0(pThis, 2, 0);
 	}
 
-	//pThis->m_CamType = (CameraType)Vars.Misc.nSlot;
+	//pThis->m_CamType = (CameraType)<debug counter in Overlay::Render>; // not Vars.Misc.nSlot - that's the save slot
 
 	return oCCameraGameMove(pThis);
 }
@@ -835,26 +848,34 @@ void hkPl0000Update(Pl0000* pThis)
 	if (!bInit)
 	{
 		bInit = true;
-		for (int i = 0; i < pThis->m_Work.m_nMaterialShaders; ++i)
+
+		// m_pShaderHooks is sized by MAX_MATERIAL_TEXTURES - a per-material texture count,
+		// not a shader count - so a model with more shaders than that overran it into the
+		// rest of the hook object.
+		for (int i = 0; i < pThis->m_Work.m_nMaterialShaders && i < (int)ARRAYSIZE(pHook->m_pShaderHooks); ++i)
 		{
 			pHook->m_pShaderHooks[i] = new VirtualTableHook((ULONG_PTR**)pThis->m_Work.m_pModelShaders[i].m_pShader);
 			pHook->m_pShaderHooks[i]->HookFunction((ULONG_PTR)&CModelShaderModule_Draw, 3);
 		}
 
-		for (int i = 0; i < pThis->m_Work.m_nMeshes - 1; ++i)
+		for (int i = 0; i < CPl0000Hook::TrackedMeshes(&pThis->m_Work); ++i)
 		{
 			pHook->m_bMeshShow[i] = pThis->m_Work.m_pMeshes[i].m_bShow;
 		}
 	}
 
-	pHook->m_bMeshShow[Vars.Gameplay.iSelectedModelMesh] = Vars.Gameplay.bSelectedMeshEnable;
+	// The selection comes from the menu slider, which is bounded by the mesh count of
+	// whatever the camera was on when it was drawn - not by m_bMeshShow.
+	if (Vars.Gameplay.iSelectedModelMesh >= 0 && Vars.Gameplay.iSelectedModelMesh < CPl0000Hook::TrackedMeshes(&pThis->m_Work))
+		pHook->m_bMeshShow[Vars.Gameplay.iSelectedModelMesh] = Vars.Gameplay.bSelectedMeshEnable;
+
 	//CGraphicCommand* pCmd = GetGraphicCommand(176);
 	//pThis->m_Work.m_pModelShaders->m_pShader->Draw(pThis->m_Work.m_pModelData->m_pDrawData);
 
 	// kind of gloss glow
 	//pThis->m_pModelInfo->m_vTint = Vars.Gameplay.vModelTint;
 
-	for (int i = 0; i < pThis->m_Work.m_nMeshes - 1; ++i)
+	for (int i = 0; i < CPl0000Hook::TrackedMeshes(&pThis->m_Work); ++i)
 	{
 		pThis->m_Work.m_pMeshes[i].m_bShow = pHook->m_bMeshShow[i];
 		pThis->m_Work.m_pMeshes[i].m_bUpdate = TRUE;

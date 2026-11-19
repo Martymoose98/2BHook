@@ -30,24 +30,34 @@ void Overlay::RenderCollisions(OverlayDrawList* pList)
 
 	for (CCollisionContextNode* pNode = g_pCollisionDataObjectManager->m_pCurrentCollision; pNode; pNode = pNode->m_pPrevious)
 	{
-		if (pNode->m_Context.m_pColTree)
-		{
-			Vector3Aligned* pvMin = &pNode->m_Context.m_pColTree->m_vP1;
-			Vector3Aligned* pvMax = &pNode->m_Context.m_pColTree->m_vP2;
+		// Nothing to draw without a collision tree, and vOrigin/vMin/vMax would otherwise be
+		// whatever the previous node left in them (or uninitialized on the first one).
+		if (!pNode->m_Context.m_pColTree)
+			continue;
 
-			vOrigin = *pvMin + ((pvMax - pvMin) / 2.0f);
-			vMin = (pNode->m_Context.m_pColTree->m_vP2 - pNode->m_Context.m_pColTree->m_vP1) / 2.0f;
-			vMax = (pNode->m_Context.m_pColTree->m_vP1 - pNode->m_Context.m_pColTree->m_vP2) / 2.0f;
-		}
+		Vector3Aligned* pvMin = &pNode->m_Context.m_pColTree->m_vP1;
+		Vector3Aligned* pvMax = &pNode->m_Context.m_pColTree->m_vP2;
+
+		// Dereference before subtracting: "pvMax - pvMin" was pointer arithmetic (the element
+		// distance between the two fields, i.e. 1), so the box origin came out as P1 + 0.5 on
+		// every axis instead of the centre of the box.
+		vOrigin = *pvMin + ((*pvMax - *pvMin) / 2.0f);
+		vMin = (*pvMax - *pvMin) / 2.0f;
+		vMax = (*pvMin - *pvMax) / 2.0f;
 
 		mTrans.InitTransform(Vector3(0, 0, 1), Vector3(1, 0, 0), Vector3(0, 1, 0), vOrigin);
 		pList->Add3DBox(vMin, vMax, mTrans, ImColor(222, 0, 222));
 
 		if (Vars.Visuals.bCollisionDebugObjectInfo && WorldToScreen(vOrigin, vMin2D))
 		{
-			for (int i = 0; pNode->m_Context.m_nNameCount - 1; ++i)
+			// The condition used to be just "m_nNameCount - 1", which never looks at i: any
+			// count other than 1 looped forever and read straight off the end of m_pNames.
+			for (int i = 0; i < pNode->m_Context.m_nNameCount; ++i)
 			{
-				pList->AddTextArgs(vMin2D, ImColor(22, 0, 222), FRF_CENTER_H | FRF_OUTLINE,
+				Vector2 vLine2D = vMin2D;
+				vLine2D.y += i * ImGui::GetFontSize();	// one name per line, not all on top of each other
+
+				pList->AddTextArgs(vLine2D, ImColor(22, 0, 222), FRF_CENTER_H | FRF_OUTLINE,
 					"%s", pNode->m_Context.m_pNames[i]);
 			}
 		}
@@ -121,8 +131,9 @@ void Overlay::RenderCollisions2(OverlayDrawList* pList)
 
 			if (Vars.Visuals.bCollisionDebugObjectInfo && WorldToScreen(vOrigin, vMin2D))
 			{
+				// m_nNames - 1 is index -1 for an object with no names.
 				pList->AddTextArgs(vMin2D, ImColor(222, 0, 222), FRF_CENTER_H | FRF_OUTLINE,
-					"%s %s idx: %x", pObj->m_pNames[pObj->m_nNames - 1].m_szName, (pInfo) ? pInfo->m_szEntityType : "", pObj->m_uScenePropIndex);
+					"%s %s idx: %x", (pObj->m_nNames > 0) ? pObj->m_pNames[pObj->m_nNames - 1].m_szName : "", (pInfo) ? pInfo->m_szEntityType : "", pObj->m_uScenePropIndex);
 			}
 		}
 	}
@@ -302,12 +313,25 @@ void Overlay::Render(OverlayDrawList* pList)
 		}
 
 #ifdef _DEBUG
+		// Camera type debug counter, stepped with Home/End. It used to live in hkPresent and
+		// step Vars.Misc.nSlot - the save slot hkSaveFileIO records on load and "Backup Save"
+		// copies - in every build, so pressing Home/End (even to move the cursor in a menu
+		// text box) silently changed which SlotData_N.dat got backed up. It only feeds this
+		// readout, so it lives here now, debug builds only.
+		static int s_iDebugCameraType = 0;
+
+		if (GetAsyncKeyState(VK_HOME) & 0x1)
+			++s_iDebugCameraType;
+
+		if (GetAsyncKeyState(VK_END) & 0x1)
+			--s_iDebugCameraType;
+
 		pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H,
 			"ang (%f,%f,%f) fov: %f cam type: %i",
 			RADTODEG(g_pCamera->m_vViewangles.x),
 			RADTODEG(g_pCamera->m_vViewangles.y),
 			RADTODEG(g_pCamera->m_vViewangles.z),
-			GetFovFromProjectionMatrix(), Vars.Misc.nSlot);
+			GetFovFromProjectionMatrix(), s_iDebugCameraType);
 #endif
 	}
 
