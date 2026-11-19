@@ -432,6 +432,12 @@ namespace Features
 	// entity, puts back the alphas they had. Alpha 0 also drops the head's shadow; the port
 	// avoids that by skipping the meshes in the main view only, which needs a draw hook.
 	// Rainbow Hair only changes the colour, so the two work together.
+	// Only these head meshes are hidden, never the body: they all sit within a few centimetres
+	// of the eye, around it, so some of them are in the view whichever way it looks. The body,
+	// the arms and what she holds stay drawn; the camera keeps out of them instead, with the
+	// pitch held 10 degrees short of straight down, the look held within reach of her heading,
+	// the eye in front of her face toward the look and a near plane of a few centimetres
+	// (hkCCameraGameSetViewAngles, ApplyFirstPersonNearPlane).
 	inline void UpdateFirstPersonHead(CBehaviorAppBase* pEntity)
 	{
 		static const char* const s_szHeadMeshes[] =
@@ -485,6 +491,89 @@ namespace Features
 		}
 
 		s_pHidden = pEntity;
+	}
+
+	// First person turns her to face the look, after the port's CFirstPerson::OnPlayerUpdate
+	// (ExcitedDelirium FirstPerson.cpp:287-299). Once the look is more than FIRSTPERSON_TURN_START
+	// off her heading she is turned toward it until she is within FIRSTPERSON_TURN_STOP, and only
+	// while she stands idle: state 0 (+0x670), Pl0000_ExecuteState's case 0 calling
+	// Pl0000_ExecuteIdle (0x140503A90). Walking and running already turn her to the input, which
+	// goes the way the view looks, and every other state owns her heading.
+	// Pl0000_TurnTowardHeading (0x1404FE750) eases her yaw (+0x94) toward the heading through
+	// CameraAngle_Approach, the fraction and the step scaled by her tick base, and reads nothing but
+	// m_pInfo and the yaw; the fraction and step are the port's (FirstPerson.cpp:38-39). This runs
+	// in CCameraGame_Update, which GameCamera_ThinkUpdate (0x140725200) calls from
+	// Game_PerFrameUpdate (0x140763A17) between two behaviour group runs (0x1404E1210, 0x1404724B0).
+	// Those hand the entity updates to CWorkerJobPool::RunBatch (0x140270C80), which waits for every
+	// worker before it returns, so nothing else is updating her while her yaw is turned here.
+	// pPlayer NULL (first person not placed) stops a turn in progress.
+	inline void TurnFirstPersonBody(Pl0000* pPlayer, float flLookYaw)
+	{
+		constexpr float FIRSTPERSON_TURN_START = DEGTORAD(60.0f);
+		constexpr float FIRSTPERSON_TURN_STOP = DEGTORAD(5.0f);
+		constexpr float FIRSTPERSON_TURN_FRACTION = 0.3f;
+		constexpr float FIRSTPERSON_TURN_STEP = DEGTORAD(30.0f);	// a tick
+		static bool s_bTurning = false;
+
+		if (!pPlayer || !Pl0000_TurnTowardHeading)
+		{
+			s_bTurning = false;
+			return;
+		}
+
+		const float flOff = fabsf(remainderf(flLookYaw - pPlayer->m_matModelToWorld.GetAxis(3).y, 2.0f * M_PI_F));
+
+		if (flOff > FIRSTPERSON_TURN_START)
+			s_bTurning = true;
+		else if (flOff < FIRSTPERSON_TURN_STOP)
+			s_bTurning = false;
+
+		if (s_bTurning && pPlayer->m_iAnimationId == 0)
+			Pl0000_TurnTowardHeading(pPlayer, flLookYaw, FIRSTPERSON_TURN_FRACTION, FIRSTPERSON_TURN_STEP);
+	}
+
+	// First person's near plane. The eye sits a few centimetres in front of her face, and the game's
+	// own near plane can cut into her arms and what she holds when she looks down. While first person
+	// is placed, the near plane is held at FIRSTPERSON_ZNEAR, or at the game's when that is nearer.
+	// CCameraInstance_SetZNear (0x14027ADA0) stores +0x268 and sets the projection dirty flag
+	// (+0x284), and CCameraInstance_SetViewProjection (0x14027AB20) rebuilds the projection from
+	// it; that runs from CCameraGame_UpdateProjectionAndShake (0x140743C10), which CCameraGame_Update
+	// calls (0x14073E521) right after SetViewAngles, so a change made in the SetViewAngles hook shows
+	// the same frame. The game itself sets the near plane only now and then: its 13 callers are the
+	// environment light sets (CEnvironmentLight_SelectActiveSets, 0x140788370, on the game camera,
+	// g_CameraGame +0x60), events, hacking and the pause map. So a near plane that isn't the one set
+	// here is the game's new one, and leaving first person puts back the game's, unless the game has
+	// set another since.
+	inline void ApplyFirstPersonNearPlane(CCameraGame* pCamera, bool bPlaced)
+	{
+		constexpr float FIRSTPERSON_ZNEAR = 0.05f;			// metres
+		static const CCameraInstance* s_pInstance = NULL;	// the instance holding ours, or NULL
+		static float s_flGameZNear = 0.0f;
+		static float s_flZNear = 0.0f;
+
+		CCameraInstance* pInstance = pCamera ? pCamera->m_pInstance : NULL;
+
+		if (!CameraInstance_SetZNear || !pInstance)
+			return;
+
+		if (bPlaced)
+		{
+			if (s_pInstance != pInstance || pInstance->m_flZNear != s_flZNear)
+				s_flGameZNear = pInstance->m_flZNear;
+
+			s_pInstance = pInstance;
+			s_flZNear = min(s_flGameZNear, FIRSTPERSON_ZNEAR);
+
+			if (pInstance->m_flZNear != s_flZNear)
+				CameraInstance_SetZNear(&pCamera->m_pInstance, s_flZNear);
+		}
+		else if (s_pInstance)
+		{
+			if (s_pInstance == pInstance && pInstance->m_flZNear == s_flZNear)
+				CameraInstance_SetZNear(&pCamera->m_pInstance, s_flGameZNear);
+
+			s_pInstance = NULL;
+		}
 	}
 
 	// Maybe for perma wet we can call WetObjectManager_SetDry(g_pWetObjectManager, pEntity->m_pInfo); then, set the wet level manually

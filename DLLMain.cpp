@@ -533,6 +533,8 @@ void LogOffsets(void)
 	LOG_OFFSET("DialogUI::System::GetText", DialogUI_System_GetText);
 	LOG_OFFSET("DialogUI::System::CreateBlackBanner", DialogUI_System_CreateBlackBanner);
 	LOG_OFFSET("Pl0000::SetFlightUnit", Pl0000_SetFlightUnit);
+	LOG_OFFSET("Pl0000_TurnTowardHeading", Pl0000_TurnTowardHeading);
+	LOG_OFFSET("CCameraInstance_SetZNear", CameraInstance_SetZNear);
 
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Flag Pointers]");
 	LOG_OFFSET("DebugFlags", g_pDebugFlags);
@@ -788,6 +790,14 @@ void FindSteamOffsets(void)
 	// head through lea rdx, [rcx+15B64h] (&m_hFlightSuit); the old RVA 0x4F8300 is now
 	// Pl0000_EnterFighterForm+0x40.
 	Pl0000_SetFlightUnit = (Pl0000_SetFlightUnitFn)FindPatternOrNull("48 8B C4 55 57 41 54 41 56 41 57 48 8D A8 ? ? ? ? 48 81 EC ? ? ? ? 48 C7 45 ? FE FF FF FF 48 89 58 10 48 89 70 18 0F 29 70 C8 0F 29 78 B8 48 8B 05 ? ? ? ? 48 33 C4 48 89 85 ? ? ? ? 48 8B F1 48 8D 91 64 5B 01 00");
+
+	// First person. Both are unique in v1.02 and build 26534214 and resolve to the same function in each.
+	// Pl0000_TurnTowardHeading (0x1404FE750, v1.02 0x1404FE650), by its head through
+	// mov rcx, [rcx+610h] (m_pInfo, for the tick base) / movaps xmm7, xmm1 (the heading).
+	Pl0000_TurnTowardHeading = (Pl0000_TurnTowardHeadingFn)FindPatternOrNull("48 89 5C 24 08 57 48 83 EC 60 0F 29 74 24 50 48 8D 3D ? ? ? ? 0F 29 7C 24 40 48 8B D9 48 8B 89 10 06 00 00 0F 28 F9");
+	// CCameraInstance_SetZNear (0x14027ADA0, v1.02 0x14027ACA0), the whole function: store the near
+	// plane at +0x268 and raise the projection dirty flag at +0x284
+	CameraInstance_SetZNear = (CCameraInstance_SetZNearFn)FindPatternOrNull("48 8B 01 F3 0F 11 88 68 02 00 00 C7 80 84 02 00 00 01 00 00 00 C3");
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.

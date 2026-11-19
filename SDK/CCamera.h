@@ -70,19 +70,21 @@ struct CCameraInstance
 	Matrix4x4 m_OldViewProjection;		//0x0200 | save
 	void* m_ptr240;						//0x0240
 	char pad0x248[24];					//0x0248
-	int m_iWidth;
-	int m_iHeight;
-	float m_flZNear;
-	float m_flZFar;
-	float m_flAspectRatio;
-	float m_flFov;
-	float pad[4];
-	BOOL m_bSetViewProjection;			//0x0284
+	int m_iWidth;						//0x0260
+	int m_iHeight;						//0x0264
+	float m_flZNear;					//0x0268 | CCameraInstance_SetZNear (0x14027ADA0) stores it and sets m_bProjectionDirty
+	float m_flZFar;						//0x026C
+	float m_flAspectRatio;				//0x0270
+	float m_flFov;						//0x0274
+	float pad[3];						//0x0278
+	BOOL m_bProjectionDirty;			//0x0284 | CCameraInstance_SetViewProjection (0x14027AB20) rebuilds the projection and clears it
 	BOOL m_bSetViewProjection2;			//0x0288
 	BOOL m_bSetViewProjection3;			//0x028C
 	char pad0x290[44];					//0x0290
 	float m_flFovY;						//0x02BC
 };
+VALIDATE_OFFSET(CCameraInstance, m_flZNear, 0x268);
+VALIDATE_OFFSET(CCameraInstance, m_bProjectionDirty, 0x284);
 
 
 struct __declspec(align(16)) CCameraTransform

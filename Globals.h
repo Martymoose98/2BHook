@@ -119,6 +119,10 @@ typedef __int64(*DialogUI_System_CreateBlackBannerFn)(void* pThis, int iOwner, i
 
 typedef void(*Pl0000_SetFlightUnitFn)(Pl0000* pThis);
 
+// First person: turning the player toward the look, and the camera's near plane
+typedef void(*Pl0000_TurnTowardHeadingFn)(CObj* pThis, float flHeading, float flFraction, float flMaxStep);
+typedef CCameraInstance*(*CCameraInstance_SetZNearFn)(CCameraInstance** ppInstance, float flZNear);
+
 typedef BOOL(*CreateTextureFn)(CGraphics* pThis, CTargetTexture *pTexture, CTextureDescription *pDesc);
 typedef CTextureResource*(*CTextureResourceManager_FindResourceFn)(unsigned int texid);
 
@@ -233,6 +237,8 @@ extern HashLowercaseStringNoLenCRC32Fn HashLowercaseStringNoLenCRC32;
 extern DialogUI_System_GetTextFn DialogUI_System_GetText;
 extern DialogUI_System_CreateBlackBannerFn DialogUI_System_CreateBlackBanner;
 extern Pl0000_SetFlightUnitFn Pl0000_SetFlightUnit;
+extern Pl0000_TurnTowardHeadingFn Pl0000_TurnTowardHeading;
+extern CCameraInstance_SetZNearFn CameraInstance_SetZNear;
 extern CpkMountFn CpkMount;
 extern CRILogCallbackFn CRILogCallback;
 

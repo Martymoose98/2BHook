@@ -815,11 +815,11 @@ return TRUE;*/
 	// First person, after the port's CFirstPerson (ExcitedDelirium FirstPerson.cpp). The game
 	// has already moved its live pose (m_vPosition/m_vTarget2/m_vUp2, CCameraGame::m_Pose at
 	// 0xF0) this frame; only the published eye and target are replaced, from the head, looking
-	// the way the normal camera looks. The camera's own angles are left alone, so the mouse,
-	// the stick and movement relative to the camera all work as usual. Only for the default
-	// follow camera on the local player: events, lock-on rigs and other camera types keep
-	// their own view. The old version aimed from m_vViewangles with a broken clamp and indexed
-	// the bones with an unchecked head index.
+	// the way the normal camera looks, within the limits below. The camera's own angles are
+	// left alone, so the mouse, the stick and movement relative to the camera all work as
+	// usual. Only for the default follow camera on the local player: events, lock-on rigs and
+	// other camera types keep their own view. The old version aimed from m_vViewangles with a
+	// broken clamp and indexed the bones with an unchecked head index.
 	// The first-person keybind (kb_firstperson_camera) toggles Vars.Misc.bFirstperson, which
 	// nothing read; the camera goes by the CAMERA_FIRSTPERSON flag the menu checkbox sets. Each
 	// press of the key now flips that flag.
@@ -833,6 +833,7 @@ return TRUE;*/
 	const bool bFirstPerson = (Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FIRSTPERSON) &&
 		!(Vars.Misc.uCameraFlags & Variables_t::Misc_t::CameraFlg::CAMERA_FREE) &&
 		pCamEntity && pCamEntity == g_pLocalPlayer && pThis->m_CamType == CAM_DEFAULT;
+	bool bPlaced = false;
 
 	Features::UpdateFirstPersonHead(bFirstPerson ? pCamEntity : NULL);
 
@@ -842,7 +843,41 @@ return TRUE;*/
 
 		if (vLook.LengthSqr() > 1e-6f)
 		{
+			// Looking down or back used to put the eye inside her: it was moved 12 cm along the look,
+			// so down into her neck and chest, or back into her shoulders. The look is now held
+			// within FIRSTPERSON_PITCH_LIMIT of level and FIRSTPERSON_YAW_LIMIT of her heading, she
+			// turns to it past a threshold (Features::TurnFirstPersonBody), the eye moves forward
+			// along the level look only, and the near plane comes in (ApplyFirstPersonNearPlane).
+			// Only the published view is held: the camera's own pose and angles are the game's, so
+			// the mouse and the stick work as usual. The input's look basis is built from this
+			// published eye, target and up (PlayerKeyboardInput_UpdateLookBasis, 0x140511970, looks
+			// at pvFocusPosition from pvTranslation, g_CameraGame +0x20 and +0x10), so she moves the
+			// way the view looks.
+			constexpr float FIRSTPERSON_PITCH_LIMIT = DEGTORAD(80.0f);
+			constexpr float FIRSTPERSON_YAW_LIMIT = DEGTORAD(100.0f);
+			constexpr float FIRSTPERSON_EYE_FORWARD = 0.10f;	// metres, ahead of the head bone
+
+			// pCamEntity is g_pLocalPlayer, which comes from the Pl0000-only GetEntityFromHandle2
+			Pl0000* pPlayer = static_cast<Pl0000*>(pCamEntity);
+
 			vLook.Normalize();
+
+			// The game's heading convention, atan2(x, z): the camera and move headings
+			// (PlayerInput_ResolveStick, port PlayerController.cpp:265-284) and the yaw
+			// Pl0000_TurnTowardHeading turns to
+			const float flLookYaw = atan2f(vLook.x, vLook.z);
+			const float flLookPitch = asinf(min(max(vLook.y, -1.0f), 1.0f));
+
+			Features::TurnFirstPersonBody(pPlayer, flLookYaw);
+
+			// Her yaw after the turn, m_vRotation.y (CObj +0x94, m_matModelToWorld row 3), the
+			// field Pl0000_TurnTowardHeading (0x1404FE750) writes
+			const float flBodyYaw = pPlayer->m_matModelToWorld.GetAxis(3).y;
+			const float flRelativeYaw = remainderf(flLookYaw - flBodyYaw, 2.0f * M_PI_F);
+			const float flViewYaw = flBodyYaw + min(max(flRelativeYaw, -FIRSTPERSON_YAW_LIMIT), FIRSTPERSON_YAW_LIMIT);
+			const float flViewPitch = min(max(flLookPitch, -FIRSTPERSON_PITCH_LIMIT), FIRSTPERSON_PITCH_LIMIT);
+			const Vector3 vLevel(sinf(flViewYaw), 0.0f, cosf(flViewYaw));
+			const Vector3 vView(vLevel.x * cosf(flViewPitch), sinf(flViewPitch), vLevel.z * cosf(flViewPitch));
 
 			// Head bone 5, 8 cm up; with no head bone, 1.5 m above the feet (the port's fallback)
 			const int16_t sHead = GetBoneIndex(pCamEntity->m_Work.m_pModelData, BONE_HEAD);
@@ -861,16 +896,28 @@ return TRUE;*/
 			s_flEyeHeight += (vHead.y - s_flEyeHeight) * 0.35f;
 			vHead.y = s_flEyeHeight;
 
-			// 12 cm forward clears the inside of the head, which UpdateFirstPersonHead hides
-			pThis->m_vSource = vHead + vLook * 0.12f;
-			pThis->m_vTarget = pThis->m_vSource + vLook;
+			// In front of her face the way the view faces, level, so looking down doesn't drop the
+			// eye into her neck. Along the look rather than her heading, as the port has it
+			// (FirstPerson.cpp:24-30): an eye in front of her face looking past her shoulder sat
+			// inside her head, and A2's skull is part of her Body mesh, which stays drawn.
+			pThis->m_vSource = vHead + vLevel * FIRSTPERSON_EYE_FORWARD;
+			pThis->m_vTarget = pThis->m_vSource + vView;
 			pThis->m_vUp = pThis->m_vUp2;
 
 			CameraGame_SetLookAt(pThis);
-
-			Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
-			return TRUE;
+			bPlaced = true;
 		}
+	}
+
+	if (!bPlaced)
+		Features::TurnFirstPersonBody(NULL, 0.0f);
+
+	Features::ApplyFirstPersonNearPlane(pThis, bPlaced);
+
+	if (bPlaced)
+	{
+		Vars.Misc.bCameraFlagsOld = Vars.Misc.uCameraFlags;
+		return TRUE;
 	}
 
 	// Freecamera: the game's own debug free camera runs instead of Move (Features::ApplyFreeCamFlags

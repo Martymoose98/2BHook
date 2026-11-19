@@ -57,6 +57,8 @@ HashLowercaseStringNoLenCRC32Fn HashLowercaseStringNoLenCRC32;
 DialogUI_System_GetTextFn DialogUI_System_GetText;
 DialogUI_System_CreateBlackBannerFn DialogUI_System_CreateBlackBanner;
 Pl0000_SetFlightUnitFn Pl0000_SetFlightUnit;
+Pl0000_TurnTowardHeadingFn Pl0000_TurnTowardHeading;
+CCameraInstance_SetZNearFn CameraInstance_SetZNear;
 ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
 CpkMountFn CpkMount;
 CRILogCallbackFn CRILogCallback;
