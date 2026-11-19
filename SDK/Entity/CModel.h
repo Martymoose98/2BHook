@@ -486,8 +486,8 @@ public:
 		WMBHdr* m_pHdr;						//0x0000
 	};
 	short* m_pBoneIndexTranslationTable;	//0x0008
-	Vector3Aligned m_vMin;					//0x0010
-	Vector3Aligned m_vMax;					//0x0020
+	Vector3Aligned m_vBoxCentre;			//0x0010 | the WMB header's bounding box, model space (CModelData::Init, 0x140190BD0)
+	Vector3Aligned m_vBoxExtent;			//0x0020
 	int32_t m_iReferenceCount;				//0x0030
 	int32_t m_iUnk;							//0x0034
 	CModelDrawData* m_pDrawData;			//0x0038

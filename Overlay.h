@@ -352,6 +352,10 @@ public:
 
 	void RenderCollisions2(OverlayDrawList* pList);
 
+	void RenderEntityBox(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const char* szLabel, int iHealth, int iMaxHealth, const ImColor& Color);
+
+	void RenderSkeleton(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const ImColor& Color);
+
 	void Render(bool bUseBuiltInOverlay);
 
 	void Render(const char* szParentWndName);

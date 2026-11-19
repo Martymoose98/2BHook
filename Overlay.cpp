@@ -135,6 +135,141 @@ void Overlay::RenderCollisions2(OverlayDrawList* pList)
 	}
 }
 
+// Whether any part of a world-space sphere can be on screen. The planes come from the view-projection
+// WorldToScreen projects with (Gribb and Hartmann): a point, as a row vector, is in view while
+// -w <= x <= w and -w <= y <= w (WorldToScreen's x / w and y / w run -1..1 across the screen) and
+// w > 0, so each side plane is column 3 plus or minus column 0 or 1, and the camera plane column 3.
+// The sphere is out once it lies wholly behind any one of them.
+static bool IsSphereInView(const Vector3& vCentre, float flRadius)
+{
+	const VMatrix& vMatrix = g_pCamera->m_pInstance->m_ViewProjection;
+
+	// The camera plane (w), then x >= -w, x <= w, y >= -w and y <= w
+	static const struct { int iAxis; float flSign; } Planes[] = { { 0, 0.0f }, { 0, 1.0f }, { 0, -1.0f }, { 1, 1.0f }, { 1, -1.0f } };
+
+	for (const auto& Plane : Planes)
+	{
+		float flPlane[4];
+
+		for (int i = 0; i < 4; ++i)
+			flPlane[i] = vMatrix[i][3] + Plane.flSign * vMatrix[i][Plane.iAxis];
+
+		const float flNormalLength = sqrtf(flPlane[0] * flPlane[0] + flPlane[1] * flPlane[1] + flPlane[2] * flPlane[2]);
+		const float flDistance = flPlane[0] * vCentre.x + flPlane[1] * vCentre.y + flPlane[2] * vCentre.z + flPlane[3];
+
+		if (flNormalLength > 0.0f && flDistance < -flRadius * flNormalLength)
+			return false;
+	}
+
+	return true;
+}
+
+// Whether the box and the skeleton are worth fitting to pEntity this frame: it needs a model with
+// meshes and a skeleton, and the sphere its model can be in has to reach the screen, so enemies off
+// screen or behind the camera don't have every bone projected. CModelData::Init (0x140190BD0)
+// copies the WMB header's bounding box, a centre and an extent in model space, to CModelData
+// +0x10 / +0x20 (Martin's m_vBoxCentre / m_vBoxExtent). Whether the extent is half or whole,
+// |centre| + |extent| reaches every corner from the model's origin; it is scaled by the longest of
+// m_matTransform's axes, and padded by half again plus a metre since the box is the bind pose and an
+// animation can swing a limb past it.
+static bool IsEntityInView(CBehaviorAppBase* pEntity)
+{
+	const CModelData* pModelData = pEntity->m_Work.m_pModelData;
+
+	if (!pModelData || pEntity->m_Work.m_nMeshes <= 0 || !pEntity->m_pBones || pEntity->m_nBones <= 0)
+		return false;
+
+	Matrix4x4& mTransform = pEntity->m_matTransform;
+	const float flScale = sqrtf(max(mTransform.GetAxis(0).LengthSqr(), max(mTransform.GetAxis(1).LengthSqr(), mTransform.GetAxis(2).LengthSqr())));
+	const float flModelRadius = pModelData->m_vBoxCentre.Length() + pModelData->m_vBoxExtent.Length();
+
+	return IsSphereInView(mTransform.GetAxis(3), flModelRadius * flScale * 1.5f + 1.0f);
+}
+
+// The ESP box for any entity with a skeleton, fitted to its bones: every bone in front of the camera
+// is projected, and their screen-space min and max place the 2D box, the label under it and the
+// health bar beside it. The 3D box uses the same bones' extents along the entity's own axes
+// (m_matTransform rows 0-2, origin row 3, as Matrix4x4::Transform applies it), so it fits whatever
+// pose and size the model is in. It used to be a fixed 1 x 1.5 x 1 m box for the camera entity only
+// (shorter than 2B, so it stopped at her shoulders). szLabel NULL draws no label; the health bar
+// needs a max health above 0, since AddHealthBar divides by it.
+void Overlay::RenderEntityBox(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const char* szLabel,
+	int iHealth, int iMaxHealth, const ImColor& Color)
+{
+	Vector2 vBone2D;
+
+	if (!pEntity->m_pBones || pEntity->m_nBones <= 0)
+		return;
+
+	Matrix4x4& mTransform = pEntity->m_matTransform;
+	Vector3 vOrigin = mTransform.GetAxis(3);
+	Vector3 vAxes[3] = { mTransform.GetAxis(0), mTransform.GetAxis(1), mTransform.GetAxis(2) };
+	float flAxisLengthSqr[3] = { vAxes[0].LengthSqr(), vAxes[1].LengthSqr(), vAxes[2].LengthSqr() };
+	Vector3 vLocalMin(FLT_MAX, FLT_MAX, FLT_MAX), vLocalMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+	ImRect Rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
+	int nProjected = 0;
+
+	for (int i = 0; i < pEntity->m_nBones; ++i)
+	{
+		const Vector3 vBone = pEntity->m_pBones[i].m_vPosition;
+		Vector3 vDelta = vBone - vOrigin;
+
+		for (int a = 0; a < 3; ++a)
+		{
+			float flLocal = (flAxisLengthSqr[a] > 0.0f) ? vDelta.Dot(vAxes[a]) / flAxisLengthSqr[a] : 0.0f;
+
+			vLocalMin[a] = min(vLocalMin[a], flLocal);
+			vLocalMax[a] = max(vLocalMax[a], flLocal);
+		}
+
+		if (WorldToScreen(vBone, vBone2D))
+		{
+			Rect.Add(ImVec2(vBone2D.x, vBone2D.y));
+			++nProjected;
+		}
+	}
+
+	if (nProjected < 2)
+		return;
+
+	// Bones sit inside the body, the hair and the shoe soles reach past them
+	Rect.Expand(Rect.GetHeight() * 0.04f);
+
+	// Nothing of it on screen (WorldToScreen projects past the screen's edges too)
+	if (!Rect.Overlaps(ImRect(0.0f, 0.0f, (float)g_pGraphicDevice->m_iScreenWidth, (float)g_pGraphicDevice->m_iScreenHeight)))
+		return;
+
+	if (Vars.Visuals.b2DEspBox)
+		pList->AddRectCorners((int)Rect.Min.x, (int)Rect.Min.y, (int)Rect.GetWidth(), (int)Rect.GetHeight(), 5, Color);
+	else
+		pList->Add3DBox(vLocalMin, vLocalMax, mTransform, Color);
+
+	if (szLabel)
+	{
+		ImVec2 vLabel(Rect.GetCenter().x, Rect.Max.y + 2.0f);
+
+		pList->AddTextArgs(vLabel, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%s", szLabel);
+	}
+
+	if (iMaxHealth > 0)
+		pList->AddHealthBar((int)Rect.Max.x + 10, (int)Rect.Min.y, (int)Rect.GetHeight(), min(max(iHealth, 0), iMaxHealth), iMaxHealth);
+}
+
+// A line from every bone to its parent, leaving out the root and the bone hanging straight off it
+void Overlay::RenderSkeleton(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const ImColor& Color)
+{
+	if (!pEntity->m_pBones)
+		return;
+
+	for (int i = 0; i < pEntity->m_nBones; ++i)
+	{
+		CBone* pCur = &pEntity->m_pBones[i];
+
+		if (pCur->m_Id != BONE_ROOT_CHILD && pCur->m_pParent && pCur->m_pParent->m_Id != BONE_ROOT)
+			pList->AddBone(pCur->m_vPosition, pCur->m_pParent->m_vPosition, Color);
+	}
+}
+
 void Overlay::Render(bool bUseBuiltInOverlay)
 {
 
@@ -195,61 +330,13 @@ void Overlay::Render(OverlayDrawList* pList)
 				*/
 			}
 
-			if (Vars.Visuals.bEspBox && pCameraEntity->m_pBones && pCameraEntity->m_nBones > 0)
+			if (Vars.Visuals.bEspBox)
 			{
-				// The box fits the skeleton. It used to be a fixed 1 x 1.5 x 1 m box (shorter than
-				// 2B, so it stopped at her shoulders), with the health bar sized from the feet to
-				// the vertical collision's OBB top. Now every bone in front of the camera is
-				// projected, and their screen-space min and max place the 2D box, the label and
-				// the health bar. The 3D box uses the same bones' extents along the entity's own
-				// axes (m_matTransform rows 0-2, origin row 3, as Matrix4x4::Transform applies it).
-				Matrix4x4& mTransform = pCameraEntity->m_matTransform;
-				Vector3 vOrigin = mTransform.GetAxis(3);
-				Vector3 vAxes[3] = { mTransform.GetAxis(0), mTransform.GetAxis(1), mTransform.GetAxis(2) };
-				float flAxisLengthSqr[3] = { vAxes[0].LengthSqr(), vAxes[1].LengthSqr(), vAxes[2].LengthSqr() };
-				Vector3 vLocalMin(FLT_MAX, FLT_MAX, FLT_MAX), vLocalMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
-				ImRect Rect(FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX);
-				int nProjected = 0;
+				const char* szObject = (pCameraEntity->m_ObjectId == OBJECTID_2B) ? "2B" :
+					(pCameraEntity->m_ObjectId == OBJECTID_A2) ? "A2" :
+					(pCameraEntity->m_ObjectId == OBJECTID_9S) ? "9S" : "Unknown";
 
-				for (int i = 0; i < pCameraEntity->m_nBones; ++i)
-				{
-					const Vector3 vBone = pCameraEntity->m_pBones[i].m_vPosition;
-					Vector3 vDelta = vBone - vOrigin;
-
-					for (int a = 0; a < 3; ++a)
-					{
-						float flLocal = (flAxisLengthSqr[a] > 0.0f) ? vDelta.Dot(vAxes[a]) / flAxisLengthSqr[a] : 0.0f;
-
-						vLocalMin[a] = min(vLocalMin[a], flLocal);
-						vLocalMax[a] = max(vLocalMax[a], flLocal);
-					}
-
-					if (WorldToScreen(vBone, vMin2D))
-					{
-						Rect.Add(ImVec2(vMin2D.x, vMin2D.y));
-						++nProjected;
-					}
-				}
-
-				if (nProjected >= 2)
-				{
-					// Bones sit inside the body, the hair and the shoe soles reach past them
-					Rect.Expand(Rect.GetHeight() * 0.04f);
-
-					const char* szObject = (pCameraEntity->m_ObjectId == OBJECTID_2B) ? "2B" :
-						(pCameraEntity->m_ObjectId == OBJECTID_A2) ? "A2" :
-						(pCameraEntity->m_ObjectId == OBJECTID_9S) ? "9S" : "Unknown";
-
-					if (Vars.Visuals.b2DEspBox)
-						pList->AddRectCorners((int)Rect.Min.x, (int)Rect.Min.y, (int)Rect.GetWidth(), (int)Rect.GetHeight(), 5, ImColor(23, 128, 150));
-					else
-						pList->Add3DBox(vLocalMin, vLocalMax, mTransform, ImColor(23, 128, 150));
-
-					ImVec2 vLabel(Rect.GetCenter().x, Rect.Max.y + 2.0f);
-
-					pList->AddTextArgs(vLabel, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, szObject);
-					pList->AddHealthBar((int)Rect.Max.x + 10, (int)Rect.Min.y, (int)Rect.GetHeight(), pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth);
-				}
+				RenderEntityBox(pList, pCameraEntity, szObject, pCameraEntity->m_iHealth, pCameraEntity->m_iMaxHealth, ImColor(23, 128, 150));
 			}
 
 			if (Vars.Visuals.bTraceLine)
@@ -271,23 +358,36 @@ void Overlay::Render(OverlayDrawList* pList)
 			}
 
 			if (Vars.Visuals.bSkeleton)
-			{
-				for (int i = 0; i < pCameraEntity->m_nBones; ++i)
-				{
-					CBone* pCur = &pCameraEntity->m_pBones[i];
-
-					if (pCur->m_Id != BONE_ROOT_CHILD && pCur->m_pParent && pCur->m_pParent->m_Id != BONE_ROOT)
-						pList->AddBone(pCur->m_vPosition, pCur->m_pParent->m_vPosition, ImColor(200, 0, 0));
-				}
-			}
+				RenderSkeleton(pList, pCameraEntity, ImColor(200, 0, 0));
 
 			if (Vars.Visuals.bEnemyInfo)
 			{
+				// Enemies only ever got this text: from the first overlay (3c95653) on, the box, the
+				// health bar and the skeleton were drawn for the camera entity alone. They now get
+				// the same ones, under the same Draw ESP Box / Draw 2D Esp Box / Draw Skeleton ticks.
+				// GetEntityFromHandle (0x140491240) is the game's enemy lookup: it ends in
+				// CEntityInfo_GetEmBase (0x140308550), which returns the entity only when its type
+				// info inherits the EmBase type record (CheckTypeInfoInheritance, 0x14026B930), the
+				// test the game's own enemy checks make (BattleBgmAction_HasFightingEnemy,
+				// 0x14033E030). So map instances (object 0x90001 and the rest of the "sc" range),
+				// pods, NPCs and players never get here, unlike through the untyped lookup.
 				for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
 				{
 					CBehaviorAppBase* pCur = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
-					if (pCur && pCur->m_iHealth > 0 && WorldToScreen(pCur->m_vPosition, vMin2D))
+					if (!pCur || pCur->m_iHealth <= 0)
+						continue;
+
+					if ((Vars.Visuals.bEspBox || Vars.Visuals.bSkeleton) && IsEntityInView(pCur))
+					{
+						if (Vars.Visuals.bEspBox)
+							RenderEntityBox(pList, pCur, NULL, pCur->m_iHealth, pCur->m_iMaxHealth, ImColor(220, 60, 60));
+
+						if (Vars.Visuals.bSkeleton)
+							RenderSkeleton(pList, pCur, ImColor(200, 0, 0));
+					}
+
+					if (WorldToScreen(pCur->m_vPosition, vMin2D))
 					{
 						pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, *MakePtr(int*, pCur, 0x28030), pCur->m_iHealth,
 							pCur->m_iMaxHealth, pCameraEntity->m_vPosition.DistTo(pCur->m_vPosition));
