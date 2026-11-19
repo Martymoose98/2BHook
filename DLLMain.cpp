@@ -1,3 +1,8 @@
+// Console, module dump and logging in every configuration. It has to come before the
+// includes: Log.h picks the LOG/WARN/LERROR definitions when it is included, so defining it
+// further down left them as no-ops in Release (no SHA256 or failure messages).
+#define VERBOSE
+
 #include <Windows.h>
 #include <VersionHelpers.h>
 #include <d3d11.h>
@@ -673,6 +678,15 @@ void FindDenuvoSteamOffsets(void)
 		g_pRubyInstances.emplace_back((MrubyImpl*)((byte*)pVM - 0x20));
 }
 
+// Reads a game global through the address FindPatternPtr resolved. FindPatternPtr returns 0
+// when the signature misses (an unknown build), and dereferencing that would crash here
+// before Setup() gets to its "unsupported version" check.
+template <typename T>
+static T ReadGamePtr(ULONG_PTR uAddress)
+{
+	return uAddress ? *(T*)uAddress : T{};
+}
+
 void FindSteamOffsets(void)
 {
 	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
@@ -759,29 +773,29 @@ void FindSteamOffsets(void)
 	g_pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 35 ? ? ? ? 48 89 74 24 ? C7 44 24 ? ? ? ? ? C7 44 24", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 8D 0D ? ? ? ? 48 8D 05 ? ? ? ? 48 89 05 ? ? ? ? E8", 3);
 	g_pWetObjectManager = (CWetObjManager*)FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B", 6);
-	g_pCollisionDataObjectManager = *(CCollisionDataObjectManager**)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 83 C4 58 C3", 3);
+	g_pCollisionDataObjectManager = ReadGamePtr<CCollisionDataObjectManager*>(FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 83 C4 58 C3", 3));
 	g_pTextureResourceManager = (CTextureResourceManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 4B 10 48 85 C9", 3);
 	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 8D 4D E7 48 8D 05", 7);
 	g_pItemManager = (CItemManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? 8B 94 87 ? ? ? ? E8 ? ? ? ? 85 C0 74 4F", 3);
-	g_pYorhaManager = *(CYorhaManager**)FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91", 3);
-	g_pNPCManager = *(CNPCManager**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3);
-	g_pEnemyManager = *(CEmBaseManager**)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE", 3);
-	g_pUserManager = *(CUserManager**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 74 2A", 3);
-	g_pNetworkDevice = *(CNetworkDevice**)FindPatternPtr(NULL, "48 8B 3D ? ? ? ? 33 DB 48 8B EA", 3);
+	g_pYorhaManager = ReadGamePtr<CYorhaManager*>(FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91", 3));
+	g_pNPCManager = ReadGamePtr<CNPCManager*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3));
+	g_pEnemyManager = ReadGamePtr<CEmBaseManager*>(FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE", 3));
+	g_pUserManager = ReadGamePtr<CUserManager*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 74 2A", 3));
+	g_pNetworkDevice = ReadGamePtr<CNetworkDevice*>(FindPatternPtr(NULL, "48 8B 3D ? ? ? ? 33 DB 48 8B EA", 3));
 	g_pMemoryDevice = (CMemoryDevice*)FindPatternPtr(NULL, "4C 89 64 24 ? 48 8D 0D ? ? ? ? 4C 89 7C 24", 8);
 
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
 	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15", 7);
 	g_szCRILogBuffer = (CHAR*)FindPatternPtr(NULL, "4C 8D 35 ? ? ? ? BD 00 01 00 00", 3);
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8B CF FF 15", 3);
-	g_pDirectInput8 = *(IDirectInput8A**)FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D", 9);
+	g_pDirectInput8 = ReadGamePtr<IDirectInput8A*>(FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D", 9));
 	g_pKeyboard = (Keyboard_t*)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA", 3);
 	// mov eax, 1 / mov [g_Mouse], rcx in CreateDirectInput8Create. The old "B8 ? ? ? ?" head missed on
 	// build 26534214, where the preceding mov rcx, [rip+disp] has a B8 byte in its displacement.
 	g_pMouse = (Mouse_t*)FindPatternPtr(NULL, "B8 01 00 00 00 48 89 0D ? ? ? ? C7 05", 8);
-	g_pOtManager = *(COtManager**)FindPatternPtr(NULL, "4C 8B C1 48 8B 0D ? ? ? ? 48 85 C9", 6);
-	g_pModelManager = *(CModelManager**)FindPatternPtr(NULL, "48 8B F9 48 8B 35", 6);
-	g_pGraphics = *(CGraphics**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);
+	g_pOtManager = ReadGamePtr<COtManager*>(FindPatternPtr(NULL, "4C 8B C1 48 8B 0D ? ? ? ? 48 85 C9", 6));
+	g_pModelManager = ReadGamePtr<CModelManager*>(FindPatternPtr(NULL, "48 8B F9 48 8B 35", 6));
+	g_pGraphics = ReadGamePtr<CGraphics*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3));
 
 	// Without CGraphics there's no swapchain to hook (issue #13: crashed here on unknown builds)
 	if (g_pGraphics && g_pGraphics->m_Display.m_pWindowedSwapChain)
@@ -791,9 +805,13 @@ void FindSteamOffsets(void)
 		g_pGraphicDevice = g_pGraphics->m_pGraphicalDevice;
 	}
 
-	g_hWnd = *(HWND*)FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3);
+	g_hWnd = ReadGamePtr<HWND>(FindPatternPtr(NULL, "48 8B 15 ? ? ? ? 48 8B 01 FF 50 68 85 C0 0F 88 ? ? ? ? 85 DB", 3));
 }
-#define VERBOSE
+
+// Set once Setup() has patched and hooked everything. Unhook() checks it because Setup()
+// can return early (unsupported build, no window procedure), and then the patches, hooks
+// and ImGui backend that Unhook() tears down were never created.
+static volatile BOOL s_bSetupComplete = FALSE;
 
 void Setup(void)
 {
@@ -847,13 +865,36 @@ void Setup(void)
 
 	LogOffsets();
 
-	// These are required for the overlay. If a signature didn't match (an unknown or
-	// updated game build), stop cleanly instead of crashing later (issue #13).
-	if (!g_pGraphics || !g_pSwapChain || !g_pGraphicDevice || !g_hWnd)
+	// The overlay and InitHooks() dereference all of these unconditionally. If a signature
+	// didn't match (an unknown or updated game build), stop cleanly instead of crashing
+	// later (issue #13).
+	const struct { const char* szName; const void* p; } RequiredOffsets[] =
+	{
+		{ "CGraphics", g_pGraphics },
+		{ "SwapChain", g_pSwapChain },
+		{ "GraphicDevice", g_pGraphicDevice },
+		{ "hWnd", g_hWnd },
+		{ "Keyboard", g_pKeyboard },
+		{ "Mouse", g_pMouse },
+		{ "Camera", g_pCamera },
+		{ "ModelAnalyzer", g_pModelAnalyzer },
+		{ "SaveFileIO", (const void*)SaveFileIO },
+	};
+	BOOL bMissingOffset = FALSE;
+
+	for (const auto& Offset : RequiredOffsets)
+	{
+		if (!Offset.p)
+		{
+			LERROR("Required game offset %s wasn't found\n", Offset.szName);
+			bMissingOffset = TRUE;
+		}
+	}
+
+	if (bMissingOffset)
 	{
 		LERROR("2B Hook Failed Initialization!\nRequired game offsets weren't found, so this game version isn't supported yet. "
-			"Please report it with the SHA256 above. (CGraphics %p, SwapChain %p, GraphicDevice %p, hWnd %p)\n",
-			g_pGraphics, g_pSwapChain, g_pGraphicDevice, g_hWnd);
+			"Please report it with the SHA256 above.\n");
 		return;
 	}
 
@@ -901,6 +942,8 @@ void Setup(void)
 
 	InitHooks();
 
+	s_bSetupComplete = TRUE;
+
 	g_pConsole->Log(ImVec4(0.0f, 0.525f, 0.0f, 1.0f), "2B Hook Initialization Complete! GLHF");
 
 	LOG("2B Hook Initialization Complete!\n");
@@ -908,6 +951,11 @@ void Setup(void)
 
 void Unhook(void)
 {
+	// Nothing below exists if Setup() bailed out: RestoreMemory() __debugbreak()s on the
+	// never-initialized patch structs, ImGui has no backend and oWndProc is null.
+	if (!s_bSetupComplete)
+		return;
+
 	RestoreMemory(&bp_NoTutorialDialogs);
 	//RestoreMemory(&bp_Framecap);
 	//RestoreMemory(&nop_Framecap[NOP_FRAMECAP_SLEEP]);
