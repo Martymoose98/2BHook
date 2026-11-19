@@ -7,6 +7,7 @@ A Mod Menu for NieR:Automata.
 ## Table of Contents
 - [Introduction](#introduction)
 - [Features](#features)
+- [Supported Game Versions](#supported-game-versions)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Documentation](#documentation)
@@ -44,6 +45,17 @@ Appendix: 🪲 - Buggy 🧪 - Exparimental ☢️ - Broken
 - 🧪 Save Backup: Makes a copy of the loaded save.
 - Wireframe: Render the scene as a wireframe.
 
+
+## Supported Game Versions
+
+The `Debug` and `Release` configurations support:
+
+- Steam build 26534214 (the November 2026 update). This build has no SteamStub or Denuvo wrapper, so `NieRAutomata.exe` works as installed.
+- Steam v1.02 unpacked with Steamless (`NieRAutomata.exe.unpacked.exe`).
+
+`NieRAutomataCompat.exe` from build 26534214 is detected but untested. The free camera and `SetLookAtNoDistance` signatures don't match it.
+
+The old Denuvo Steam build is no longer supported. The `Debug (Denuvo)` / `Release (Denuvo)` project configurations are kept for reference, but they aren't in `2BHook.slnx` and don't currently build.
 
 ## Installation
 

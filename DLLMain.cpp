@@ -776,7 +776,9 @@ void FindSteamOffsets(void)
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8B CF FF 15", 3);
 	g_pDirectInput8 = *(IDirectInput8A**)FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D", 9);
 	g_pKeyboard = (Keyboard_t*)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA", 3);
-	g_pMouse = (Mouse_t*)FindPatternPtr(NULL, "B8 ? ? ? ? 48 89 0D ? ? ? ? C7 05", 8);
+	// mov eax, 1 / mov [g_Mouse], rcx in CreateDirectInput8Create. The old "B8 ? ? ? ?" head missed on
+	// build 26534214, where the preceding mov rcx, [rip+disp] has a B8 byte in its displacement.
+	g_pMouse = (Mouse_t*)FindPatternPtr(NULL, "B8 01 00 00 00 48 89 0D ? ? ? ? C7 05", 8);
 	g_pOtManager = *(COtManager**)FindPatternPtr(NULL, "4C 8B C1 48 8B 0D ? ? ? ? 48 85 C9", 6);
 	g_pModelManager = *(CModelManager**)FindPatternPtr(NULL, "48 8B F9 48 8B 35", 6);
 	g_pGraphics = *(CGraphics**)FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 0F 84 ? ? ? ? 49 8B D6", 3);

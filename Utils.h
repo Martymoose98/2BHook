@@ -90,6 +90,8 @@ enum NierVersion
 	NIERVER_102_WOLF_EXTENDED_HEAPS,
 	NIERVER_WINSTORE,
 	NIERVER_DEBUG,
+	NIERVER_STEAM_26534214,			// Steam build 26534214 (Nov 2026 update, no SteamStub/Denuvo)
+	NIERVER_STEAM_26534214_COMPAT,	// NieRAutomataCompat.exe from the same build
 	NIERVER_MAX
 };
 
@@ -117,6 +119,12 @@ static std::ostream& operator<<(std::ostream& os, const NierVersion& v)
 		break;
 	case NIERVER_DEBUG:
 		os << "NieR:Automata (Debug)";
+		break;
+	case NIERVER_STEAM_26534214:
+		os << "NieR:Automata (Steam build 26534214)";
+		break;
+	case NIERVER_STEAM_26534214_COMPAT:
+		os << "NieR:Automata (Steam build 26534214 Compat)";
 		break;
 	case NIERVER_UNKNOWN:
 	default:
@@ -164,6 +172,12 @@ struct NierVersionInfo
 			break;
 		case NIERVER_DEBUG:
 			m_szVersion = TEXT("NieR:Automata (Debug)");
+			break;
+		case NIERVER_STEAM_26534214:
+			m_szVersion = TEXT("NieR:Automata (Steam build 26534214)");
+			break;
+		case NIERVER_STEAM_26534214_COMPAT:
+			m_szVersion = TEXT("NieR:Automata (Steam build 26534214 Compat)");
 			break;
 		case NIERVER_UNKNOWN:
 		default:
@@ -345,6 +359,8 @@ static NierVersionInfo* QueryNierBinaryVersion(void)
 		{ NIERVER_102_WOLF_EXTENDED_HEAPS, "\xC9\x90\x4A\x39\xE4\x48\xD6\xCB\x3C\x98\xC2\x8A\x90\x15\x9C\xF9\x31\x47\x53\xB0\xCF\xEA\x5C\xEB\x4E\x76\xA1\x2D\x33\x08\xA3\x55" },
 		{ NIERVER_WINSTORE, "\x3D\xDE\x56\x6C\xEA\x3E\x3B\xC1\x5E\x45\x92\x66\x02\xFB\x4F\x24\xD4\x8F\x77\xDF\x8A\x7B\xC5\x50\xA5\xB2\xDC\xAE\xCC\xCF\x09\x48" },
 		{ NIERVER_DEBUG, "\xE9\xEF\x66\x01\xEB\x40\xEB\x0A\x6D\x3F\x30\xA6\x63\x95\x43\xEC\x2F\x81\x71\xC2\x6A\x3D\xE8\xB2\xB1\x30\x39\xEE\xBE\x3B\xC8\x1C" },
+		{ NIERVER_STEAM_26534214, "\x09\x85\x4C\x2D\x45\xD9\xA7\x2E\x66\x35\x7E\x72\xF5\x0C\xEE\x37\x9B\xB2\xEA\xFE\x35\xB3\xD6\x4E\x5E\x88\xF4\xED\xDC\x86\x13\xFA" },
+		{ NIERVER_STEAM_26534214_COMPAT, "\x8A\x51\x0D\x8D\x6F\x56\x91\xB6\x9D\xCE\xDD\xC3\x35\x50\x8B\x2D\xC6\xCD\xFF\x92\x74\xC2\x36\xBD\x6C\xC8\x0B\x14\xE5\x48\x50\x0C" },
 		{ NIERVER_UNKNOWN }
 	};
 	BYTE* pHash;
