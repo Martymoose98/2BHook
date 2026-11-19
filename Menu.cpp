@@ -445,10 +445,13 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 	ImGui::PopItemWidth();
 	ImGui::Columns();
 
-	char szDesc[64];
-	char* szName = (char*)ItemManager_GetItemNameById(g_pItemManager, Vars.Gameplay.iSpawnItemId);
+	// "###ItemName" keeps the input's ID fixed while the resolved name in its label changes;
+	// otherwise the field lost focus whenever a keystroke matched a different item. %.48s keeps
+	// a long item name inside the buffer (sprintf_s would hit the invalid parameter handler).
+	char szDesc[96];
+	const char* szName = ItemManager_GetItemNameById(g_pItemManager, Vars.Gameplay.iSpawnItemId);
 	// FIXME: Broken on the new version this fucking function keeps crashing
-	sprintf_s(szDesc, "Item Name or Id: (%s)", szName);
+	sprintf_s(szDesc, "Item Name or Id: (%.48s)###ItemName", szName ? szName : "?");
 	ImGui::InputText(szDesc, Vars.Gameplay.szItemName, _ARRAYSIZE(Vars.Gameplay.szItemName));
 	int id = ItemManager_GetItemIdByName(g_pItemManager, Vars.Gameplay.szItemName);
 	Vars.Gameplay.iSpawnItemId = (id != -1) ? id : atoi(Vars.Gameplay.szItemName);
