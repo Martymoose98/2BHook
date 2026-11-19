@@ -551,6 +551,8 @@ void LogOffsets(void)
 	LOG_OFFSET("CNetworkDevice", g_pNetworkDevice);
 	LOG_OFFSET("CMemoryDevice", g_pMemoryDevice);
 	LOG_OFFSET("DataDirectory", g_szDataDirectoryPath);
+	LOG_OFFSET("CpkMount", CpkMount);
+	LOG_OFFSET("CpkEntries", g_pCpkEntries);
 	LOG_OFFSET("Money", g_piMoney);
 	LOG_OFFSET("Experience", g_piExperience);
 	LOG_OFFSET("IDirectInput8A", g_pDirectInput8);
@@ -788,6 +790,18 @@ void FindSteamOffsets(void)
 	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15", 7);
 	g_szCRILogBuffer = (CHAR*)FindPatternPtr(NULL, "4C 8D 35 ? ? ? ? BD 00 01 00 00", 3);
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8B CF FF 15", 3);
+
+	// HwRofsFst_MountCpk (CPK_LoadFromPath in the IDB) and the mount table it fills, for Load CPK
+	CpkMount = (CpkMountFn)FindPattern(NULL, "40 55 57 41 57 48 83 EC 30 33 FF 48 8B EA 44 8B F9 48 85 D2 75");
+
+	// lea r8, g_HwRofsFstMounts / mov [rsp+50h], rbx / mov rax, r8 / lea rdx, <end of the table>
+	ULONG_PTR uCpkMountTable = FindPattern(NULL, "4C 8D 05 ? ? ? ? 48 89 5C 24 50 49 8B C0 48 8D 15");
+
+	if (uCpkMountTable && uCpkMountTable != (ULONG_PTR)-1)
+	{
+		g_pCpkEntries = (CpkEntry*)(uCpkMountTable + 7 + *(LONG*)(uCpkMountTable + 3));
+		g_pCpkEntriesEnd = (CpkEntry*)(uCpkMountTable + 22 + *(LONG*)(uCpkMountTable + 18));
+	}
 	g_pDirectInput8 = ReadGamePtr<IDirectInput8A*>(FindPatternPtr(NULL, "0F 88 ? ? ? ? 48 8B 0D ? ? ? ? 4C 8D 0D", 9));
 	g_pKeyboard = (Keyboard_t*)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 4C 8D 44 24 ? BA", 3);
 	// mov eax, 1 / mov [g_Mouse], rcx in CreateDirectInput8Create. The old "B8 ? ? ? ?" head missed on

@@ -739,18 +739,34 @@ namespace Features
 	//	return SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &c);
 	//}
 
-	// broken
+	// Mounts <data directory><szCpkName>.cpk above every archive that's already mounted, the
+	// way FileSystem_MountArchive mounts the game's own. Returns its slot in the game's mount
+	// table (g_HwRofsFstMounts), or NULL if it couldn't be mounted. This used to walk the table
+	// at hard-coded Denuvo-build addresses, which are the middle of unrelated code on v1.02 and
+	// build 26534214, and CpkMount was never found outside the Denuvo build.
 	static CpkEntry* LoadCpk(const char* szCpkName)
 	{
+		if (!CpkMount || !g_pCpkEntries || !g_szDataDirectoryPath)
+			return NULL;
+
 		char szFullpath[MAX_PATH];
 
 		sprintf_s(szFullpath, "%s%s.cpk", g_szDataDirectoryPath, szCpkName);
 
-		CpkEntry* pEntry = (CpkEntry*)0x141991D90;
+		int iLoadOrder = 0;
 
-		while (pEntry->m_bInUse && pEntry < (CpkEntry*)0x141992590) ++pEntry;
+		for (const CpkEntry* pEntry = g_pCpkEntries; pEntry < g_pCpkEntriesEnd; ++pEntry)
+			if (pEntry->m_bInUse && pEntry->m_iLoadOrder >= iLoadOrder)
+				iLoadOrder = pEntry->m_iLoadOrder + 1;
 
-		return CpkMount((--pEntry)->m_iLoadOrder + 1, szFullpath);
+		if (!CpkMount(iLoadOrder, szFullpath))
+			return NULL;
+
+		for (CpkEntry* pEntry = g_pCpkEntries; pEntry < g_pCpkEntriesEnd; ++pEntry)
+			if (pEntry->m_bInUse && pEntry->m_iLoadOrder == iLoadOrder)
+				return pEntry;
+
+		return NULL;
 	}
 
 	// if this doesn't work might have to create critical section, enter, copy the array contents and zero out the array, then leave

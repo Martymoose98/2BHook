@@ -76,6 +76,8 @@ HWND g_hWnd;
 HINSTANCE g_hInstance;
 HANDLE* g_phHeaps;
 LPSTR g_szDataDirectoryPath;
+CpkEntry* g_pCpkEntries;
+CpkEntry* g_pCpkEntriesEnd;
 LPSTR g_szCRILogBuffer;
 std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 std::vector<MrubyImpl*> g_pRubyInstances;

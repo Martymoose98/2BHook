@@ -125,7 +125,9 @@ typedef CObjReadSystem::Work* (*CObjReadSystem_FindObjectWorkFn)(int ObjectId);
 typedef CObjReadSystem::Work::Desc*(*PreloadFileFn)(__int64 thisrcx, int filetype, const char* szFilename, void* pHeap, byte flag, CObjReadSystem::Work* pWork);
 typedef void(*ObjReadSystem_RequestEndFn)(__int64 a1, int ObjectId);
 typedef BOOL(*ObjReadSystem_PreloadModelFn)(CObjReadSystem::Work* pWork);
-typedef CpkEntry*(*CpkMountFn)(int iLoadOrder, char* szPath); // 0x140956D70 
+// HwRofsFst_MountCpk: true if the archive is bound and ready. (The Denuvo build's version at
+// 0x140956D70 returned the CpkEntry* instead.)
+typedef bool(*CpkMountFn)(int iLoadOrder, const char* szPath);
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
 typedef void(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*);
@@ -244,6 +246,8 @@ extern HWND g_hWnd;
 extern HINSTANCE g_hInstance;
 extern HANDLE* g_phHeaps;
 extern LPSTR g_szDataDirectoryPath;
+extern CpkEntry* g_pCpkEntries;		// g_HwRofsFstMounts, the game's CPK mount table
+extern CpkEntry* g_pCpkEntriesEnd;	// one past its last entry
 extern LPSTR g_szCRILogBuffer;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 extern std::vector<MrubyImpl*> g_pRubyInstances;
