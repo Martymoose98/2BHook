@@ -543,7 +543,9 @@ namespace Features
 		ChangePlayerEx(g_pCamera->m_pCamEntity);
 	}
 
-	static void DuplicateBuddyAsNPC(void)
+	// Clears the player's buddy handle (m_hBuddy, Pl0000 +0x1647C). It was called DuplicateBuddyAsNPC,
+	// but nothing is duplicated: the buddy entity stays in the world.
+	static void UnlinkBuddy(void)
 	{
 		if (g_pLocalPlayer)
 			g_pLocalPlayer->m_hBuddy.m_uValue = 0;

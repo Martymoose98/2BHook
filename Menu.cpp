@@ -488,11 +488,11 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 			DestroyBuddy(pBuddy);
 	}
 
-	if (ImGui::Button("Duplicate Buddy As NPC") && g_pLocalPlayer)
-	{
-		//Features::DuplicateBuddyAsNPC()
-		g_pLocalPlayer->m_hBuddy.m_uValue = NULL;
-	}
+	// It was labelled "Duplicate Buddy As NPC", but all it does is clear the buddy handle
+	if (ImGui::Button("Unlink Buddy"))
+		Features::UnlinkBuddy();
+
+	ImGui::SetItemTooltip("Clears the player's buddy handle (also kb_unlink_buddy, F3 by default). Nothing is duplicated; the buddy stays where it is.");
 
 	ImGui::SameLine();
 
@@ -722,7 +722,9 @@ void CMenu::MiscTab(void)
 		Features::UnlockAllAchievements();
 
 	ImGui::Checkbox("No Tutorial Dialogs", &Vars.Gameplay.bNoTutorialDialogs);
-	ImGui::InputInt("Frame Budget (3ms step)", &g_pGraphics->m_iFrameBudget);
+	// CGraphics +0x308 is in thirds of a millisecond: Graphics_LimitFrameAndPresent (0x14024A250)
+	// waits until three times the milliseconds since the last frame reach it
+	ImGui::InputInt("Frame Budget (1/3 ms, 50 = 60 FPS)", &g_pGraphics->m_iFrameBudget);
 	ImGui::Checkbox("Anti-VSync", &Vars.Misc.bAntiVSync);
 	ImGui::SameLine();
 	ImGui::Checkbox("Anti-Framerate Cap", &Vars.Misc.bAntiFramerateCap);

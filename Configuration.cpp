@@ -496,8 +496,8 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_KEYBINDS, L"kb_airstuck",
 		CKeybindFunctional<void>(L"kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYPRESSED, Features::Airstuck)));
 
-	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_KEYBINDS, L"kb_duplicate_buddy",
-		CKeybindFunctional<void>(L"kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC)));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_KEYBINDS, L"kb_unlink_buddy",
+		CKeybindFunctional<void>(L"kb_unlink_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::UnlinkBuddy)));
 
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_KEYBINDS, L"kb_play_animation",
 		CKeybindFunctional<void>(L"kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation)));
@@ -808,7 +808,7 @@ void CConfig::InitializeConfig()
 	AddKeybind(new CKeybindToggleable("kb_firstperson_camera", DIK_F1, &Vars.Misc.bFirstperson));
 	AddKeybind(new CKeybindFunctional<void>("kb_change_player", DIK_F6, IKeybind::KEYBIND_ON_KEYPRESSED, Features::SwapPlayer));
 	AddKeybind(new CKeybindFunctional<void>("kb_airstuck", DIK_F7, IKeybind::KEYBIND_ON_KEYDOWN, Features::Airstuck));
-	AddKeybind(new CKeybindFunctional<void>("kb_duplicate_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::DuplicateBuddyAsNPC));
+	AddKeybind(new CKeybindFunctional<void>("kb_unlink_buddy", DIK_F3, IKeybind::KEYBIND_ON_KEYPRESSED, Features::UnlinkBuddy));
 	AddKeybind(new CKeybindFunctional<void>("kb_play_animation", DIK_F5, IKeybind::KEYBIND_ON_KEYPRESSED, Features::PlayAnimation));
 	AddKeybind(new CKeybindFunctional<void, eTransformMatrix, float>("kb_teleport_forward", DIK_F10, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, 0.5f));
 	AddKeybind(new CKeybindFunctional<void, eTransformMatrix, float>("kb_teleport_backward", DIK_F11, IKeybind::KEYBIND_ON_KEYDOWN, Features::TeleportScalar, FORWARD, -0.5f));
