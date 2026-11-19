@@ -251,7 +251,7 @@
     <Text Include="ImGui\LICENSE.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="2B Hook.rc" />
+    <ResourceCompile Include="2BHook.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

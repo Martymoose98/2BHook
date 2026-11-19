@@ -283,7 +283,7 @@
     </Text>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="2B Hook.rc">
+    <ResourceCompile Include="2BHook.rc">
       <Filter>Resource Files</Filter>
     </ResourceCompile>
   </ItemGroup>
