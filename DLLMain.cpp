@@ -1028,7 +1028,7 @@ void Unhook(void)
 	Vars.Gameplay.bNoEnemyDamage = false;
 	Vars.Gameplay.bNoWorldDamage = false;
 
-	Features::ApplyHealthMods();
+	Features::ApplyHealthMods(true);
 
 	ImGui_ImplDX11_Shutdown();
 

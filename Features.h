@@ -15,7 +15,10 @@ int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 namespace Features
 {
 	// inline (not static) so the Godmode state below is shared by DLLMain.cpp and Hooks.cpp
-	inline void ApplyHealthMods(void)
+	// bUnloading: called from Unhook, which also runs in DLL_PROCESS_DETACH while the game exits.
+	// The player is freed by then (g_pLocalPlayer is only refreshed per frame), so only the code
+	// patches and the debug flags are restored and the player is not touched.
+	inline void ApplyHealthMods(bool bUnloading = false)
 	{
 		// No Enemy Damage and No Fall Damage stay as NOPs. Checked in build 26534214, the only flag
 		// tests on those paths are:
@@ -42,7 +45,7 @@ namespace Features
 		// away, and neither toggle can switch the other off. Godmode's debug bit 0x4000 already makes HitStep skip
 		// ship hits; doing this for Godmode too keeps the ship safe if the game rewrites the debug
 		// flags.
-		Pl0000* pPlayer = g_pLocalPlayer;
+		Pl0000* pPlayer = bUnloading ? NULL : g_pLocalPlayer;
 		const bool bInShip = pPlayer && (pPlayer->m_ObjectId & 0xFFFFF000) == 0x10000 &&
 			(pPlayer->m_iAnimationId == PL_STATE_HACKING_SHIP || pPlayer->m_iAnimationId == PL_STATE_ENDROLL_SHIP);
 
