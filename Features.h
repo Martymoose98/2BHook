@@ -9,6 +9,7 @@
 
 CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
 CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity);
+Pl0000* GetPl0000(CBehaviorAppBase* pEntity);
 int GetModelMeshIndex(const CModelWork* pWork, const char* szMesh);
 
 
@@ -776,6 +777,28 @@ namespace Features
 		ReleaseSemaphore(pNext->m_hTaskSemaphore, 1, NULL);
 	}
 
+	// Create Entity's result. JobManager_CreateTask (CJobManager::CreateTask, 0x140270140) only links
+	// CreateEntityStub into the job manager's run list and returns, so the entity is made later, when
+	// that task runs. CreateEntity used to return g_CreateCtx.pInfo straight away - the previous
+	// spawn's, or NULL - and the menu made that the buddy, Emil or the flight unit. The stub now
+	// records the new entity's handle here, and ApplyCreatedEntity hooks it up from hkPresent.
+	enum SpawnState : LONG
+	{
+		SPAWN_IDLE,
+		SPAWN_QUEUED,	// CreateEntityStub hasn't run yet
+		SPAWN_DONE,		// m_hEntity is set, 0 if the game couldn't create it
+	};
+
+	struct PendingSpawn_t
+	{
+		volatile LONG m_lState = SPAWN_IDLE;
+		uint32_t m_ObjectId = 0;
+		EntityHandle_t m_hOwner;	// the camera entity when Create Entity was pressed
+		EntityHandle_t m_hEntity;
+	};
+
+	inline PendingSpawn_t g_PendingSpawn;
+
 	// this fucking thread will hang the whole game if not returned promptly wtf!
 	static __declspec(noreturn) void CreateEntityStub(CreateStub_t* pParams)
 	{
@@ -788,6 +811,10 @@ namespace Features
 		//JobManager_PauseTask(g_pJobManager, 1); 
 
 		pParams->pInfo = SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &pParams->Create);
+
+		// The handle rather than the info, which may be gone by the time hkPresent looks at it
+		g_PendingSpawn.m_hEntity.m_uValue = (pParams->pInfo) ? pParams->pInfo->m_hEntity.m_uValue : 0;
+		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_DONE);
 
 		// HACK: I don't know how to properly use their async job manager well enough!
 		//SetTaskFunction((void(*)(void*))pFunc, NULL);
@@ -803,8 +830,33 @@ namespace Features
 	// NOTE: idk how i fixed it but it's fixed just don't spawn too many partners else it crashes
 	// RIP: 0x7FF682948722  test    byte ptr [rax+5C4h], 3 ; Logical Compare
 	// OWNER: SPAWN_CRASH_NEW_sub_7FF682948620 
-	static CEntityInfo* CreateEntity(const char* szName, uint32_t ObjectId, OPTIONAL set_info_t* pSetInfo)
+	//
+	// Queues the spawn and returns whether it was queued; ApplyCreatedEntity finishes it. One at a
+	// time, since the task reads g_CreateCtx when it runs. CJobManager::CreateTask takes a task off
+	// m_pFreeTasks (+0x18) and raises the fatal error g_szTaskIsOutOfWork when there is none, so
+	// an exhausted pool is checked for first and the spawn refused.
+	static bool CreateEntity(const char* szName, uint32_t ObjectId, OPTIONAL set_info_t* pSetInfo, EntityHandle_t hOwner)
 	{
+		static CJobManager* pJobMgrAlt = (CJobManager*)
+			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
+
+		if (InterlockedCompareExchange(&g_PendingSpawn.m_lState, SPAWN_QUEUED, SPAWN_IDLE) != SPAWN_IDLE)
+		{
+			g_pConsole->Warn("Create Entity: the last entity is still being created");
+			return false;
+		}
+
+		if (!pJobMgrAlt || !JobManager_CreateTask || !pJobMgrAlt->m_pFreeTasks)
+		{
+			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+			g_pConsole->Warn("Create Entity: no free task to create it on, try again later");
+			return false;
+		}
+
+		g_PendingSpawn.m_ObjectId = ObjectId;
+		g_PendingSpawn.m_hOwner = hOwner;
+		g_PendingSpawn.m_hEntity.m_uValue = 0;
+
 		g_CreateCtx.Create.m_szName = szName;
 		g_CreateCtx.Create.m_ObjectIds[0] = ObjectId;
 		g_CreateCtx.Create.m_ObjectIds[1] = ObjectId;
@@ -817,9 +869,6 @@ namespace Features
 			g_CreateCtx.Create.m_iGenerateMode = pSetInfo->m_i0x088;
 		}
 
-		static CJobManager* pJobMgrAlt = (CJobManager*)
-			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
-	
 		static CJobManager::FindAndDestoryTaskFn FindDestroyTsk = (CJobManager::FindAndDestoryTaskFn)
 			FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 8B");
 		static CJobManager::UpdateFn UpdateMgr = (CJobManager::UpdateFn)
@@ -853,7 +902,53 @@ namespace Features
 
 		//JobManager_DestroyTask(pJobMgrAlt, pJobMgrAlt->m_pActiveTasks);
 
-		return g_CreateCtx.pInfo;
+		return true;
+	}
+
+	// Hooks up what Create Entity made, once CreateEntityStub has run: a 2B, A2 or 9S becomes the
+	// buddy of whoever pressed it (m_hBuddy), Emil the game's Emil (g_pEmilHandle), and a flight
+	// unit is boarded through Pl0000::SetFlightUnit (0x1404F8400), which takes the one
+	// m_hFlightSuit names. The spawner is looked up again by handle and used only if it is still
+	// there and a Pl0000.
+	inline void ApplyCreatedEntity(void)
+	{
+		if (g_PendingSpawn.m_lState != SPAWN_DONE)
+			return;
+
+		EntityHandle_t hEntity = g_PendingSpawn.m_hEntity;
+		EntityHandle_t hOwner = g_PendingSpawn.m_hOwner;
+		const uint32_t ObjectId = g_PendingSpawn.m_ObjectId;
+
+		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+
+		if (!GetEntityInfoFromHandle(&hEntity))
+		{
+			g_pConsole->Warn("Create Entity: ObjectId %x wasn't created", ObjectId);
+			return;
+		}
+
+		Pl0000* pOwner = GetPl0000(GetEntityFromHandleGlobal(&hOwner));
+
+		switch (ObjectId)
+		{
+		case OBJECTID_2B:
+		case OBJECTID_A2:
+		case OBJECTID_9S:
+			if (pOwner)
+				pOwner->m_hBuddy = hEntity;
+			break;
+		case 0x11010:
+			if (g_pEmilHandle)
+				*g_pEmilHandle = hEntity;
+			break;
+		case 0x10010:
+			if (pOwner && Pl0000_SetFlightUnit)
+			{
+				pOwner->m_hFlightSuit = hEntity;
+				Pl0000_SetFlightUnit(pOwner);
+			}
+			break;
+		}
 	}
 
 	struct ParticleStub_t

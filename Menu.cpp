@@ -628,41 +628,9 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 		//	}
 		//}
 
-		CEntityInfo* pInfo = Features::CreateEntity(szClass, ObjectId, &set_info);
-
-		if (pInfo)
-		{
-			switch (pInfo->m_ObjectId)
-			{
-			case OBJECTID_2B:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				//SetSceneEntity("buddy_2B", pInfo); // FIXME: !!!
-				//SetSceneEntity("buddy", pInfo);
-				break;
-			case OBJECTID_A2:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				//SetSceneEntity("buddy_A2", pInfo);
-				//SetSceneEntity("buddy", pInfo);
-				break;
-			case OBJECTID_9S:
-				pCameraEnt->m_hBuddy = pInfo->m_hEntity;
-				//SetSceneEntity("buddy_9S", pInfo);
-				//SetSceneEntity("buddy", pInfo);
-				break;
-			case 0x11010:
-				*g_pEmilHandle = pInfo->m_hEntity;
-				break;
-			case 0x10010:
-				// Pl0000::SetFlightUnit (0x1404F8400) puts the player in the flight unit m_hFlightSuit
-				// names. It was called at v1.02's RVA, Pl0000_EnterFighterForm+0x40 on build 26534214.
-				if (Pl0000_SetFlightUnit)
-				{
-					pCameraEnt->m_hFlightSuit = pInfo->m_hEntity;
-					Pl0000_SetFlightUnit(pCameraEnt);
-				}
-				break;
-			}
-		}
+		// Only queued: the buddy, Emil or flight unit hookup is done by Features::ApplyCreatedEntity
+		// once the entity exists, a frame or more later
+		Features::CreateEntity(szClass, ObjectId, &set_info, pCameraEnt->m_pInfo->m_hEntity);
 	}
 
 	ImGui::ListBox("Spawn Blacklist", &Vars.Gameplay.iSelectedBlacklistItem, BlacklistItemCallback, Vars.Gameplay.SpawnBlacklist.data(), (int)Vars.Gameplay.SpawnBlacklist.size());

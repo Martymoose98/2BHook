@@ -417,6 +417,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	if (Vars.Gameplay.bBalanceEnemyLevels)
 		Features::BuffEnemies();
 
+	Features::ApplyCreatedEntity();
+
 	Features::ApplyHealthMods();
 	Features::ApplyFreeCamFlags();
 
