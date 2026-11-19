@@ -682,16 +682,17 @@ namespace Features
 		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
 	}
 
+	// The game passes g_ITEM_MANAGER (0x140F56120) as this to both: HapMiscState_AddItem
+	// (0x1403827C0) and the UseItem script command (0x140338EC2). These used to get the item
+	// database (g_pItemManager, 0x14133B890), which CItemManager::UseItem (0x140844B60) passes on to
+	// UseItemById (0x140844300), and that writes through it. AddItem doesn't read this at all.
 	static void AddItem(int id, int quantity)
 	{
-		// I don't know what this is. I just know it's related to the item manager
-		static CItemManager* pItemManager = (CItemManager*)FindPatternPtr(NULL, "7E CA 48 8D 15", 5);
+		ItemManager_AddItem(g_pGameItemManager, id, quantity);
 
-		ItemManager_AddItem(pItemManager, id, quantity);
-
-		if (Vars.Gameplay.bInstantEquip)
+		if (Vars.Gameplay.bInstantEquip && g_pGameItemManager)
 		{
-			ItemManager_UseItem(pItemManager, ItemManager_GetItemNameById(g_pItemManager, id));
+			ItemManager_UseItem(g_pGameItemManager, ItemManager_GetItemNameById(g_pItemManager, id));
 		}
 	}
 

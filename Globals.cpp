@@ -92,6 +92,7 @@ EntityHandle_t* g_pLocalPlayerHandle;
 EntityHandle_t* g_pEmilHandle;
 CEntityList* g_pEntityList;
 CItemManager* g_pItemManager;
+CItemManager* g_pGameItemManager;
 CUserManager* g_pUserManager;
 CYorhaManager* g_pYorhaManager;
 CNPCManager* g_pNPCManager;

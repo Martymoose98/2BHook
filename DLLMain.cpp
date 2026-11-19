@@ -546,6 +546,8 @@ void LogOffsets(void)
 	LOG_OFFSET("CNPCManager", g_pNPCManager);
 	LOG_OFFSET("CEnemyManager", g_pEnemyManager);
 	LOG_OFFSET("CUserManager", g_pUserManager);
+	LOG_OFFSET("CItemManager (database)", g_pItemManager);
+	LOG_OFFSET("CItemManager (g_ITEM_MANAGER)", g_pGameItemManager);
 	LOG_OFFSET("UiFileSlots", g_pUiFileSlots);
 	LOG_OFFSET("DialogUISystem", g_pDialogUISystem);
 	LOG_OFFSET("CWetObjectManager", g_pWetObjectManager);
@@ -847,6 +849,9 @@ void FindSteamOffsets(void)
 	g_pTextureResourceManager = (CTextureResourceManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 4B 10 48 85 C9", 3);
 	g_pModelAnalyzer = (CModelAnalyzer*)FindPatternPtr(NULL, "48 8D 4D E7 48 8D 05", 7);
 	g_pItemManager = (CItemManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? 8B 94 87 ? ? ? ? E8 ? ? ? ? 85 C0 74 4F", 3);
+	// g_ITEM_MANAGER (0x140F56120, v1.02 0x140F56110) from the UseItem script command (0x140338EBB):
+	// lea rdx, <item name> / lea rcx, g_ITEM_MANAGER / call CItemManager::UseItem
+	g_pGameItemManager = (CItemManager*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? C7 45 ? 01 00 00 00 48 8D 75", 10);
 	g_pYorhaManager = ReadGamePtr<CYorhaManager*>(FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91", 3));
 	g_pNPCManager = ReadGamePtr<CNPCManager*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3));
 	g_pEnemyManager = ReadGamePtr<CEmBaseManager*>(FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE", 3));

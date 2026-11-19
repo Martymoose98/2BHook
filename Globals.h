@@ -271,7 +271,8 @@ extern Pl0000* g_pLocalPlayer;
 extern EntityHandle_t* g_pLocalPlayerHandle;
 extern EntityHandle_t* g_pEmilHandle;
 extern CEntityList* g_pEntityList;
-extern CItemManager* g_pItemManager;
+extern CItemManager* g_pItemManager;		// the item database (IDA: g_ItemManager)
+extern CItemManager* g_pGameItemManager;	// what the game passes CItemManager::AddItem/UseItem (IDA: g_ITEM_MANAGER)
 extern CYorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern CNPCManager* g_pNPCManager;
