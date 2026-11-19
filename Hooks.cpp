@@ -418,6 +418,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 		Features::BuffEnemies();
 
 	Features::ApplyCreatedEntity();
+	Features::ApplyNoCollision(g_pCamera->m_pCamEntity);
 
 	Features::ApplyHealthMods();
 	Features::ApplyFreeCamFlags();

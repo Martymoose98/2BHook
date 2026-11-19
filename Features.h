@@ -347,25 +347,49 @@ namespace Features
 		}
 	}
 
-	static void ApplyHorizontalCollision(Pl0000* pEntity)
+	// No Model Collision switches off the camera entity's horizontal collision (m_HorizontalCollision,
+	// Pl0000 +0x18C0). It used to be applied from the Gameplay tab, so only while that tab was
+	// drawn, and unticked it forced the collision on every frame, which undid the game's own
+	// switch-offs (events, the flight unit). Now hkPresent calls this every frame and it acts only
+	// when the tick or the camera entity changes: it switches the collision off once, and unticking
+	// (or the camera moving on) puts back the owner and enabled state that entity had. Entities
+	// are tracked by handle, since a pointer from an earlier frame may be gone.
+	inline void ApplyNoCollision(CBehaviorAppBase* pCameraEnt)
 	{
-		if (!pEntity)
+		static EntityHandle s_hApplied = 0;		// the entity whose collision is off
+		static EntityHandle s_hSavedOwner = 0;
+		static BOOL s_bSavedEnabled = FALSE;
+
+		Pl0000* pWanted = Vars.Gameplay.bNoCollision ? GetPl0000(pCameraEnt) : NULL;
+		const EntityHandle hWanted = pWanted ? pWanted->m_pInfo->m_hEntity.m_uValue : 0;
+
+		if (hWanted == s_hApplied)
 			return;
 
-		pEntity->m_HorizontalCollision.m_hOwner = pEntity->m_pInfo->m_hEntity;
-		pEntity->m_HorizontalCollision.m_bEnabled = TRUE;
-		pEntity->m_HorizontalCollision.m_bCollision = FALSE;
-	}
+		if (s_hApplied)
+		{
+			EntityHandle_t hApplied;
+			hApplied.m_uValue = s_hApplied;
 
-	static void RemoveHorizontalCollision(Pl0000* pEntity)
-	{
-		if (!pEntity)
+			if (Pl0000* pApplied = GetPl0000(GetEntityFromHandleGlobal(&hApplied)))
+			{
+				pApplied->m_HorizontalCollision.m_hOwner = s_hSavedOwner;
+				pApplied->m_HorizontalCollision.m_bEnabled = s_bSavedEnabled;
+			}
+		}
+
+		s_hApplied = hWanted;
+
+		if (!pWanted)
 			return;
 
-		pEntity->m_HorizontalCollision.m_hOwner = 0;
-		pEntity->m_HorizontalCollision.m_bEnabled = FALSE;
-		pEntity->m_HorizontalCollision.m_bCollision = FALSE;
-		pEntity->m_HorizontalCollision.m_vMin = pEntity->m_vPosition;
+		s_hSavedOwner = pWanted->m_HorizontalCollision.m_hOwner;
+		s_bSavedEnabled = pWanted->m_HorizontalCollision.m_bEnabled;
+
+		pWanted->m_HorizontalCollision.m_hOwner = 0;
+		pWanted->m_HorizontalCollision.m_bEnabled = FALSE;
+		pWanted->m_HorizontalCollision.m_bCollision = FALSE;
+		pWanted->m_HorizontalCollision.m_vMin = pWanted->m_vPosition;
 	}
 
 	// UnlockAchievement is only resolved for the Denuvo build; on v1.02 and build 26534214 it stayed

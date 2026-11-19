@@ -515,9 +515,8 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 		Features::ChangeBuddy(PROTAGONIST_9S);
 	}
 
+	// Applied from hkPresent (Features::ApplyNoCollision)
 	ImGui::Checkbox("No Model Collision", &Vars.Gameplay.bNoCollision);
-
-	Vars.Gameplay.bNoCollision ? Features::RemoveHorizontalCollision(pCameraEnt) : Features::ApplyHorizontalCollision(pCameraEnt);
 
 	ImGui::SameLine();
 
