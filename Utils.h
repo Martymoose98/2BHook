@@ -418,9 +418,9 @@ VALIDATE_OFFSET(CDirectInputDevice8A, m_pDerived, 0x0008);
 VALIDATE_OFFSET(CDirectInputDevice8A, m_CriticalSection, 0x0150);
 VALIDATE_SIZE(CDirectInputDevice8A, 0x01A0);
 
-// TODO: finish dinput8.dll & gamerendereroverlay64.dll stuff
-// Thanks valve and your gamerendereroverlay64.dll!HookedDirectInput8Create
-#pragma region gamerendereroverlay64
+// TODO: finish dinput8.dll & gameoverlayrenderer64.dll stuff
+// Thanks valve and your gameoverlayrenderer64.dll!HookedDirectInput8Create
+#pragma region gameoverlayrenderer64
 
 // Size of struct 0x18 (24) bytes
 struct CWrapDirectInput8
@@ -469,40 +469,195 @@ struct CWrapMouseDevice8 //: public IWrapMouseDevice8
 };
 VALIDATE_SIZE(CWrapMouseDevice8, 0x48);
 
-#pragma endregion gamerendereroverlay64
+#pragma endregion gameoverlayrenderer64
 
-static void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
+// The DirectInput helpers below are inline rather than static so their one-time state (the
+// resolved module, what was logged, which devices are locked) is shared by every translation
+// unit instead of copied into each. They call Log:: directly rather than through LOG/WARN,
+// which expand differently per translation unit (and to nothing in Release).
+
+// Reads a pointer out of memory laid out by someone else's hook, where it may not be valid
+inline bool TryReadPointer(const void* pAddress, void** ppValue)
 {
-	// For fucks that have a dinput8.dll hook we need to specify we want the original dll!
-	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("System32\\dinput8.dll"));
-	HMODULE hOwnerModule = NULL;
-
-	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
+	__try
 	{
-		//pDevice = CONTAINING_RECORD(pDevice, CWrapDirectInputDevice8, m_pDeviceA);
-		pDevice = ((CWrapDirectInputDevice8*)pDevice)->m_pDeviceA;
+		*ppValue = *(void* const*)pAddress;
+		return true;
 	}
-
-	CDirectInputDevice8A* pImpl = CONTAINING_RECORD(pDevice, CDirectInputDevice8A, m_pDerived);
-
-	EnterCriticalSection(&pImpl->m_CriticalSection);
+	__except (EXCEPTION_EXECUTE_HANDLER)
+	{
+		return false;
+	}
 }
 
-static void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
+// The real dinput8.dll from the system directory. A dinput8.dll proxy in the game folder (a
+// mod loader) has the same name, so plain GetModuleHandle("dinput8.dll") could return that.
+inline HMODULE GetSystemDirectInput8(void)
 {
-	// For fucks that have a dinput8.dll hook we need to specify we want the original dll!
-	static HMODULE s_hDirectInput8 = GetModuleHandle(TEXT("System32\\dinput8.dll"));
-	HMODULE hOwnerModule = NULL;
+	static HMODULE s_hDirectInput8 = NULL;
+	static bool s_bResolved = false;
 
-	if (s_hDirectInput8 != RtlPcToFileHeader(*(void**)pDevice, (PVOID*)&hOwnerModule))
+	if (s_bResolved)
+		return s_hDirectInput8;
+
+	s_bResolved = true;
+	s_hDirectInput8 = GetModuleHandleW(L"System32\\dinput8.dll");
+
+	// GetModuleHandle isn't documented to take a relative path, so if that form doesn't
+	// resolve, build the full path from the real system directory.
+	if (!s_hDirectInput8)
 	{
-		//pDevice = CONTAINING_RECORD(pDevice, CWrapDirectInputDevice8, m_pDeviceA);
-		pDevice = ((CWrapDirectInputDevice8*)pDevice)->m_pDeviceA;
+		WCHAR szPath[MAX_PATH];
+		const UINT cchPath = GetSystemDirectoryW(szPath, MAX_PATH);
+
+		if (cchPath && cchPath < MAX_PATH && !wcscat_s(szPath, L"\\dinput8.dll"))
+			s_hDirectInput8 = GetModuleHandleW(szPath);
 	}
 
-	CDirectInputDevice8A* pImpl = CONTAINING_RECORD(pDevice, CDirectInputDevice8A, m_pDerived);
+	if (s_hDirectInput8)
+	{
+		CHAR szModule[MAX_PATH] = "";
 
-	LeaveCriticalSection(&pImpl->m_CriticalSection);
+		GetModuleFileNameA(s_hDirectInput8, szModule, MAX_PATH);
+		Log::Log(__FUNCSIG__, "DirectInput: system dinput8.dll is %p (%s)\n", s_hDirectInput8, szModule);
+	}
+	else
+	{
+		Log::Warn(__FUNCSIG__, "DirectInput: the system dinput8.dll isn't loaded, so the keyboard and mouse are hooked without their device lock\n");
+	}
+
+	return s_hDirectInput8;
+}
+
+// Logs each module that owns a device we can't lock, once
+inline void LogUnlockableDirectInputDevice(HMODULE hOwner, const void* pVtable)
+{
+	static HMODULE s_Logged[8];
+	static int s_nLogged = 0;
+
+	for (int i = 0; i < s_nLogged; ++i)
+	{
+		if (s_Logged[i] == hOwner)
+			return;
+	}
+
+	if (s_nLogged < ARRAYSIZE(s_Logged))
+		s_Logged[s_nLogged++] = hOwner;
+
+	CHAR szOwner[MAX_PATH] = "(no module)";
+
+	if (hOwner)
+		GetModuleFileNameA(hOwner, szOwner, MAX_PATH);
+
+	Log::Warn(__FUNCSIG__, "DirectInput: device vtable %p belongs to %s, not dinput8.dll, so it is hooked without the device lock\n",
+		pVtable, szOwner);
+}
+
+// Finds the dinput8.dll CDIDev behind pDevice, whose critical section is held while the
+// device's vtable is swapped. Returns NULL when that can't be done safely:
+//	- dinput8.dll's own device: the CDIDev it belongs to, as before.
+//	- the Steam overlay's wrapper (gameoverlayrenderer64.dll): the device it wraps, but only
+//	  if that one really is dinput8.dll's.
+//	- anything else - ReShade, Special K, Wine/Proton's dinput, unknown wrappers - has its own
+//	  layout, so nothing is locked. That's acceptable: the vtable swap is one atomic pointer
+//	  write. This used to treat every non-dinput8 device as the Steam overlay's wrapper and
+//	  enter a "critical section" at an offset into whatever object it really was.
+inline CDirectInputDevice8A* ResolveDirectInputDevice(IDirectInputDevice8A* pDevice)
+{
+	void* pVtable = NULL;
+
+	if (!pDevice || !TryReadPointer(pDevice, &pVtable))
+		return NULL;
+
+	const HMODULE hDirectInput8 = GetSystemDirectInput8();
+	HMODULE hOwner = NULL;
+
+	RtlPcToFileHeader(pVtable, (PVOID*)&hOwner);
+
+	if (hDirectInput8 && hOwner == hDirectInput8)
+		return CONTAINING_RECORD(pDevice, CDirectInputDevice8A, m_pDerived);
+
+	if (hDirectInput8 && hOwner && hOwner == GetModuleHandleW(L"gameoverlayrenderer64.dll"))
+	{
+		void* pInner = NULL;
+		void* pInnerVtable = NULL;
+		HMODULE hInnerOwner = NULL;
+
+		if (TryReadPointer(&((CWrapDirectInputDevice8*)pDevice)->m_pDeviceA, &pInner) && pInner &&
+			TryReadPointer(pInner, &pInnerVtable) &&
+			RtlPcToFileHeader(pInnerVtable, (PVOID*)&hInnerOwner) && hInnerOwner == hDirectInput8)
+		{
+			return CONTAINING_RECORD((IDirectInputDevice8A*)pInner, CDirectInputDevice8A, m_pDerived);
+		}
+
+		// The overlay wraps something other than dinput8.dll (another hook underneath it)
+		if (hInnerOwner)
+		{
+			LogUnlockableDirectInputDevice(hInnerOwner, pInnerVtable);
+			return NULL;
+		}
+	}
+
+	LogUnlockableDirectInputDevice(hOwner, pVtable);
+
+	return NULL;
+}
+
+// The devices currently locked, with what Lock resolved for them. Unlock uses the same
+// answer even if the device's vtable has changed in between (a hook being installed).
+struct DirectInputDeviceLock
+{
+	IDirectInputDevice8A* m_pDevice;
+	CDirectInputDevice8A* m_pImpl;
+};
+
+inline DirectInputDeviceLock* GetDirectInputDeviceLocks(void)
+{
+	static DirectInputDeviceLock s_Locks[4] = {};
+
+	return s_Locks;
+}
+
+inline void IDirectInputDevice_Lock(IDirectInputDevice8A* pDevice)
+{
+	CDirectInputDevice8A* pImpl = ResolveDirectInputDevice(pDevice);
+
+	if (!pImpl)
+		return;
+
+	DirectInputDeviceLock* pLocks = GetDirectInputDeviceLocks();
+
+	for (int i = 0; i < 4; ++i)
+	{
+		if (!pLocks[i].m_pDevice)
+		{
+			EnterCriticalSection(&pImpl->m_CriticalSection);
+			pLocks[i].m_pDevice = pDevice;
+			pLocks[i].m_pImpl = pImpl;
+			return;
+		}
+	}
+
+	// No room to remember it, so it couldn't be unlocked reliably either: don't lock
+	Log::Warn(__FUNCSIG__, "DirectInput: too many devices locked at once, hooking %p without the device lock\n", pDevice);
+}
+
+inline void IDirectInputDevice_Unlock(IDirectInputDevice8A* pDevice)
+{
+	DirectInputDeviceLock* pLocks = GetDirectInputDeviceLocks();
+
+	for (int i = 0; i < 4; ++i)
+	{
+		if (pLocks[i].m_pDevice == pDevice)
+		{
+			LeaveCriticalSection(&pLocks[i].m_pImpl->m_CriticalSection);
+			pLocks[i].m_pDevice = NULL;
+			pLocks[i].m_pImpl = NULL;
+			return;
+		}
+	}
+
+	// Lock didn't lock it (not dinput8.dll's device), so there is nothing to release
 }
 
 // https://stackoverflow.com/questions/46182845/field-of-view-aspect-ratio-view-matrix-from-projection-matrix-hmd-ost-calib
