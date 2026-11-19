@@ -1,0 +1,9 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="2BHook.vcxproj">
+    <BuildDependency Project="Fluorine/Fluorine/Fluorine.vcxproj" />
+  </Project>
+  <Project Path="Fluorine/Fluorine/Fluorine.vcxproj" />
+</Solution>
