@@ -938,7 +938,14 @@ void Setup(void)
 	//InitializeNopMemory(&nop_Framecap[NOP_FRAMECAP_SPINLOCK], g_pAntiFramerateCap_Spinlock, 2);
 
 	InitializeBytePatchMemory(&bp_Framecap, g_pAntiFramerateCap_Test4, JmpFramecap, 7);
-	InitializeBytePatchMemory(&bp_NoTutorialDialogs, (void*)FindPattern(NULL, "77 07 8B CA"), LocalJmp, 1);
+	// Pl0000_CallDialogTutorial, the script command that opens tutorial dialogs: lea eax, [rdx-1] /
+	// mov r8d, edx / cmp eax, 0Ch / ja <ret> / ... / jmp Tutorial_Open. Turning the ja (+9) into
+	// a jmp makes it always return. The old "77 07 8B CA" was from the Denuvo build and matched
+	// nothing on v1.02 or build 26534214.
+	ULONG_PTR uCallDialogTutorial = FindPattern(NULL, "8D 42 FF 44 8B C2 83 F8 0C 77 ? 33 D2 41 8B C8 E9");
+
+	InitializeBytePatchMemory(&bp_NoTutorialDialogs,
+		(uCallDialogTutorial && uCallDialogTutorial != (ULONG_PTR)-1) ? (void*)(uCallDialogTutorial + 9) : NULL, LocalJmp, 1);
 
 	InitHooks();
 
