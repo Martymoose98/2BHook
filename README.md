@@ -201,7 +201,7 @@ CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 20
   5. uploads the zip to Nexus Mods, if that is configured. It's uploaded as a new version of the main file, with the name `2BHook <tag>`, the version from the tag (`v1.2.0` becomes `1.2.0`), and the summary as its description. The mod page's version is set to match, and the changes are added to the mod's changelog as plain text.
 
 To cut a release:
-1. Set the version in `Version.h`. It's the only place it's set: the DLL's version resource, the menu title and the log all read it.
+1. Set the version in `Version.h`. It's the only place it's set: the DLL's version resource, the menu title and the log all read it. A hotfix sets `HOOK_VERSION_HOTFIX` and is tagged with all four numbers (`v1.2.3.1`); its Nexus upload archives the version it replaces.
 2. Optionally, add hand-written notes as `.github/release-notes/v<version>.md`, with a Nexus summary (see below).
 3. Commit, then push Fluorine first if it has new commits, then 2BHook.
 4. Push the matching tag:

@@ -45,13 +45,16 @@ jobs:
           git submodule update --init --recursive
 
       # Version.h is the one place the version is set, as numbers; its strings are built from them.
-      # Refuse a tag that doesn't match Major.Minor.Patch, before anything is built or published.
+      # Refuse a tag that doesn't match Major.Minor.Patch (and .Hotfix when that isn't 0, v1.2.3.1),
+      # before anything is built or published.
       - name: Check the tag against Version.h
         shell: bash
         run: |
           num() { sed -n "s/^#define $1[[:space:]]*\([0-9][0-9]*\).*/\1/p" Version.h; }
           version="$(num HOOK_VERSION_MAJOR).$(num HOOK_VERSION_MINOR).$(num HOOK_VERSION_PATCH)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Version.h: couldn't read the version numbers (got $version)"; exit 1; }
+          hotfix="$(num HOOK_VERSION_HOTFIX)"
+          if [ -n "$hotfix" ] && [ "$hotfix" != "0" ]; then version="$version.$hotfix"; fi
           [ "$TAG" = "v$version" ] || { echo "::error::Tag $TAG doesn't match Version.h (v$version)"; exit 1; }
 
       # Hand-written notes in .github/release-notes/<tag>.md win when the tagged commit has them.
@@ -73,6 +76,8 @@ jobs:
             } > CHANGELOG.md
           fi
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          # A hotfix (a fourth number that isn't 0) replaces the release it fixes on Nexus
+          if [[ "${TAG#v}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[1-9][0-9]*$ ]]; then echo "hotfix=true" >> "$GITHUB_OUTPUT"; fi
 
       - uses: actions/setup-python@v7
         with:
@@ -129,6 +134,7 @@ jobs:
 
       # Uploads a new version of the existing Nexus file NEXUSMODS_FILE_ID (v3 Upload API, in
       # open beta; the action is pinned to its latest beta tag). The changelog needs the mod id.
+      # A hotfix archives the version it replaces (v1.2.3.1 archives 1.2.3).
       - name: Upload to Nexus Mods
         if: steps.nexus.outputs.enabled == 'true'
         uses: Nexus-Mods/upload-action@v1.0.0-beta.11
@@ -142,4 +148,5 @@ jobs:
           description: ${{ steps.notes.outputs.summary }}
           category: main
           update_mod_version: true          # the mod page's version follows the release
+          archive_existing_version: ${{ steps.changelog.outputs.hotfix == 'true' }}
           changelog: ${{ steps.notes.outputs.nexus }}

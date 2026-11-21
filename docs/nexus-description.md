@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.3[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It adds a Glow ESP, and chams now show through every wall; 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.3.1[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It adds a Glow ESP, and chams now show through every wall; 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -112,6 +112,11 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [line]
 [size=4][b]Changelog[/b][/size]
 [spoiler]
+[b]Version 1.2.3.1[/b] (November 2026)
+[list]
+[*]Chams and Glow work with MSAA on. In 1.2.3 they showed nothing with it, and before that they could put the light's view of the enemies on the screen.
+[/list]
+
 [b]Version 1.2.3[/b] (November 2026)
 [i]New[/i]
 [list]
