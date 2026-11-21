@@ -1040,30 +1040,75 @@ struct PuidMixin
 };
 
 /*
-SceneStateHead
+SceneStateHead, PuidNode in the IDB: a node of the red-black tree that holds the scene-state names
+(CSceneStateNames).
 size = 0x20 (32) bytes
 */
 struct SceneStateHead
 {
-
+	SceneStateHead* m_pHead;		//0x0000
+	SceneStateHead* m_pRight;		//0x0008
+	SceneStateHead* m_pLeft;		//0x0010
+	bool m_bRed;					//0x0018
+	bool m_bLast;					//0x0019 | set on the tree's sentinel
+	char _0x001A[6];				//0x001A
 };
+VALIDATE_OFFSET(SceneStateHead, m_bRed, 0x18);
+VALIDATE_OFFSET(SceneStateHead, m_bLast, 0x19);
+VALIDATE_SIZE(SceneStateHead, 0x20);
 
-// this has a doubly linked list for sure prbably a different struct tho
-// that is 32 bytes that is the head
-// RED BLACK TREE iirc
-struct SceneState
+/*
+SceneState, PuidMixin in the IDB: one scene-state name, such as "Buddy/A2" (group "Buddy", state
+"A2"), interned in CSceneStateNames with the name stored right behind the node.
+CSceneStateSystem::Insert hands one back with a reference taken, and CSceneEntitySystem::RemoveNode
+drops it.
+size = 0x38 (56) bytes
+*/
+struct SceneState : SceneStateHead
 {
-	SceneStateHead* m_pHead;	//0x0000
-	SceneState* m_pNext;		//0x0008
-	SceneState* m_pLast;		//0x0010
-	char _0x0018;				//0x0018
-	bool m_bLast;				//0x0019  not 100%
-	char _0x0020[6];			//0x0020
-	uint32_t m_DescriptionHash;	//crc32
-	char alignment[4];
-	char* m_szDescription;
-	size_t m_ReferenceCount;	//not sure
+	uint32_t m_uDescriptionHash;	//0x0020 | CRC32 of the name, the tree's key
+	char _0x0024[4];				//0x0024
+	char* m_szDescription;			//0x0028 | the name, right behind the node
+	size_t m_uReferenceCount;		//0x0030
 };
+VALIDATE_OFFSET(SceneState, m_uDescriptionHash, 0x20);
+VALIDATE_OFFSET(SceneState, m_szDescription, 0x28);
+VALIDATE_OFFSET(SceneState, m_uReferenceCount, 0x30);
+VALIDATE_SIZE(SceneState, 0x38);
+
+/*
+CSceneStateNames: the game's table of scene-state names (g_pSceneStateSystem_Scenes, 0x140F8C4E0;
+v1.02 0x140F8C220). Each name is in it once, keyed by its CRC32, with a reference count.
+*/
+class CSceneStateNames
+{
+public:
+	// CSceneStateSystem::Insert (0x140150E70; v1.02 0x140150D80): the name's node with a reference
+	// taken, added if it isn't there. NULL before the game's name heap is up.
+	typedef SceneState* (*InsertFn)(CSceneStateNames* pThis, uint32_t uCrc32, const char* szName, __int64 cbLength);
+
+	char _0x0000[8];				//0x0000
+	SceneStateHead m_Header;		//0x0008 | the tree's sentinel; m_Header.m_pHead is the root
+	CReadWriteLock m_Lock;			//0x0028 | held while the tree changes
+};
+VALIDATE_OFFSET(CSceneStateNames, m_Header, 0x08);
+VALIDATE_OFFSET(CSceneStateNames, m_Lock, 0x28);
+
+/*
+CSceneStateEntry: a scene state's definition (CSceneStateSystem::m_Definitions) or a state that is
+set (CSceneStateSystem::m_States). Both arrays are sorted by m_pName's hash.
+size = 0x20 (32) bytes
+*/
+struct CSceneStateEntry
+{
+	SceneState* m_pGroup;			//0x0000 | "Buddy" in "Buddy/A2": setting the state clears the group's others
+	SceneState* m_pState;			//0x0008 | "A2"
+	SceneState* m_pName;			//0x0010 | "Buddy/A2"
+	int32_t m_iDefinitionIndex;		//0x0018
+	char _0x001C[4];				//0x001C
+};
+VALIDATE_OFFSET(CSceneStateEntry, m_pName, 0x10);
+VALIDATE_SIZE(CSceneStateEntry, 0x20);
 
 struct CStateObject
 {
@@ -1106,9 +1151,9 @@ public:
 	CScenePosSystem m_PosSystem;			//0x0028
 	char _0x0038[8];						//0x0038
 	TokenCategory m_Token;					//0x0040
-	DynamicArray<SceneState> m_OldStates;	//0x0060 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	DynamicArray<CSceneStateEntry> m_Definitions;	//0x0060 | every state the game knows (was m_OldStates) //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 	char _0x80[16];							//0x0080
-	DynamicArray<SceneState> m_States;		//0x0090 //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
+	DynamicArray<CSceneStateEntry> m_States;	//0x0090 | the states that are set //const lib::DynamicArray<hap::scene_state::SceneState,hap::configure::Allocator>
 	void* m_0xB0;							//0x00B0
 	void* m_0xB8;							//0x00B8
 	DynamicArray<std::pair<uint32_t, void*>> m_SubPhases;	//0x00C0 //lib::DynamicArray<std::pair<hap::scene_state::SubPhaseBind::Key,hap::scene_state::SubPhaseBind::Item>,hap::configure::Allocator>::`vftable'
@@ -1116,7 +1161,7 @@ public:
 	DynamicArray<std::pair<uint32_t, void*>> m_SubPhases2;		//0x00	//lib::DynamicArray<std::pair<hap::scene_state::SubPhaseBind::Key,hap::scene_state::SubPhaseBind::Item>,hap::configure::Allocator>::`vftable'
 };
 VALIDATE_OFFSET(CSceneStateSystem, m_Token, 0x40);
-VALIDATE_OFFSET(CSceneStateSystem, m_OldStates, 0x60);
+VALIDATE_OFFSET(CSceneStateSystem, m_Definitions, 0x60);
 VALIDATE_OFFSET(CSceneStateSystem, m_States, 0x90);	
 
 //max size 0xC0
@@ -1204,12 +1249,11 @@ public:
 class CSceneEntitySystem
 {
 public:
-	// not sure if it actually finds the heap (it might just find the scene state) 0x1400538A0
-	typedef void* (*FindSceneStateFn)(CSceneEntitySystem* pThis, uint32_t uCrc, const char* szName, __int64 length);
 	typedef CEntityInfo* (*CreateEntityFn)(CSceneEntitySystem* pThis, Create_t* pCreate);
 	typedef CEntityInfo* (*FindByObjectIdFn)(CSceneEntitySystem* pThis, uint32_t uObjectId, CEntityInfo* pInfo);
 	typedef void (*UpdateFn)(CSceneEntitySystem* pThis);
-	// Drops the reference *ppSlot holds (freeing the node on the last one) and clears the slot
+	// Drops the reference *ppSlot holds (freeing the node on the last one) and clears the slot. It
+	// works on scene-state names (CSceneStateNames); the IDB has it under CSceneEntitySystem.
 	typedef void (*RemoveNodeFn)(SceneState** ppSlot);
 
 	int32_t m_nInfoLists;

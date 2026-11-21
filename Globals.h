@@ -95,9 +95,11 @@ typedef __int64(*PlaySoundFn)(Sound* pSound);
 typedef uint32_t(*HashStringCRC32Fn)(const char* szName, __int64 length);
 typedef uint32_t(*FNV1HashFn)(const char* szString);
 typedef __int64(*HeapInstance_ReserveMemoryFn)(CHeapInstance* pThis, HeapAlloc_t* pMemory, __int64 nReserveBytes, void* pUnknown, unsigned int flags, void* pStruct);
-typedef void*(*CSceneEntitySystem_FindSceneStateFn)(CSceneEntitySystem* pThis, uint32_t crc, const char* szName, __int64 length);
-typedef bool(*CSceneStateSystem_SetFn)(/*hap::scene_state::SceneStateSystem* */void* pThis, SceneState** ppSceneState);
-typedef BOOL(*SceneStateUnkFn)(void* unused, void* pSceneState);	//SceneStateUnkFn = 0x140053B00
+// The scene-state functions; CSceneStateNames::InsertFn interns a name (ReversedStructsUnpacked.h)
+typedef void(*CSceneStateSystem_SetFn)(CSceneStateSystem* pThis, SceneState** ppName);	// hap::scene_state::SceneStateSystem
+typedef CSceneStateEntry*(*CSceneStateSystem_FindDefinitionFn)(SceneState* const* ppName, const DynamicArray<CSceneStateEntry>* pDefinitions);
+typedef CSceneStateEntry*(*CSceneStateArray_InsertByNameFn)(DynamicArray<CSceneStateEntry>* pStates, const CSceneStateEntry* pEntry);	// 0x140053B00 in the Denuvo build
+typedef void(*CSceneStateSystem_NotifyChangedFn)(CSceneStateSystem* pThis, bool bEvaluateGroups);
 typedef void(*SetSceneEntityFn)(const char* szHashName, CEntityInfo* pInfo);
 typedef __int64(*CallTutorialDialogFn)(__int64, uint32_t dialogId); //callTutorialDialog address = 0x1401B1F30
 typedef bool(*QuestState_RequestStateInternalFn)(DWORD *pQuestId);
@@ -209,10 +211,13 @@ extern CWetObjectManager::SetDryFn WetObjectManager_SetDry;
 extern CWetObjectManager::AddLocalEntityFn WetObjectManager_AddLocalEntity;
 extern CEntityInfo::DeleteFn EntityInfo_Delete;
 extern CSceneEntitySystem::CreateEntityFn SceneEntitySystem_CreateEntity;
-extern CSceneEntitySystem::FindSceneStateFn SceneEntitySystem_FindSceneState;
+extern CSceneStateNames::InsertFn SceneStateSystem_Insert;
 extern CSceneEntitySystem::FindByObjectIdFn SceneEntitySystem_FindByObjectId;
 extern CSceneEntitySystem::RemoveNodeFn SceneEntitySystem_RemoveNode;
 extern CSceneStateSystem_SetFn SceneStateSystem_Set;
+extern CSceneStateSystem_FindDefinitionFn SceneStateSystem_FindDefinition;
+extern CSceneStateArray_InsertByNameFn SceneStateArray_InsertByName;
+extern CSceneStateSystem_NotifyChangedFn SceneStateSystem_NotifyChanged;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAt;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;
 extern ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
@@ -314,6 +319,7 @@ extern CCameraGame* g_pCamera;
 extern VMatrix* g_pViewMatrix;
 extern CJobManager* g_pJobManager;
 extern CSceneStateSystem* g_pSceneStateSystem;
+extern CSceneStateNames* g_pSceneStateSystem_Scenes;			// the scene-state names
 extern CSceneEntitySystem* g_pSceneEntitySystem;
 extern CObjReadSystem* g_pObjReadSystem;						// g_ObjReadSystem, what the two checks above take
 extern CConstructionInfo<void>* g_pConstructionInfoList;	// g_ConstructionInfoList, one row per object id

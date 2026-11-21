@@ -543,7 +543,7 @@ void LogOffsets(void)
 	LOG_OFFSET("CUserManager::GiveAchievement", UserManager_GiveAchievement);
 	LOG_OFFSET("ResetCamera", ResetCamera);
 	LOG_OFFSET("ChangePlayer", ChangePlayer);
-	LOG_OFFSET("FindSceneState", SceneEntitySystem_FindSceneState);
+	LOG_OFFSET("CSceneStateSystem::Insert", SceneStateSystem_Insert);
 	LOG_OFFSET("SetSceneEntity", SetSceneEntity);
 	LOG_OFFSET("CSceneEntitySystem::RemoveNode", SceneEntitySystem_RemoveNode);
 	LOG_OFFSET("SaveFileIO", SaveFileIO);
@@ -553,6 +553,9 @@ void LogOffsets(void)
 	LOG_OFFSET("DeleteSaveData", DeleteSaveData);
 	LOG_OFFSET("CSceneEntitySystem::CreateEntity", SceneEntitySystem_CreateEntity);
 	LOG_OFFSET("CSceneStateSystem::Set", SceneStateSystem_Set);
+	LOG_OFFSET("CSceneStateSystem_FindDefinition", SceneStateSystem_FindDefinition);
+	LOG_OFFSET("CSceneStateArray_InsertByName", SceneStateArray_InsertByName);
+	LOG_OFFSET("CSceneStateSystem_NotifyChanged", SceneStateSystem_NotifyChanged);
 	LOG_OFFSET("CWetObjectManager::SetWet", WetObjectManager_SetWet);
 	LOG_OFFSET("CWetObjectManager::SetDry", WetObjectManager_SetDry);
 	LOG_OFFSET("CWetObjectManager::AddLocalEntity", WetObjectManager_AddLocalEntity);
@@ -603,6 +606,7 @@ void LogOffsets(void)
 	LOG_OFFSET("ConstructionInfoList", g_pConstructionInfoList);
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "ConstructionInfoList rows: %u", g_uConstructionInfoRows);
 	LOG_OFFSET("CSceneStateSystem", g_pSceneStateSystem);
+	LOG_OFFSET("SceneStateSystem_Scenes", g_pSceneStateSystem_Scenes);
 	LOG_OFFSET("COtManager", g_pOtManager);
 	LOG_OFFSET("CModelManager", g_pModelManager);
 	LOG_OFFSET("CModelAnalyzer", g_pModelAnalyzer);
@@ -648,7 +652,7 @@ void FindDenuvoSteamOffsets(void)
 	UnlockAchievement = (UnlockAchievementFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B D8 83 3D", 1);
 	ResetCamera = (CCameraGame::ResetCameraFn)FindPatternPtr(NULL, "E8 ? ? ? ? 41 0F 28 07", 1);
 	ChangePlayer = (ChangePlayerFn)FindPattern(NULL, "40 53 48 83 EC 20 8B 05 ? ? ? ? 48 8B D9 48 8D 4C 24 ? 89 44 24 30 E8 ? ? ? ? 48 85 C0 74 31");
-	SceneEntitySystem_FindSceneState = (CSceneEntitySystem::FindSceneStateFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
+	SceneStateSystem_Insert = (CSceneStateNames::InsertFn)FindPatternPtr(NULL, "E8 ? ? ? ? 83 CE 01", 1);
 	SetSceneEntity = (SetSceneEntityFn)FindPatternPtr(NULL, "E8 ? ? ? ? 8B 87 ? ? ? ? 41 3B C4", 1);
 
 	SaveFileIO = (CSaveDataDevice::SaveFileIOFn)FindPattern(NULL, "8B 51 30 FF CA");
@@ -801,7 +805,7 @@ void FindSteamOffsets(void)
 	ChangePlayer = (ChangePlayerFn)FindPattern(NULL, "40 53 48 83 EC 30 48 8B D9 E8 ? ? ? ? 81 25");
 	SetLocalPlayer = (SetLocalPlayerFn)FindPattern(NULL, "40 53 56 57 48 83 EC 70 48 8B F1");
 	EntityInfo_Delete = (CEntityInfo::DeleteFn)FindPattern(NULL, "40 53 48 83 EC 20 8B 41 2C");
-	SceneEntitySystem_FindSceneState = (CSceneEntitySystem::FindSceneStateFn)FindPattern(NULL, "40 56 57 41 54 41 56 41 57 48 83 EC ? 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 4D 8B F1"); // [E8 ? ? ? ? 48 89 45 E0 + 1]
+	SceneStateSystem_Insert = (CSceneStateNames::InsertFn)FindPattern(NULL, "40 56 57 41 54 41 56 41 57 48 83 EC ? 48 C7 44 24 ? ? ? ? ? 48 89 5C 24 ? 48 89 6C 24 ? 4D 8B F1"); // [E8 ? ? ? ? 48 89 45 E0 + 1]
 	SceneEntitySystem_FindByObjectId = (CSceneEntitySystem::FindByObjectIdFn)FindPattern(NULL, "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 20 83 79 48 00 48");
 	// CSceneEntitySystem::RemoveNode (0x140150C60, v1.02 0x140150B70), through its test of the
 	// scene-state tree's root (cmp byte ptr [rax+19h], 0)
@@ -811,6 +815,14 @@ void FindSteamOffsets(void)
 	SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 89 5C 24 ? 57 48 83 EC 20 48 8B 02 48 8B FA"); // [E8 ? ? ? ? EB 38 48 89 5C 24 ? + 1]
 	// this is the internal function both work but using the internal func probably has consecquences I am not aware of
 	//SceneStateSystem_Set = (CSceneStateSystem_SetFn)FindPattern(NULL, "48 8B C4 57 48 81 EC 60 04 00 00 48 C7 44 24 ? FE FF FF FF 48 89 58 ? 48 89 70"); // [E8 ? ? ? ? 84 C0 74 19 B2 01 + 1]
+	// CSceneStateSystem::SetInternal (0x140356800; v1.02 0x140356700) finds the state's definition,
+	// clears its group and inserts it into m_States. Features::AddSceneState does the same without
+	// clearing the group, through SetInternal's calls to CSceneStateSystem_FindDefinition
+	// (0x140326D30) and CSceneStateArray_InsertByName (0x14034C170), then sends the change notice
+	// Set does (CSceneStateSystem_NotifyChanged, 0x14035CC40). Each call site is unique in both builds.
+	SceneStateSystem_FindDefinition = (CSceneStateSystem_FindDefinitionFn)FindPatternPtr(NULL, "48 8D 51 60 48 8B C8 E8 ? ? ? ? 48 8B D8 48 85 C0 0F 84", 8);
+	SceneStateArray_InsertByName = (CSceneStateArray_InsertByNameFn)FindPatternPtr(NULL, "48 8B D3 48 8D 8F 90 00 00 00 E8 ? ? ? ? 48 8B 43 08", 11);
+	SceneStateSystem_NotifyChanged = (CSceneStateSystem_NotifyChangedFn)FindPatternPtr(NULL, "84 C0 75 0B 48 8B 5C 24 38 48 83 C4 20 5F C3 B2 01 48 8B CB E8", 21);
 
 	ExecuteSound = (PlaySoundFn)FindPattern(NULL, "40 56 57 41 56 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 58 48 89 6C 24 60 48 8B E9");
 
@@ -954,6 +966,11 @@ void FindSteamOffsets(void)
 	g_pJobManager = (CJobManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 85 C0 0F 84 00 01 00 00", 3);
 	g_pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 35 ? ? ? ? 48 89 74 24 ? C7 44 24 ? ? ? ? ? C7 44 24", 3);
 	g_pSceneStateSystem = (CSceneStateSystem*)FindPatternPtr(NULL, "48 89 05 ? ? ? ? 48 8D 0D ? ? ? ? 48 8D 05 ? ? ? ? 48 89 05 ? ? ? ? E8", 3);
+	// g_pSceneStateSystem_Scenes (0x140F8C4E0; v1.02 0x140F8C220), the scene-state names: the lea rcx
+	// of a call to CSceneStateSystem::Insert. The pattern matches 70 such calls in each build, and
+	// every one of them loads this table, so the first match does. The features used to look it up
+	// each on their own.
+	g_pSceneStateSystem_Scenes = (CSceneStateNames*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
 	g_pWetObjectManager = (CWetObjManager*)FindPatternPtr(NULL, "48 8B D9 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8D 8B", 6);
 	g_pCollisionDataObjectManager = ReadGamePtr<CCollisionDataObjectManager*>(FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 83 C4 58 C3", 3));
 	g_pTextureResourceManager = (CTextureResourceManager*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 90 48 8B 4B 10 48 85 C9", 3);

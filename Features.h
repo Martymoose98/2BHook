@@ -322,12 +322,12 @@ namespace Features
 		}
 	}
 
-	static void AddEntityToBlackList()
+	static void AddEntityToBlackList(void)
 	{
 
 	}
 
-	// CSceneStateSystem::Insert (0x140150E70, SceneEntitySystem_FindSceneState here) hands back the
+	// CSceneStateSystem::Insert (0x140150E70, SceneStateSystem_Insert here) hands back the
 	// name's node with a reference taken, which the game drops once the state is set
 	// (ColosseumAction_Update, 0x14039F2AF: Insert, CSceneStateSystem::Set, then
 	// CSceneEntitySystem::RemoveNode). Without that, every press leaked a reference and the node
@@ -338,80 +338,96 @@ namespace Features
 			SceneEntitySystem_RemoveNode(ppScene);
 	}
 
+	// The game's scene states are names like "Buddy/A2": group "Buddy", state "A2". A name is
+	// interned in g_pSceneStateSystem_Scenes and set on g_pSceneStateSystem. Returns the name with a
+	// reference taken, for ReleaseSceneState, or NULL.
+	static SceneState* InsertSceneState(const char* szName)
+	{
+		if (!szName || !g_pSceneStateSystem_Scenes || !SceneStateSystem_Insert || !HashStringCRC32)
+			return NULL;
+
+		__int64 cbName = (__int64)strlen(szName);
+
+		return SceneStateSystem_Insert(g_pSceneStateSystem_Scenes, HashStringCRC32(szName, cbName), szName, cbName);
+	}
+
+	// Sets a scene state the way the game does (CSceneStateSystem::Set, 0x140354B20): a state with a
+	// group replaces the group's current one, so "Buddy/A2" replaces "Buddy/2B". A name the game has
+	// no definition for does nothing.
+	static void SetSceneState(const char* szName)
+	{
+		if (!g_pSceneStateSystem || !SceneStateSystem_Set)
+			return;
+
+		SceneState* pName = InsertSceneState(szName);
+
+		if (!pName)
+			return;
+
+		SceneStateSystem_Set(g_pSceneStateSystem, &pName);
+		ReleaseSceneState(&pName);
+	}
+
+	// Experimental: sets a scene state next to its group's current one, so "Buddy/A2" joins
+	// "Buddy/2B". It is CSceneStateSystem::SetInternal without CSceneStateSystem_ClearGroup, then the
+	// change notice Set sends; Set's quest bookkeeping (states named q...) is left out. False when
+	// the game has no definition for the name.
+	static bool AddSceneState(const char* szName)
+	{
+		if (!g_pSceneStateSystem || !SceneStateSystem_FindDefinition || !SceneStateArray_InsertByName || !SceneStateSystem_NotifyChanged)
+			return false;
+
+		SceneState* pName = InsertSceneState(szName);
+
+		if (!pName)
+			return false;
+
+		CSceneStateEntry* pDefinition = SceneStateSystem_FindDefinition(&pName, &g_pSceneStateSystem->m_Definitions);
+
+		if (pDefinition)
+		{
+			SceneStateArray_InsertByName(&g_pSceneStateSystem->m_States, pDefinition);
+			SceneStateSystem_NotifyChanged(g_pSceneStateSystem, true);
+		}
+
+		ReleaseSceneState(&pName);
+		return pDefinition != NULL;
+	}
+
+	// The buddy scene states, by PROTAGONIST_2B, PROTAGONIST_A2 and PROTAGONIST_9S. The game also
+	// has "Buddy/Auto".
+	static const char* GetBuddySceneState(int buddy)
+	{
+		static const char* const s_szBuddyStates[] = { "Buddy/2B", "Buddy/A2", "Buddy/9S" };
+
+		return (buddy >= 0 && buddy < (int)ARRAYSIZE(s_szBuddyStates)) ? s_szBuddyStates[buddy] : NULL;
+	}
+
 	static void ChangeBuddy(int buddy)
 	{
-		// I don't know what this is. It appears to be related to scene entity system
-		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
-		unsigned int crc;
-		SceneState* pScene;
-
-		switch (buddy)
-		{
-		case PROTAGONIST_2B:
-			crc = HashStringCRC32("Buddy/2B", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/2B", 8);
-			LOG("return value: %x\n", pScene);
-			break;
-		case PROTAGONIST_A2:
-			crc = HashStringCRC32("Buddy/A2", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/A2", 8);
-			LOG("return value: %x\n", pScene);
-			break;
-		case PROTAGONIST_9S:
-			crc = HashStringCRC32("Buddy/9S", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "Buddy/9S", 8);
-			LOG("return value: %x\n", pScene);
-			break;
-		default:
-			return;
-		}
-		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
-		ReleaseSceneState(&pScene);
-		// old ver
-		//((SceneStateSystem_SetFn)(0x14001EBE0))((void*)0x14158CBC0, &pScene);
+		SetSceneState(GetBuddySceneState(buddy));
 	}
 
-	// exprimential
-	static void AddBuddy(void)
+	// Experimental: a second buddy next to the current one. It used to insert into the scene-state
+	// array through Denuvo-build addresses and a heap address from one run of the game (0x6CFB210),
+	// so it could only crash on any other build or run.
+	static void AddBuddy(int buddy)
 	{
-		// I don't know what this is. It appears to be related to scene entity system
-		static CSceneEntitySystem* pRBTreeScenes = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
-		unsigned int crc;
-		void* pScene;
-		__int64 val;
-
-		crc = HashStringCRC32("Buddy/A2", 8);
-		pScene = SceneEntitySystem_FindSceneState(pRBTreeScenes, crc, "Buddy/A2", 8);
-
-
-		//(*(bool(*)(void*, __int64*))(0x14001EC80))((void*)0x14158CBC0, &ret);
-
-		val = (*(__int64(*)(void*, unsigned long*))(0x140058A90))((void*)0x14158CC50, (DWORD*)(*(QWORD*)pScene + 0x20)); // != 0x6CFB210
-
-		(*(__int64(*)(__int64, void*))(0x140053B00))(0x6CFB210, pScene);
+		AddSceneState(GetBuddySceneState(buddy));
 	}
 
-	// exprimential
+	// Experimental. The game reads these when a route starts (PlayerRouteState_Initialize,
+	// 0x1407C7B00): SZPROTAGONIST_2B, _A2 and _9S pick the protagonist, and Load/A22B and Load/A29S
+	// are checked after them. Setting one only takes effect then.
 	static void AddPlayer(int player)
 	{
-		// I don't know what this is. It appears to be related to scene entity system (
-		static CSceneEntitySystem* pRBTreeScenes = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
-		unsigned int crc;
-		SceneState* pScene;
-
 		switch (player)
 		{
 		case PROTAGONIST_2B:
-			//crc = HashStringCRC32("PL/2B", 8);
-			//pScene = (SceneState*)FindSceneState(&cs, crc, "PL/2B", 8);
-			crc = HashStringCRC32("Load/A29S", 10);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pRBTreeScenes, crc, "Load/A29S", 10); // Load/A29S | Load/A22B	
-			SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
+			SetSceneState("Load/A29S");	// or Load/A22B
 			break;
 		case PROTAGONIST_A2:
-			crc = HashStringCRC32("PL/A2", 5);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pRBTreeScenes, crc, "PL/A2", 5);
-			SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
+			SetSceneState(SZPROTAGONIST_A2);
 			break;
 		default:
 			break;
@@ -697,8 +713,6 @@ namespace Features
 
 		SetLocalPlayer(&pEntity->m_pInfo->m_hEntity);
 
-		//*(PDWORD)0x1419AED20 = 0x80000000;
-
 		ResetCamera(g_pCamera);
 	}
 
@@ -707,7 +721,6 @@ namespace Features
 		if (pCameraEnt && g_pLocalPlayer)
 		{
 			ChangePlayer(g_pLocalPlayer);
-			//pCameraEnt = g_pCamera->m_pCamEntity;//GetEntityFromHandle(&g_pCamera->m_hEntity);
 		}
 	}
 
@@ -857,30 +870,10 @@ namespace Features
 
 	static void AddPod(int pod)
 	{
-		// I don't know what this is. It appears to be related to scene entity system
-		static CSceneEntitySystem* pSceneEntitySystem = (CSceneEntitySystem*)FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 48 89 44 24 ? 48 85 C0 74 ? 8B 50", 3);
-		unsigned int crc;
-		SceneState* pScene;
+		static const char* const s_szPodStates[] = { "own_podA", "own_podB", "own_podC" };	// POD_A, POD_B, POD_C
 
-		switch (pod)
-		{
-		case POD_A:
-			crc = HashStringCRC32("own_podA", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podA", 8);
-			break;
-		case POD_B:
-			crc = HashStringCRC32("own_podB", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podB", 8);
-			break;
-		case POD_C:
-			crc = HashStringCRC32("own_podC", 8);
-			pScene = (SceneState*)SceneEntitySystem_FindSceneState(pSceneEntitySystem, crc, "own_podC", 8);
-			break;
-		default:
-			return;
-		}
-		SceneStateSystem_Set(g_pSceneStateSystem, &pScene);
-		ReleaseSceneState(&pScene);
+		if (pod >= 0 && pod < (int)ARRAYSIZE(s_szPodStates))
+			SetSceneState(s_szPodStates[pod]);
 	}
 
 	// The game passes g_ITEM_MANAGER (0x140F56120) as this to both: HapMiscState_AddItem
@@ -931,18 +924,6 @@ namespace Features
 		}
 	}
 
-	//doesn't work tbh
-	static void ModelSwap(Pl0000* pEntA, Pl0000* pEntB)
-	{
-		UNREFERENCED_PARAMETER(pEntA);
-		UNREFERENCED_PARAMETER(pEntB);
-
-		//CModel tmp;
-
-		//memcpy(&tmp, pEntB, sizeof(CModel));
-		//tmp.m_vPosition = pEntA->m_vPosition;
-		//memcpy(pEntA, &tmp, sizeof(CModel));
-	}
 
 	// Where the sun is now, as Move Sun's elevation and azimuth, so ticking it doesn't move the sun.
 	// From the direction CLightManager::Update last built, which is right whether the angles came
@@ -973,7 +954,7 @@ namespace Features
 	// While a light set fades into the next (entering another area), the game blends the active set
 	// towards the new one each frame, so the sun can move until the fade ends.
 	// (This used to read a v1.02 address for Dennis's Sun struct and change nothing.)
-	static void MoveSun()
+	static void MoveSun(void)
 	{
 		static bool s_bHolding = false;
 
