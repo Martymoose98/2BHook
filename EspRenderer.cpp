@@ -1,5 +1,6 @@
 #include "EspRenderer.h"
 
+#include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <stdio.h>
 #include <string.h>
@@ -21,11 +22,10 @@ namespace EspRenderer
 		"	return o;\n"
 		"}\n";
 
-	// The mask: the colour and, in alpha, the flags (out of 255). No inputs, so it links with any
-	// of the game's vertex shaders.
-	static const char s_szMaskPS[] =
-		"cbuffer Params : register(b0) { float4 g_Color; float4 g_Unused; };\n"
-		"float4 main() : SV_Target { return g_Color; }\n";
+	// The mask: the colour and, in alpha, the flags (out of 255), as constants. No inputs, so it
+	// links with any of the game's vertex shaders, and no constant buffer, so the game's pixel
+	// shader constants are never rebound around its draws (their offsets wouldn't survive that).
+	static const char s_szMaskPSFormat[] = "float4 main() : SV_Target { return float4(%.9g, %.9g, %.9g, %.9g); }\n";
 
 	// The parameters of the passes below: g_UV maps the back buffer's uv onto the mask (xy scale,
 	// zw offset: the part of it the game's viewport covered); g_Misc.x is 1 for a reversed depth
@@ -89,7 +89,6 @@ namespace EspRenderer
 
 	static ID3D11Device* s_pDevice;
 	static ID3D11VertexShader* s_pFullscreenVS;
-	static ID3D11PixelShader* s_pMaskPS;
 	static ID3D11PixelShader* s_pChamsPS;
 	static ID3D11PixelShader* s_pGlowPrepPS;
 	static ID3D11PixelShader* s_pBlurPS;
@@ -101,7 +100,21 @@ namespace EspRenderer
 	static ID3D11DepthStencilState* s_pNoDepth;
 	static ID3D11RasterizerState* s_pFullscreenRS;
 
+	// The mask's pixel shaders, one for each colour and set of flags, made at their first use
+	struct MaskShader_t
+	{
+		float m_Color[3];
+		uint32_t m_uFlags;
+		ID3D11PixelShader* m_pShader;
+	};
+
+	static MaskShader_t s_MaskShaders[16];
+	static int s_nMaskShaders;
+
 	// ---------------------------------------------------------------- targets
+
+	// The frame's size, from the back buffer: the game's main depth buffer is the one this size
+	static UINT s_uFrameWidth, s_uFrameHeight;
 
 	// The game's depth buffer the mask follows, held so its address can't be reused
 	static ID3D11Texture2D* s_pSceneDepth;
@@ -119,13 +132,15 @@ namespace EspRenderer
 	static ID3D11RenderTargetView* s_pGlowRTV[2];
 	static ID3D11ShaderResourceView* s_pGlowSRV[2];
 
+	// The depth buffers left out, each logged once
+	static const void* s_pRejected[16];
+	static int s_nRejected;
+
 	// This frame
 	static bool s_bMaskStarted;							// cleared and drawn into
 	static bool s_bReversedDepth;
 	static D3D11_VIEWPORT s_MaskViewport;				// the game's, at the first mask draw
 	static uint32_t s_uFlagsDrawn;						// every flag drawn into the mask
-	static bool s_bSkippedOther;						// a target was drawn into another depth buffer
-	static int s_nMissedFrames;							// frames that only saw other depth buffers
 
 	// What BeginMaskDraw replaced
 	static ID3D11RenderTargetView* s_pSavedRTVs[D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT];
@@ -136,7 +151,6 @@ namespace EspRenderer
 	static FLOAT s_SavedBlendFactor[4];
 	static UINT s_uSavedSampleMask;
 	static ID3D11PixelShader* s_pSavedPS;
-	static ID3D11Buffer* s_pSavedPSParams;
 
 	template<typename T>
 	static void SafeRelease(T*& p)
@@ -182,6 +196,31 @@ namespace EspRenderer
 		return SUCCEEDED(hr);
 	}
 
+	static ID3D11PixelShader* GetMaskShader(const float Color[3], uint32_t uFlags)
+	{
+		for (int i = 0; i < s_nMaskShaders; ++i)
+		{
+			const MaskShader_t* pEntry = &s_MaskShaders[i];
+
+			if (pEntry->m_uFlags == uFlags && !memcmp(pEntry->m_Color, Color, sizeof(pEntry->m_Color)))
+				return pEntry->m_pShader;
+		}
+
+		if (s_nMaskShaders >= (int)ARRAYSIZE(s_MaskShaders))
+			return NULL;
+
+		char szSource[256];
+		MaskShader_t Entry = { { Color[0], Color[1], Color[2] }, uFlags, NULL };
+
+		sprintf_s(szSource, s_szMaskPSFormat, Color[0], Color[1], Color[2], (float)uFlags / 255.0f);
+
+		if (!CreatePS(NULL, szSource, &Entry.m_pShader))
+			return NULL;
+
+		s_MaskShaders[s_nMaskShaders++] = Entry;
+		return Entry.m_pShader;
+	}
+
 	// The typeless format of a depth buffer and the format a shader reads its depth through
 	static bool GetDepthFormats(DXGI_FORMAT Format, DXGI_FORMAT* pTypeless, DXGI_FORMAT* pShaderFormat)
 	{
@@ -212,11 +251,16 @@ namespace EspRenderer
 		}
 	}
 
-	static void ReleaseTargets(void)
+	static void ReleaseSceneDepth(void)
 	{
 		SafeRelease(s_pSceneDepthSRV);
 		SafeRelease(s_pSceneDepthCopy);
 		SafeRelease(s_pSceneDepth);
+	}
+
+	static void ReleaseTargets(void)
+	{
+		ReleaseSceneDepth();
 		SafeRelease(s_pMaskSRV);
 		SafeRelease(s_pMaskRTV);
 		SafeRelease(s_pMask);
@@ -253,30 +297,12 @@ namespace EspRenderer
 			SUCCEEDED(s_pDevice->CreateShaderResourceView(*ppTexture, NULL, ppSRV));
 	}
 
-	// Makes the targets for the game's depth buffer pTexture. Only the biggest one it draws a
-	// target into is followed, the main one: reflections and the like get smaller ones.
-	static bool FollowSceneDepth(ID3D11Texture2D* pTexture)
+	static bool CreateMaskTargets(UINT uWidth, UINT uHeight)
 	{
-		if (pTexture == s_pSceneDepth)
-			return true;
-
-		D3D11_TEXTURE2D_DESC Desc;
-		DXGI_FORMAT Typeless, ShaderFormat;
-
-		pTexture->GetDesc(&Desc);
-
-		if (Desc.SampleDesc.Count > 1 || Desc.ArraySize != 1 || !GetDepthFormats(Desc.Format, &Typeless, &ShaderFormat))
-			return false;
-
-		if (s_pSceneDepth && (UINT64)Desc.Width * Desc.Height <= (UINT64)s_uWidth * s_uHeight)
-			return false;
-
-		ReleaseTargets();
-
 		D3D11_TEXTURE2D_DESC DepthDesc = {};
 
-		DepthDesc.Width = Desc.Width;
-		DepthDesc.Height = Desc.Height;
+		DepthDesc.Width = uWidth;
+		DepthDesc.Height = uHeight;
 		DepthDesc.MipLevels = 1;
 		DepthDesc.ArraySize = 1;
 		DepthDesc.Format = DXGI_FORMAT_R32_TYPELESS;
@@ -295,51 +321,144 @@ namespace EspRenderer
 		SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
 		SRVDesc.Texture2D.MipLevels = 1;
 
-		bool bOk = CreateColorTarget(Desc.Width, Desc.Height, &s_pMask, &s_pMaskRTV, &s_pMaskSRV) &&
+		bool bOk = CreateColorTarget(uWidth, uHeight, &s_pMask, &s_pMaskRTV, &s_pMaskSRV) &&
 			SUCCEEDED(s_pDevice->CreateTexture2D(&DepthDesc, NULL, &s_pMaskDepthTex)) &&
 			SUCCEEDED(s_pDevice->CreateDepthStencilView(s_pMaskDepthTex, &DSVDesc, &s_pMaskDSV)) &&
 			SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pMaskDepthTex, &SRVDesc, &s_pMaskDepthSRV));
 
 		for (int i = 0; i < 2 && bOk; ++i)
-			bOk = CreateColorTarget(max(Desc.Width / 2, 1u), max(Desc.Height / 2, 1u), &s_pGlow[i], &s_pGlowRTV[i], &s_pGlowSRV[i]);
+			bOk = CreateColorTarget(max(uWidth / 2, 1u), max(uHeight / 2, 1u), &s_pGlow[i], &s_pGlowRTV[i], &s_pGlowSRV[i]);
 
-		// The game's depth itself when a shader can read it, else a copy made each frame
+		if (bOk)
+		{
+			s_uWidth = uWidth;
+			s_uHeight = uHeight;
+		}
+
+		return bOk;
+	}
+
+	// A view of the game's depth itself when a shader can read it, else of a copy made each frame
+	static bool CreateSceneDepthView(ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc, DXGI_FORMAT Typeless, DXGI_FORMAT ShaderFormat)
+	{
+		D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
+
 		SRVDesc.Format = ShaderFormat;
+		SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		SRVDesc.Texture2D.MipLevels = 1;
 
-		if (bOk && (Desc.BindFlags & D3D11_BIND_SHADER_RESOURCE))
+		if (Desc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
+			return SUCCEEDED(s_pDevice->CreateShaderResourceView(pTexture, &SRVDesc, &s_pSceneDepthSRV));
+
+		D3D11_TEXTURE2D_DESC CopyDesc = Desc;
+
+		CopyDesc.Format = Typeless;
+		CopyDesc.Usage = D3D11_USAGE_DEFAULT;
+		CopyDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+		CopyDesc.CPUAccessFlags = 0;
+		CopyDesc.MiscFlags = 0;
+
+		return SUCCEEDED(s_pDevice->CreateTexture2D(&CopyDesc, NULL, &s_pSceneDepthCopy)) &&
+			SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pSceneDepthCopy, &SRVDesc, &s_pSceneDepthSRV));
+	}
+
+	static void LogRejected(ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc)
+	{
+		UNREFERENCED_PARAMETER(Desc);	// LOG is nothing in Release builds
+
+		for (int i = 0; i < s_nRejected; ++i)
 		{
-			bOk = SUCCEEDED(s_pDevice->CreateShaderResourceView(pTexture, &SRVDesc, &s_pSceneDepthSRV));
+			if (s_pRejected[i] == pTexture)
+				return;
 		}
-		else if (bOk)
+
+		if (s_nRejected < (int)ARRAYSIZE(s_pRejected))
+			s_pRejected[s_nRejected++] = pTexture;
+
+		LOG("EspRenderer: leaving out the %ux%u depth buffer %p (format %d): the frame is %ux%u\n", Desc.Width, Desc.Height, pTexture, Desc.Format,
+			s_uFrameWidth, s_uFrameHeight);
+	}
+
+	// Follows the game's main depth buffer, the one the size of the frame. The targets are also
+	// drawn into others, shadow maps (which can be bigger than the screen) among them, whose
+	// silhouettes are from another view or at another size: following the biggest one put the
+	// light's view of them on the screen. Those are left out, and so are their draws.
+	static bool FollowSceneDepth(ID3D11Texture2D* pTexture)
+	{
+		if (pTexture == s_pSceneDepth)
+			return true;
+
+		D3D11_TEXTURE2D_DESC Desc;
+		DXGI_FORMAT Typeless, ShaderFormat;
+
+		pTexture->GetDesc(&Desc);
+
+		if (!s_uFrameWidth || Desc.Width != s_uFrameWidth || Desc.Height != s_uFrameHeight ||
+			Desc.SampleDesc.Count > 1 || Desc.ArraySize != 1 || !GetDepthFormats(Desc.Format, &Typeless, &ShaderFormat))
 		{
-			D3D11_TEXTURE2D_DESC CopyDesc = Desc;
-
-			CopyDesc.Format = Typeless;
-			CopyDesc.Usage = D3D11_USAGE_DEFAULT;
-			CopyDesc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
-			CopyDesc.CPUAccessFlags = 0;
-			CopyDesc.MiscFlags = 0;
-
-			bOk = SUCCEEDED(s_pDevice->CreateTexture2D(&CopyDesc, NULL, &s_pSceneDepthCopy)) &&
-				SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pSceneDepthCopy, &SRVDesc, &s_pSceneDepthSRV));
+			LogRejected(pTexture, Desc);
+			return false;
 		}
 
-		if (!bOk)
+		// Another of the frame's size while the one followed is in use this frame: keep that one
+		if (s_pSceneDepth && s_bMaskStarted)
+			return false;
+
+		// The same size: only the view of the game's depth changes
+		if (s_uWidth != Desc.Width || s_uHeight != Desc.Height)
 		{
-			LOG("EspRenderer: couldn't make the targets for a %ux%u depth buffer (format %d)\n", Desc.Width, Desc.Height, Desc.Format);
 			ReleaseTargets();
+
+			if (!CreateMaskTargets(Desc.Width, Desc.Height))
+			{
+				LOG("EspRenderer: couldn't make the %ux%u mask\n", Desc.Width, Desc.Height);
+				ReleaseTargets();
+				return false;
+			}
+		}
+		else
+		{
+			ReleaseSceneDepth();
+		}
+
+		if (!CreateSceneDepthView(pTexture, Desc, Typeless, ShaderFormat))
+		{
+			LOG("EspRenderer: couldn't read the %ux%u depth buffer %p (format %d)\n", Desc.Width, Desc.Height, pTexture, Desc.Format);
+			ReleaseSceneDepth();
 			return false;
 		}
 
 		s_pSceneDepth = pTexture;
 		s_pSceneDepth->AddRef();
-		s_uWidth = Desc.Width;
-		s_uHeight = Desc.Height;
 
 		LOG("EspRenderer: following the %ux%u depth buffer %p (format %d, %s)\n", Desc.Width, Desc.Height, pTexture, Desc.Format,
 			s_pSceneDepthCopy ? "copied each frame" : "read directly");
 
 		return true;
+	}
+
+	// The depth buffer bound for the draw being made, held, or NULL
+	static ID3D11Texture2D* GetBoundDepth(ID3D11DeviceContext* pContext)
+	{
+		ID3D11DepthStencilView* pDSV = NULL;
+		ID3D11Resource* pResource = NULL;
+		ID3D11Texture2D* pTexture = NULL;
+
+		pContext->OMGetRenderTargets(0, NULL, &pDSV);
+
+		if (!pDSV)
+			return NULL;
+
+		pDSV->GetResource(&pResource);
+		pDSV->Release();
+
+		if (pResource)
+		{
+			pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pTexture);
+			pResource->Release();
+		}
+
+		return pTexture;
 	}
 
 	bool Initialize(ID3D11Device* pDevice)
@@ -359,7 +478,6 @@ namespace EspRenderer
 		pVS->Release();
 
 		if (FAILED(hr) ||
-			!CreatePS(NULL, s_szMaskPS, &s_pMaskPS) ||
 			!CreatePS(s_szCommon, s_szChamsPS, &s_pChamsPS) ||
 			!CreatePS(s_szCommon, s_szGlowPrepPS, &s_pGlowPrepPS) ||
 			!CreatePS(s_szCommon, s_szBlurPS, &s_pBlurPS) ||
@@ -436,8 +554,12 @@ namespace EspRenderer
 	{
 		ReleaseTargets();
 
+		for (int i = 0; i < s_nMaskShaders; ++i)
+			SafeRelease(s_MaskShaders[i].m_pShader);
+
+		s_nMaskShaders = 0;
+
 		SafeRelease(s_pFullscreenVS);
-		SafeRelease(s_pMaskPS);
 		SafeRelease(s_pChamsPS);
 		SafeRelease(s_pGlowPrepPS);
 		SafeRelease(s_pBlurPS);
@@ -466,32 +588,14 @@ namespace EspRenderer
 		pContext->Unmap(s_pParams, 0);
 	}
 
-	bool BeginMaskDraw(ID3D11DeviceContext* pContext, const float Color[3], uint32_t uFlags)
+	bool IsMainPass(ID3D11DeviceContext* pContext)
 	{
-		if (!s_pMaskPS)
-			return false;
+		// Without its shaders there is no mask to keep apart: the seen colour goes everywhere, as
+		// before it existed
+		if (!s_pFullscreenVS)
+			return true;
 
-		// The mask follows the depth buffer the game draws its targets into
-		ID3D11RenderTargetView* pTarget = NULL;
-		ID3D11DepthStencilView* pDSV = NULL;
-
-		pContext->OMGetRenderTargets(1, &pTarget, &pDSV);
-		SafeRelease(pTarget);
-
-		if (!pDSV)
-			return false;
-
-		ID3D11Resource* pResource = NULL;
-		ID3D11Texture2D* pTexture = NULL;
-
-		pDSV->GetResource(&pResource);
-		pDSV->Release();
-
-		if (pResource)
-		{
-			pResource->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&pTexture);
-			pResource->Release();
-		}
+		ID3D11Texture2D* pTexture = GetBoundDepth(pContext);
 
 		if (!pTexture)
 			return false;
@@ -499,12 +603,20 @@ namespace EspRenderer
 		const bool bFollowed = FollowSceneDepth(pTexture);
 
 		pTexture->Release();
+		return bFollowed;
+	}
 
-		if (!bFollowed)
-		{
-			s_bSkippedOther = true;
+	bool BeginMaskDraw(ID3D11DeviceContext* pContext, const float Color[3], uint32_t uFlags)
+	{
+		if (!s_pFullscreenVS || !IsMainPass(pContext))
 			return false;
-		}
+
+		uFlags |= ESPMASK_PRESENT;
+
+		ID3D11PixelShader* pMaskShader = GetMaskShader(Color, uFlags);
+
+		if (!pMaskShader)
+			return false;
 
 		// Which way the game's depth runs, from the test it draws with
 		pContext->OMGetDepthStencilState(&s_pSavedDepth, &s_uSavedStencilRef);
@@ -537,18 +649,11 @@ namespace EspRenderer
 		pContext->OMGetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, s_pSavedRTVs, &s_pSavedDSV);
 		pContext->OMGetBlendState(&s_pSavedBlend, s_SavedBlendFactor, &s_uSavedSampleMask);
 		pContext->PSGetShader(&s_pSavedPS, NULL, NULL);
-		pContext->PSGetConstantBuffers(0, 1, &s_pSavedPSParams);
-
-		const float MaskColor[4] = { Color[0], Color[1], Color[2], (float)(uFlags | ESPMASK_PRESENT) / 255.0f };
-		const float Unused[4] = {};
-
-		SetParams(pContext, MaskColor, Unused);
 
 		pContext->OMSetRenderTargets(1, &s_pMaskRTV, s_pMaskDSV);
 		pContext->OMSetDepthStencilState(s_pMaskDepth[s_bReversedDepth ? 1 : 0], 0);
 		pContext->OMSetBlendState(NULL, NULL, 0xFFFFFFFF);
-		pContext->PSSetShader(s_pMaskPS, NULL, 0);
-		pContext->PSSetConstantBuffers(0, 1, &s_pParams);
+		pContext->PSSetShader(pMaskShader, NULL, 0);
 
 		s_uFlagsDrawn |= uFlags;
 		return true;
@@ -560,7 +665,6 @@ namespace EspRenderer
 		pContext->OMSetDepthStencilState(s_pSavedDepth, s_uSavedStencilRef);
 		pContext->OMSetBlendState(s_pSavedBlend, s_SavedBlendFactor, s_uSavedSampleMask);
 		pContext->PSSetShader(s_pSavedPS, NULL, 0);
-		pContext->PSSetConstantBuffers(0, 1, &s_pSavedPSParams);
 
 		for (ID3D11RenderTargetView*& pRTV : s_pSavedRTVs)
 			SafeRelease(pRTV);
@@ -569,11 +673,11 @@ namespace EspRenderer
 		SafeRelease(s_pSavedDepth);
 		SafeRelease(s_pSavedBlend);
 		SafeRelease(s_pSavedPS);
-		SafeRelease(s_pSavedPSParams);
 	}
 
 	// Everything Composite changes, put back afterwards: the game's state cache only binds what it
-	// thinks has changed, so anything left bound would carry into its next frame
+	// thinks has changed, so anything left bound would carry into its next frame. Pixel shader
+	// constant buffer 0 goes back with its offset and size when the context can say what they were.
 	struct StateBackup_t
 	{
 		D3D11_PRIMITIVE_TOPOLOGY Topology;
@@ -585,7 +689,10 @@ namespace EspRenderer
 		ID3D11PixelShader* pPS;
 		ID3D11ShaderResourceView* pSRVs[3];
 		ID3D11SamplerState* pSamplers[2];
+		ID3D11DeviceContext1* pContext1;
 		ID3D11Buffer* pPSParams;
+		UINT uFirstConstant;
+		UINT nConstants;
 		ID3D11RasterizerState* pRS;
 		UINT nViewports;
 		D3D11_VIEWPORT Viewports[D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE];
@@ -608,7 +715,12 @@ namespace EspRenderer
 			pContext->PSGetShader(&pPS, NULL, NULL);
 			pContext->PSGetShaderResources(0, 3, pSRVs);
 			pContext->PSGetSamplers(0, 2, pSamplers);
-			pContext->PSGetConstantBuffers(0, 1, &pPSParams);
+
+			if (SUCCEEDED(pContext->QueryInterface(__uuidof(ID3D11DeviceContext1), (void**)&pContext1)))
+				pContext1->PSGetConstantBuffers1(0, 1, &pPSParams, &uFirstConstant, &nConstants);
+			else
+				pContext->PSGetConstantBuffers(0, 1, &pPSParams);
+
 			pContext->RSGetState(&pRS);
 			nViewports = D3D11_VIEWPORT_AND_SCISSORRECT_OBJECT_COUNT_PER_PIPELINE;
 			pContext->RSGetViewports(&nViewports, Viewports);
@@ -628,7 +740,12 @@ namespace EspRenderer
 			pContext->PSSetShader(pPS, NULL, 0);
 			pContext->PSSetShaderResources(0, 3, pSRVs);
 			pContext->PSSetSamplers(0, 2, pSamplers);
-			pContext->PSSetConstantBuffers(0, 1, &pPSParams);
+
+			if (pContext1)
+				pContext1->PSSetConstantBuffers1(0, 1, &pPSParams, &uFirstConstant, &nConstants);
+			else
+				pContext->PSSetConstantBuffers(0, 1, &pPSParams);
+
 			pContext->RSSetState(pRS);
 			pContext->RSSetViewports(nViewports, Viewports);
 			pContext->OMSetRenderTargets(D3D11_SIMULTANEOUS_RENDER_TARGET_COUNT, pRTVs, pDSV);
@@ -649,6 +766,7 @@ namespace EspRenderer
 				SafeRelease(pSampler);
 
 			SafeRelease(pPSParams);
+			SafeRelease(pContext1);
 			SafeRelease(pRS);
 
 			for (ID3D11RenderTargetView*& pRTV : pRTVs)
@@ -673,34 +791,19 @@ namespace EspRenderer
 
 	static void EndFrame(void)
 	{
-		// A resolution change gives the game a smaller depth buffer, which FollowSceneDepth won't
-		// take while the old one is held: after a second of only that, let go
-		if (s_bSkippedOther && !s_bMaskStarted)
-		{
-			if (++s_nMissedFrames > 60)
-			{
-				ReleaseTargets();
-				s_nMissedFrames = 0;
-			}
-		}
-		else
-		{
-			s_nMissedFrames = 0;
-		}
-
-		s_bSkippedOther = false;
 		s_bMaskStarted = false;
 		s_uFlagsDrawn = 0;
 	}
 
 	void Composite(ID3D11DeviceContext* pContext, ID3D11RenderTargetView* pBackBuffer)
 	{
-		if (!s_bMaskStarted || !pBackBuffer || !(s_uFlagsDrawn & (ESPMASK_CHAMS | ESPMASK_GLOW)))
+		if (!pBackBuffer)
 		{
 			EndFrame();
 			return;
 		}
 
+		// The frame's size, which picks the game's main depth buffer for the next frame
 		ID3D11Resource* pBackBufferResource = NULL;
 		ID3D11Texture2D* pBackBufferTexture = NULL;
 		D3D11_TEXTURE2D_DESC BackBufferDesc = {};
@@ -721,6 +824,15 @@ namespace EspRenderer
 
 		pBackBufferTexture->GetDesc(&BackBufferDesc);
 		pBackBufferTexture->Release();
+
+		s_uFrameWidth = BackBufferDesc.Width;
+		s_uFrameHeight = BackBufferDesc.Height;
+
+		if (!s_bMaskStarted || !s_pSceneDepth || !(s_uFlagsDrawn & (ESPMASK_CHAMS | ESPMASK_GLOW)))
+		{
+			EndFrame();
+			return;
+		}
 
 		StateBackup_t Backup = {};
 

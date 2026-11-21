@@ -30,16 +30,23 @@ namespace EspRenderer
 
 	void Shutdown(void);
 
+	// Whether the draw being made goes into the game's main depth buffer, the one the size of the
+	// frame, which the mask follows. The targets are drawn into shadow maps and other buffers too,
+	// where their silhouettes are from another view or at another size; those draws are left alone.
+	// True when EspRenderer couldn't start, so the seen colour still works.
+	bool IsMainPass(ID3D11DeviceContext* pContext);
+
 	// From hkDrawIndexed, around one of a target's colour draws: binds the mask, the mask's depth
 	// test and a flat colour in place of the game's targets and pixel shader. False, with nothing
-	// changed, when the draw can't go into the mask (another depth buffer than the game's main one,
-	// or the targets couldn't be made).
+	// changed, when the draw can't go into the mask (not the main pass, or the targets couldn't be
+	// made). The game's pixel shader constants are left alone.
 	bool BeginMaskDraw(ID3D11DeviceContext* pContext, const float Color[3], uint32_t uFlags);
 
 	// Puts back what BeginMaskDraw replaced
 	void EndMaskDraw(ID3D11DeviceContext* pContext);
 
 	// From hkPresent, before the menu: draws the hidden colour and the glow into the back buffer
-	// and leaves the game's state as it was. The mask is cleared at its first draw of the next frame.
+	// and leaves the game's state as it was. The back buffer's size picks the game's main depth
+	// buffer. The mask is cleared at its first draw of the next frame.
 	void Composite(ID3D11DeviceContext* pContext, ID3D11RenderTargetView* pBackBuffer);
 }

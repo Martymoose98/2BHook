@@ -312,6 +312,15 @@ static bool DrawChams(ID3D11DeviceContext* pContext, const ChamsRange_t* pRange,
 		return false;
 	}
 
+	// Only the draws into the game's main depth buffer. The same models are drawn into shadow maps
+	// and other buffers too, where the seen colour would be wrong and the silhouette (from the
+	// light's view, or at another size) landed somewhere else on the screen.
+	if (!EspRenderer::IsMainPass(pContext))
+	{
+		pShader->Release();
+		return false;
+	}
+
 	const bool bNPC = pRange->m_Type == CHAMS_NPC;
 
 	// The silhouette, for the hidden colour and the glow
