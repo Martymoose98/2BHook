@@ -52,7 +52,8 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 
 **Visuals**
 - ESP for the player and enemies: a box fitted to the skeleton (2D or 3D), HP bar, skeleton and trace line.
-- Chams: enemies through walls, red where something hides them and green where you can see them, and NPC Chams for NPCs and Emil in blue and cyan. Use Shader switches between flat colours and the game's own shading.
+- Chams: enemies through walls, red where something hides them and green where you can see them, and NPC Chams for NPCs and Emil in blue and cyan. Use Shader switches the seen colour between flat and the game's own shading.
+- Glow and NPC Glow: a glow around enemies (red) and NPCs and Emil (blue), through walls too.
 - Enemy, NPC and world info text.
 - Collision info: the loaded collision trees and the live collision objects' bounds.
 - Wireframe.
@@ -129,7 +130,7 @@ Turn it off for one build with `-p:PostBuildEventUseInBuild=false`. It is off au
 
 2BHook is a DLL, so something has to load it into the game. Use one of these:
 
-- **The 2B Hook Launcher** (recommended): the official launcher, currently v1.5. It's open source, and you can get it from the Files tab of the [2B Hook Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10?tab=files) or from GitHub at [Martymoose98/2B-Mod-Launcher](https://github.com/Martymoose98/2B-Mod-Launcher).
+- **The 2B Hook Launcher** (recommended): the official launcher, currently v1.5.1. It's open source, and you can get it from the Files tab of the [2B Hook Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10?tab=files) or from GitHub at [Martymoose98/2B-Mod-Launcher](https://github.com/Martymoose98/2B-Mod-Launcher).
   1. Put `2BHook.dll` in the `mods` folder next to `NieRAutomata.exe`. The launcher creates that folder the first time it runs if it's missing.
   2. Run the launcher. It finds the game, starts it (or attaches to it if it's already running), and loads every DLL in `mods`.
 - **A proxy DLL loader**: a DLL the game loads by itself, which then loads the DLLs from a `mods` folder.

@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.2[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It brings back Chams (now an ESP for enemies and NPCs), Model Tint Color and Show Game Errors, and adds Move Sun, a motion player and Heap Scale; see the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.3[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It adds a Glow ESP, and chams now show through every wall; 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -28,6 +28,7 @@
 [list]
 [*]ESP for the player and enemies: a box fitted to the skeleton (2D or 3D), HP bar, skeleton and trace line
 [*]Chams: enemies through walls in red and green, NPCs and Emil in blue and cyan
+[*]Glow: a glow around enemies (red) and NPCs (blue), through walls too
 [*]Enemy, NPC and world info, plus collision info
 [*]Rainbow Hair, Rainbow Pod, Hide Pod
 [*]Per-mesh colour and visibility, and Model Tint Color for the whole model
@@ -65,7 +66,7 @@
 [size=4][b]Installation[/b][/size]
 
 [b]With the 2B Hook Launcher (recommended)[/b]
-The official launcher (v1.5) is open source. Get it from this page's Files tab or [url=https://github.com/Martymoose98/2B-Mod-Launcher]GitHub[/url].
+The official launcher (v1.5.1) is open source. Get it from this page's Files tab or [url=https://github.com/Martymoose98/2B-Mod-Launcher]GitHub[/url].
 [list=1]
 [*]Put [b]2BHook.dll[/b] in the [b]mods[/b] folder next to NieRAutomata.exe. The launcher creates the folder if it's missing.
 [*]Run the launcher. It finds the game, starts it (or attaches to it if it's already running) and loads every DLL in [b]mods[/b].
@@ -99,7 +100,7 @@ Change the keybinds in the menu's Config tab.
 [line]
 [size=4][b]Known issues[/b][/size]
 [list]
-[*]Chams colours an enemy's own model only; weapons and parts drawn from a separate model keep their normal look.
+[*]Chams and Glow colour an enemy's own model only; weapons and parts drawn from a separate model keep their normal look.
 [*]First person also hides the head's shadow.
 [/list]
 
@@ -111,6 +112,19 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [line]
 [size=4][b]Changelog[/b][/size]
 [spoiler]
+[b]Version 1.2.3[/b] (November 2026)
+[i]New[/i]
+[list]
+[*][b]Glow[/b] and [b]NPC Glow[/b] (Visuals): a soft glow around enemies (red) and NPCs and Emil (blue), through walls too.
+[/list]
+[i]Fixes[/i]
+[list]
+[*][b]Chams:[/b] the hidden colour shows through every wall, not only the walls the game drew before the enemy. Use Shader now only changes the seen colour.
+[*]Closing the game with the window's X no longer hangs it.
+[*][b]Spawner:[/b] Entity Scale starts at 1,1,1 (it was 0,0,0, so spawns were invisible until it was changed).
+[*]Entity View is as wide as the window, and Display Enemy Info is three lines under the ESP box.
+[/list]
+
 [b]Version 1.2.2[/b] (November 2026)
 [i]Working again[/i]
 [list]
