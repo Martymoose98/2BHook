@@ -202,6 +202,7 @@
     <ClInclude Include="MemoryDeviceHook.h" />
     <ClInclude Include="Menu.h" />
     <ClInclude Include="Theme.h" />
+    <ClInclude Include="EspRenderer.h" />
     <ClInclude Include="MaterialTint.h" />
     <ClInclude Include="mot.h" />
     <ClInclude Include="Overlay.h" />
@@ -252,6 +253,7 @@
     <ClCompile Include="MemoryDeviceHook.cpp" />
     <ClCompile Include="Menu.cpp" />
     <ClCompile Include="Theme.cpp" />
+    <ClCompile Include="EspRenderer.cpp" />
     <ClCompile Include="MaterialTint.cpp" />
     <ClCompile Include="mot.cpp" />
     <ClCompile Include="Overlay.cpp" />

@@ -1,4 +1,5 @@
 #include "Hooks.h"
+#include "EspRenderer.h"
 #include "MaterialTint.h"
 
 
@@ -147,10 +148,14 @@ void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 
 // Chams, an ESP: enemies (Chams) and NPCs (NPC Chams) drawn in one colour where something is in front
 // of them and another where they can be seen, red and green for enemies, blue and cyan for NPCs.
-// hkDrawIndexed draws each of their draws twice in place of the game's: the hidden colour with the
-// depth test off, then the seen colour with the game's own depth state. "Use Shader" colours them
-// with a flat pixel shader; without it the game's shader runs with a colour texture in its first
-// texture slot, so the model is still lit. The camera entity is left alone.
+// Glow (and NPC Glow) puts a glow of the hidden colour around them, through walls too. hkDrawIndexed
+// draws each of their colour draws into EspRenderer's mask, and with chams draws it again in the seen
+// colour, with the game's own depth state, in place of the game's draw. EspRenderer::Composite fills
+// in the hidden colour after the frame, wherever the game drew something nearer: drawn in place with
+// the depth test off, it stayed only where the wall in front had been drawn before the target, and
+// whatever the game drew afterwards covered it. "Use Shader" colours the seen pass with a flat pixel
+// shader; without it the game's shader runs with a colour texture in its first texture slot, so the
+// model is still lit. The camera entity is left alone.
 //
 // Their draws are told apart by their models' index buffers, which UpdateChamsTargets gathers once
 // a frame. Each vertex group of a model has one (CModelDrawData::m_pVertexGroups), and
@@ -177,15 +182,20 @@ struct ChamsRange_t
 	UINT m_uFirst;
 	UINT m_uEnd;
 	ChamsType_t m_Type;
+	uint32_t m_uFlags;			// EspRenderer::ESPMASK_CHAMS and _GLOW
 };
 
 static ChamsRange_t s_ChamsRanges[256];
 static int s_nChamsRanges;
 
+// The hidden colours, which the glow takes too: red for enemies, blue for NPCs (g_pRed, g_pBlue)
+static const float s_EnemyHiddenColor[3] = { 1.0f, 0.0f, 0.0f };
+static const float s_NPCHiddenColor[3] = { 0.0f, 0.3f, 1.0f };
+
 // The index ranges of one entity's model, once each
-static void AddChamsTargets(const CModelWork* pWork, ChamsType_t Type)
+static void AddChamsTargets(const CModelWork* pWork, ChamsType_t Type, uint32_t uFlags)
 {
-	if (!pWork || !pWork->m_pModelData)
+	if (!pWork || !pWork->m_pModelData || !uFlags)
 		return;
 
 	const CModelDrawData* pDrawData = pWork->m_pModelData->m_pDrawData;
@@ -201,7 +211,7 @@ static void AddChamsTargets(const CModelWork* pWork, ChamsType_t Type)
 			continue;
 
 		ChamsRange_t Range = { pIndices->m_pInfo->m_pBuffer, pIndices->m_uIndexStart,
-			pIndices->m_uIndexStart + (UINT)pIndices->m_nIndices, Type };
+			pIndices->m_uIndexStart + (UINT)pIndices->m_nIndices, Type, uFlags };
 
 		bool bKnown = false;
 
@@ -221,36 +231,39 @@ static void UpdateChamsTargets(void)
 {
 	s_nChamsRanges = 0;
 
-	if (Vars.Visuals.bChams && g_pEnemyManager && GetEntityFromHandle)
+	const uint32_t uEnemyFlags = (Vars.Visuals.bChams ? EspRenderer::ESPMASK_CHAMS : 0) | (Vars.Visuals.bGlow ? EspRenderer::ESPMASK_GLOW : 0);
+	const uint32_t uNPCFlags = (Vars.Visuals.bNPCChams ? EspRenderer::ESPMASK_CHAMS : 0) | (Vars.Visuals.bNPCGlow ? EspRenderer::ESPMASK_GLOW : 0);
+
+	if (uEnemyFlags && g_pEnemyManager && GetEntityFromHandle)
 	{
 		for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
 		{
 			CBehaviorAppBase* pEnemy = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
 
 			if (pEnemy && pEnemy->m_iHealth > 0)
-				AddChamsTargets(&pEnemy->m_Work, CHAMS_ENEMY);
+				AddChamsTargets(&pEnemy->m_Work, CHAMS_ENEMY, uEnemyFlags);
 		}
 	}
 
-	if (Vars.Visuals.bNPCChams && g_pNPCManager)
+	if (uNPCFlags && g_pNPCManager)
 	{
 		for (size_t i = 0; i < g_pNPCManager->m_handles.m_Count; ++i)
 		{
 			CBehaviorAppBase* pNPC = GetEntityFromHandleGlobal(&g_pNPCManager->m_handles.m_pItems[i]);
 
 			if (pNPC)
-				AddChamsTargets(&pNPC->m_Work, CHAMS_NPC);
+				AddChamsTargets(&pNPC->m_Work, CHAMS_NPC, uNPCFlags);
 		}
 
 		CBehaviorAppBase* pEmil = g_pEmilHandle ? GetEntityFromHandleGlobal(g_pEmilHandle) : NULL;
 
 		if (pEmil)
-			AddChamsTargets(&pEmil->m_Work, CHAMS_NPC);
+			AddChamsTargets(&pEmil->m_Work, CHAMS_NPC, uNPCFlags);
 	}
 }
 
-// Which chams a draw gets, from the index buffer and range it reads, or CHAMS_NONE
-static ChamsType_t GetChamsType(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation)
+// The target a draw belongs to, from the index buffer and range it reads, or NULL
+static const ChamsRange_t* FindChamsRange(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation)
 {
 	ID3D11Buffer* pIndexBuffer = NULL;
 	DXGI_FORMAT Format;
@@ -259,7 +272,7 @@ static ChamsType_t GetChamsType(ID3D11DeviceContext* pContext, UINT IndexCount, 
 	pContext->IAGetIndexBuffer(&pIndexBuffer, &Format, &uOffset);
 
 	if (!pIndexBuffer)
-		return CHAMS_NONE;
+		return NULL;
 
 	pIndexBuffer->Release();	// only its address is compared
 
@@ -269,16 +282,16 @@ static ChamsType_t GetChamsType(ID3D11DeviceContext* pContext, UINT IndexCount, 
 
 		if (pRange->m_pBuffer == pIndexBuffer && StartIndexLocation >= pRange->m_uFirst &&
 			StartIndexLocation + IndexCount <= pRange->m_uEnd)
-			return pRange->m_Type;
+			return pRange;
 	}
 
-	return CHAMS_NONE;
+	return NULL;
 }
 
-// Draws one of a model's draws in its chams colours in place of the game's. False, with nothing
-// drawn, for a draw without a pixel shader or a colour target: the shadow and depth passes, which
-// are left to the game.
-static bool DrawChams(ID3D11DeviceContext* pContext, ChamsType_t Type, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
+// One of a target's draws: into EspRenderer's mask, then with chams in the seen colour in place of
+// the game's draw. False when the game's own draw is still to be made: a draw without a pixel
+// shader or a colour target (the shadow and depth passes, left to the game), or a glow-only target.
+static bool DrawChams(ID3D11DeviceContext* pContext, const ChamsRange_t* pRange, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
 	ID3D11PixelShader* pShader = NULL;
 	ID3D11RenderTargetView* pTarget = NULL;
@@ -299,32 +312,29 @@ static bool DrawChams(ID3D11DeviceContext* pContext, ChamsType_t Type, UINT Inde
 		return false;
 	}
 
-	ID3D11DepthStencilState* pDepthState = NULL;
+	const bool bNPC = pRange->m_Type == CHAMS_NPC;
+
+	// The silhouette, for the hidden colour and the glow
+	if (EspRenderer::BeginMaskDraw(pContext, bNPC ? s_NPCHiddenColor : s_EnemyHiddenColor, pRange->m_uFlags))
+	{
+		oDrawIndexed(pContext, IndexCount, StartIndexLocation, BaseVertexLocation);
+		EspRenderer::EndMaskDraw(pContext);
+	}
+
+	if (!(pRange->m_uFlags & EspRenderer::ESPMASK_CHAMS))
+	{
+		pShader->Release();
+		return false;
+	}
+
 	ID3D11ShaderResourceView* pTexture = NULL;
-	UINT uStencilRef = 0;
 	const bool bUseShader = Vars.Visuals.iChamType != 0;
-	const bool bNPC = Type == CHAMS_NPC;
-	ID3D11PixelShader* pHiddenShader = bNPC ? g_pBlue : g_pRed;
 	ID3D11PixelShader* pSeenShader = bNPC ? g_pCyan : g_pGreen;
-	ID3D11ShaderResourceView* pHiddenTexture = bNPC ? g_pBlueSRV : g_pRedSRV;
 	ID3D11ShaderResourceView* pSeenTexture = bNPC ? g_pCyanSRV : g_pGreenSRV;
 
-	pContext->OMGetDepthStencilState(&pDepthState, &uStencilRef);
 	pContext->PSGetShaderResources(0, 1, &pTexture);
 
-	// Hidden: no depth test and no depth write
-	pContext->OMSetDepthStencilState(g_pDepthStencilStates[DISABLED], uStencilRef);
-
-	if (bUseShader)
-		pContext->PSSetShader(pHiddenShader, NULL, 0);
-	else
-		pContext->PSSetShaderResources(0, 1, &pHiddenTexture);
-
-	oDrawIndexed(pContext, IndexCount, StartIndexLocation, BaseVertexLocation);
-
 	// Seen: the game's own depth state
-	pContext->OMSetDepthStencilState(pDepthState, uStencilRef);
-
 	if (bUseShader)
 		pContext->PSSetShader(pSeenShader, NULL, 0);
 	else
@@ -336,9 +346,6 @@ static bool DrawChams(ID3D11DeviceContext* pContext, ChamsType_t Type, UINT Inde
 	// only binds what it has changed, so anything left here would carry over to its next draws.
 	pContext->PSSetShader(pShader, NULL, 0);
 	pContext->PSSetShaderResources(0, 1, &pTexture);
-
-	if (pDepthState)
-		pDepthState->Release();
 
 	if (pTexture)
 		pTexture->Release();
@@ -668,6 +675,9 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	if (g_pRenderTargetView)
 		g_pDeviceContext->OMSetRenderTargets(1, &g_pRenderTargetView, NULL);
 
+	// The chams' hidden colour and the glow, under the menu
+	EspRenderer::Composite(g_pDeviceContext, g_pRenderTargetView);
+
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
 	//COtManager::GetGraphicCommand(176i64);
@@ -773,9 +783,9 @@ void hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexL
 
 	if (s_nChamsRanges)
 	{
-		ChamsType_t Type = GetChamsType(pThis, IndexCount, StartIndexLocation);
+		const ChamsRange_t* pRange = FindChamsRange(pThis, IndexCount, StartIndexLocation);
 
-		if (Type != CHAMS_NONE && DrawChams(pThis, Type, IndexCount, StartIndexLocation, BaseVertexLocation))
+		if (pRange && DrawChams(pThis, pRange, IndexCount, StartIndexLocation, BaseVertexLocation))
 			return;
 	}
 
@@ -1556,5 +1566,8 @@ DWORD hkXInputGetState(DWORD dwUserIndex, PXINPUT_STATE pState)
 LRESULT WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
 	ImGui_ImplWin32_WndProcHandler(hWnd, uMsg, wParam, lParam);
-	return oWndProc(hWnd, uMsg, wParam, lParam);
+
+	// SetWindowLongPtr can hand back a handle rather than the procedure itself, which only
+	// CallWindowProc knows how to call
+	return CallWindowProc(oWndProc, hWnd, uMsg, wParam, lParam);
 }

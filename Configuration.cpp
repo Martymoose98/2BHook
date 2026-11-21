@@ -466,6 +466,8 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_traceline", Vars.Visuals.flTraceLength));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_chams", Vars.Visuals.bChams));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_npc_chams", Vars.Visuals.bNPCChams));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_glow", Vars.Visuals.bGlow));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_npc_glow", Vars.Visuals.bNPCGlow));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_move_sun", Vars.Visuals.bMoveSun));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_sun_elevation", Vars.Visuals.flSunElevation));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_sun_azimuth", Vars.Visuals.flSunAzimuth));
@@ -796,6 +798,8 @@ void CConfig::InitializeConfig()
 	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_traceline", Vars.Visuals.flTraceLength));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_chams", Vars.Visuals.bChams));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_npc_chams", Vars.Visuals.bNPCChams));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_glow", Vars.Visuals.bGlow));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_npc_glow", Vars.Visuals.bNPCGlow));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_move_sun", Vars.Visuals.bMoveSun));
 	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_sun_elevation", Vars.Visuals.flSunElevation));
 	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_sun_azimuth", Vars.Visuals.flSunAzimuth));
@@ -875,6 +879,7 @@ void CConfig::LoadDefault()
 	ZeroMemory(&Vars.Visuals, sizeof(Variables_t::Visuals_t));
 	ZeroMemory(&Vars.Misc, sizeof(Variables_t::Misc_t));
 	ZeroMemory(&Vars.Gameplay, UFIELD_OFFSET(Variables_t::Gameplay_t, SpawnBlacklist));
+	Vars.Gameplay.vSpawnEntityScale = Vector3Aligned(1.0f, 1.0f, 1.0f);	// not 0,0,0, which spawns nothing visible
 
 	PurgeConfig();
 	InitializeConfig();

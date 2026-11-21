@@ -16,6 +16,7 @@
 
 #include "cpk.h"
 #include "mot.h"
+#include "EspRenderer.h"
 #include "Hooks.h"
 #include "MaterialTint.h"
 #include "Version.h"
@@ -495,6 +496,10 @@ HRESULT InitD3D11(void)
 		LERROR("Failed to CreateShaderResourceView for red texture");
 		return hr;
 	}
+
+	// The chams' hidden colour and the glow
+	if (!EspRenderer::Initialize(g_pDevice))
+		LERROR("EspRenderer failed to initialize: no hidden chams colour or glow");
 
 	GeneratePixelShader(g_pDevice, &g_pRed, 1.0f, 0.0f, 0.0f);
 	GeneratePixelShader(g_pDevice, &g_pGreen, 0.0f, 1.0f, 0.0f);
@@ -1252,6 +1257,7 @@ void Unhook(void)
 	Features::ApplyHealthMods(true);
 	Features::ApplyFreeCamFlags(true);
 
+	EspRenderer::Shutdown();
 	ImGui_ImplDX11_Shutdown();
 
 	SetWindowLongPtr(g_hWnd, GWLP_WNDPROC, (LONG_PTR)oWndProc);
@@ -1262,13 +1268,14 @@ void Unhook(void)
 	Log::DetachConsole();
 #endif
 
-	FreeLibraryAndExitThread(g_hInstance, EXIT_SUCCESS);
+	// This used to end in FreeLibraryAndExitThread. Unhook only runs from DllMain, which the
+	// loader calls while it unloads this DLL, so that freed it a second time and ended the
+	// thread that was unloading it, with the loader lock held. A thread that unloads 2BHook
+	// itself would call FreeLibraryAndExitThread after Unhook.
 }
 
 BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD dwReason, LPVOID lpContext)
 {
-	UNREFERENCED_PARAMETER(lpContext);
-
 	g_hInstance = hInstDll;
 
 	switch (dwReason)
@@ -1279,7 +1286,13 @@ BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD dwReason, LPVOID lpContext)
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Setup, NULL, 0, NULL);
 		break;
 	case DLL_PROCESS_DETACH:
-		Unhook();
+		// lpContext isn't NULL when the process is exiting: the window's X, Alt+F4, the game's own
+		// quit. Its other threads are gone by then, and the locks they held stay held, so the
+		// teardown could wait forever on one: the D3D objects ImGui releases, the console, the
+		// heap. Windows frees all of it, and the patches don't matter in a process that is ending,
+		// so Unhook only runs when the DLL is unloaded from a live process.
+		if (!lpContext)
+			Unhook();
 		break;
 	default:
 		break;

@@ -660,7 +660,21 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 	ImGui::Checkbox("Use Shader", (bool*)&Vars.Visuals.iChamType);
 
 	if (ImGui::IsItemHovered())
-		ImGui::SetTooltip("Flat colours. Without it the game's own shading is kept, with the colour as the texture.");
+		ImGui::SetTooltip("A flat seen colour. Without it the game's own shading is kept, with the colour as the texture.");
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("Glow", &Vars.Visuals.bGlow);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("A red glow around enemies, through walls too.");
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("NPC Glow", &Vars.Visuals.bNPCGlow);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("A blue glow around NPCs and Emil.");
 
 	ImGui::SameLine();
 
@@ -1583,6 +1597,9 @@ void CMenu::DisplayEntityHandles(void)
 			EntitySlots.push_back(uSlot);
 	}
 
+	// As wide as the window, less the label: each entry (class, object id, set type, base, handle)
+	// was cut off at the default width of two thirds
+	ImGui::SetNextItemWidth(-(ImGui::CalcTextSize("Entity View").x + ImGui::GetStyle().ItemInnerSpacing.x));
 	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, &EntitySlots, (int)EntitySlots.size());
 
 	// Same as above: the entity list changes under a selection made in an earlier frame.

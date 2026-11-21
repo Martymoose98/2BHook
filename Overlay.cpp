@@ -193,14 +193,15 @@ static bool IsEntityInView(CBehaviorAppBase* pEntity)
 // (m_matTransform rows 0-2, origin row 3, as Matrix4x4::Transform applies it), so it fits whatever
 // pose and size the model is in. It used to be a fixed 1 x 1.5 x 1 m box for the camera entity only
 // (shorter than 2B, so it stopped at her shoulders). szLabel NULL draws no label; the health bar
-// needs a max health above 0, since AddHealthBar divides by it.
-void Overlay::RenderEntityBox(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const char* szLabel,
-	int iHealth, int iMaxHealth, const ImColor& Color)
+// needs a max health above 0, since AddHealthBar divides by it. False when nothing was drawn;
+// otherwise *pvBelow, if given, is where more text can go: centred under the box and its label.
+bool Overlay::RenderEntityBox(OverlayDrawList* pList, CBehaviorAppBase* pEntity, const char* szLabel,
+	int iHealth, int iMaxHealth, const ImColor& Color, ImVec2* pvBelow)
 {
 	Vector2 vBone2D;
 
 	if (!pEntity->m_pBones || pEntity->m_nBones <= 0)
-		return;
+		return false;
 
 	Matrix4x4& mTransform = pEntity->m_matTransform;
 	Vector3 vOrigin = mTransform.GetAxis(3);
@@ -231,29 +232,37 @@ void Overlay::RenderEntityBox(OverlayDrawList* pList, CBehaviorAppBase* pEntity,
 	}
 
 	if (nProjected < 2)
-		return;
+		return false;
 
 	// Bones sit inside the body, the hair and the shoe soles reach past them
 	Rect.Expand(Rect.GetHeight() * 0.04f);
 
 	// Nothing of it on screen (WorldToScreen projects past the screen's edges too)
 	if (!Rect.Overlaps(ImRect(0.0f, 0.0f, (float)g_pGraphicDevice->m_iScreenWidth, (float)g_pGraphicDevice->m_iScreenHeight)))
-		return;
+		return false;
 
 	if (Vars.Visuals.b2DEspBox)
 		pList->AddRectCorners((int)Rect.Min.x, (int)Rect.Min.y, (int)Rect.GetWidth(), (int)Rect.GetHeight(), 5, Color);
 	else
 		pList->Add3DBox(vLocalMin, vLocalMax, mTransform, Color);
 
+	ImVec2 vBelow(Rect.GetCenter().x, Rect.Max.y + 2.0f);
+
 	if (szLabel)
 	{
-		ImVec2 vLabel(Rect.GetCenter().x, Rect.Max.y + 2.0f);
+		ImVec2 vLabel = vBelow;
 
 		pList->AddTextArgs(vLabel, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "%s", szLabel);
+		vBelow.y += ImGui::GetFontSize();
 	}
 
 	if (iMaxHealth > 0)
 		pList->AddHealthBar((int)Rect.Max.x + 10, (int)Rect.Min.y, (int)Rect.GetHeight(), min(max(iHealth, 0), iMaxHealth), iMaxHealth);
+
+	if (pvBelow)
+		*pvBelow = vBelow;
+
+	return true;
 }
 
 // A line from every bone to its parent, leaving out the root and the bone hanging straight off it
@@ -379,20 +388,47 @@ void Overlay::Render(OverlayDrawList* pList)
 					if (!pCur || pCur->m_iHealth <= 0)
 						continue;
 
+					// The info text goes under the box when one is drawn, else under the enemy's feet
+					ImVec2 vText;
+					bool bText = false;
+
 					if ((Vars.Visuals.bEspBox || Vars.Visuals.bSkeleton) && IsEntityInView(pCur))
 					{
 						if (Vars.Visuals.bEspBox)
-							RenderEntityBox(pList, pCur, NULL, pCur->m_iHealth, pCur->m_iMaxHealth, ImColor(220, 60, 60));
+							bText = RenderEntityBox(pList, pCur, NULL, pCur->m_iHealth, pCur->m_iMaxHealth, ImColor(220, 60, 60), &vText);
 
 						if (Vars.Visuals.bSkeleton)
 							RenderSkeleton(pList, pCur, ImColor(200, 0, 0));
 					}
 
+					if (!bText && WorldToScreen(pCur->m_vPosition, vMin2D))
+					{
+						vText = ImVec2(vMin2D.x, vMin2D.y);
+						bText = true;
+					}
+
+					// Three lines: the type (empty for most enemies) and level, the health, the distance
+					if (bText)
+					{
+						const char* szType = pCur->m_pInfo->m_szEntityType;
+						const float flLine = ImGui::GetFontSize();
+						const ImColor TextColor(0, 255, 0);
+						ImVec2 vLine = vText;
+
+						if (*szType)
+							pList->AddTextArgs(vLine, TextColor, FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i", szType, *MakePtr(int*, pCur, 0x28030));
+						else
+							pList->AddTextArgs(vLine, TextColor, FRF_CENTER_H | FRF_OUTLINE, "Enemy Lvl: %i", *MakePtr(int*, pCur, 0x28030));
+
+						vLine = ImVec2(vText.x, vText.y + flLine);
+						pList->AddTextArgs(vLine, TextColor, FRF_CENTER_H | FRF_OUTLINE, "HP: %i/%i", pCur->m_iHealth, pCur->m_iMaxHealth);
+
+						vLine = ImVec2(vText.x, vText.y + flLine * 2.0f);
+						pList->AddTextArgs(vLine, TextColor, FRF_CENTER_H | FRF_OUTLINE, "Dist: %.1fm", pCameraEntity->m_vPosition.DistTo(pCur->m_vPosition));
+					}
+
 					if (WorldToScreen(pCur->m_vPosition, vMin2D))
 					{
-						pList->AddTextArgs(vMin2D, ImColor(0, 255, 0), FRF_CENTER_H | FRF_OUTLINE, "Enemy: %s Lvl: %i HP: %i/%i Dist: %.1fm", pCur->m_pInfo->m_szEntityType, *MakePtr(int*, pCur, 0x28030), pCur->m_iHealth,
-							pCur->m_iMaxHealth, pCameraEntity->m_vPosition.DistTo(pCur->m_vPosition));
-
 						float fov = g_pCamera->m_vPosition.DistTo(pCur->m_vPosition);
 
 						if (fov < best)

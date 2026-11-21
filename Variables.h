@@ -11,6 +11,8 @@ typedef struct Variables_t
 		bool bChams;		// enemies
 		bool bNPCChams;
 		int iChamType;
+		bool bGlow;			// enemies
+		bool bNPCGlow;
 		bool bEspBox;
 		bool b2DEspBox;
 		bool bEnemyInfo;
@@ -55,7 +57,7 @@ typedef struct Variables_t
 		float flPodTintHue;
 		int iSelectedPodMesh;
 		int iAnimation;
-		Vector3Aligned vSpawnEntityScale;
+		Vector3Aligned vSpawnEntityScale = Vector3Aligned(1.0f, 1.0f, 1.0f);	// Create Entity's scale: 1,1,1 is the object's own size
 		uint32_t uSelectedSpawnId;	// the object id picked in the Spawn tab's list, 0 for none
 		char szSpawnSearch[64];
 		bool bSpawnLoadedOnly;
