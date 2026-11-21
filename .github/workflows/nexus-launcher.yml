@@ -1,0 +1,94 @@
+# Uploads a 2B Mod Launcher release (Martymoose98/2B-Mod-Launcher) to the 2BHook Nexus Mods page,
+# as a new version of the launcher's file there. Run it from the Actions tab with the launcher's
+# tag. The launcher's file is the one on the page with "Launcher" in its name, unless a file id is
+# given; the lookup prints the page's files either way.
+name: Nexus launcher upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Launcher release tag, e.g. v1.5.1
+        required: true
+      file_id:
+        description: The launcher's Nexus file id (empty finds the file with "Launcher" in its name)
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+
+    env:
+      TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Download the launcher release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --repo Martymoose98/2B-Mod-Launcher --pattern "2B-Mod-Launcher-$TAG.zip" --dir dist
+          ls -l dist
+
+      # NEXUSMODS_MOD_ID is the mod's v3 id, (game id << 32) | mod id; the v1 API lists the files.
+      # The 2BHook file (NEXUSMODS_FILE_ID) has to be among them, which shows the ids are the kind
+      # the upload takes.
+      - name: Find the launcher's Nexus file
+        id: file
+        env:
+          API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
+          MOD_UID: ${{ vars.NEXUSMODS_MOD_ID }}
+          MAIN_FILE_ID: ${{ vars.NEXUSMODS_FILE_ID }}
+          FILE_ID: ${{ inputs.file_id }}
+        shell: python
+        run: |
+          import json, os, sys, urllib.request
+
+          mod_id = int(os.environ['MOD_UID']) & 0xFFFFFFFF
+          request = urllib.request.Request(
+              f'https://api.nexusmods.com/v1/games/nierautomata/mods/{mod_id}/files.json',
+              headers={'apikey': os.environ['API_KEY'], 'Accept': 'application/json',
+                       'User-Agent': '2BHook-release-workflow', 'Application-Name': '2BHook-release-workflow',
+                       'Application-Version': '1.0'})
+          files = json.load(urllib.request.urlopen(request))['files']
+
+          for f in files:
+              print(f"{f['file_id']:>8} | {f.get('category_name')} | {f.get('version')} | {f.get('name')}")
+
+          ids = {str(f['file_id']) for f in files}
+
+          if os.environ['MAIN_FILE_ID'] not in ids:
+              sys.exit('::error::NEXUSMODS_FILE_ID is not among the listed file ids, so they are not the ids the upload takes. Give the launcher\'s file id from the Files tab (Advanced).')
+
+          wanted = os.environ.get('FILE_ID', '').strip()
+
+          if wanted:
+              match = [f for f in files if str(f['file_id']) == wanted]
+          else:
+              match = [f for f in files if 'launcher' in (f.get('name') or '').lower()
+                       and f.get('category_name') not in ('OLD_VERSION', 'DELETED', 'ARCHIVED')]
+
+          if len(match) != 1:
+              sys.exit(f'::error::{len(match)} files match. Run again with the launcher\'s file id.')
+
+          f = match[0]
+          category = {'MAIN': 'main', 'OPTIONAL': 'optional', 'MISCELLANEOUS': 'miscellaneous'}.get(f.get('category_name'), 'optional')
+          print(f"::notice::The launcher's file: {f['file_id']} ({f.get('name')} {f.get('version')}, {category})")
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"id={f['file_id']}\ncategory={category}\nversion={os.environ['TAG'].lstrip('v')}\n")
+
+      - name: Upload to Nexus Mods
+        uses: Nexus-Mods/upload-action@v1.0.0-beta.11
+        with:
+          api_key: ${{ secrets.NEXUSMODS_API_KEY }}
+          file_id: ${{ steps.file.outputs.id }}
+          filename: dist/2B-Mod-Launcher-${{ env.TAG }}.zip
+          version: ${{ steps.file.outputs.version }}
+          display_name: 2B Mod Launcher ${{ env.TAG }}
+          description: The official 2B Hook launcher. It finds NieR:Automata in any Steam library, starts it (or attaches to it) and loads every DLL in the game's mods folder.
+          category: ${{ steps.file.outputs.category }}
+          update_mod_version: false
