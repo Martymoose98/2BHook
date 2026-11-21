@@ -62,7 +62,7 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 - Menu themes: Default, YoRHa (the game's own menu colours) or Custom, with per-colour overrides, a resizable menu and UI scaling that follows DPI and resolution.
 
 **Spawning**
-- Entity spawner: every object in the game's construction table (enemies, NPCs, pods, weapons, items, map objects...), grouped by type, with a search box. Entries whose assets aren't loaded on the current map can't be spawned.
+- Entity spawner: every object in the game's construction table (enemies, NPCs, pods, weapons, items, map objects...), grouped by type, with a search box. Anything in it can be spawned; entries whose assets aren't loaded on the current map are marked, and their files are loaded before they're spawned.
 - Spawn blacklist: stop chosen entities from being created.
 - Item spawning by id or name, with Instant Equip.
 - Buddy switching (2B, A2 or 9S as buddy), Unlink Buddy, Destroy Buddy.

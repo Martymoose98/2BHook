@@ -531,6 +531,8 @@ void LogOffsets(void)
 	LOG_OFFSET("GetConstructionInfo", GetConstructionInfo);
 	LOG_OFFSET("CObjReadSystem::RequestStartAsscessory", ObjReadSystem_RequestStartAsscessory);
 	LOG_OFFSET("CObjReadSystem::RequestStartFilter", ObjReadSystem_RequestStartFilter);
+	LOG_OFFSET("CObjReadSystem::RequestStart", ObjReadSystem_RequestStart);
+	LOG_OFFSET("CObjReadSystem_ReleaseRequest", ObjReadSystem_ReleaseRequest);
 	LOG_OFFSET("ExCollision::GetOBBMax", ExCollision_GetOBBMax);
 	LOG_OFFSET("ExCollision_ResetOrigin", ExCollision_ResetOrigin);
 	LOG_OFFSET("HashLowercaseStringNoLenCRC32", HashLowercaseStringNoLenCRC32);
@@ -837,6 +839,15 @@ void FindSteamOffsets(void)
 		ObjReadSystem_RequestStartAsscessory = (CObjReadSystem_IsObjectReadyFn)ResolveRel32(uFreeSpawn, 13);
 		ObjReadSystem_RequestStartFilter = (CObjReadSystem_IsObjectReadyFn)ResolveRel32(uFreeSpawn, 38);
 	}
+
+	// What the same free spawner calls around them, for Create Entity's loading: it requests the
+	// files once, waits for the checks above, spawns, and releases the request once the entity is
+	// gone. Both by their heads through the g_ObjNoPreloadIds test, which they share; the register
+	// moves and frame offsets tell them apart. Unique in both builds:
+	// CObjReadSystem::RequestStart (0x1408511B0, v1.02 0x140850D90)
+	ObjReadSystem_RequestStart = (CObjReadSystem_RequestStartFn)FindPatternOrNull("40 57 41 54 41 55 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 68 48 89 6C 24 70 48 89 74 24 78 41 8B E8 8B FA 4C 8B E9 48 8D 59 10 48 89 5C 24 60 83 7B 28 00 74 0A 48 8B CB FF 15 ? ? ? ? 90 8B 05 ? ? ? ? 83 F8 FF");
+	// CObjReadSystem_ReleaseRequest (0x140850FB0, v1.02 0x140850B90)
+	ObjReadSystem_ReleaseRequest = (CObjReadSystem_ReleaseRequestFn)FindPatternOrNull("40 57 41 56 41 57 48 83 EC 30 48 C7 44 24 20 FE FF FF FF 48 89 5C 24 58 48 89 6C 24 60 48 89 74 24 68 45 8B F0 8B FA 48 8B E9 48 8D 59 10 48 89 5C 24 50 83 7B 28 00 74 0A 48 8B CB FF 15 ? ? ? ? 90 8B 05 ? ? ? ? 83 F8 FF");
 
 	// SaveIO Hook has to be reworked as CSaveDataDevice now resides in rbx instead of rcx.
 	// Probably the best solution is to rebuild the function and call that from the hook.

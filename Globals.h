@@ -141,6 +141,11 @@ typedef BOOL(*ObjReadSystem_PreloadModelFn)(CObjReadSystem::Work* pWork);
 // CObjReadSystem::RequestStartAsscessory and ::RequestStartFilter (the IDB's names): despite the
 // names both only look, and answer 1 when an object and its dependencies are ready
 typedef int(*CObjReadSystem_IsObjectReadyFn)(CObjReadSystem* pThis, uint32_t uObjectId, int32_t iSetType);
+// CObjReadSystem::RequestStart takes read references on an object's files and those of every
+// object its dependency record names, starting the reads of any not in memory; 1 on success.
+// CObjReadSystem_ReleaseRequest drops exactly the references RequestStart took.
+typedef int(*CObjReadSystem_RequestStartFn)(CObjReadSystem* pThis, uint32_t uObjectId, uint32_t uSetType);
+typedef void(*CObjReadSystem_ReleaseRequestFn)(CObjReadSystem* pThis, uint32_t uObjectId, uint32_t uSetType);
 // HwRofsFst_MountCpk: true if the archive is bound and ready. (The Denuvo build's version at
 // 0x140956D70 returned the CpkEntry* instead.)
 typedef bool(*CpkMountFn)(int iLoadOrder, const char* szPath);
@@ -236,6 +241,8 @@ extern ObjReadSystem_RequestEndFn RequestEnd;
 extern ObjReadSystem_PreloadModelFn PreloadModel;
 extern CObjReadSystem_IsObjectReadyFn ObjReadSystem_RequestStartAsscessory;
 extern CObjReadSystem_IsObjectReadyFn ObjReadSystem_RequestStartFilter;
+extern CObjReadSystem_RequestStartFn ObjReadSystem_RequestStart;
+extern CObjReadSystem_ReleaseRequestFn ObjReadSystem_ReleaseRequest;
 extern COtManager_GetGraphicCommandFn GetGraphicCommand;
 extern CreateTextureFn CreateTexture;
 extern CTextureResourceManager_FindResourceFn TextureResourceManager_FindResource;

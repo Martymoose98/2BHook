@@ -417,7 +417,9 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	if (Vars.Gameplay.bBalanceEnemyLevels)
 		Features::BuffEnemies();
 
+	Features::UpdatePendingSpawn();
 	Features::ApplyCreatedEntity();
+	Features::ReleaseDeadSpawnRequests();
 	Features::ApplyNoCollision(g_pCamera->m_pCamEntity);
 	Features::ApplyHidePod(g_pCamera->m_pCamEntity);
 

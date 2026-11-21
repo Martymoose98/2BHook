@@ -565,11 +565,11 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 
 // The Spawn list's marks: a fixed red and the amber the theme editor uses, both readable on the
 // dark presets and on YoRHa's beige
-static const ImVec4 SPAWN_BLOCKED_COLOR = ImVec4(0.80f, 0.15f, 0.10f, 1.00f);
+static const ImVec4 SPAWN_WARNING_COLOR = ImVec4(0.80f, 0.15f, 0.10f, 1.00f);
 static const ImVec4 SPAWN_UNTESTED_COLOR = ImVec4(0.80f, 0.40f, 0.00f, 1.00f);
 
 static const char* const SPAWN_NOT_LOADED_TEXT = "Assets not loaded on this map. The game reads an object's files in "
-	"only where a map, scene or quest uses it, and Create Entity spawns only what is in memory.";
+	"only where a map, scene or quest uses it; Create Entity has the game load them, and spawns it once they're in.";
 
 static const char* const SPAWN_UNTESTED_TEXT = "Untested: not in the old hand-made spawn list. It may need a parent, "
 	"a quest or a scene that a free spawn doesn't give it.";
@@ -588,24 +588,15 @@ static const char* GetSpawnLabel(const SpawnList::Entry_t& Entry, char* szBuffer
 	return szBuffer;
 }
 
-// Why Create Entity is off for the picked entry, or NULL when it can be spawned
-static const char* GetCantSpawnReason(const SpawnList::Entry_t* pEntry, DWORD dwSetType)
+// Why Create Entity is off for the picked entry, or NULL when it can be spawned. The asset marks
+// and warnings don't turn it off.
+static const char* GetCantSpawnReason(const SpawnList::Entry_t* pEntry)
 {
 	if (!pEntry)
 		return "Pick an entity in the list first.";
 
-	if (pEntry->m_szBlocked)
-		return pEntry->m_szBlocked;
-
-	switch (SpawnList::CheckAssets(*pEntry, dwSetType))
-	{
-	case SpawnList::ASSETS_RESIDENT:
-		break;
-	case SpawnList::ASSETS_NOT_LOADED:
-		return SPAWN_NOT_LOADED_TEXT;
-	default:
-		return "The game's asset checks weren't found on this build, so nothing can be spawned.";
-	}
+	if (Features::g_PendingSpawn.m_lState == Features::SPAWN_LOADING)
+		return "Loading the last entity's files. It spawns once they're in.";
 
 	if (Features::g_PendingSpawn.m_lState != Features::SPAWN_IDLE)
 		return "The last entity is still being created.";
@@ -650,36 +641,34 @@ static void DrawSpawnTooltip(const SpawnList::Entry_t& Entry, SpawnList::Assets_
 	ImGui::Text("%s  %s  ObjectId 0x%X", (Entry.m_szObjectName[0]) ? Entry.m_szObjectName : "-", Entry.m_szClass, Entry.m_ObjectId);
 	ImGui::Separator();
 
-	if (Entry.m_szBlocked)
+	if (Entry.m_szWarning)
 	{
-		ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_BLOCKED_COLOR);
-		ImGui::TextUnformatted(Entry.m_szBlocked);
+		ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_WARNING_COLOR);
+		ImGui::TextUnformatted(Entry.m_szWarning);
 		ImGui::PopStyleColor();
 	}
-	else
-	{
-		switch (Assets)
-		{
-		case SpawnList::ASSETS_RESIDENT:
-			ImGui::TextUnformatted("Assets loaded: it can be spawned here.");
-			break;
-		case SpawnList::ASSETS_NOT_LOADED:
-			ImGui::TextUnformatted(SPAWN_NOT_LOADED_TEXT);
-			break;
-		case SpawnList::ASSETS_UNCHECKED:
-			ImGui::TextUnformatted("Checking its assets...");
-			break;
-		default:
-			ImGui::TextUnformatted("The game's asset checks weren't found on this build.");
-			break;
-		}
 
-		if (!Entry.m_szName)
-		{
-			ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_UNTESTED_COLOR);
-			ImGui::TextUnformatted(SPAWN_UNTESTED_TEXT);
-			ImGui::PopStyleColor();
-		}
+	switch (Assets)
+	{
+	case SpawnList::ASSETS_RESIDENT:
+		ImGui::TextUnformatted("Assets loaded on this map.");
+		break;
+	case SpawnList::ASSETS_NOT_LOADED:
+		ImGui::TextUnformatted(SPAWN_NOT_LOADED_TEXT);
+		break;
+	case SpawnList::ASSETS_UNCHECKED:
+		ImGui::TextUnformatted("Checking its assets...");
+		break;
+	default:
+		ImGui::TextUnformatted("The game's asset checks weren't found on this build.");
+		break;
+	}
+
+	if (!Entry.m_szName)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, SPAWN_UNTESTED_COLOR);
+		ImGui::TextUnformatted(SPAWN_UNTESTED_TEXT);
+		ImGui::PopStyleColor();
 	}
 
 	if (!Entry.m_bOwnRow)
@@ -698,23 +687,24 @@ static void SetupSpawnColumns(void)
 	ImGui::TableSetupColumn("Id", ImGuiTableColumnFlags_WidthFixed, flFont * 4.5f);
 }
 
-// One row, its ID the object id. The mark: !! never spawned, -- its assets aren't here, ? untested
-// (not in the old hand-made list); rows that can't be spawned are greyed.
+// One row, its ID the object id. The mark: !! a free spawn is likely broken, -- its assets aren't
+// here, ? untested (not in the old hand-made list). Every row can be spawned; those whose assets
+// aren't here are greyed.
 static void DrawSpawnRow(const SpawnList::Entry_t& Entry, SpawnList::Assets_t Assets)
 {
 	const ImGuiStyle& Style = ImGui::GetStyle();
-	const bool bSpawnable = !Entry.m_szBlocked && Assets == SpawnList::ASSETS_RESIDENT;
+	const bool bLoaded = Assets == SpawnList::ASSETS_RESIDENT;
 	const char* szMark = "";
 	ImVec4 vMark = Style.Colors[ImGuiCol_Text];
 	char szSelectable[16];
 	char szLabel[64];
 
-	if (Entry.m_szBlocked)
+	if (Entry.m_szWarning)
 	{
 		szMark = "!!";
-		vMark = SPAWN_BLOCKED_COLOR;
+		vMark = SPAWN_WARNING_COLOR;
 	}
-	else if (!bSpawnable)
+	else if (!bLoaded)
 	{
 		szMark = "--";
 		vMark = Style.Colors[ImGuiCol_TextDisabled];
@@ -745,7 +735,7 @@ static void DrawSpawnRow(const SpawnList::Entry_t& Entry, SpawnList::Assets_t As
 		ImGui::EndTooltip();
 	}
 
-	ImGui::PushStyleColor(ImGuiCol_Text, Style.Colors[(bSpawnable) ? ImGuiCol_Text : ImGuiCol_TextDisabled]);
+	ImGui::PushStyleColor(ImGuiCol_Text, Style.Colors[(bLoaded) ? ImGuiCol_Text : ImGuiCol_TextDisabled]);
 	ImGui::TableNextColumn();
 	ImGui::TextUnformatted(GetSpawnLabel(Entry, szLabel, sizeof(szLabel)));
 	ImGui::TableNextColumn();
@@ -775,7 +765,7 @@ static void DrawSpawnList(DWORD dwSetType)
 
 	ImGui::SameLine();
 	ImGui::Checkbox("Loaded Only", &Vars.Gameplay.bSpawnLoadedOnly);
-	ImGui::SetItemTooltip("Only what can be spawned here: its assets are in memory on this map.");
+	ImGui::SetItemTooltip("Only what is in memory on this map already.");
 
 	SpawnList::SetFilter(Vars.Gameplay.szSpawnSearch, Vars.Gameplay.bSpawnLoadedOnly);
 
@@ -862,7 +852,7 @@ static void DrawSpawnList(DWORD dwSetType)
 
 	ImGui::EndChild();
 
-	ImGui::TextDisabled("?  untested    --  assets not loaded here    !!  never spawned    (hover a row for why)");
+	ImGui::TextDisabled("?  untested    --  assets not loaded here    !!  likely broken as a free spawn    (hover a row for why)");
 }
 
 void CMenu::SpawnTab(Pl0000* pCameraEnt)
@@ -899,7 +889,7 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 	ImGui::InputFloat3("Entity Scale", (float*)&Vars.Gameplay.vSpawnEntityScale);
 
 	const SpawnList::Entry_t* pSelected = (Vars.Gameplay.uSelectedSpawnId) ? SpawnList::Lookup(Vars.Gameplay.uSelectedSpawnId) : NULL;
-	const char* szCantSpawn = GetCantSpawnReason(pSelected, dwSetType);
+	const char* szCantSpawn = GetCantSpawnReason(pSelected);
 
 	ImGui::BeginDisabled(szCantSpawn != NULL);
 
@@ -920,7 +910,8 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 		set_info.m_dw0x74 = 0;
 		set_info.m_i0x078 = 0;
 
-		// Only queued: the buddy, Emil or flight unit hookup is done by Features::ApplyCreatedEntity
+		// Only started: its files are loaded first (Features::UpdatePendingSpawn), and the buddy, Emil
+		// or flight unit hookup is done by Features::ApplyCreatedEntity
 		// once the entity exists, a frame or more later
 		Features::CreateEntity(pSelected->m_szSpawnName, pSelected->m_ObjectId, &set_info, pCameraEnt->m_pInfo->m_hEntity);
 	}
@@ -932,7 +923,11 @@ void CMenu::SpawnTab(Pl0000* pCameraEnt)
 
 	ImGui::SameLine();
 
-	if (pSelected)
+	if (Features::g_PendingSpawn.m_lState == Features::SPAWN_LOADING)
+	{
+		ImGui::TextDisabled("Loading ObjectId 0x%X's files...", Features::g_PendingSpawn.m_ObjectId);
+	}
+	else if (pSelected)
 	{
 		char szLabel[64];
 

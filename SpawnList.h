@@ -32,7 +32,7 @@ namespace SpawnList
 		uint32_t m_ObjectId;
 		const char* m_szClass;		// its construction row's class (CConstructionInfo::m_szName)
 		const char* m_szName;		// its name in the old hand-made list (Variables_t::SpawnEntities), or NULL
-		const char* m_szBlocked;	// why it is never spawned, or NULL
+		const char* m_szWarning;	// why a free spawn of it is likely broken, or NULL; it can still be spawned
 		char m_szObjectName[16];	// the game's name for the id: "em1000" for 0x21000, whose files are em1000.dat/.dtt
 		char m_szSpawnName[32];		// what the entity's CEntityInfo::m_szEntityType becomes
 		char m_szSearch[112];		// names, class and hex id in lower case, for the search box
@@ -124,24 +124,24 @@ namespace SpawnList
 		// piece's own wmb, dat buffers and ObjectParam.bxm (Create_t flag 0x40000000), and
 		// EffectModelEntity_Create (0x140750840) makes ef ids in the effect system's own spawn system
 		// and gives each its owner effect. A free spawn has none of that - for a map piece
-		// CObj_LoadTexturesAndModel (0x14084D310) falls back to the dummy WMB - and its assets can't
-		// be checked, so these are never spawned.
-		inline const char* GetBlockReason(uint32_t ObjectId)
+		// CObj_LoadTexturesAndModel (0x14084D310) falls back to the dummy WMB - so these are marked
+		// with a warning. They can still be spawned.
+		inline const char* GetWarning(uint32_t ObjectId)
 		{
 			static const uint32_t NoPreloadIds[] = { 0x50000, 0x50001, 0x400FD, 0x700000 };
 
 			const uint32_t uPrefix = ObjectId & 0xFFFF0000;
 
 			if (uPrefix == 0x90000)
-				return "A map piece (sc). The game creates these from a streamed map piece, with that piece's own model and data; a free spawn has neither, and its assets can't be checked.";
+				return "A map piece (sc). The game creates these from a streamed map piece, with that piece's own model and data; a free spawn has neither, so expect the dummy model.";
 
 			if (uPrefix == 0x50000)
-				return "An effect (ef). The game creates these as part of an effect, which gives them their model and owner; a free spawn has neither, and its assets can't be checked.";
+				return "An effect (ef). The game creates these as part of an effect, which gives them their model and owner; a free spawn has neither.";
 
 			for (uint32_t uId : NoPreloadIds)
 			{
 				if (ObjectId == uId)
-					return "On the game's no-preload list: it has no files of its own, so whatever creates it supplies its data, and its assets can't be checked.";
+					return "On the game's no-preload list: it has no files of its own, so whatever creates it supplies its data; a free spawn has none.";
 			}
 
 			return NULL;
@@ -167,7 +167,7 @@ namespace SpawnList
 			Entry.m_ObjectId = ObjectId;
 			Entry.m_szClass = (pRow && pRow->m_szName) ? pRow->m_szName : "";
 			Entry.m_szName = (pSeed) ? pSeed->m_szName : NULL;
-			Entry.m_szBlocked = GetBlockReason(ObjectId);
+			Entry.m_szWarning = GetWarning(ObjectId);
 			Entry.m_iGroup = GetGroup(ObjectId);
 			Entry.m_bOwnRow = pRow && pRow->m_uObjectId == ObjectId;
 
@@ -193,7 +193,7 @@ namespace SpawnList
 			{
 				++s_nGroupSize[Entry.m_iGroup];
 
-				if (!Entry.m_szBlocked && Entry.m_Assets == ASSETS_RESIDENT)
+				if (Entry.m_Assets == ASSETS_RESIDENT)
 					++s_nGroupLoaded[Entry.m_iGroup];
 			}
 		}
@@ -242,7 +242,7 @@ namespace SpawnList
 		}
 	}
 
-	// The entry's assets now, the way Create Entity checks them (Features::GetSpawnAssets)
+	// The entry's assets now, the way the game checks them before a free spawn (Features::GetSpawnAssets)
 	inline Assets_t CheckAssets(const Entry_t& Entry, DWORD dwSetType)
 	{
 		switch (Features::GetSpawnAssets(Entry.m_ObjectId, dwSetType))
@@ -285,10 +285,6 @@ namespace SpawnList
 			Entry_t& Entry = s_Entries[s_uNextCheck];
 
 			s_uNextCheck = (s_uNextCheck + 1) % s_Entries.size();
-
-			// Never spawned, so not asked about
-			if (Entry.m_szBlocked)
-				continue;
 
 			const Assets_t Assets = CheckAssets(Entry, dwSetType);
 
@@ -341,7 +337,7 @@ namespace SpawnList
 		{
 			const Entry_t& Entry = s_Entries[i];
 
-			if (bLoadedOnly && (Entry.m_szBlocked || Entry.m_Assets != ASSETS_RESIDENT))
+			if (bLoadedOnly && Entry.m_Assets != ASSETS_RESIDENT)
 				continue;
 
 			bool bMatch = true;

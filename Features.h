@@ -7,6 +7,8 @@
 #include "Log.h"
 #include "Console.h"
 
+#include <vector>
+
 CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
 CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity);
 Pl0000* GetPl0000(CBehaviorAppBase* pEntity);
@@ -985,13 +987,8 @@ namespace Features
 	// (0x14082B190) spawns its "FreeEnemy" only once both of these answer 1 for the id and set type
 	// (see FindSteamOffsets). They only look, under the read system's locks.
 	//
-	// Spawning without it isn't a clean failure. CreateEntityInternal (0x1407453C0) gets the files
-	// from CObjReadSystem::GetDataAtSet (0x14084E1F0), which for files that aren't in memory calls
-	// RequestStart and ObjRead_BeginLoadingData (0x14075EDE0): that sets g_bOBJREAD_LoadingData,
-	// which stops MainUpdateExec drawing the world (0x14075EFCA), and pauses task 1 of the game's
-	// job manager (CJobManager::PauseTask).
-	// The read then reserves the files' memory from the object's heap, and when the map has no
-	// room for them CObjReadWorkDesc_Tick raises the fatal out-of-memory box (0x14019B1AD).
+	// The Spawn list's marks and its Loaded Only box use it, and Create Entity waits for it after
+	// requesting the files (UpdatePendingSpawn), as the free spawner does.
 	inline SpawnAssets_t GetSpawnAssets(uint32_t ObjectId, DWORD dwSetType)
 	{
 		if (!g_pObjReadSystem || !ObjReadSystem_RequestStartAsscessory || !ObjReadSystem_RequestStartFilter)
@@ -1003,32 +1000,50 @@ namespace Features
 	}
 
 	// The set type CreateEntityInternal creates with (0x140745551): the set info's, else Create_t's.
-	// It picks the dependency record GetSpawnAssets walks (CObjReadSystem_GetDependencies,
-	// 0x14084E070).
+	// It picks the dependency record the read system requests, checks and releases
+	// (CObjReadSystem_GetDependencies, 0x14084E070).
 	inline DWORD GetCreateSetType(const Create_t* pCreate)
 	{
 		return pCreate->m_pSetInfo ? pCreate->m_pSetInfo->m_dwSetType : pCreate->m_dwSetType;
 	}
 
-	// Create Entity's result. JobManager_CreateTask (CJobManager::CreateTask, 0x140270140) only links
-	// CreateEntityStub into the job manager's run list and returns, so the entity is made later, when
-	// that task runs. CreateEntity used to return g_CreateCtx.pInfo straight away - the previous
-	// spawn's, or NULL - and the menu made that the buddy, Emil or the flight unit. The stub now
-	// records the new entity's handle here, and ApplyCreatedEntity hooks it up from hkPresent.
+	// Create Entity loads an object's files before it spawns it, the way the game's free spawner
+	// does (ModelSetSpawnList_Update, 0x14082B190): CObjReadSystem::RequestStart once, wait until
+	// GetSpawnAssets answers resident, spawn, and CObjReadSystem_ReleaseRequest once the entity is
+	// gone. The entity takes references of its own when it is constructed (CObj::Construct,
+	// 0x14084D010, ObjRead_AddRefObject), so the request only has to cover the wait; it is kept
+	// for the entity's life all the same, as the free spawner keeps it.
+	//
+	// Spawning without the wait crashed (dump of 2026-11-20 19:03): CreateEntityInternal
+	// (0x1407453C0) got the files from CObjReadSystem::GetDataAtSet (0x14084E1F0), which started
+	// reading the missing ones, and a Pl0000 then played a motion from a pl0000 data slot that
+	// pointed at a CRILAYLA buffer - a compressed file still being read - and
+	// DataFile::QueryFileIndex (0x14026B500) read far out of bounds.
+	//
+	// JobManager_CreateTask (CJobManager::CreateTask, 0x140270140) only links CreateEntityStub into
+	// the job manager's run list and returns, so the entity is made later, when that task runs.
+	// The stub records the new entity's handle here, and ApplyCreatedEntity hooks it up from
+	// hkPresent.
 	enum SpawnState : LONG
 	{
 		SPAWN_IDLE,
+		SPAWN_LOADING,	// its files are requested; UpdatePendingSpawn queues it once they are in
 		SPAWN_QUEUED,	// CreateEntityStub hasn't run yet
 		SPAWN_DONE,		// m_hEntity is set, 0 if the game couldn't create it
 	};
+
+	// How long Create Entity waits for an object's files before it gives up and releases them
+	constexpr ULONGLONG SPAWN_LOAD_TIMEOUT_MS = 30000;
 
 	struct PendingSpawn_t
 	{
 		volatile LONG m_lState = SPAWN_IDLE;
 		uint32_t m_ObjectId = 0;
+		DWORD m_dwSetType = 0;		// what the files were requested with (GetCreateSetType)
+		bool m_bRequested = false;	// RequestStart was called and its references are still held
+		ULONGLONG m_ullLoadStart = 0;
 		EntityHandle_t m_hOwner;	// the camera entity when Create Entity was pressed
 		EntityHandle_t m_hEntity;
-		bool m_bAssetsGone = false;	// the stub found the files gone from memory and didn't create it
 		// Create_t::m_szName until the task has run. CreateEntityInternal copies it with
 		// strcpy_s(m_szEntityType, 0x20, ...) (0x14074543E), which raises the invalid parameter
 		// handler at 32 characters or more, and a class name can be that long
@@ -1038,28 +1053,42 @@ namespace Features
 
 	inline PendingSpawn_t g_PendingSpawn;
 
-	// this fucking thread will hang the whole game if not returned promptly wtf!
-	static __declspec(noreturn) void CreateEntityStub(CreateStub_t* pParams)
+	// The requests held for spawned entities, released once the entity is gone
+	// (ReleaseDeadSpawnRequests), as the free spawner releases its own. Only hkPresent touches it.
+	struct HeldSpawnRequest_t
+	{
+		EntityHandle_t m_hEntity;
+		uint32_t m_ObjectId;
+		DWORD m_dwSetType;
+	};
+
+	inline std::vector<HeldSpawnRequest_t> g_HeldSpawnRequests;
+
+	inline CJobManager* GetSpawnJobManager(void)
 	{
 		static CJobManager* pJobMgrAlt = (CJobManager*)
 			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
+
+		return pJobMgrAlt;
+	}
+
+	inline void ReleaseSpawnRequest(uint32_t ObjectId, DWORD dwSetType)
+	{
+		if (g_pObjReadSystem && ObjReadSystem_ReleaseRequest)
+			ObjReadSystem_ReleaseRequest(g_pObjReadSystem, ObjectId, dwSetType);
+	}
+
+	// this fucking thread will hang the whole game if not returned promptly wtf!
+	static __declspec(noreturn) void CreateEntityStub(CreateStub_t* pParams)
+	{
+		CJobManager* pJobMgrAlt = GetSpawnJobManager();
 
 		static void* pFunc = (void*)FindPattern(NULL, "48 83 EC 48 48 8D 0D ? ? ? ? E8");
 
 		// Stops the SceneTask thread from running
 		//JobManager_PauseTask(g_pJobManager, 1); 
 
-		// Asked again here, where it is created: the files can leave memory between the menu's
-		// frame and this task, and then GetDataAtSet would start reading them
-		if (GetSpawnAssets(pParams->Create.m_ObjectIds[0], GetCreateSetType(&pParams->Create)) == SPAWN_ASSETS_RESIDENT)
-		{
-			pParams->pInfo = SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &pParams->Create);
-		}
-		else
-		{
-			pParams->pInfo = NULL;
-			g_PendingSpawn.m_bAssetsGone = true;
-		}
+		pParams->pInfo = SceneEntitySystem_CreateEntity(g_pSceneEntitySystem, &pParams->Create);
 
 		// The handle rather than the info, which may be gone by the time hkPresent looks at it
 		g_PendingSpawn.m_hEntity.m_uValue = (pParams->pInfo) ? pParams->pInfo->m_hEntity.m_uValue : 0;
@@ -1080,70 +1109,23 @@ namespace Features
 	// RIP: 0x7FF682948722  test    byte ptr [rax+5C4h], 3 ; Logical Compare
 	// OWNER: SPAWN_CRASH_NEW_sub_7FF682948620 
 	//
-	// Queues the spawn and returns whether it was queued; ApplyCreatedEntity finishes it. One at a
-	// time, since the task reads g_CreateCtx when it runs. CJobManager::CreateTask takes a task off
+	// Hands the loaded spawn to the job manager. CJobManager::CreateTask takes a task off
 	// m_pFreeTasks (+0x18) and raises the fatal error g_szTaskIsOutOfWork when there is none, so
-	// an exhausted pool is checked for first and the spawn refused. So is an object whose assets
-	// aren't in memory (GetSpawnAssets).
-	static bool CreateEntity(const char* szName, uint32_t ObjectId, OPTIONAL set_info_t* pSetInfo, EntityHandle_t hOwner)
+	// an exhausted pool is waited out instead (false: try again next frame).
+	static bool QueueLoadedSpawn(void)
 	{
-		static CJobManager* pJobMgrAlt = (CJobManager*)
-			FindPatternPtr(NULL, "48 8D 0D ? ? ? ? E8 ? ? ? ? 41 8B D7 48 8D 0D ? ? ? ? E8 ? ? ? ? EB 99", 3);
-
-		if (InterlockedCompareExchange(&g_PendingSpawn.m_lState, SPAWN_QUEUED, SPAWN_IDLE) != SPAWN_IDLE)
-		{
-			g_pConsole->Warn("Create Entity: the last entity is still being created");
-			return false;
-		}
+		CJobManager* pJobMgrAlt = GetSpawnJobManager();
 
 		if (!pJobMgrAlt || !JobManager_CreateTask || !pJobMgrAlt->m_pFreeTasks)
-		{
-			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
-			g_pConsole->Warn("Create Entity: no free task to create it on, try again later");
 			return false;
-		}
 
-		g_PendingSpawn.m_ObjectId = ObjectId;
-		g_PendingSpawn.m_hOwner = hOwner;
-		g_PendingSpawn.m_hEntity.m_uValue = 0;
-		g_PendingSpawn.m_bAssetsGone = false;
-
-		if (szName)
-			strncpy_s(g_PendingSpawn.m_szName, szName, _TRUNCATE);
-
-		g_CreateCtx.Create.m_szName = (szName) ? g_PendingSpawn.m_szName : NULL;
-		g_CreateCtx.Create.m_ObjectIds[0] = ObjectId;
-		g_CreateCtx.Create.m_ObjectIds[1] = ObjectId;
-		g_CreateCtx.Create.m_iGenerateMode = 1;
-
-		if (pSetInfo)
-		{
-			g_CreateCtx.SetInfo = *pSetInfo;
-			g_CreateCtx.Create.m_pSetInfo = &g_CreateCtx.SetInfo;
-			g_CreateCtx.Create.m_iGenerateMode = pSetInfo->m_i0x088;
-		}
-
-		// Only what is in memory already (see GetSpawnAssets): the game's free spawner requests an
-		// object's files and waits for them, this doesn't
-		switch (GetSpawnAssets(ObjectId, GetCreateSetType(&g_CreateCtx.Create)))
-		{
-		case SPAWN_ASSETS_RESIDENT:
-			break;
-		case SPAWN_ASSETS_NOT_LOADED:
-			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
-			g_pConsole->Warn("Create Entity: ObjectId %x's assets aren't loaded on this map", ObjectId);
-			return false;
-		default:
-			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
-			g_pConsole->Warn("Create Entity: can't check ObjectId %x's assets on this game build", ObjectId);
-			return false;
-		}
+		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_QUEUED);
 
 		static CJobManager::FindAndDestoryTaskFn FindDestroyTsk = (CJobManager::FindAndDestoryTaskFn)
 			FindPattern(NULL, "48 89 5C 24 08 57 48 83 EC 20 48 8B 41 10 8B");
 		static CJobManager::UpdateFn UpdateMgr = (CJobManager::UpdateFn)
 			FindPattern(NULL, "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 40 48 8B 59 10 33");
-		
+
 		//if (pJobMgrAlt->m_uActiveTasks > 0)
 		//{
 		//	//FindDestroyTsk(pJobMgrAlt, 1);
@@ -1164,7 +1146,7 @@ namespace Features
 		//
 		//LONG p;
 		//ReleaseSemaphore(g_pJobManager->m_pTask->m_hSemaphore, 1, &p);
-		// 
+		//
 		//FindDestroyTsk(g_pJobManager, 1);
 		//_StartTask(g_pJobManager, (void(*)(void*)) & CreateEntityStub, &g_CreateCtx);
 		//JobManager_CreateTask(g_pJobManager, &CreateEntityStub, &g_CreateCtx, 0, "SpawnTask");
@@ -1173,6 +1155,116 @@ namespace Features
 		//JobManager_DestroyTask(pJobMgrAlt, pJobMgrAlt->m_pActiveTasks);
 
 		return true;
+	}
+
+	// Waits out a requested spawn's files, from hkPresent: queues it once they are all in, gives
+	// up after SPAWN_LOAD_TIMEOUT_MS and releases them.
+	inline void UpdatePendingSpawn(void)
+	{
+		if (g_PendingSpawn.m_lState != SPAWN_LOADING)
+			return;
+
+		if (GetSpawnAssets(g_PendingSpawn.m_ObjectId, g_PendingSpawn.m_dwSetType) == SPAWN_ASSETS_RESIDENT && QueueLoadedSpawn())
+			return;
+
+		if (GetTickCount64() - g_PendingSpawn.m_ullLoadStart < SPAWN_LOAD_TIMEOUT_MS)
+			return;
+
+		if (g_PendingSpawn.m_bRequested)
+			ReleaseSpawnRequest(g_PendingSpawn.m_ObjectId, g_PendingSpawn.m_dwSetType);
+
+		g_PendingSpawn.m_bRequested = false;
+		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+
+		g_pConsole->Warn("Create Entity: ObjectId %x wasn't created, its files didn't load within %llu seconds",
+			g_PendingSpawn.m_ObjectId, SPAWN_LOAD_TIMEOUT_MS / 1000);
+	}
+
+	// Starts a spawn and returns whether it was started; UpdatePendingSpawn queues it once its
+	// files are loaded, and ApplyCreatedEntity finishes it. One at a time, since the task reads
+	// g_CreateCtx when it runs.
+	static bool CreateEntity(const char* szName, uint32_t ObjectId, OPTIONAL set_info_t* pSetInfo, EntityHandle_t hOwner)
+	{
+		if (InterlockedCompareExchange(&g_PendingSpawn.m_lState, SPAWN_LOADING, SPAWN_IDLE) != SPAWN_IDLE)
+		{
+			g_pConsole->Warn("Create Entity: the last entity is still being created");
+			return false;
+		}
+
+		CJobManager* pJobMgrAlt = GetSpawnJobManager();
+
+		if (!pJobMgrAlt || !JobManager_CreateTask)
+		{
+			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+			g_pConsole->Warn("Create Entity: the game's job manager wasn't found on this build");
+			return false;
+		}
+
+		g_PendingSpawn.m_ObjectId = ObjectId;
+		g_PendingSpawn.m_hOwner = hOwner;
+		g_PendingSpawn.m_hEntity.m_uValue = 0;
+		g_PendingSpawn.m_bRequested = false;
+
+		if (szName)
+			strncpy_s(g_PendingSpawn.m_szName, szName, _TRUNCATE);
+
+		g_CreateCtx.Create.m_szName = (szName) ? g_PendingSpawn.m_szName : NULL;
+		g_CreateCtx.Create.m_ObjectIds[0] = ObjectId;
+		g_CreateCtx.Create.m_ObjectIds[1] = ObjectId;
+		g_CreateCtx.Create.m_iGenerateMode = 1;
+
+		if (pSetInfo)
+		{
+			g_CreateCtx.SetInfo = *pSetInfo;
+			g_CreateCtx.Create.m_pSetInfo = &g_CreateCtx.SetInfo;
+			g_CreateCtx.Create.m_iGenerateMode = pSetInfo->m_i0x088;
+		}
+
+		g_PendingSpawn.m_dwSetType = GetCreateSetType(&g_CreateCtx.Create);
+		g_PendingSpawn.m_ullLoadStart = GetTickCount64();
+
+		if (g_pObjReadSystem && ObjReadSystem_RequestStart && ObjReadSystem_ReleaseRequest)
+		{
+			// Also for files already in memory: the references keep them there until it is created
+			if (!ObjReadSystem_RequestStart(g_pObjReadSystem, ObjectId, g_PendingSpawn.m_dwSetType))
+			{
+				InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+				g_pConsole->Warn("Create Entity: the game couldn't request ObjectId %x's files", ObjectId);
+				return false;
+			}
+
+			g_PendingSpawn.m_bRequested = true;
+		}
+		else if (GetSpawnAssets(ObjectId, g_PendingSpawn.m_dwSetType) != SPAWN_ASSETS_RESIDENT)
+		{
+			// Without the request, only what is already in memory can be spawned safely
+			InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
+			g_pConsole->Warn("Create Entity: can't load ObjectId %x's files on this game build", ObjectId);
+			return false;
+		}
+
+		// Queued straight away when the files are in, otherwise once they are
+		UpdatePendingSpawn();
+
+		return true;
+	}
+
+	// Releases the requests of spawned entities that are gone, from hkPresent
+	inline void ReleaseDeadSpawnRequests(void)
+	{
+		for (size_t i = 0; i < g_HeldSpawnRequests.size();)
+		{
+			HeldSpawnRequest_t& Held = g_HeldSpawnRequests[i];
+
+			if (GetEntityInfoFromHandle(&Held.m_hEntity))
+			{
+				++i;
+				continue;
+			}
+
+			ReleaseSpawnRequest(Held.m_ObjectId, Held.m_dwSetType);
+			g_HeldSpawnRequests.erase(g_HeldSpawnRequests.begin() + i);
+		}
 	}
 
 	// Hooks up what Create Entity made, once CreateEntityStub has run: a 2B, A2 or 9S becomes the
@@ -1188,19 +1280,24 @@ namespace Features
 		EntityHandle_t hEntity = g_PendingSpawn.m_hEntity;
 		EntityHandle_t hOwner = g_PendingSpawn.m_hOwner;
 		const uint32_t ObjectId = g_PendingSpawn.m_ObjectId;
+		const DWORD dwSetType = g_PendingSpawn.m_dwSetType;
+		const bool bRequested = g_PendingSpawn.m_bRequested;
 
-		const bool bAssetsGone = g_PendingSpawn.m_bAssetsGone;
-
+		g_PendingSpawn.m_bRequested = false;
 		InterlockedExchange(&g_PendingSpawn.m_lState, SPAWN_IDLE);
 
 		if (!GetEntityInfoFromHandle(&hEntity))
 		{
-			if (bAssetsGone)
-				g_pConsole->Warn("Create Entity: ObjectId %x wasn't created, its assets left memory before it could be", ObjectId);
-			else
-				g_pConsole->Warn("Create Entity: ObjectId %x wasn't created", ObjectId);
+			if (bRequested)
+				ReleaseSpawnRequest(ObjectId, dwSetType);
+
+			g_pConsole->Warn("Create Entity: ObjectId %x wasn't created", ObjectId);
 			return;
 		}
+
+		// Kept until the entity is gone (ReleaseDeadSpawnRequests)
+		if (bRequested)
+			g_HeldSpawnRequests.push_back({ hEntity, ObjectId, dwSetType });
 
 		Pl0000* pOwner = GetPl0000(GetEntityFromHandleGlobal(&hOwner));
 
