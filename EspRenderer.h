@@ -30,11 +30,15 @@ namespace EspRenderer
 
 	void Shutdown(void);
 
-	// Whether the draw being made goes into the game's main depth buffer, the one the size of the
-	// frame, which the mask follows. The targets are drawn into shadow maps and other buffers too,
-	// where their silhouettes are from another view or at another size; those draws are left alone.
-	// True when EspRenderer couldn't start, so the seen colour still works.
+	// Whether the draw being made goes into the game's main depth buffer, which the mask follows:
+	// the one the size of the frame, multisampled or not, first drawn into this frame (the game has
+	// two and can switch between them). The targets are drawn into the 2048x2048 shadow map too,
+	// where their silhouettes are from the light's view; those draws are left alone. True when
+	// EspRenderer couldn't start, so the seen colour still works.
 	bool IsMainPass(ID3D11DeviceContext* pContext);
+
+	// One line for the menu: the depth buffer followed last frame and the ones left out
+	void GetStatus(char* szStatus, size_t cchStatus);
 
 	// From hkDrawIndexed, around one of a target's colour draws: binds the mask, the mask's depth
 	// test and a flat colour in place of the game's targets and pixel shader. False, with nothing

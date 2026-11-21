@@ -1,4 +1,5 @@
 #include "Menu.h"
+#include "EspRenderer.h"
 #include "MaterialTint.h"
 #include "SpawnList.h"
 #include "mot.h"
@@ -683,6 +684,16 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 	ImGui::SameLine();
 
 	ImGui::Checkbox("Display NPC Info", &Vars.Visuals.bNPCInfo);
+
+	// Which of the game's depth buffers the chams' hidden colour and the glow follow, and the ones
+	// they leave out (EspRenderer), so a screenshot shows why they don't appear
+	if (Vars.Visuals.bChams || Vars.Visuals.bNPCChams || Vars.Visuals.bGlow || Vars.Visuals.bNPCGlow)
+	{
+		char szStatus[512];
+
+		EspRenderer::GetStatus(szStatus, sizeof(szStatus));
+		ImGui::TextDisabled("Depth buffers: %s", szStatus);
+	}
 
 	ImGui::Separator();
 

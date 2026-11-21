@@ -27,45 +27,60 @@ namespace EspRenderer
 	// shader constants are never rebound around its draws (their offsets wouldn't survive that).
 	static const char s_szMaskPSFormat[] = "float4 main() : SV_Target { return float4(%.9g, %.9g, %.9g, %.9g); }\n";
 
-	// The parameters of the passes below: g_UV maps the back buffer's uv onto the mask (xy scale,
-	// zw offset: the part of it the game's viewport covered); g_Misc.x is 1 for a reversed depth
-	// buffer, y the depth bias, z the glow's strength. The blur takes its step in g_UV.xy.
+	// What the passes below share. g_UV maps the back buffer's uv onto the mask (xy scale, zw
+	// offset: the part of it the game's viewport covered); g_Misc.x is 1 for a reversed depth
+	// buffer, y the depth bias, z the glow's strength; g_Size is the mask's size (and its inverse).
+	// The blur takes its step in g_UV.xy. The game's depth buffer can be multisampled (the game's
+	// MSAA setting); the mask then is too, with the same samples, and sample 0 of each is compared,
+	// where both were rasterized alike. MS picks the textures' kind.
 	static const char s_szCommon[] =
-		"cbuffer Params : register(b0) { float4 g_UV; float4 g_Misc; };\n"
-		"SamplerState Point : register(s0);\n"
-		"SamplerState Linear : register(s1);\n"
-		"uint GetFlags(float4 Mask) { return (uint)(Mask.a * 255.0 + 0.5); }\n";
+		"cbuffer Params : register(b0) { float4 g_UV; float4 g_Misc; float4 g_Size; };\n"
+		"SamplerState Linear : register(s0);\n"
+		"#if MS\n"
+		"Texture2DMS<float4> Mask : register(t0);\n"
+		"Texture2DMS<float> MaskDepth : register(t1);\n"
+		"Texture2DMS<float> SceneDepth : register(t2);\n"
+		"float4 LoadMask(int2 p) { return Mask.Load(p, 0); }\n"
+		"float LoadMaskDepth(int2 p) { return MaskDepth.Load(p, 0); }\n"
+		"float LoadSceneDepth(int2 p) { return SceneDepth.Load(p, 0); }\n"
+		"#else\n"
+		"Texture2D<float4> Mask : register(t0);\n"
+		"Texture2D<float> MaskDepth : register(t1);\n"
+		"Texture2D<float> SceneDepth : register(t2);\n"
+		"float4 LoadMask(int2 p) { return Mask.Load(int3(p, 0)); }\n"
+		"float LoadMaskDepth(int2 p) { return MaskDepth.Load(int3(p, 0)); }\n"
+		"float LoadSceneDepth(int2 p) { return SceneDepth.Load(int3(p, 0)); }\n"
+		"#endif\n"
+		"uint GetFlags(float4 Mask) { return (uint)(Mask.a * 255.0 + 0.5); }\n"
+		"int2 MaskTexel(float2 uv) { return min(int2((uv * g_UV.xy + g_UV.zw) * g_Size.xy), int2(g_Size.xy) - 1); }\n";
 
 	// The hidden colour: where a chams target is behind what the game drew
 	static const char s_szChamsPS[] =
-		"Texture2D Mask : register(t0);\n"
-		"Texture2D<float> MaskDepth : register(t1);\n"
-		"Texture2D<float> SceneDepth : register(t2);\n"
 		"float4 main(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target\n"
 		"{\n"
-		"	float2 t = uv * g_UV.xy + g_UV.zw;\n"
-		"	float4 m = Mask.SampleLevel(Point, t, 0);\n"
+		"	int2 p = MaskTexel(uv);\n"
+		"	float4 m = LoadMask(p);\n"
 		"	if ((GetFlags(m) & 2) == 0) discard;\n"
-		"	float d = MaskDepth.SampleLevel(Point, t, 0);\n"
-		"	float s = SceneDepth.SampleLevel(Point, t, 0);\n"
+		"	float d = LoadMaskDepth(p);\n"
+		"	float s = LoadSceneDepth(p);\n"
 		"	bool bHidden = (g_Misc.x > 0.5) ? (d < s - g_Misc.y) : (d > s + g_Misc.y);\n"
 		"	if (!bHidden) discard;\n"
 		"	return float4(m.rgb, 1.0);\n"
 		"}\n";
 
-	// The glow's source, at half size: the glow targets' colours, from four texels of the mask
+	// The glow's source, at half size: the glow targets' colours, from the four mask texels under
+	// each of its texels
 	static const char s_szGlowPrepPS[] =
-		"Texture2D Mask : register(t0);\n"
-		"float4 Tap(float2 t) { float4 m = Mask.SampleLevel(Point, t, 0); return (GetFlags(m) & 4) ? float4(m.rgb, 1.0) : float4(0, 0, 0, 0); }\n"
+		"float4 Tap(int2 p) { float4 m = LoadMask(min(p, int2(g_Size.xy) - 1)); return (GetFlags(m) & 4) ? float4(m.rgb, 1.0) : float4(0, 0, 0, 0); }\n"
 		"float4 main(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target\n"
 		"{\n"
-		"	float2 h = g_Misc.zw * 0.5;\n"
-		"	return (Tap(uv + float2(-h.x, -h.y)) + Tap(uv + float2(h.x, -h.y)) + Tap(uv + float2(-h.x, h.y)) + Tap(uv + float2(h.x, h.y))) * 0.25;\n"
+		"	int2 p = int2(pos.xy) * 2;\n"
+		"	return (Tap(p) + Tap(p + int2(1, 0)) + Tap(p + int2(0, 1)) + Tap(p + int2(1, 1))) * 0.25;\n"
 		"}\n";
 
 	// One direction of a 9-tap gaussian, in five bilinear fetches
 	static const char s_szBlurPS[] =
-		"Texture2D Source : register(t0);\n"
+		"Texture2D Source : register(t3);\n"
 		"float4 main(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target\n"
 		"{\n"
 		"	float2 s = g_UV.xy;\n"
@@ -77,24 +92,29 @@ namespace EspRenderer
 
 	// The glow, added around the silhouettes (not over them)
 	static const char s_szGlowPS[] =
-		"Texture2D Glow : register(t0);\n"
-		"Texture2D Mask : register(t1);\n"
+		"Texture2D Glow : register(t3);\n"
 		"float4 main(float4 pos : SV_Position, float2 uv : TEXCOORD0) : SV_Target\n"
 		"{\n"
-		"	float2 t = uv * g_UV.xy + g_UV.zw;\n"
-		"	float4 g = Glow.SampleLevel(Linear, t, 0);\n"
-		"	float fInside = (GetFlags(Mask.SampleLevel(Point, t, 0)) & 4) ? 1.0 : 0.0;\n"
+		"	float4 g = Glow.SampleLevel(Linear, uv * g_UV.xy + g_UV.zw, 0);\n"
+		"	float fInside = (GetFlags(LoadMask(MaskTexel(uv))) & 4) ? 1.0 : 0.0;\n"
 		"	return float4(g.rgb * g_Misc.z * (1.0 - fInside), 0.0);\n"
 		"}\n";
 
+	enum
+	{
+		SAMPLES_ONE,
+		SAMPLES_MANY,
+		_SAMPLES_KINDS
+	};
+
 	static ID3D11Device* s_pDevice;
 	static ID3D11VertexShader* s_pFullscreenVS;
-	static ID3D11PixelShader* s_pChamsPS;
-	static ID3D11PixelShader* s_pGlowPrepPS;
+	static ID3D11PixelShader* s_pChamsPS[_SAMPLES_KINDS];
+	static ID3D11PixelShader* s_pGlowPrepPS[_SAMPLES_KINDS];
+	static ID3D11PixelShader* s_pGlowPS[_SAMPLES_KINDS];
 	static ID3D11PixelShader* s_pBlurPS;
-	static ID3D11PixelShader* s_pGlowPS;
-	static ID3D11Buffer* s_pParams;						// two float4s, rewritten for each pass
-	static ID3D11SamplerState* s_pSamplers[2];			// point, linear (clamped)
+	static ID3D11Buffer* s_pParams;						// three float4s, rewritten for each pass
+	static ID3D11SamplerState* s_pLinear;				// clamped
 	static ID3D11BlendState* s_pAdditive;
 	static ID3D11DepthStencilState* s_pMaskDepth[2];	// LESS, GREATER (reversed depth): the nearest target wins
 	static ID3D11DepthStencilState* s_pNoDepth;
@@ -113,30 +133,54 @@ namespace EspRenderer
 
 	// ---------------------------------------------------------------- targets
 
-	// The frame's size, from the back buffer: the game's main depth buffer is the one this size
+	// The frame's size, from the back buffer: the game's main depth buffers are this size
 	static UINT s_uFrameWidth, s_uFrameHeight;
 
-	// The game's depth buffer the mask follows, held so its address can't be reused
-	static ID3D11Texture2D* s_pSceneDepth;
-	static ID3D11Texture2D* s_pSceneDepthCopy;			// when the game's can't be read by a shader
-	static ID3D11ShaderResourceView* s_pSceneDepthSRV;
-	static UINT s_uWidth, s_uHeight;
+	// The game's depth buffers the mask has followed, each held (so its address can't be reused)
+	// with the view a shader reads it through. The game has two of the frame's size and can draw a
+	// frame into either.
+	struct SceneDepth_t
+	{
+		ID3D11Texture2D* m_pTexture;
+		ID3D11Texture2D* m_pCopy;						// when the game's can't be read by a shader
+		ID3D11ShaderResourceView* m_pSRV;
+		UINT64 m_uLastFrame;
+	};
 
+	static SceneDepth_t s_SceneDepths[4];
+	static SceneDepth_t* s_pCurrent;					// this frame's
+
+	// The mask, the shape of the game's depth buffers (size and samples)
+	static UINT s_uWidth, s_uHeight;
+	static DXGI_SAMPLE_DESC s_Samples;
 	static ID3D11Texture2D* s_pMask;
 	static ID3D11RenderTargetView* s_pMaskRTV;
 	static ID3D11ShaderResourceView* s_pMaskSRV;
 	static ID3D11Texture2D* s_pMaskDepthTex;
 	static ID3D11DepthStencilView* s_pMaskDSV;
 	static ID3D11ShaderResourceView* s_pMaskDepthSRV;
-	static ID3D11Texture2D* s_pGlow[2];					// half size, ping-ponged by the blur
+	static ID3D11Texture2D* s_pGlow[2];					// half size, single-sampled, ping-ponged by the blur
 	static ID3D11RenderTargetView* s_pGlowRTV[2];
 	static ID3D11ShaderResourceView* s_pGlowSRV[2];
+
+	// The depth buffers targets were drawn into, for the menu's status line
+	struct DepthStats_t
+	{
+		const void* m_pTexture;
+		UINT m_uWidth, m_uHeight, m_uSamples;
+		int m_nDraws;
+		bool m_bFollowed;
+	};
+
+	static DepthStats_t s_Stats[8], s_LastStats[8];
+	static int s_nStats, s_nLastStats;
 
 	// The depth buffers left out, each logged once
 	static const void* s_pRejected[16];
 	static int s_nRejected;
 
 	// This frame
+	static UINT64 s_uFrame;
 	static bool s_bMaskStarted;							// cleared and drawn into
 	static bool s_bReversedDepth;
 	static D3D11_VIEWPORT s_MaskViewport;				// the game's, at the first mask draw
@@ -162,16 +206,17 @@ namespace EspRenderer
 		}
 	}
 
-	static ID3DBlob* Compile(const char* szCommon, const char* szSource, const char* szProfile)
+	static ID3DBlob* Compile(const char* szCommon, const char* szSource, const char* szProfile, bool bMultisampled)
 	{
-		char szFull[4096];
+		char szFull[6144];
 		ID3DBlob* pBlob = NULL;
 		ID3DBlob* pErrors = NULL;
+		const D3D_SHADER_MACRO Macros[] = { { "MS", bMultisampled ? "1" : "0" }, { NULL, NULL } };
 
 		if (sprintf_s(szFull, "%s%s", szCommon ? szCommon : "", szSource) < 0)
 			return NULL;
 
-		HRESULT hr = D3DCompile(szFull, strlen(szFull), "EspRenderer", NULL, NULL, "main", szProfile, D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &pBlob, &pErrors);
+		HRESULT hr = D3DCompile(szFull, strlen(szFull), "EspRenderer", Macros, NULL, "main", szProfile, D3DCOMPILE_OPTIMIZATION_LEVEL3, 0, &pBlob, &pErrors);
 
 		if (FAILED(hr))
 		{
@@ -183,9 +228,9 @@ namespace EspRenderer
 		return pBlob;
 	}
 
-	static bool CreatePS(const char* szCommon, const char* szSource, ID3D11PixelShader** ppShader)
+	static bool CreatePS(const char* szCommon, const char* szSource, bool bMultisampled, ID3D11PixelShader** ppShader)
 	{
-		ID3DBlob* pBlob = Compile(szCommon, szSource, "ps_4_0");
+		ID3DBlob* pBlob = Compile(szCommon, szSource, "ps_5_0", bMultisampled);
 
 		if (!pBlob)
 			return false;
@@ -214,7 +259,7 @@ namespace EspRenderer
 
 		sprintf_s(szSource, s_szMaskPSFormat, Color[0], Color[1], Color[2], (float)uFlags / 255.0f);
 
-		if (!CreatePS(NULL, szSource, &Entry.m_pShader))
+		if (!CreatePS(NULL, szSource, false, &Entry.m_pShader))
 			return NULL;
 
 		s_MaskShaders[s_nMaskShaders++] = Entry;
@@ -251,16 +296,19 @@ namespace EspRenderer
 		}
 	}
 
-	static void ReleaseSceneDepth(void)
+	static void ReleaseSceneDepth(SceneDepth_t* pEntry)
 	{
-		SafeRelease(s_pSceneDepthSRV);
-		SafeRelease(s_pSceneDepthCopy);
-		SafeRelease(s_pSceneDepth);
+		if (pEntry == s_pCurrent)
+			s_pCurrent = NULL;
+
+		SafeRelease(pEntry->m_pSRV);
+		SafeRelease(pEntry->m_pCopy);
+		SafeRelease(pEntry->m_pTexture);
+		pEntry->m_uLastFrame = 0;
 	}
 
-	static void ReleaseTargets(void)
+	static void ReleaseMaskTargets(void)
 	{
-		ReleaseSceneDepth();
 		SafeRelease(s_pMaskSRV);
 		SafeRelease(s_pMaskRTV);
 		SafeRelease(s_pMask);
@@ -276,10 +324,19 @@ namespace EspRenderer
 		}
 
 		s_uWidth = s_uHeight = 0;
+		s_Samples = {};
 		s_bMaskStarted = false;
 	}
 
-	static bool CreateColorTarget(UINT uWidth, UINT uHeight, ID3D11Texture2D** ppTexture, ID3D11RenderTargetView** ppRTV, ID3D11ShaderResourceView** ppSRV)
+	static void ReleaseTargets(void)
+	{
+		for (SceneDepth_t& Entry : s_SceneDepths)
+			ReleaseSceneDepth(&Entry);
+
+		ReleaseMaskTargets();
+	}
+
+	static bool CreateGlowTarget(UINT uWidth, UINT uHeight, ID3D11Texture2D** ppTexture, ID3D11RenderTargetView** ppRTV, ID3D11ShaderResourceView** ppSRV)
 	{
 		D3D11_TEXTURE2D_DESC Desc = {};
 
@@ -297,58 +354,74 @@ namespace EspRenderer
 			SUCCEEDED(s_pDevice->CreateShaderResourceView(*ppTexture, NULL, ppSRV));
 	}
 
-	static bool CreateMaskTargets(UINT uWidth, UINT uHeight)
+	// The mask in the shape of the game's depth buffer: the same size and samples, so a target's
+	// draw lands on the same pixels and samples in both
+	static bool CreateMaskTargets(UINT uWidth, UINT uHeight, DXGI_SAMPLE_DESC Samples)
 	{
-		D3D11_TEXTURE2D_DESC DepthDesc = {};
+		const bool bMultisampled = Samples.Count > 1;
+		D3D11_TEXTURE2D_DESC Desc = {};
 
-		DepthDesc.Width = uWidth;
-		DepthDesc.Height = uHeight;
-		DepthDesc.MipLevels = 1;
-		DepthDesc.ArraySize = 1;
-		DepthDesc.Format = DXGI_FORMAT_R32_TYPELESS;
-		DepthDesc.SampleDesc.Count = 1;
-		DepthDesc.Usage = D3D11_USAGE_DEFAULT;
-		DepthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+		Desc.Width = uWidth;
+		Desc.Height = uHeight;
+		Desc.MipLevels = 1;
+		Desc.ArraySize = 1;
+		Desc.SampleDesc = Samples;
+		Desc.Usage = D3D11_USAGE_DEFAULT;
+
+		D3D11_RENDER_TARGET_VIEW_DESC RTVDesc = {};
+		RTVDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		RTVDesc.ViewDimension = bMultisampled ? D3D11_RTV_DIMENSION_TEXTURE2DMS : D3D11_RTV_DIMENSION_TEXTURE2D;
 
 		D3D11_DEPTH_STENCIL_VIEW_DESC DSVDesc = {};
-
 		DSVDesc.Format = DXGI_FORMAT_D32_FLOAT;
-		DSVDesc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+		DSVDesc.ViewDimension = bMultisampled ? D3D11_DSV_DIMENSION_TEXTURE2DMS : D3D11_DSV_DIMENSION_TEXTURE2D;
 
 		D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
-
-		SRVDesc.Format = DXGI_FORMAT_R32_FLOAT;
-		SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		SRVDesc.ViewDimension = bMultisampled ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
 		SRVDesc.Texture2D.MipLevels = 1;
 
-		bool bOk = CreateColorTarget(uWidth, uHeight, &s_pMask, &s_pMaskRTV, &s_pMaskSRV) &&
-			SUCCEEDED(s_pDevice->CreateTexture2D(&DepthDesc, NULL, &s_pMaskDepthTex)) &&
+		Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		Desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+		SRVDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		bool bOk = SUCCEEDED(s_pDevice->CreateTexture2D(&Desc, NULL, &s_pMask)) &&
+			SUCCEEDED(s_pDevice->CreateRenderTargetView(s_pMask, &RTVDesc, &s_pMaskRTV)) &&
+			SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pMask, &SRVDesc, &s_pMaskSRV));
+
+		Desc.Format = DXGI_FORMAT_R32_TYPELESS;
+		Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
+		SRVDesc.Format = DXGI_FORMAT_R32_FLOAT;
+
+		bOk = bOk && SUCCEEDED(s_pDevice->CreateTexture2D(&Desc, NULL, &s_pMaskDepthTex)) &&
 			SUCCEEDED(s_pDevice->CreateDepthStencilView(s_pMaskDepthTex, &DSVDesc, &s_pMaskDSV)) &&
 			SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pMaskDepthTex, &SRVDesc, &s_pMaskDepthSRV));
 
 		for (int i = 0; i < 2 && bOk; ++i)
-			bOk = CreateColorTarget(max(uWidth / 2, 1u), max(uHeight / 2, 1u), &s_pGlow[i], &s_pGlowRTV[i], &s_pGlowSRV[i]);
+			bOk = CreateGlowTarget(max(uWidth / 2, 1u), max(uHeight / 2, 1u), &s_pGlow[i], &s_pGlowRTV[i], &s_pGlowSRV[i]);
 
-		if (bOk)
+		if (!bOk)
 		{
-			s_uWidth = uWidth;
-			s_uHeight = uHeight;
+			ReleaseMaskTargets();
+			return false;
 		}
 
-		return bOk;
+		s_uWidth = uWidth;
+		s_uHeight = uHeight;
+		s_Samples = Samples;
+		return true;
 	}
 
 	// A view of the game's depth itself when a shader can read it, else of a copy made each frame
-	static bool CreateSceneDepthView(ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc, DXGI_FORMAT Typeless, DXGI_FORMAT ShaderFormat)
+	static bool CreateSceneDepthView(SceneDepth_t* pEntry, ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc, DXGI_FORMAT Typeless, DXGI_FORMAT ShaderFormat)
 	{
 		D3D11_SHADER_RESOURCE_VIEW_DESC SRVDesc = {};
 
 		SRVDesc.Format = ShaderFormat;
-		SRVDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+		SRVDesc.ViewDimension = (Desc.SampleDesc.Count > 1) ? D3D11_SRV_DIMENSION_TEXTURE2DMS : D3D11_SRV_DIMENSION_TEXTURE2D;
 		SRVDesc.Texture2D.MipLevels = 1;
 
 		if (Desc.BindFlags & D3D11_BIND_SHADER_RESOURCE)
-			return SUCCEEDED(s_pDevice->CreateShaderResourceView(pTexture, &SRVDesc, &s_pSceneDepthSRV));
+			return SUCCEEDED(s_pDevice->CreateShaderResourceView(pTexture, &SRVDesc, &pEntry->m_pSRV));
 
 		D3D11_TEXTURE2D_DESC CopyDesc = Desc;
 
@@ -358,13 +431,14 @@ namespace EspRenderer
 		CopyDesc.CPUAccessFlags = 0;
 		CopyDesc.MiscFlags = 0;
 
-		return SUCCEEDED(s_pDevice->CreateTexture2D(&CopyDesc, NULL, &s_pSceneDepthCopy)) &&
-			SUCCEEDED(s_pDevice->CreateShaderResourceView(s_pSceneDepthCopy, &SRVDesc, &s_pSceneDepthSRV));
+		return SUCCEEDED(s_pDevice->CreateTexture2D(&CopyDesc, NULL, &pEntry->m_pCopy)) &&
+			SUCCEEDED(s_pDevice->CreateShaderResourceView(pEntry->m_pCopy, &SRVDesc, &pEntry->m_pSRV));
 	}
 
-	static void LogRejected(ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc)
+	static void LogRejected(ID3D11Texture2D* pTexture, const D3D11_TEXTURE2D_DESC& Desc, const char* szWhy)
 	{
 		UNREFERENCED_PARAMETER(Desc);	// LOG is nothing in Release builds
+		UNREFERENCED_PARAMETER(szWhy);
 
 		for (int i = 0; i < s_nRejected; ++i)
 		{
@@ -375,17 +449,17 @@ namespace EspRenderer
 		if (s_nRejected < (int)ARRAYSIZE(s_pRejected))
 			s_pRejected[s_nRejected++] = pTexture;
 
-		LOG("EspRenderer: leaving out the %ux%u depth buffer %p (format %d): the frame is %ux%u\n", Desc.Width, Desc.Height, pTexture, Desc.Format,
-			s_uFrameWidth, s_uFrameHeight);
+		LOG("EspRenderer: leaving out the %ux%u x%u depth buffer %p (format %d): %s\n", Desc.Width, Desc.Height, Desc.SampleDesc.Count, pTexture,
+			Desc.Format, szWhy);
 	}
 
-	// Follows the game's main depth buffer, the one the size of the frame. The targets are also
-	// drawn into others, shadow maps (which can be bigger than the screen) among them, whose
-	// silhouettes are from another view or at another size: following the biggest one put the
-	// light's view of them on the screen. Those are left out, and so are their draws.
+	// This frame's scene depth: the first depth buffer of the frame's size that a target is drawn
+	// into. The shadow map (2048x2048) is left out: its silhouettes are from the light's view, and
+	// following the biggest depth buffer put them on the screen. The game's own depth buffers are
+	// multisampled with MSAA on, which this used to leave out too, so it had only the shadow map.
 	static bool FollowSceneDepth(ID3D11Texture2D* pTexture)
 	{
-		if (pTexture == s_pSceneDepth)
+		if (s_pCurrent && s_pCurrent->m_pTexture == pTexture)
 			return true;
 
 		D3D11_TEXTURE2D_DESC Desc;
@@ -393,52 +467,91 @@ namespace EspRenderer
 
 		pTexture->GetDesc(&Desc);
 
-		if (!s_uFrameWidth || Desc.Width != s_uFrameWidth || Desc.Height != s_uFrameHeight ||
-			Desc.SampleDesc.Count > 1 || Desc.ArraySize != 1 || !GetDepthFormats(Desc.Format, &Typeless, &ShaderFormat))
+		if (!s_uFrameWidth || Desc.Width != s_uFrameWidth || Desc.Height != s_uFrameHeight)
 		{
-			LogRejected(pTexture, Desc);
+			LogRejected(pTexture, Desc, "not the frame's size");
 			return false;
 		}
 
-		// Another of the frame's size while the one followed is in use this frame: keep that one
-		if (s_pSceneDepth && s_bMaskStarted)
+		if (Desc.ArraySize != 1 || !GetDepthFormats(Desc.Format, &Typeless, &ShaderFormat))
+		{
+			LogRejected(pTexture, Desc, "an array or an unknown format");
+			return false;
+		}
+
+		// This frame has its depth buffer already
+		if (s_pCurrent)
 			return false;
 
-		// The same size: only the view of the game's depth changes
-		if (s_uWidth != Desc.Width || s_uHeight != Desc.Height)
+		if (s_uWidth != Desc.Width || s_uHeight != Desc.Height || s_Samples.Count != Desc.SampleDesc.Count || s_Samples.Quality != Desc.SampleDesc.Quality)
 		{
-			ReleaseTargets();
+			ReleaseMaskTargets();
 
-			if (!CreateMaskTargets(Desc.Width, Desc.Height))
+			if (!CreateMaskTargets(Desc.Width, Desc.Height, Desc.SampleDesc))
 			{
-				LOG("EspRenderer: couldn't make the %ux%u mask\n", Desc.Width, Desc.Height);
-				ReleaseTargets();
+				LOG("EspRenderer: couldn't make the %ux%u x%u mask\n", Desc.Width, Desc.Height, Desc.SampleDesc.Count);
 				return false;
 			}
 		}
-		else
+
+		SceneDepth_t* pEntry = NULL;
+		SceneDepth_t* pOldest = &s_SceneDepths[0];
+
+		for (SceneDepth_t& Entry : s_SceneDepths)
 		{
-			ReleaseSceneDepth();
+			if (Entry.m_pTexture == pTexture)
+				pEntry = &Entry;
+
+			if (Entry.m_uLastFrame < pOldest->m_uLastFrame)
+				pOldest = &Entry;
 		}
 
-		if (!CreateSceneDepthView(pTexture, Desc, Typeless, ShaderFormat))
+		if (!pEntry)
 		{
-			LOG("EspRenderer: couldn't read the %ux%u depth buffer %p (format %d)\n", Desc.Width, Desc.Height, pTexture, Desc.Format);
-			ReleaseSceneDepth();
-			return false;
+			pEntry = pOldest;
+			ReleaseSceneDepth(pEntry);
+
+			if (!CreateSceneDepthView(pEntry, pTexture, Desc, Typeless, ShaderFormat))
+			{
+				LOG("EspRenderer: couldn't read the %ux%u x%u depth buffer %p (format %d)\n", Desc.Width, Desc.Height, Desc.SampleDesc.Count, pTexture, Desc.Format);
+				ReleaseSceneDepth(pEntry);
+				return false;
+			}
+
+			pEntry->m_pTexture = pTexture;
+			pEntry->m_pTexture->AddRef();
+
+			LOG("EspRenderer: following the %ux%u x%u depth buffer %p (format %d, %s)\n", Desc.Width, Desc.Height, Desc.SampleDesc.Count, pTexture,
+				Desc.Format, pEntry->m_pCopy ? "copied each frame" : "read directly");
 		}
 
-		s_pSceneDepth = pTexture;
-		s_pSceneDepth->AddRef();
-
-		LOG("EspRenderer: following the %ux%u depth buffer %p (format %d, %s)\n", Desc.Width, Desc.Height, pTexture, Desc.Format,
-			s_pSceneDepthCopy ? "copied each frame" : "read directly");
-
+		pEntry->m_uLastFrame = s_uFrame;
+		s_pCurrent = pEntry;
 		return true;
 	}
 
-	// The depth buffer bound for the draw being made, held, or NULL
-	static ID3D11Texture2D* GetBoundDepth(ID3D11DeviceContext* pContext)
+	static void RecordDraw(ID3D11Texture2D* pTexture, bool bFollowed)
+	{
+		for (int i = 0; i < s_nStats; ++i)
+		{
+			if (s_Stats[i].m_pTexture == pTexture)
+			{
+				++s_Stats[i].m_nDraws;
+				return;
+			}
+		}
+
+		if (s_nStats >= (int)ARRAYSIZE(s_Stats))
+			return;
+
+		D3D11_TEXTURE2D_DESC Desc;
+
+		pTexture->GetDesc(&Desc);
+		s_Stats[s_nStats++] = { pTexture, Desc.Width, Desc.Height, Desc.SampleDesc.Count, 1, bFollowed };
+	}
+
+	// Whether the bound depth buffer is this frame's scene depth
+	static bool CheckMainPass(ID3D11DeviceContext* pContext, bool bRecord)
 	{
 		ID3D11DepthStencilView* pDSV = NULL;
 		ID3D11Resource* pResource = NULL;
@@ -447,7 +560,7 @@ namespace EspRenderer
 		pContext->OMGetRenderTargets(0, NULL, &pDSV);
 
 		if (!pDSV)
-			return NULL;
+			return false;
 
 		pDSV->GetResource(&pResource);
 		pDSV->Release();
@@ -458,7 +571,16 @@ namespace EspRenderer
 			pResource->Release();
 		}
 
-		return pTexture;
+		if (!pTexture)
+			return false;
+
+		const bool bFollowed = FollowSceneDepth(pTexture);
+
+		if (bRecord)
+			RecordDraw(pTexture, bFollowed);
+
+		pTexture->Release();
+		return bFollowed;
 	}
 
 	bool Initialize(ID3D11Device* pDevice)
@@ -468,7 +590,7 @@ namespace EspRenderer
 
 		s_pDevice = pDevice;
 
-		ID3DBlob* pVS = Compile(NULL, s_szFullscreenVS, "vs_4_0");
+		ID3DBlob* pVS = Compile(NULL, s_szFullscreenVS, "vs_5_0", false);
 
 		if (!pVS)
 			return false;
@@ -477,11 +599,18 @@ namespace EspRenderer
 
 		pVS->Release();
 
-		if (FAILED(hr) ||
-			!CreatePS(s_szCommon, s_szChamsPS, &s_pChamsPS) ||
-			!CreatePS(s_szCommon, s_szGlowPrepPS, &s_pGlowPrepPS) ||
-			!CreatePS(s_szCommon, s_szBlurPS, &s_pBlurPS) ||
-			!CreatePS(s_szCommon, s_szGlowPS, &s_pGlowPS))
+		bool bOk = SUCCEEDED(hr) && CreatePS(s_szCommon, s_szBlurPS, false, &s_pBlurPS);
+
+		for (int iKind = 0; iKind < _SAMPLES_KINDS && bOk; ++iKind)
+		{
+			const bool bMultisampled = iKind == SAMPLES_MANY;
+
+			bOk = CreatePS(s_szCommon, s_szChamsPS, bMultisampled, &s_pChamsPS[iKind]) &&
+				CreatePS(s_szCommon, s_szGlowPrepPS, bMultisampled, &s_pGlowPrepPS[iKind]) &&
+				CreatePS(s_szCommon, s_szGlowPS, bMultisampled, &s_pGlowPS[iKind]);
+		}
+
+		if (!bOk)
 		{
 			Shutdown();
 			return false;
@@ -489,23 +618,20 @@ namespace EspRenderer
 
 		D3D11_BUFFER_DESC BufferDesc = {};
 
-		BufferDesc.ByteWidth = 2 * 4 * sizeof(float);
+		BufferDesc.ByteWidth = 3 * 4 * sizeof(float);
 		BufferDesc.Usage = D3D11_USAGE_DYNAMIC;
 		BufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 		BufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
 		D3D11_SAMPLER_DESC SamplerDesc = {};
 
-		SamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+		SamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
 		SamplerDesc.AddressU = SamplerDesc.AddressV = SamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
 		SamplerDesc.ComparisonFunc = D3D11_COMPARISON_NEVER;
 		SamplerDesc.MaxLOD = D3D11_FLOAT32_MAX;
 
-		bool bOk = SUCCEEDED(s_pDevice->CreateBuffer(&BufferDesc, NULL, &s_pParams)) &&
-			SUCCEEDED(s_pDevice->CreateSamplerState(&SamplerDesc, &s_pSamplers[0]));
-
-		SamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
-		bOk = bOk && SUCCEEDED(s_pDevice->CreateSamplerState(&SamplerDesc, &s_pSamplers[1]));
+		bOk = SUCCEEDED(s_pDevice->CreateBuffer(&BufferDesc, NULL, &s_pParams)) &&
+			SUCCEEDED(s_pDevice->CreateSamplerState(&SamplerDesc, &s_pLinear));
 
 		D3D11_BLEND_DESC BlendDesc = {};
 
@@ -559,14 +685,17 @@ namespace EspRenderer
 
 		s_nMaskShaders = 0;
 
+		for (int iKind = 0; iKind < _SAMPLES_KINDS; ++iKind)
+		{
+			SafeRelease(s_pChamsPS[iKind]);
+			SafeRelease(s_pGlowPrepPS[iKind]);
+			SafeRelease(s_pGlowPS[iKind]);
+		}
+
 		SafeRelease(s_pFullscreenVS);
-		SafeRelease(s_pChamsPS);
-		SafeRelease(s_pGlowPrepPS);
 		SafeRelease(s_pBlurPS);
-		SafeRelease(s_pGlowPS);
 		SafeRelease(s_pParams);
-		SafeRelease(s_pSamplers[0]);
-		SafeRelease(s_pSamplers[1]);
+		SafeRelease(s_pLinear);
 		SafeRelease(s_pAdditive);
 		SafeRelease(s_pMaskDepth[0]);
 		SafeRelease(s_pMaskDepth[1]);
@@ -576,7 +705,7 @@ namespace EspRenderer
 		s_pDevice = NULL;
 	}
 
-	static void SetParams(ID3D11DeviceContext* pContext, const float A[4], const float B[4])
+	static void SetParams(ID3D11DeviceContext* pContext, const float A[4], const float B[4], const float C[4])
 	{
 		D3D11_MAPPED_SUBRESOURCE Mapped;
 
@@ -585,6 +714,7 @@ namespace EspRenderer
 
 		memcpy(Mapped.pData, A, 4 * sizeof(float));
 		memcpy((float*)Mapped.pData + 4, B, 4 * sizeof(float));
+		memcpy((float*)Mapped.pData + 8, C, 4 * sizeof(float));
 		pContext->Unmap(s_pParams, 0);
 	}
 
@@ -595,20 +725,42 @@ namespace EspRenderer
 		if (!s_pFullscreenVS)
 			return true;
 
-		ID3D11Texture2D* pTexture = GetBoundDepth(pContext);
+		return CheckMainPass(pContext, true);
+	}
 
-		if (!pTexture)
-			return false;
+	void GetStatus(char* szStatus, size_t cchStatus)
+	{
+		if (!szStatus || !cchStatus)
+			return;
 
-		const bool bFollowed = FollowSceneDepth(pTexture);
+		szStatus[0] = '\0';
 
-		pTexture->Release();
-		return bFollowed;
+		if (!s_pFullscreenVS)
+		{
+			strcpy_s(szStatus, cchStatus, "couldn't start (shaders)");
+			return;
+		}
+
+		if (!s_nLastStats)
+		{
+			sprintf_s(szStatus, cchStatus, "no target drawn last frame (frame %ux%u)", s_uFrameWidth, s_uFrameHeight);
+			return;
+		}
+
+		for (int i = 0; i < s_nLastStats; ++i)
+		{
+			const DepthStats_t* pStats = &s_LastStats[i];
+			char szEntry[96];
+
+			sprintf_s(szEntry, "%s%ux%u x%u: %d draws, %s", i ? "; " : "", pStats->m_uWidth, pStats->m_uHeight, pStats->m_uSamples, pStats->m_nDraws,
+				pStats->m_bFollowed ? "followed" : "left out");
+			strcat_s(szStatus, cchStatus, szEntry);
+		}
 	}
 
 	bool BeginMaskDraw(ID3D11DeviceContext* pContext, const float Color[3], uint32_t uFlags)
 	{
-		if (!s_pFullscreenVS || !IsMainPass(pContext))
+		if (!s_pFullscreenVS || !CheckMainPass(pContext, false) || !s_pMaskRTV)
 			return false;
 
 		uFlags |= ESPMASK_PRESENT;
@@ -687,8 +839,8 @@ namespace EspRenderer
 		ID3D11DomainShader* pDS;
 		ID3D11GeometryShader* pGS;
 		ID3D11PixelShader* pPS;
-		ID3D11ShaderResourceView* pSRVs[3];
-		ID3D11SamplerState* pSamplers[2];
+		ID3D11ShaderResourceView* pSRVs[4];
+		ID3D11SamplerState* pSampler;
 		ID3D11DeviceContext1* pContext1;
 		ID3D11Buffer* pPSParams;
 		UINT uFirstConstant;
@@ -713,8 +865,8 @@ namespace EspRenderer
 			pContext->DSGetShader(&pDS, NULL, NULL);
 			pContext->GSGetShader(&pGS, NULL, NULL);
 			pContext->PSGetShader(&pPS, NULL, NULL);
-			pContext->PSGetShaderResources(0, 3, pSRVs);
-			pContext->PSGetSamplers(0, 2, pSamplers);
+			pContext->PSGetShaderResources(0, 4, pSRVs);
+			pContext->PSGetSamplers(0, 1, &pSampler);
 
 			if (SUCCEEDED(pContext->QueryInterface(__uuidof(ID3D11DeviceContext1), (void**)&pContext1)))
 				pContext1->PSGetConstantBuffers1(0, 1, &pPSParams, &uFirstConstant, &nConstants);
@@ -738,8 +890,8 @@ namespace EspRenderer
 			pContext->DSSetShader(pDS, NULL, 0);
 			pContext->GSSetShader(pGS, NULL, 0);
 			pContext->PSSetShader(pPS, NULL, 0);
-			pContext->PSSetShaderResources(0, 3, pSRVs);
-			pContext->PSSetSamplers(0, 2, pSamplers);
+			pContext->PSSetShaderResources(0, 4, pSRVs);
+			pContext->PSSetSamplers(0, 1, &pSampler);
 
 			if (pContext1)
 				pContext1->PSSetConstantBuffers1(0, 1, &pPSParams, &uFirstConstant, &nConstants);
@@ -762,9 +914,7 @@ namespace EspRenderer
 			for (ID3D11ShaderResourceView*& pSRV : pSRVs)
 				SafeRelease(pSRV);
 
-			for (ID3D11SamplerState*& pSampler : pSamplers)
-				SafeRelease(pSampler);
-
+			SafeRelease(pSampler);
 			SafeRelease(pPSParams);
 			SafeRelease(pContext1);
 			SafeRelease(pRS);
@@ -781,18 +931,32 @@ namespace EspRenderer
 	static void SetTarget(ID3D11DeviceContext* pContext, ID3D11RenderTargetView* pRTV, UINT uWidth, UINT uHeight)
 	{
 		const D3D11_VIEWPORT Viewport = { 0.0f, 0.0f, (FLOAT)uWidth, (FLOAT)uHeight, 0.0f, 1.0f };
-		ID3D11ShaderResourceView* const NoSRVs[3] = {};
+		ID3D11ShaderResourceView* const NoSRVs[4] = {};
 
 		// A texture can't be read and drawn into at once
-		pContext->PSSetShaderResources(0, 3, NoSRVs);
+		pContext->PSSetShaderResources(0, 4, NoSRVs);
 		pContext->OMSetRenderTargets(1, &pRTV, NULL);
 		pContext->RSSetViewports(1, &Viewport);
 	}
 
 	static void EndFrame(void)
 	{
+		memcpy(s_LastStats, s_Stats, sizeof(s_Stats));
+		s_nLastStats = s_nStats;
+		s_nStats = 0;
+
 		s_bMaskStarted = false;
 		s_uFlagsDrawn = 0;
+		s_pCurrent = NULL;
+		++s_uFrame;
+
+		// Depth buffers the game hasn't drawn a target into for a while (a resolution change, a
+		// new device) are let go
+		for (SceneDepth_t& Entry : s_SceneDepths)
+		{
+			if (Entry.m_pTexture && Entry.m_uLastFrame + 600 < s_uFrame)
+				ReleaseSceneDepth(&Entry);
+		}
 	}
 
 	void Composite(ID3D11DeviceContext* pContext, ID3D11RenderTargetView* pBackBuffer)
@@ -803,7 +967,7 @@ namespace EspRenderer
 			return;
 		}
 
-		// The frame's size, which picks the game's main depth buffer for the next frame
+		// The frame's size, which picks the game's main depth buffers for the next frame
 		ID3D11Resource* pBackBufferResource = NULL;
 		ID3D11Texture2D* pBackBufferTexture = NULL;
 		D3D11_TEXTURE2D_DESC BackBufferDesc = {};
@@ -828,18 +992,19 @@ namespace EspRenderer
 		s_uFrameWidth = BackBufferDesc.Width;
 		s_uFrameHeight = BackBufferDesc.Height;
 
-		if (!s_bMaskStarted || !s_pSceneDepth || !(s_uFlagsDrawn & (ESPMASK_CHAMS | ESPMASK_GLOW)))
+		if (!s_bMaskStarted || !s_pCurrent || !s_pCurrent->m_pSRV || !(s_uFlagsDrawn & (ESPMASK_CHAMS | ESPMASK_GLOW)))
 		{
 			EndFrame();
 			return;
 		}
 
+		const int iKind = (s_Samples.Count > 1) ? SAMPLES_MANY : SAMPLES_ONE;
 		StateBackup_t Backup = {};
 
 		Backup.Save(pContext);
 
-		if (s_pSceneDepthCopy)
-			pContext->CopyResource(s_pSceneDepthCopy, s_pSceneDepth);
+		if (s_pCurrent->m_pCopy)
+			pContext->CopyResource(s_pCurrent->m_pCopy, s_pCurrent->m_pTexture);
 
 		pContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		pContext->IASetInputLayout(NULL);
@@ -849,7 +1014,7 @@ namespace EspRenderer
 		pContext->GSSetShader(NULL, NULL, 0);
 		pContext->RSSetState(s_pFullscreenRS);
 		pContext->OMSetDepthStencilState(s_pNoDepth, 0);
-		pContext->PSSetSamplers(0, 2, s_pSamplers);
+		pContext->PSSetSamplers(0, 1, &s_pLinear);
 		pContext->PSSetConstantBuffers(0, 1, &s_pParams);
 
 		// The back buffer's uv onto the part of the mask the game's viewport covered
@@ -857,16 +1022,18 @@ namespace EspRenderer
 			s_MaskViewport.Width / (float)s_uWidth, s_MaskViewport.Height / (float)s_uHeight,
 			s_MaskViewport.TopLeftX / (float)s_uWidth, s_MaskViewport.TopLeftY / (float)s_uHeight
 		};
+		const float Size[4] = { (float)s_uWidth, (float)s_uHeight, 1.0f / (float)s_uWidth, 1.0f / (float)s_uHeight };
+		const float NoParams[4] = {};
 
-		if ((s_uFlagsDrawn & ESPMASK_CHAMS) && s_pSceneDepthSRV)
+		if (s_uFlagsDrawn & ESPMASK_CHAMS)
 		{
 			const float Misc[4] = { s_bReversedDepth ? 1.0f : 0.0f, 1e-6f, 0.0f, 0.0f };
-			ID3D11ShaderResourceView* const SRVs[3] = { s_pMaskSRV, s_pMaskDepthSRV, s_pSceneDepthSRV };
+			ID3D11ShaderResourceView* const SRVs[3] = { s_pMaskSRV, s_pMaskDepthSRV, s_pCurrent->m_pSRV };
 
 			SetTarget(pContext, pBackBuffer, BackBufferDesc.Width, BackBufferDesc.Height);
-			SetParams(pContext, UV, Misc);
+			SetParams(pContext, UV, Misc, Size);
 			pContext->OMSetBlendState(NULL, NULL, 0xFFFFFFFF);
-			pContext->PSSetShader(s_pChamsPS, NULL, 0);
+			pContext->PSSetShader(s_pChamsPS[iKind], NULL, 0);
 			pContext->PSSetShaderResources(0, 3, SRVs);
 			pContext->Draw(3, 0);
 		}
@@ -875,15 +1042,13 @@ namespace EspRenderer
 		{
 			const UINT uGlowWidth = max(s_uWidth / 2, 1u);
 			const UINT uGlowHeight = max(s_uHeight / 2, 1u);
-			const float NoUV[4] = {};
-			const float PrepMisc[4] = { 0.0f, 0.0f, 1.0f / (float)s_uWidth, 1.0f / (float)s_uHeight };
 
 			pContext->OMSetBlendState(NULL, NULL, 0xFFFFFFFF);
 
 			// The glow targets' silhouettes at half size
 			SetTarget(pContext, s_pGlowRTV[0], uGlowWidth, uGlowHeight);
-			SetParams(pContext, NoUV, PrepMisc);
-			pContext->PSSetShader(s_pGlowPrepPS, NULL, 0);
+			SetParams(pContext, NoParams, NoParams, Size);
+			pContext->PSSetShader(s_pGlowPrepPS[iKind], NULL, 0);
 			pContext->PSSetShaderResources(0, 1, &s_pMaskSRV);
 			pContext->Draw(3, 0);
 
@@ -897,26 +1062,26 @@ namespace EspRenderer
 				const float Step[4] = { (iSource == 0) ? flSpread / (float)uGlowWidth : 0.0f, (iSource == 1) ? flSpread / (float)uGlowHeight : 0.0f, 0.0f, 0.0f };
 
 				SetTarget(pContext, s_pGlowRTV[iSource ^ 1], uGlowWidth, uGlowHeight);
-				SetParams(pContext, Step, NoUV);
-				pContext->PSSetShaderResources(0, 1, &s_pGlowSRV[iSource]);
+				SetParams(pContext, Step, NoParams, Size);
+				pContext->PSSetShaderResources(3, 1, &s_pGlowSRV[iSource]);
 				pContext->Draw(3, 0);
 			}
 
 			// Added to the back buffer around the silhouettes
 			const float GlowMisc[4] = { 0.0f, 0.0f, 2.5f, 0.0f };
-			ID3D11ShaderResourceView* const SRVs[2] = { s_pGlowSRV[0], s_pMaskSRV };
 
 			SetTarget(pContext, pBackBuffer, BackBufferDesc.Width, BackBufferDesc.Height);
-			SetParams(pContext, UV, GlowMisc);
+			SetParams(pContext, UV, GlowMisc, Size);
 			pContext->OMSetBlendState(s_pAdditive, NULL, 0xFFFFFFFF);
-			pContext->PSSetShader(s_pGlowPS, NULL, 0);
-			pContext->PSSetShaderResources(0, 2, SRVs);
+			pContext->PSSetShader(s_pGlowPS[iKind], NULL, 0);
+			pContext->PSSetShaderResources(0, 1, &s_pMaskSRV);
+			pContext->PSSetShaderResources(3, 1, &s_pGlowSRV[0]);
 			pContext->Draw(3, 0);
 		}
 
-		ID3D11ShaderResourceView* const NoSRVs[3] = {};
+		ID3D11ShaderResourceView* const NoSRVs[4] = {};
 
-		pContext->PSSetShaderResources(0, 3, NoSRVs);
+		pContext->PSSetShaderResources(0, 4, NoSRVs);
 
 		Backup.Restore(pContext);
 		EndFrame();
