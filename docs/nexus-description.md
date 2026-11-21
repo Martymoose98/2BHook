@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.0[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. Many features were checked against the game again and reworked, and the 1.2.0 changes are listed at the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.1[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. 1.2.0 checked many features against the game again and reworked them; its changes and 1.2.1's fixes are at the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -37,7 +37,7 @@
 
 [b]Spawning[/b]
 [list]
-[*]Entity spawner: every object in the game's construction table (enemies, NPCs, pods, weapons, items, map objects), grouped by type, with search. Only objects whose assets are loaded on the current map can be spawned.
+[*]Entity spawner: every object in the game's construction table (enemies, NPCs, pods, weapons, items, map objects), grouped by type, with search. Anything in it can be spawned; objects whose assets aren't loaded on the current map are marked, and their files are loaded before they're spawned.
 [*]Spawn blacklist
 [*]Item spawning with Instant Equip
 [*]Buddy switching (2B, A2, 9S), Unlink Buddy, Destroy Buddy
@@ -107,6 +107,23 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [line]
 [size=4][b]Changelog[/b][/size]
 [spoiler]
+[b]Version 1.2.1[/b] (November 2026)
+[i]Fixes[/i]
+[list]
+[*][b]No Model Collision:[/b] turning it off no longer snaps you back to the first wall you walked through. You stay where you are, and collision starts again from there.
+[/list]
+[i]Entity spawner[/i]
+[list]
+[*]Anything in the list can be spawned again. When an object's assets aren't loaded on the current map, Create Entity has the game load its files first and spawns it once they're in, the way the game's own spawner does.
+[*]Entries whose assets aren't loaded are still greyed with --, and the "Loaded only" filter still hides them.
+[*]Effects (ef), map pieces (sc) and the game's no-preload objects can be spawned too. Their !! mark is now a warning: the game normally gives these their model and data when it creates them, so a free spawn may show the dummy model or not work.
+[/list]
+[i]Other[/i]
+[list]
+[*][b]Console:[/b] the log fills the Console tab and grows when you resize the menu or play at a higher resolution, instead of staying a small fixed box.
+[*]The DLL's version info names the product 2BHook.
+[/list]
+
 [b]Version 1.2.0[/b] (November 2026: Steam build 26534214)
 [i]Game support[/i]
 [list]
