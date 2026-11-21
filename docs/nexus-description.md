@@ -75,7 +75,7 @@ The official launcher (v1.5.1) is open source. Get it from this page's Files tab
 [b]With a DLL injector[/b]
 Start the game, wait for the main menu, then inject [b]2BHook.dll[/b] with an injector such as Xenos or Extreme Injector.
 
-Each release on [url=https://github.com/Martymoose98/2BHook/releases]GitHub Releases[/url] has the DLL, the README and a .pdb for crash reports.
+Each release on [url=https://github.com/Martymoose98/2BHook/releases]GitHub Releases[/url] has the DLL and the README.
 
 [b]Note:[/b] other DLL mods with hard-coded addresses for older game builds can crash the game on the November 2026 update. Update them first.
 

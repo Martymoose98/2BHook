@@ -141,7 +141,7 @@ Turn it off for one build with `-p:PostBuildEventUseInBuild=false`. It is off au
   1. Start the game and wait for the main menu.
   2. Inject `2BHook.dll`. Injecting earlier can fail.
 
-Prebuilt releases are on the [Releases](https://github.com/Martymoose98/2BHook/releases) page: `2BHook-<version>.zip` (the DLL and this README) plus the matching `.pdb`. They're also on the [Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10). Otherwise, build from source as above.
+Prebuilt releases are on the [Releases](https://github.com/Martymoose98/2BHook/releases) page: `2BHook-<version>.zip` (the DLL and this README). They're also on the [Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10). Otherwise, build from source as above.
 
 2BHook can run alongside other DLL mods. Mods with hard-coded addresses for an older game build, such as old builds of NASA, can crash the game on build 26534214, so update them first.
 
@@ -196,8 +196,8 @@ CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 20
 - **Release** (`.github/workflows/release.yml`) runs when a `v*` tag is pushed. It:
   1. takes the release notes from `.github/release-notes/<tag>.md` if the tagged commit has that file, or otherwise writes a changelog from the commits since the previous `v*` tag. It also checks the notes' Nexus summary (see below), before building, so bad notes fail in seconds;
   2. builds Release x64;
-  3. packages `2BHook-<tag>.zip` (the DLL and README) and `2BHook-<tag>.pdb`;
-  4. creates the GitHub release with both files and the notes;
+  3. packages `2BHook-<tag>.zip` (the DLL and README). The PDB isn't released; the Build workflow's artifact has it;
+  4. creates the GitHub release with the zip and the notes;
   5. uploads the zip to Nexus Mods, if that is configured. It's uploaded as a new version of the main file, with the name `2BHook <tag>`, the version from the tag (`v1.2.0` becomes `1.2.0`), and the summary as its description. The mod page's version is set to match, and the changes are added to the mod's changelog as plain text.
 
 To cut a release:

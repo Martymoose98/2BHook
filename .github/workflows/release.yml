@@ -1,8 +1,9 @@
 # Cuts a release when a v* tag is pushed (or for an existing tag, from the Actions tab): takes
 # the notes from .github/release-notes/<tag>.md (or the commits since the previous v* tag when
 # there is no such file) and their Nexus summary, builds Release x64, packages 2BHook-<tag>.zip
-# (DLL + README) and 2BHook-<tag>.pdb, creates or updates the GitHub release, and uploads the zip
-# to Nexus Mods when the Nexus settings are present.
+# (DLL + README), creates or updates the GitHub release, and uploads the zip to Nexus Mods when
+# the Nexus settings are present. The PDB stays out of releases; the Build workflow keeps it as an
+# artifact.
 name: Release
 
 on:
@@ -94,7 +95,6 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Compress-Archive -Path x64/Release/2BHook.dll, README.md -DestinationPath "dist/2BHook-$env:TAG.zip"
-          Copy-Item x64/Release/2BHook.pdb "dist/2BHook-$env:TAG.pdb"
 
       # Created on the first run for a tag; a re-run from the Actions tab replaces the assets and
       # the notes instead of failing.
