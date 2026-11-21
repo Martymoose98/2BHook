@@ -144,6 +144,9 @@
     <ClInclude Include="Version.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="WinInclude.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="ReversedStructs.h">
       <Filter>Header Files\SDK</Filter>
     </ClInclude>

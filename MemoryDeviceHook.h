@@ -1,7 +1,11 @@
 #pragma once
 
+#include "WinInclude.h"
+
 #include <vector>
-#include <Fluorine\VirtualTableHook.h>
+
+#include <Fluorine/VirtualTableHook.h>
+
 #include "ReversedStructs.h"
 
 BOOL hkCHeapInstanceSetHeapInfo(CHeapInstance* pThis, CHeapInfo* pInfo, unsigned __int64 cbSize, int nChildren, int flags);
@@ -71,18 +75,27 @@ public:
 
 		CHeapInfo* pInfo = (CHeapInfo*)HeapReAlloc(m_pDevice->m_hHeap, HEAP_NO_SERIALIZE, pHeap->m_pInfo, cbNeeded);
 
-		// fix parent, child, next and prev pointers
+		if (!pInfo)
+		{
+			pHeap->m_Lock.Unlock();
+			m_pDevice->m_Lock.Unlock();
+			return;
+		}
+
+		// fix parent, child, next and prev pointers. HeapReAlloc may have moved the block and freed the
+		// old one, so the links are read from the new block, which holds a copy (they were read
+		// through pHeap->m_pInfo, the freed block)
 		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo)
 			pHeap->m_pParentInfo->m_pChildInfo = pInfo;
 
 		//if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo)
 		//	pHeap->m_pNextPartition->= pInfo;
 
-		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo)
-			pHeap->m_pInfo->m_pNext->m_pPrevious = pInfo;
+		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo && pInfo->m_pNext)
+			pInfo->m_pNext->m_pPrevious = pInfo;
 
-		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo)
-			pHeap->m_pInfo->m_pPrevious->m_pNext = pInfo;
+		if (pHeap->m_pParentInfo && pHeap->m_pParentInfo->m_pChildInfo && pInfo->m_pPrevious)
+			pInfo->m_pPrevious->m_pNext = pInfo;
 
 		pHeap->m_pInfo = pInfo;
 
@@ -108,5 +121,41 @@ private:
 	VirtualTableHook m_DeviceHeapHook;
 	std::vector<VirtualTableHook> m_HeapHooks;
 };
+
+// Bigger heaps. The game makes all its memory heaps up front: Mem::Startup (0x14086B970) asks
+// CMemorySystem::CreateHeap (0x1402623B0) for five roots, about 4.4 GB between them, each from the
+// Win32 heap, and every other heap is carved out of one of those by
+// CMemoryDevice::CreateChildHeapInternal (0x140261DE0), at startup or when a map block, the UI or a
+// movie needs one. Their sizes are fixed, so loading more than a map plans for (Create Entity on
+// anything) can run a heap out and stop the game with its out-of-memory box.
+//
+// This multiplies every heap's size by the "Heap Scale" setting (i_heap_scale in default.xml,
+// read here since the menu's config loads too late): the roots, and each child whose parent was
+// made bigger, so every child still fits in its parent. It has to be in place before Mem::Startup
+// runs, so it only works when the mod loader loads 2BHook from the mods folder at startup;
+// injected later, it finds the heaps already made and leaves them alone. ExcitedDelirium does the
+// same at a fixed 2x (MemSystem.h, HEAP_SCALE_MAIN / HEAP_SCALE_VRAM).
+//
+// It replaces MemoryDeviceHook above, whose grow-when-full path moved a heap's memory with
+// HeapReAlloc and so left every pointer into the heap dangling.
+namespace HeapScale
+{
+	enum Status_t
+	{
+		HEAPSCALE_OFF,				// Heap Scale is 1, or the setting couldn't be read
+		HEAPSCALE_APPLIED,			// the heaps were made bigger at startup
+		HEAPSCALE_TOO_LATE,		// 2BHook was loaded after the game made its heaps
+		HEAPSCALE_NOT_FOUND,		// a signature didn't match this build
+	};
+
+	constexpr int MAX_SCALE = 4;
+
+	// From DllMain, before anything else: reads the setting and hooks heap creation
+	void InstallEarly(HINSTANCE hInstance);
+	void Uninstall(void);
+
+	int GetScale(void);			// what the heaps were made with, 1 when off
+	Status_t GetStatus(void);
+}
 
 #include "Globals.h" // cyclic dependancy if on top

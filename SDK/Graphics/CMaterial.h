@@ -1,13 +1,13 @@
 #pragma once
 
-#include "..\Common.h"
-#include "..\Graphics.h"
+#include "../Common.h"
+#include "../Graphics.h"
 
 
 typedef struct CSamplerParam
 {
 	CConstantBuffer* m_pBuffer;
-	BOOL m_bInitalized;
+	BOOL m_bInitialized;
 } CModelMatrix;
 
 struct CSamplerParameterGroup

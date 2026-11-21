@@ -89,7 +89,9 @@
       <AdditionalLibraryDirectories>$(OutDir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
+      <!-- C4201 (nameless struct/union) and C4324 (padded for an alignment specifier) are notices about deliberate code: the SDK and math types use anonymous structs in unions, and aligned types are padded on purpose. -->
+      <DisableSpecificWarnings>4201;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <ShowIncludes>false</ShowIncludes>
       <Optimization>Disabled</Optimization>
       <FavorSizeOrSpeed>Neither</FavorSizeOrSpeed>
@@ -104,7 +106,9 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
+      <!-- C4201 (nameless struct/union) and C4324 (padded for an alignment specifier) are notices about deliberate code: the SDK and math types use anonymous structs in unions, and aligned types are padded on purpose. -->
+      <DisableSpecificWarnings>4201;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -131,7 +135,9 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release (Denuvo)|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
+      <!-- C4201 (nameless struct/union) and C4324 (padded for an alignment specifier) are notices about deliberate code: the SDK and math types use anonymous structs in unions, and aligned types are padded on purpose. -->
+      <DisableSpecificWarnings>4201;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -157,7 +163,9 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug (Denuvo)|x64'">
     <ClCompile>
       <PreprocessorDefinitions>DENUVO_STEAM_BUILD;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level4</WarningLevel>
+      <!-- C4201 (nameless struct/union) and C4324 (padded for an alignment specifier) are notices about deliberate code: the SDK and math types use anonymous structs in unions, and aligned types are padded on purpose. -->
+      <DisableSpecificWarnings>4201;4324;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <SupportJustMyCode>true</SupportJustMyCode>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -200,6 +208,7 @@
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="Version.h" />
+    <ClInclude Include="WinInclude.h" />
     <ClInclude Include="ReversedStructs.h" />
     <ClInclude Include="ReversedStructsDenuvo.h" />
     <ClInclude Include="ReversedStructsUnpacked.h" />

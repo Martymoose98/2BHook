@@ -1,7 +1,8 @@
 #pragma once
 
-#include "ImGui/imgui.h"
-#include "ImGui/imgui_internal.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_internal.h"
+
 #include "Math.h"
 #include "Utils.h"
 #include "Globals.h"
@@ -179,7 +180,7 @@ struct OverlayDrawList : public ImDrawList
 
 			R = ImRect(flLeft, flBottom, flRight, flTop);
 
-			AddRectCorners(flLeft, flBottom, flRight - flLeft, flTop - flBottom, flThickness, color);
+			AddRectCorners((int)flLeft, (int)flBottom, (int)(flRight - flLeft), (int)(flTop - flBottom), (int)flThickness, color);
 			//AddLine(ImVec2(left, bottom), ImVec2(left + flThickness, top), color, flThickness);
 			//AddLine(ImVec2(left, top), ImVec2(right, top), color, flThickness);
 			//AddLine(ImVec2(right, top), ImVec2(right, bottom), color, flThickness);
@@ -233,7 +234,10 @@ struct OverlayDrawList : public ImDrawList
 		int pxhealth = (height - ((height * health) / max_health));
 		ImColor col = ImColor(R, G, 0);
 
-		AddTextArgs(ImVec2((float)(x + 2), (float)(y + pxhealth)), col, FRF_LEFT | FRF_OUTLINE, "%i/%i HP", health, max_health);
+		// A named position: AddTextArgs moves it by the alignment, so it takes a reference
+		ImVec2 vTextPos((float)(x + 2), (float)(y + pxhealth));
+
+		AddTextArgs(vTextPos, col, FRF_LEFT | FRF_OUTLINE, "%i/%i HP", health, max_health);
 		AddRectFilled(ImVec2((float)(x - 4), (float)(y + pxhealth)), ImVec2((float)(x - 2), (float)(y + pxhealth + height - pxhealth + 1)), col);
 		AddRectBordered(x - 5, y - 1, 3, height + 2, 1, ImColor(0, 0, 0));
 	}

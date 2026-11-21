@@ -2,7 +2,7 @@
 
 Renderer* g_pRenderer = new Renderer();
 
-HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, ID3D11Buffer* pVertexBuffer)
+HRESULT Renderer::Initialize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, ID3D11Buffer* pVertexBuffer)
 {
 	if (!pDevice || !pDeviceContext || !pVertexBuffer)
 		return S_FALSE;
@@ -15,7 +15,7 @@ HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceC
 	return S_OK;
 }
 
-HRESULT Renderer::Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext) // this needs more shit
+HRESULT Renderer::Initialize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext) // this needs more shit
 {
 	HRESULT hr;
 	D3D11_BUFFER_DESC Desc;
@@ -281,6 +281,10 @@ void Renderer::DrawFilledRect(int x, int y, int width, int height, const Color& 
 
 void Renderer::DrawFilledRect(const RenderList& list, const Vector4& rect, const Color& color)
 {
+	UNREFERENCED_PARAMETER(list);
+	UNREFERENCED_PARAMETER(rect);
+	UNREFERENCED_PARAMETER(color);
+
 	//Vertex v[]
 	//{
 	//	{ rect.x,			rect.y,				0.f, color },

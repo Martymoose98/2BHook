@@ -1,6 +1,6 @@
 #pragma once
 
-#include "..\Common.h"
+#include "../Common.h"
 
 #include "CObj.h"
 
@@ -423,7 +423,8 @@ public:
 	ExActionState m_ActionState;						//0x00830  ExActionState (BehaviorExtension)
 	int32_t m_iHealth;									//0x00858
 	int32_t m_iMaxHealth;								//0x0085C
-	char _0x0860[36];									//0x00860 | Animation functions access a pointer here maybe ( Animation::Motion::Unit::NodeHandler::`vftable')
+	struct CEntityDataWork* m_pDataWork;				//0x00860 | its motions and data files (mot.h); BehaviorAppBase_PlayMotionNoWrap reads it
+	char _0x0868[28];									//0x00868
 	BYTE m_flags;										//0x00884 | 0x40 = no collision
 	char _0x0885[91];									//0x00885
 	ExWaypoint m_Waypoint;								//0x008E0 | ExWaypoint (BehaviorExtension)
@@ -445,6 +446,7 @@ public:
 };
 VALIDATE_OFFSET(CBehaviorAppBase, m_ActionState, 0x0830);
 VALIDATE_OFFSET(CBehaviorAppBase, m_iHealth, 0x0858);
+VALIDATE_OFFSET(CBehaviorAppBase, m_pDataWork, 0x0860);
 VALIDATE_OFFSET(CBehaviorAppBase, m_iOldAnimationId, 0x0990);
 VALIDATE_OFFSET(CBehaviorAppBase, m_LimitedTimeFlags, 0x09A8);
 VALIDATE_OFFSET(CBehaviorAppBase, m_Npc, 0x0A98);

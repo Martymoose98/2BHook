@@ -360,8 +360,15 @@ void CConsole::EnumConsoleData(void)
 	ImGui::EndChild();
 }
 
-void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
+// CRI's main error callback, installed by InitHooks. The game installs none, so without it every CRI
+// error and warning is counted and dropped. CriLogInternal returns what this returns, so it answers
+// the message, as ExcitedDelirium's NierCri_OnError does.
+const char* CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
-	if (Vars.Misc.bConsoleShowGameErrors)
+	UNREFERENCED_PARAMETER(a4);
+
+	if (Vars.Misc.bConsoleShowGameErrors && g_pConsole)
 		g_pConsole->Warn("%s\n", CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
+
+	return szFormat;
 }

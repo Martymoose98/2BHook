@@ -1,21 +1,22 @@
 #ifndef __REVERSEDSTRUCTSUNPACKED_H__
 #define __REVERSEDSTRUCTSUNPACKED_H__
 
+#include "WinInclude.h"
 #include <d3d11.h>
-#include <dxgi1_2.h>
 #include <dinput.h>
+#include <dxgi1_2.h>
+
 #include "SteamApi.h"
 #include "Math.h"
 
+#include "SDK/Common.h"
+#include "SDK/CSaveDataDevice.h"
+#include "SDK/CCamera.h"
 
-#include "SDK\Common.h"
-#include "SDK\CSaveDataDevice.h"
-#include "SDK\CCamera.h"
-
-#include "SDK\Entity\CBehavior.h"
-#include "SDK\Entity\Pl0000.h"
-#include "SDK\Entity\Pl0013.h"
-#include "SDK\Entity\Pl1010.h"
+#include "SDK/Entity/CBehavior.h"
+#include "SDK/Entity/Pl0000.h"
+#include "SDK/Entity/Pl0013.h"
+#include "SDK/Entity/Pl1010.h"
 
 
 #define _MM_RSHUFFLE(mask, x, y, z, w) \
@@ -360,7 +361,7 @@ struct CCollisionDataSegment
 struct CCollisionObjectName
 {
 	char* m_szName;
-	int32_t m_bInitalized;
+	int32_t m_bInitialized;
 };
 
 struct CCollisionTreeNode;
@@ -659,6 +660,46 @@ struct Sun
 	Vector4 m_vColor;		 //0x0040
 	float m_flBloom;		 //0x0044
 };
+
+// A light set: the lighting a room (or the active blend of two) is drawn with. Only the parts
+// Move Sun uses are named (ExcitedDelirium, LightManager.h; the same offsets in build 26534214).
+// Directional light i points towards {sin(az) sin(polar), cos(polar), cos(az) sin(polar)} from
+// m_DirAng[i] = {polar, azimuth} in degrees, so polar 0 is straight overhead. The sun is light
+// m_iActiveSlot.
+#define LIGHTSET_FLAG_SUN_TURNS_POLAR	0x01	// light 0's polar angle comes from g_flSunPolarDeg, which turns by m_DirAng[0][0] a tick
+#define LIGHTSET_FLAG_SUN_TURNS_AZIMUTH	0x80	// the same for its azimuth (g_flSunAzimuthDeg, m_DirAng[0][1])
+#define LIGHTSET_FLAGS_SUN_TURNS		(LIGHTSET_FLAG_SUN_TURNS_POLAR | LIGHTSET_FLAG_SUN_TURNS_AZIMUTH)
+
+struct CLightSetParams
+{
+	char _0x0000[16];					//0x0000
+	uint32_t m_uFlags;					//0x0010 | LIGHTSET_FLAG_*
+	char _0x0014[636];					//0x0014
+	float m_DirAng[8][2];				//0x0290 | {polar, azimuth} in degrees per directional light
+	char _0x02D0[456];					//0x02D0
+	uint8_t m_iActiveSlot;				//0x0498 | the directional light that is the sun
+	char _0x0499[11367];				//0x0499
+};
+VALIDATE_OFFSET(CLightSetParams, m_uFlags, 0x10);
+VALIDATE_OFFSET(CLightSetParams, m_DirAng, 0x290);
+VALIDATE_OFFSET(CLightSetParams, m_iActiveSlot, 0x498);
+VALIDATE_SIZE(CLightSetParams, 0x3100);
+
+// g_LightManager (0x14102B0F0). CLightManager::Update (0x140796170), from MainUpdateExec, rebuilds
+// every directional light's direction from m_ActiveLightSet.m_DirAng each frame.
+struct CLightManager
+{
+	void* m_pVtbl;						//0x00000
+	char _0x00008[8];					//0x00008
+	CLightSetParams m_ActiveLightSet;	//0x00010 | what is drawn; blended towards the bound set on a change
+	float m_DirLightDirLocal[8][3];		//0x03110 | the directions, towards each light
+	char _0x03170[557560];				//0x03170
+	CLightSetParams* m_pBoundLightSetPrev;	//0x8B368
+	CLightSetParams* m_pBoundLightSetCur;	//0x8B370 | the room's own set, which the active one comes from
+};
+VALIDATE_OFFSET(CLightManager, m_ActiveLightSet, 0x10);
+VALIDATE_OFFSET(CLightManager, m_DirLightDirLocal, 0x3110);
+VALIDATE_OFFSET(CLightManager, m_pBoundLightSetCur, 0x8B370);
 
 class CDialogWindow
 {
@@ -1081,7 +1122,7 @@ VALIDATE_OFFSET(CSceneStateSystem, m_States, 0x90);
 //max size 0xC0
 struct set_info_t
 {
-	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initalized to an identity 4x4 matrix
+	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initialized to an identity 4x4 matrix
 	Matrix4x4 m_mat;
 	Vector3Aligned m_vPosition;
 	Vector3Aligned m_vRotation;
@@ -1344,7 +1385,7 @@ public:
 	CCallback<CGameContentDeviceSteam, DlcInstalled_t, false> m_Callback;	//0x0008 | id is 1005
 	CallbackInstalled* m_pItems;											//0x0028
 	DWORD m_uItems;															//0x0030
-	BOOL m_bInitalized;														//0x0034
+	BOOL m_bInitialized;														//0x0034
 };
 VALIDATE_SIZE(CGameContentDeviceSteam, 56);
 
@@ -1582,7 +1623,7 @@ public:
 
 	//void* m_pVtable;		//0x00
 	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_Overlay; //0x08 id = 331
-	BOOL m_bInitalized;		//0x28
+	BOOL m_bInitialized;		//0x28
 	char pad2[4];			//0x2C
 	ISteamUser019* m_pUser;	//0x30
 	BOOL m_bOverlayActive;	//0x38

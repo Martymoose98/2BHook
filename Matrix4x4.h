@@ -2,6 +2,12 @@
 #include <ostream>
 #include <immintrin.h>
 
+// winnt.h's, for files that include this before Windows.h. The same definition, so winnt.h
+// coming later doesn't redefine it.
+#ifndef UNREFERENCED_PARAMETER
+#define UNREFERENCED_PARAMETER(P) (P)
+#endif
+
 #define _MM_BLEND(x, y, z, w) ((x) | ((y) << 1) | ((z) << 2) | ((w) << 3))
 
 class Vector3;
@@ -88,12 +94,12 @@ public:
 
 	inline Matrix4x4& operator*(const Matrix4x4& matrix);
 
-	Matrix4x4 Matrix4x4::operator+ (const Matrix4x4& m) const
+	Matrix4x4 Matrix4x4::operator+ (const Matrix4x4& matrix) const
 	{
-		__m128 R0 = _mm_add_ps(m0, m.m0);
-		__m128 R1 = _mm_add_ps(m1, m.m1);
-		__m128 R2 = _mm_add_ps(m2, m.m2);
-		__m128 R3 = _mm_add_ps(m3, m.m3);
+		__m128 R0 = _mm_add_ps(m0, matrix.m0);
+		__m128 R1 = _mm_add_ps(m1, matrix.m1);
+		__m128 R2 = _mm_add_ps(m2, matrix.m2);
+		__m128 R3 = _mm_add_ps(m3, matrix.m3);
 
 		return Matrix4x4(R0, R1, R2, R3);
 	}
@@ -181,6 +187,8 @@ inline void Matrix4x4::Transpose()
 
 inline void Matrix4x4::Rotate(const Vector3& v, float theta, Vector3& vRotate)
 {
+	UNREFERENCED_PARAMETER(theta);
+
 	/*float sin, cos;
 	Math::SinCos(theta, &sin, &cos);
 	vRotate = v * cos + (sin * (e x v)) + (1.f - cos) * (e dot v) * e;*/

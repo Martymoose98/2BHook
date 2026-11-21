@@ -1,8 +1,10 @@
 #ifndef __REVERSEDSTRUCTSDENUVO_H__
 #define __REVERSEDSTRUCTSDENUVO_H__
 
+#include "WinInclude.h"
 #include <d3d11.h>
 #include <dinput.h>
+
 #include "SteamApi.h"
 #include "Math.h"
 
@@ -437,7 +439,7 @@ struct CTargetTexture
 {
 	void* m_vtbl;
 	CTexture* m_pTexture;
-	BOOL m_bInitalized;
+	BOOL m_bInitialized;
 };
 
 struct CTextureBatch;
@@ -925,7 +927,7 @@ class CConstantBuffer
 typedef struct CSamplerParam
 {
 	CConstantBuffer* m_pBuffer;
-	BOOL m_bInitalized;
+	BOOL m_bInitialized;
 } CModelMatrix;
 
 struct CSamplerParameterGroup
@@ -2135,7 +2137,7 @@ struct CVertexBuffer
 {
 	void* m_pVtbl;
 	QWORD qword8;						//0x08
-	BOOL m_bInitalized;					//0x10
+	BOOL m_bInitialized;					//0x10
 	UINT m_uVertexSize;					//0x14
 	INT m_nVertices;					//0x18
 	char pad1c[12];						//0x1C
@@ -2148,7 +2150,7 @@ VALIDATE_SIZE(CVertexBuffer, 0x38);
 struct CIndexBuffer
 {
 	void* m_pVtbl;						//0x00
-	BOOL m_bInitalized;					//0x0C
+	BOOL m_bInitialized;					//0x0C
 	UINT m_uIndiceSize;					//0x08	
 	INT m_nIndices;						//0x10
 	char pad14[12];						//0x14
@@ -2536,9 +2538,9 @@ struct COtManager
 	BYTE gap94[4];							//0x94
 	COtManagerPtr98* m_ptr98;				//0x98
 	BYTE gapA0[4];							//0xA0
-	BOOL m_bGraphicListInitalized;			//0xA4
+	BOOL m_bGraphicListInitialized;			//0xA4
 };
-VALIDATE_OFFSET(COtManager, m_bGraphicListInitalized, 0xA4);
+VALIDATE_OFFSET(COtManager, m_bGraphicListInitialized, 0xA4);
 VALIDATE_SIZE(COtManager, 0xA8);
 
 // Size = 0xF0 (240) bytes
@@ -3095,7 +3097,7 @@ struct CSceneEntitySystem
 //max size 0xC0
 struct set_info_t
 {
-	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initalized to an indenity 4x4 matrix
+	// pretty sure all these vec 0 - 48 are just a mat4x4 -- it get initialized to an indenity 4x4 matrix
 	Matrix4x4 m_mat;
 	Vector3Aligned m_vPosition;
 	Vector3Aligned m_vRotation;
@@ -3383,7 +3385,7 @@ public:
 
 	//void* m_pVtable;		//0x00
 	CCallback<COsSystemDeviceSteam, GameOverlayActivated_t, false> m_overlay; //0x08 id = 331
-	BOOL m_bInitalized;		//0x28
+	BOOL m_bInitialized;		//0x28
 	char pad2[4];			//0x2C
 	ISteamUser019* m_pUser;	//0x30
 	BOOL m_bOverlayActive;	//0x38

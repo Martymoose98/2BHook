@@ -1,5 +1,6 @@
 #pragma once
-#include <Windows.h>
+#include "WinInclude.h"
+
 #include <stdio.h>
 
 //#define VERBOSE		// Useless TODO and FIXME marcos superceeded by vs tasklist
@@ -187,7 +188,7 @@ public:
 	{
 		CONSOLE_SCREEN_BUFFER_INFO csbi;
 		GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (csbi.wAttributes & 0xFF00) | Foreground | (Background << 4));
+		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (WORD)((csbi.wAttributes & 0xFF00) | Foreground | (Background << 4)));
 	}
 
 	static void GetConsoleColors(enum ConsoleColors& Foreground, enum ConsoleColors& Background)

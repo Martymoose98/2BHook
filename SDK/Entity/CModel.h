@@ -1,9 +1,9 @@
 #ifndef __CMODEL_H__
 #define __CMODEL_H__
 
-#include "..\Common.h"
-#include "..\wmb.h"
-#include "..\Graphics\CMaterial.h"
+#include "../Common.h"
+#include "../wmb.h"
+#include "../Graphics/CMaterial.h"
 
 // defines for bone ids
 #define BONE_ROOT		4094
@@ -564,7 +564,7 @@ struct CCameraDevice
 struct __declspec(align(16)) CVertexLayoutEntry
 {
 	CVertexLayout* m_pVertex;
-	BOOL m_bInitalized;
+	BOOL m_bInitialized;
 };
 
 //size of struct is 0x110 (272) bytes

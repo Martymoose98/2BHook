@@ -1,6 +1,7 @@
 #include "Menu.h"
 #include "MaterialTint.h"
 #include "SpawnList.h"
+#include "mot.h"
 
 CMenu* g_pMenu;
 
@@ -22,6 +23,8 @@ namespace
 
 		virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) override
 		{
+			UNREFERENCED_PARAMETER(cchValue);
+
 			m_Preset = Theme::PresetFromKey(szValue);
 		}
 
@@ -52,6 +55,8 @@ namespace
 
 		virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) override
 		{
+			UNREFERENCED_PARAMETER(cchValue);
+
 			ImVec4 Color;
 
 			if (Theme::ParseColor(szValue, Color))
@@ -525,6 +530,113 @@ void CMenu::GameplayTab(Pl0000* pCameraEnt)
 		ImGui::Checkbox("Model Gravity", (bool*)&pCameraEnt->m_VerticalCollision.m_bEnabled);
 }
 
+// Visuals > Motion: play one of the camera entity's own motions, or a .mot from disk, through the
+// game's motion system (MotionPlayer, mot.h)
+static void MotionPlayerUI(CBehaviorAppBase* pEntity)
+{
+	static std::vector<MotionPlayer::EntityMotion_t> s_Motions;
+	static int s_iSelected = 0;
+	static char s_szPath[MAX_PATH] = {};
+	static char s_szError[256] = {};
+	static int s_iSlot = 0;
+	static float s_flBlend = 10.0f;
+	static float s_flRate = 1.0f;
+	static bool s_bLoop = true;
+
+	if (!MotionPlayer::IsAvailable())
+	{
+		ImGui::TextDisabled("Not available on this game build.");
+		return;
+	}
+
+	if (!pEntity || !pEntity->m_pDataWork)
+	{
+		ImGui::TextDisabled("The camera entity has no motions.");
+		return;
+	}
+
+	ImGui::SliderInt("Motion Slot", &s_iSlot, 0, 3, "%d", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::DragFloat("Blend In", &s_flBlend, 0.5f, 0.0f, 60.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::DragFloat("Rate", &s_flRate, 0.01f, -4.0f, 4.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+	ImGui::Checkbox("Loop", &s_bLoop);
+
+	ImGui::Separator();
+
+	// The list is read from the entity's DATs each frame the header is open: the camera can move
+	// to another entity, and a DAT can be unloaded
+	MotionPlayer::GetEntityMotions(pEntity, s_Motions);
+
+	if (s_Motions.empty())
+	{
+		ImGui::TextDisabled("No .mot files in its DATs.");
+	}
+	else
+	{
+		s_iSelected = min(max(s_iSelected, 0), (int)s_Motions.size() - 1);
+
+		if (ImGui::BeginCombo("Its Motions", s_Motions[s_iSelected].m_szName))
+		{
+			for (int i = 0; i < (int)s_Motions.size(); ++i)
+			{
+				ImGui::PushID(i);
+
+				if (ImGui::Selectable(s_Motions[i].m_szName, i == s_iSelected))
+					s_iSelected = i;
+
+				ImGui::PopID();
+			}
+
+			ImGui::EndCombo();
+		}
+
+		const MotHeader* pSelected = s_Motions[s_iSelected].m_pMot;
+
+		// From the header; the frame rate byte is 0 for the game's 60
+		ImGui::TextDisabled("%d frames, %u curves", pSelected->sFrameCount, pSelected->uRecordCount);
+
+		if (ImGui::Button("Play"))
+			MotionPlayer::RequestPlay(pEntity, s_Motions[s_iSelected].m_pMot, s_Motions[s_iSelected].m_szName, s_iSlot, s_flBlend, s_flRate, s_bLoop);
+	}
+
+	ImGui::InputText("Motion File", s_szPath, sizeof(s_szPath));
+
+	if (ImGui::Button("Load And Play"))
+	{
+		s_szError[0] = '\0';
+
+		MotHeader* pMot = MotionPlayer::LoadFromDisk(s_szPath, s_szError, sizeof(s_szError));
+
+		if (pMot)
+		{
+			const char* szName = strrchr(s_szPath, '\\');
+			MotionPlayer::RequestPlay(pEntity, pMot, szName ? szName + 1 : s_szPath, s_iSlot, s_flBlend, s_flRate, s_bLoop);
+		}
+	}
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("A .mot made for this model's skeleton. It stays loaded until 2BHook unloads.");
+
+	ImGui::SameLine();
+
+	if (ImGui::Button("Stop"))
+		MotionPlayer::RequestStop(pEntity, s_iSlot, s_flBlend);
+
+	if (s_szError[0])
+		ImGui::TextColored(ImVec4(0.9f, 0.3f, 0.2f, 1.0f), "%s", s_szError);
+
+	switch (int iResult = MotionPlayer::GetLastResult())
+	{
+	case MotionPlayer::MOTIONPLAYER_PENDING:
+		ImGui::TextDisabled("Waiting for the entity's next update...");
+		break;
+	case -1:
+		break;
+	default:
+		ImGui::TextDisabled("Playing (handle %d).", iResult);
+		break;
+	}
+}
+
 void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 {
 	ImGui::Checkbox("Wireframe", &Vars.Misc.bWireframe);
@@ -533,9 +645,22 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 
 	ImGui::Checkbox("Chams", &Vars.Visuals.bChams);
 
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Enemies through walls: red where something is in front of them, green where they can be seen.");
+
+	ImGui::SameLine();
+
+	ImGui::Checkbox("NPC Chams", &Vars.Visuals.bNPCChams);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("NPCs and Emil the same way, in blue (hidden) and cyan (seen).");
+
 	ImGui::SameLine();
 
 	ImGui::Checkbox("Use Shader", (bool*)&Vars.Visuals.iChamType);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Flat colours. Without it the game's own shading is kept, with the colour as the texture.");
 
 	ImGui::SameLine();
 
@@ -558,6 +683,26 @@ void CMenu::VisualsTab(CBehaviorAppBase* pCameraEnt)
 	ImGui::DragFloat("Camera Fov", &Vars.Visuals.flFov, 1.0f, 20.0f, 179.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
 
 	ImGui::Separator();
+
+	// Ticking it starts from where the sun is, so nothing jumps; Features::MoveSun holds it there
+	if (ImGui::Checkbox("Move Sun", &Vars.Visuals.bMoveSun) && Vars.Visuals.bMoveSun)
+		Features::GetSunAngles(&Vars.Visuals.flSunElevation, &Vars.Visuals.flSunAzimuth);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Holds the sun, and the light and shadows it casts, at the angles below.");
+
+	if (Vars.Visuals.bMoveSun)
+	{
+		// Below the horizon the scene is lit from underneath; the game's own suns stay above it
+		ImGui::SliderFloat("Sun Elevation", &Vars.Visuals.flSunElevation, -90.0f, 90.0f, "%.1f deg", ImGuiSliderFlags_AlwaysClamp);
+		ImGui::SliderFloat("Sun Azimuth", &Vars.Visuals.flSunAzimuth, 0.0f, 360.0f, "%.1f deg", ImGuiSliderFlags_AlwaysClamp);
+	}
+
+	ImGui::Separator();
+
+	if (ImGui::CollapsingHeader("Motion"))
+		MotionPlayerUI(pCameraEnt);
+
 	//ImGui::Checkbox("Display Emil Info", &Vars.Visuals.bEmilInfo);
 
 	ApplyModelMods(static_cast<Pl0000*>(pCameraEnt));
@@ -1085,6 +1230,36 @@ void CMenu::MiscTab(void)
 	if (!bUIElementAvailable)
 		ImGui::SetItemTooltip("Not available on this game build.");
 
+	ImGui::Separator();
+
+	// Read from default.xml when the game starts (HeapScale::InstallEarly), so save the config after changing it
+	Vars.Misc.iHeapScale = min(max(Vars.Misc.iHeapScale, 1), HeapScale::MAX_SCALE);
+	ImGui::SliderInt("Heap Scale", &Vars.Misc.iHeapScale, 1, HeapScale::MAX_SCALE, "%dx", ImGuiSliderFlags_AlwaysClamp);
+
+	if (ImGui::IsItemHovered())
+		ImGui::SetTooltip("Multiplies the size of every game memory heap, for loading more than a map plans for.\n"
+			"Takes effect the next time the game starts, from the saved default config, and only with\n"
+			"2BHook in the mods folder: it has to be loaded before the game makes its heaps.\n"
+			"The game's heaps are about 4.4 GB, and each step adds that much again.");
+
+	switch (HeapScale::GetStatus())
+	{
+	case HeapScale::HEAPSCALE_APPLIED:
+		ImGui::TextDisabled("Heaps made %dx bigger at startup.", HeapScale::GetScale());
+		break;
+	case HeapScale::HEAPSCALE_TOO_LATE:
+		ImGui::TextDisabled("Not applied: 2BHook was loaded after the game made its heaps.");
+		break;
+	case HeapScale::HEAPSCALE_NOT_FOUND:
+		ImGui::TextDisabled("Not applied: not found in this game build.");
+		break;
+	default:
+		ImGui::TextDisabled("The game's own heap sizes.");
+		break;
+	}
+
+	ImGui::Separator();
+
 	// new test shit
 	ImGui::InputInt("Debug Flags", (int*)g_pDebugFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
 	ImGui::InputInt("Camera Flags", (int*)g_pCameraFlags, 1, 100, ImGuiInputTextFlags_CharsHexadecimal);
@@ -1104,7 +1279,7 @@ void CMenu::ConfigTab(void)
 	{
 		CConfigItemXml<CKeybind>* pItem = static_cast<CConfigItemXml<CKeybind>*>(it->second);
 		CKeybind& Keybind = pItem->GetValue();
-		const KeyOrdinal* pKey = FindKeyOrdinal(Keybind.GetKeycode());
+		const KeyOrdinal* pKey = FindKeyOrdinal((USHORT)Keybind.GetKeycode());
 
 		if (pKey)
 		{
@@ -1400,12 +1575,12 @@ void CMenu::DisplayEntityHandles(void)
 	// An entry counts as live the way GetEntityInfoFromHandle tests it.
 	std::vector<uint32_t> EntitySlots;
 
-	for (uint32_t i = 0; i < g_pEntityList->m_uItems; ++i)
+	for (uint32_t uSlot = 0; uSlot < g_pEntityList->m_uItems; ++uSlot)
 	{
-		const CEntityInfo* pInfo = g_pEntityList->m_pItems[i].second;
+		const CEntityInfo* pInfo = g_pEntityList->m_pItems[uSlot].second;
 
 		if (pInfo && !(pInfo->m_Flags & 3))
-			EntitySlots.push_back(i);
+			EntitySlots.push_back(uSlot);
 	}
 
 	ImGui::ListBox("Entity View", &Vars.Gameplay.iSelectedEntityHandle, &EntityCallback, &EntitySlots, (int)EntitySlots.size());
@@ -1664,9 +1839,17 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::SameLine();
 
-	if (!Vars.Gameplay.bRainbowModel)
+	// The model's own colour (w is its alpha), edited in place like the mesh colour beside it. This
+	// used to edit Vars.Gameplay.vModelTint, which nothing read. The game leaves it white: its only
+	// setter, CModelInfo_SetColor (0x140198C00), is called by the Esp103 effect alone. A change
+	// needs MODELINFO_FLAG_TINT_DIRTY, which CModelWork_Update (0x140196620) tests to pass the
+	// colour on to the model's draw entries (see Features::SetModelAlpha), so every edit raises it.
+	CModelInfo* pModelInfo = pEntity->m_pModelInfo;
+
+	if (!Vars.Gameplay.bRainbowModel && pModelInfo)
 	{
-		ImGui::ColorPicker4("Model Tint Color", (float*)&Vars.Gameplay.vModelTint);
+		if (ImGui::ColorPicker4("Model Tint Color", (float*)&pModelInfo->m_vTint))
+			pModelInfo->m_uFlags |= MODELINFO_FLAG_TINT_DIRTY;
 	}
 
 	ImGui::PopItemWidth();

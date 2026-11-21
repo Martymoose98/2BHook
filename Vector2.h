@@ -1,6 +1,7 @@
 #pragma once
 #include <ostream>
-#include "ImGui/imgui.h"
+
+#include "imgui/imgui.h"
 
 class Vector2
 {

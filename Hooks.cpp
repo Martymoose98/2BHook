@@ -87,6 +87,8 @@ std::unordered_map<void*, CPl0000Hook*> g_pHookedEntities;
 // WIP
 void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 {
+	UNREFERENCED_PARAMETER(pThis);
+
 	typedef __int64 (*OriginalFn)(CModelShaderModule*, CModelEntryData*);
 	typedef __int64 (*Original2Fn)(CModelShaderModule*, CModelShader*, CModelExtendWork*);
 	//((OriginalFn)m_shaderhook.GetFunctionAddress(3))(pThis, pData);
@@ -143,6 +145,211 @@ void CModelShaderModule_Draw(CModelShaderModule* pThis, CModelEntryData* pData)
 	//}
 }
 
+// Chams, an ESP: enemies (Chams) and NPCs (NPC Chams) drawn in one colour where something is in front
+// of them and another where they can be seen, red and green for enemies, blue and cyan for NPCs.
+// hkDrawIndexed draws each of their draws twice in place of the game's: the hidden colour with the
+// depth test off, then the seen colour with the game's own depth state. "Use Shader" colours them
+// with a flat pixel shader; without it the game's shader runs with a colour texture in its first
+// texture slot, so the model is still lit. The camera entity is left alone.
+//
+// Their draws are told apart by their models' index buffers, which UpdateChamsTargets gathers once
+// a frame. Each vertex group of a model has one (CModelDrawData::m_pVertexGroups), and
+// CGraphicContextDx11_SetIndexBuffer (0x1402563C0) binds its D3D buffer with m_uIndexStart added to
+// every draw's start index, so a draw is the model's when it reads that buffer within
+// [m_uIndexStart, m_uIndexStart + m_nIndices). Enemies of one kind share a model, so its ranges are
+// gathered once. A model's non-instanced draws go through
+// CGraphicContextDx11_DrawIndexed (0x140256DD0, context slot 46; R_DrawMesh in ExcitedDelirium),
+// which flushes the game's state cache and then calls ID3D11DeviceContext::DrawIndexed, so
+// hkDrawIndexed sees the state the game draws with.
+//
+// This used to replace slot 46 of the game's context and call Denuvo-build addresses, and was only
+// installed in Debug builds of that version, so the checkboxes did nothing on v1.02 and 26534214.
+enum ChamsType_t
+{
+	CHAMS_NONE = -1,
+	CHAMS_ENEMY,
+	CHAMS_NPC,
+};
+
+struct ChamsRange_t
+{
+	ID3D11Buffer* m_pBuffer;	// only compared, never used
+	UINT m_uFirst;
+	UINT m_uEnd;
+	ChamsType_t m_Type;
+};
+
+static ChamsRange_t s_ChamsRanges[256];
+static int s_nChamsRanges;
+
+// The index ranges of one entity's model, once each
+static void AddChamsTargets(const CModelWork* pWork, ChamsType_t Type)
+{
+	if (!pWork || !pWork->m_pModelData)
+		return;
+
+	const CModelDrawData* pDrawData = pWork->m_pModelData->m_pDrawData;
+
+	if (!pDrawData || !pDrawData->m_pVertexGroups)
+		return;
+
+	for (int i = 0; i < pDrawData->m_nVertexGroups; ++i)
+	{
+		const CIndexBuffer* pIndices = pDrawData->m_pVertexGroups[i].m_pIndexBuffer;
+
+		if (!pIndices || !pIndices->m_pInfo || !pIndices->m_pInfo->m_pBuffer || pIndices->m_nIndices <= 0)
+			continue;
+
+		ChamsRange_t Range = { pIndices->m_pInfo->m_pBuffer, pIndices->m_uIndexStart,
+			pIndices->m_uIndexStart + (UINT)pIndices->m_nIndices, Type };
+
+		bool bKnown = false;
+
+		for (int j = 0; j < s_nChamsRanges && !bKnown; ++j)
+			bKnown = s_ChamsRanges[j].m_pBuffer == Range.m_pBuffer && s_ChamsRanges[j].m_uFirst == Range.m_uFirst &&
+				s_ChamsRanges[j].m_uEnd == Range.m_uEnd;
+
+		if (!bKnown && s_nChamsRanges < (int)ARRAYSIZE(s_ChamsRanges))
+			s_ChamsRanges[s_nChamsRanges++] = Range;
+	}
+}
+
+// Once a frame from hkPresent, on the thread that draws: the living enemies (through the game's
+// enemy lookup, as Display Enemy Info), the NPCs and Emil (through the untyped one, as Display
+// NPC Info)
+static void UpdateChamsTargets(void)
+{
+	s_nChamsRanges = 0;
+
+	if (Vars.Visuals.bChams && g_pEnemyManager && GetEntityFromHandle)
+	{
+		for (size_t i = 0; i < g_pEnemyManager->m_handles.m_Count; ++i)
+		{
+			CBehaviorAppBase* pEnemy = GetEntityFromHandle(&g_pEnemyManager->m_handles.m_pItems[i]);
+
+			if (pEnemy && pEnemy->m_iHealth > 0)
+				AddChamsTargets(&pEnemy->m_Work, CHAMS_ENEMY);
+		}
+	}
+
+	if (Vars.Visuals.bNPCChams && g_pNPCManager)
+	{
+		for (size_t i = 0; i < g_pNPCManager->m_handles.m_Count; ++i)
+		{
+			CBehaviorAppBase* pNPC = GetEntityFromHandleGlobal(&g_pNPCManager->m_handles.m_pItems[i]);
+
+			if (pNPC)
+				AddChamsTargets(&pNPC->m_Work, CHAMS_NPC);
+		}
+
+		CBehaviorAppBase* pEmil = g_pEmilHandle ? GetEntityFromHandleGlobal(g_pEmilHandle) : NULL;
+
+		if (pEmil)
+			AddChamsTargets(&pEmil->m_Work, CHAMS_NPC);
+	}
+}
+
+// Which chams a draw gets, from the index buffer and range it reads, or CHAMS_NONE
+static ChamsType_t GetChamsType(ID3D11DeviceContext* pContext, UINT IndexCount, UINT StartIndexLocation)
+{
+	ID3D11Buffer* pIndexBuffer = NULL;
+	DXGI_FORMAT Format;
+	UINT uOffset;
+
+	pContext->IAGetIndexBuffer(&pIndexBuffer, &Format, &uOffset);
+
+	if (!pIndexBuffer)
+		return CHAMS_NONE;
+
+	pIndexBuffer->Release();	// only its address is compared
+
+	for (int i = 0; i < s_nChamsRanges; ++i)
+	{
+		const ChamsRange_t* pRange = &s_ChamsRanges[i];
+
+		if (pRange->m_pBuffer == pIndexBuffer && StartIndexLocation >= pRange->m_uFirst &&
+			StartIndexLocation + IndexCount <= pRange->m_uEnd)
+			return pRange->m_Type;
+	}
+
+	return CHAMS_NONE;
+}
+
+// Draws one of a model's draws in its chams colours in place of the game's. False, with nothing
+// drawn, for a draw without a pixel shader or a colour target: the shadow and depth passes, which
+// are left to the game.
+static bool DrawChams(ID3D11DeviceContext* pContext, ChamsType_t Type, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
+{
+	ID3D11PixelShader* pShader = NULL;
+	ID3D11RenderTargetView* pTarget = NULL;
+
+	pContext->PSGetShader(&pShader, NULL, NULL);
+	pContext->OMGetRenderTargets(1, &pTarget, NULL);
+
+	const bool bColourPass = pShader && pTarget;
+
+	if (pTarget)
+		pTarget->Release();
+
+	if (!bColourPass)
+	{
+		if (pShader)
+			pShader->Release();
+
+		return false;
+	}
+
+	ID3D11DepthStencilState* pDepthState = NULL;
+	ID3D11ShaderResourceView* pTexture = NULL;
+	UINT uStencilRef = 0;
+	const bool bUseShader = Vars.Visuals.iChamType != 0;
+	const bool bNPC = Type == CHAMS_NPC;
+	ID3D11PixelShader* pHiddenShader = bNPC ? g_pBlue : g_pRed;
+	ID3D11PixelShader* pSeenShader = bNPC ? g_pCyan : g_pGreen;
+	ID3D11ShaderResourceView* pHiddenTexture = bNPC ? g_pBlueSRV : g_pRedSRV;
+	ID3D11ShaderResourceView* pSeenTexture = bNPC ? g_pCyanSRV : g_pGreenSRV;
+
+	pContext->OMGetDepthStencilState(&pDepthState, &uStencilRef);
+	pContext->PSGetShaderResources(0, 1, &pTexture);
+
+	// Hidden: no depth test and no depth write
+	pContext->OMSetDepthStencilState(g_pDepthStencilStates[DISABLED], uStencilRef);
+
+	if (bUseShader)
+		pContext->PSSetShader(pHiddenShader, NULL, 0);
+	else
+		pContext->PSSetShaderResources(0, 1, &pHiddenTexture);
+
+	oDrawIndexed(pContext, IndexCount, StartIndexLocation, BaseVertexLocation);
+
+	// Seen: the game's own depth state
+	pContext->OMSetDepthStencilState(pDepthState, uStencilRef);
+
+	if (bUseShader)
+		pContext->PSSetShader(pSeenShader, NULL, 0);
+	else
+		pContext->PSSetShaderResources(0, 1, &pSeenTexture);
+
+	oDrawIndexed(pContext, IndexCount, StartIndexLocation, BaseVertexLocation);
+
+	// Put back what the game bound. Its state cache (CGraphicsRenderContext_PreRender, 0x1402554F0)
+	// only binds what it has changed, so anything left here would carry over to its next draws.
+	pContext->PSSetShader(pShader, NULL, 0);
+	pContext->PSSetShaderResources(0, 1, &pTexture);
+
+	if (pDepthState)
+		pDepthState->Release();
+
+	if (pTexture)
+		pTexture->Release();
+
+	pShader->Release();
+
+	return true;
+}
+
+// The old Chams, kept for reference: it replaced slot 46 of the game's graphics context with
+// Denuvo-build addresses and is only installed in Debug builds of that version (hkPresent).
 BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 {
 	ID3D11RasterizerState* pRS;
@@ -161,7 +368,7 @@ BOOL DrawIndexedPrimitive(CGraphicContextDx11* pThis, RenderInfo* pInfo)
 		{
 			CBatch* pBatch = &pDrawData->m_pBatches[i];
 
-			if (pInfo->m_uVertexCount == pBatch->m_nVertices && pInfo->m_uIndexCountPerInstance == pBatch->m_nPrimitives)
+			if (pInfo->m_uVertexCount == (UINT)pBatch->m_nVertices && pInfo->m_uIndexCountPerInstance == (UINT)pBatch->m_nPrimitives)
 			{
 				bChams = TRUE;
 				break;
@@ -237,6 +444,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	g_pLocalPlayer = static_cast<Pl0000*>(GetEntityFromHandle2(g_pLocalPlayerHandle));
 
 	Pl0000* pCameraEnt = static_cast<Pl0000*>(g_pCamera->m_pCamEntity);
+
+	UpdateChamsTargets();
 
 #if defined(_DEBUG) && defined(DENUVO_STEAM_BUILD)
 
@@ -421,6 +630,7 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	Features::ApplyCreatedEntity();
 	Features::ReleaseDeadSpawnRequests();
 	Features::ApplyNoCollision(g_pCamera->m_pCamEntity);
+	Features::MoveSun();
 	Features::ApplyHidePod(g_pCamera->m_pCamEntity);
 
 	Features::ApplyHealthMods();
@@ -505,6 +715,11 @@ HRESULT hkCreateSwapChain(IDXGIFactory* pThis, IUnknown* pDevice, DXGI_SWAP_CHAI
 
 HRESULT hkCreateSwapChainForHwnd(IDXGIFactory2* pThis, IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
+	UNREFERENCED_PARAMETER(pThis);
+	UNREFERENCED_PARAMETER(pDevice);
+	UNREFERENCED_PARAMETER(pDesc);
+	UNREFERENCED_PARAMETER(ppSwapChain);
+
 	return E_NOTIMPL;
 }
 
@@ -555,6 +770,14 @@ void hkDrawIndexed(ID3D11DeviceContext* pThis, UINT IndexCount, UINT StartIndexL
 
 	if (Vars.Misc.bWireframe && Strides[0] == 28)
 		g_pDeviceContext->RSSetState(g_pRenderWireframeState); // wireframe
+
+	if (s_nChamsRanges)
+	{
+		ChamsType_t Type = GetChamsType(pThis, IndexCount, StartIndexLocation);
+
+		if (Type != CHAMS_NONE && DrawChams(pThis, Type, IndexCount, StartIndexLocation, BaseVertexLocation))
+			return;
+	}
 
 	oDrawIndexed(pThis, IndexCount, StartIndexLocation, BaseVertexLocation);
 }
@@ -647,8 +870,8 @@ HRESULT hkMouseGetDeviceState(IDirectInputDevice8A* pThis, DWORD cbData, LPVOID 
 	}
 	else if (pState)
 	{
-		Vars.Misc.flDeltaX = pState->lX;
-		Vars.Misc.flDeltaY = pState->lY;
+		Vars.Misc.flDeltaX = (float)pState->lX;
+		Vars.Misc.flDeltaY = (float)pState->lY;
 	}
 
 	g_pMouseHook->Rehook();
@@ -953,7 +1176,7 @@ CModelShaderModule* hkCreateModelShaderModule(CModelAnalyzer* pThis, CModelShade
 {
 	// Changes the shader vvv causes artifacts
 	//pShader->m_pMaterial->m_szShaderName = "CLT00_XXXXX";
-	CTextureDescription Desc;
+	[[maybe_unused]] CTextureDescription Desc;
 
 #if 0
 	static CTargetTexture* pTex = CreateTextureR("C:\\Users\\marty\\source\\repos\\2B Hook\\2B Hook\\Kim Jong Un Flood.dds", Desc);
@@ -1019,9 +1242,6 @@ void hkPl0000Update(Pl0000* pThis)
 	//CGraphicCommand* pCmd = GetGraphicCommand(176);
 	//pThis->m_Work.m_pModelShaders->m_pShader->Draw(pThis->m_Work.m_pModelData->m_pDrawData);
 
-	// kind of gloss glow
-	//pThis->m_pModelInfo->m_vTint = Vars.Gameplay.vModelTint;
-
 	for (int i = 0; i < CPl0000Hook::TrackedMeshes(&pThis->m_Work); ++i)
 	{
 		pThis->m_Work.m_pMeshes[i].m_bShow = pHook->m_bMeshShow[i];
@@ -1034,6 +1254,8 @@ void hkPl0000Update(Pl0000* pThis)
 // TODO: new hook doesn't need last param and shadow space in thunk
 void* hkCreateEntity(CSceneEntitySystemUnk* pUnknown, CEntityInfo* pInfo, uint32_t uObjectId, int32_t iGroupId, CHeapInfo* pHeapInfo)
 {
+	UNREFERENCED_PARAMETER(pHeapInfo);
+
 	CConstructionInfo<void>* pConstruct = GetConstructionInfo(uObjectId);
 	void* pEntity = NULL;
 
@@ -1154,6 +1376,10 @@ BOOL hkLoadWordBlacklist(CBannedWordChecker* pThis, __int64 thisrdx, QWORD* this
 
 	return TRUE;
 #endif
+
+	UNREFERENCED_PARAMETER(thisrdx);
+	UNREFERENCED_PARAMETER(thisr8);
+	UNREFERENCED_PARAMETER(szBlacklistName);
 
 	Features::DisableWordBlacklist(pThis, NULL);
 	return TRUE;
@@ -1291,7 +1517,7 @@ LPTOP_LEVEL_EXCEPTION_FILTER hkSetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION
 {
 	if (lpTopLevelExceptionFilter != &UnhandledExceptionHandler)
 	{
-		auto& it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
+		auto it = std::find(g_pExceptionHandlers.cbegin(), g_pExceptionHandlers.cend(), lpTopLevelExceptionFilter);
 
 		if (it == g_pExceptionHandlers.cend())
 			g_pExceptionHandlers.push_back(lpTopLevelExceptionFilter);

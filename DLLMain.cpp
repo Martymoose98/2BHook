@@ -3,18 +3,16 @@
 // further down left them as no-ops in Release (no SHA256 or failure messages).
 #define VERBOSE
 
-#include <Windows.h>
-#include <VersionHelpers.h>
+#include "WinInclude.h"
 #include <d3d11.h>
+#include <VersionHelpers.h>
 
 #include <iostream>
 
-#include <Fluorine\Memory.h>
-#include <Fluorine\VirtualTableHook.h>
-#include <Fluorine\ImportTableHook.h>
-
-#include <Fluorine\ExportUtil.h>
-
+#include <Fluorine/ExportUtil.h>
+#include <Fluorine/ImportTableHook.h>
+#include <Fluorine/Memory.h>
+#include <Fluorine/VirtualTableHook.h>
 
 #include "cpk.h"
 #include "mot.h"
@@ -158,7 +156,7 @@ void InitHooks(void)
 	// Also, forget what this does but it's not critical for the dll's operation.
 	// If I do keep I need to resig the new version
 #ifdef DENUVO_STEAM_BUILD
-	InitalizeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
+	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "0F 29 22 49 8B CE"), 12);
 #else
 	InitializeNopMemory(&nop_HairColor, (void*)FindPattern(NULL, "E8 ? ? ? ? 44 89 6B 68"), 9);
 #endif
@@ -168,6 +166,37 @@ void InitHooks(void)
 	// Per-material colours (issue #16); disables itself if a signature is missing
 	MaterialTint::Init();
 #endif
+
+	// Play a .mot (Visuals > Motion); off when its signatures aren't found
+	if (!MotionPlayer::Initialize())
+		WARN("Motion player: not found in this game build.\n");
+
+	// Show Game Errors. The game never installs a CRI error callback, so CriLogInternal counts every
+	// CRI error and warning and drops it. Only into an empty slot, so another mod's stays.
+	if (CRIMainCallbackLog)
+		InterlockedCompareExchangePointer((PVOID*)CRIMainCallbackLog, (PVOID)&CRILogCallbackConsole, NULL);
+}
+
+// A 1x1 texture of one colour (0xAABBGGRR) and its view, for Chams without "Use Shader"
+static HRESULT CreateColorTexture(uint32_t uColor, ID3D11ShaderResourceView** ppView)
+{
+	D3D11_SUBRESOURCE_DATA Data = { &uColor, sizeof(uColor), 0 };
+	D3D11_TEXTURE2D_DESC Desc = {};
+	Desc.Width = Desc.Height = Desc.MipLevels = Desc.ArraySize = 1;
+	Desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+	Desc.SampleDesc.Count = 1;
+	Desc.Usage = D3D11_USAGE_IMMUTABLE;
+	Desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+	ID3D11Texture2D* pTexture = NULL;
+	HRESULT hr = g_pDevice->CreateTexture2D(&Desc, &Data, &pTexture);
+
+	if (FAILED(hr))
+		return hr;
+
+	hr = g_pDevice->CreateShaderResourceView(pTexture, NULL, ppView);
+	pTexture->Release();
+	return hr;
 }
 
 HRESULT CreateRenderTarget(void)
@@ -337,7 +366,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LERROR("2B Hook Failed Initalization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
+		LERROR("2B Hook Failed Initialization!\nCould not obtain a ID3D11Device pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -345,7 +374,7 @@ HRESULT InitD3D11(void)
 
 	if (FAILED(hr))
 	{
-		LERROR("2B Hook Failed Initalization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
+		LERROR("2B Hook Failed Initialization!\nCould not obtain a IDXGIFactory pointer! HRESULT %x\n", hr);
 		return hr;
 	}
 
@@ -355,13 +384,13 @@ HRESULT InitD3D11(void)
 
 	if (!ImGui_ImplDX11_Init(g_pDevice, g_pDeviceContext) || !ImGui_ImplWin32_Init(g_hWnd))
 	{
-		LERROR("2B Hook Failed Initalization!\nCould not initalize ImGui!\n");
+		LERROR("2B Hook Failed Initialization!\nCould not initialize ImGui!\n");
 		return S_FALSE;
 	}
 
 	if (!ImGui_ImplDX11_CreateDeviceObjects())
 	{
-		LERROR("2B Hook Failed Initalization!\nCould not create device objects!\n");
+		LERROR("2B Hook Failed Initialization!\nCould not create device objects!\n");
 		return S_FALSE;
 	}
 
@@ -470,6 +499,12 @@ HRESULT InitD3D11(void)
 	GeneratePixelShader(g_pDevice, &g_pRed, 1.0f, 0.0f, 0.0f);
 	GeneratePixelShader(g_pDevice, &g_pGreen, 0.0f, 1.0f, 0.0f);
 
+	// NPC Chams' colours
+	GeneratePixelShader(g_pDevice, &g_pBlue, 0.0f, 0.3f, 1.0f);
+	GeneratePixelShader(g_pDevice, &g_pCyan, 0.0f, 1.0f, 1.0f);
+	CreateColorTexture(0xFFFF4D00, &g_pBlueSRV);
+	CreateColorTexture(0xFFFFFF00, &g_pCyanSRV);
+
 	return S_OK;
 }
 
@@ -496,7 +531,7 @@ void ExposeHiddenXInputFunctions(void)
 void LogOffsets(void)
 {
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "[Function Pointers]");
-	LOG_OFFSET("CRILogCallback", CRILogCallback);
+	LOG_OFFSET("CriMainCallbackLog", CRIMainCallbackLog);
 	LOG_OFFSET("GetEntityInfoFromHandle", GetEntityInfoFromHandle);
 	LOG_OFFSET("GetEntityFromHandle", GetEntityFromHandle);
 	LOG_OFFSET("GetItemNameById", ItemManager_GetItemNameById);
@@ -584,8 +619,8 @@ void LogOffsets(void)
 	LOG_OFFSET("CKeyboard", g_pKeyboard);
 	LOG_OFFSET("CMouse", g_pMouse);
 	LOG_OFFSET("CGraphics", g_pGraphics);
+	LOG_OFFSET("CLightManager", g_pLightManager);
 	LOG_OFFSET("ViewMatrix", g_pViewMatrix);
-	LOG_OFFSET("CRILogBuffer", g_szCRILogBuffer);
 	LOG_OFFSET("DataDirPath", g_szDataDirectoryPath);
 
 	CCONSOLE_DEBUG_LOG(ImVec4(0.0f, 0.5f, 0.8f, 1.0f), "Data Directory Path: %s", g_szDataDirectoryPath);
@@ -601,8 +636,7 @@ void LogOffsets(void)
 */
 void FindDenuvoSteamOffsets(void)
 {
-	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D", 10);
-	CRILogCallback = CRILogCallbackConsole; // CRILogCallbackWinConsole
+	CRIMainCallbackLog = (CRILogCallbackFn*)FindPatternPtr(NULL, "48 8B 35 ? ? ? ? 48 8B 1D", 10);
 
 	CalculateLevel = (CalculateLevelFn)FindPattern(NULL, "44 8B 91 ? ? ? ? 45 33 C9 41 8B C1 45 85 D2 7E");
 	GetEntityFromHandle = (GetEntityFromHandleFn)FindPattern(NULL, "40 53 48 83 EC ? 8B 11 85 D2 74"); // there is like 50 identical functions kek
@@ -675,7 +709,6 @@ void FindDenuvoSteamOffsets(void)
 	g_pDecreaseHealth[NOP_DAMAGE_ENEMY] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? 41 0F 48 C5");
 	g_pDecreaseHealth[NOP_DAMAGE_WORLD] = (byte*)FindPattern(NULL, "29 BB ? ? ? ? 8B 83 ? ? ? ? BD ? ? ? ? 0F 48 C5");
 
-	g_szCRILogBuffer = (CHAR*)0x14270F500; // TODO: Sig but low priority!
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "E8 ? ? ? ? 48 8D 3D ? ? ? ? 48 8B CF", 8);
 	g_pDirectInput8 = *(IDirectInput8A**)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 48 89 35", 3);
 	g_pKeyboard = (Keyboard_t*)FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 85 C9 74 06 48 8B 01 FF 50 10 48 89 35 ? ? ? ? 48 89 35 ? ? ? ? 89", 3);
@@ -732,8 +765,11 @@ static ULONG_PTR ResolveRel32(ULONG_PTR uMatch, UINT uOffset)
 
 void FindSteamOffsets(void)
 {
-	CRILogCallback = (CRILogCallbackFn)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
-	CRILogCallback = CRILogCallbackConsole; //CRILogCallbackWinConsole
+	// CriMainCallbackLog (0x14176D2D0), CRI's main error callback slot, for Show Game Errors:
+	// mov rbx, CriMainCallbackLog / test rsi, rsi in CriLogInternal (0x140098494, the same address
+	// in v1.02). Unique in both builds. This used to be overwritten with CRILogCallbackConsole
+	// straight away, so the callback was never installed.
+	CRIMainCallbackLog = (CRILogCallbackFn*)FindPatternPtr(NULL, "48 8B 1D ? ? ? ? 48 85 F6", 3);
 
 	CalculateLevel = (CalculateLevelFn)FindPatternPtr(NULL, "E8 ? ? ? ? 45 33 FF 8B 48 10", 1);
 	GetConstructionInfo = (GetConstructorFn)FindPattern(NULL, "33 D2 48 8D 05 ? ? ? ? 44 8B C2");
@@ -928,6 +964,10 @@ void FindSteamOffsets(void)
 	g_pGameItemManager = (CItemManager*)FindPatternPtr(NULL, "48 8D 15 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? C7 45 ? 01 00 00 00 48 8D 75", 10);
 	g_pYorhaManager = ReadGamePtr<CYorhaManager*>(FindPatternPtr(NULL, "48 89 0D ? ? ? ? 48 83 C4 28 C3 48 85 C0 48 89 05 ? ? ? ? 48 8B C8 0F 95 C0 48 83 C4 28 C3 CC 89 91", 3));
 	g_pNPCManager = ReadGamePtr<CNPCManager*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 40 0F 95 C7 8B C7 48 8B 5C 24 ? 48 83 C4 30", 3));
+
+	// g_LightManager (0x14102B0F0, v1.02 0x14102ADB0), for Move Sun: lea rcx, g_LightManager /
+	// call CLightManager::Update in MainUpdateExec. Unique in both builds.
+	g_pLightManager = (CLightManager*)FindPatternPtr(NULL, "85 C0 75 05 E8 ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? BA 01 00 00 00 48 8D 0D", 12);
 	g_pEnemyManager = ReadGamePtr<CEmBaseManager*>(FindPatternPtr(NULL, "48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 48 8B 0D ? ? ? ? 48 8B 01 8B D3 FF 90 ? ? ? ? 44 89 BE", 3));
 	g_pUserManager = ReadGamePtr<CUserManager*>(FindPatternPtr(NULL, "48 89 1D ? ? ? ? 48 85 DB 74 2A", 3));
 	g_pNetworkDevice = ReadGamePtr<CNetworkDevice*>(FindPatternPtr(NULL, "48 8B 3D ? ? ? ? 33 DB 48 8B EA", 3));
@@ -935,7 +975,6 @@ void FindSteamOffsets(void)
 
 	g_pCamera = (CCameraGame*)FindPatternPtr(NULL, "81 25 ? ? ? ? ? ? ? ? 48 8D 0D ? ? ? ? E8 ? ? ? ? 48 8B 03", 13);
 	g_pViewMatrix = (VMatrix*)FindPatternPtr(NULL, "48 8D 4E 10 48 8D 15", 7);
-	g_szCRILogBuffer = (CHAR*)FindPatternPtr(NULL, "4C 8D 35 ? ? ? ? BD 00 01 00 00", 3);
 	g_szDataDirectoryPath = (CHAR*)FindPatternPtr(NULL, "48 8D 3D ? ? ? ? 48 8B CF FF 15", 3);
 
 	// HwRofsFst_MountCpk (CPK_LoadFromPath in the IDB) and the mount table it fills, for Load CPK
@@ -1077,7 +1116,7 @@ void Setup(void)
 
 	g_pMenu = new CMenu(AdapterOutput);
 
-	//g_pRenderer->Initalize(g_pDevice, g_pDeviceContext);
+	//g_pRenderer->Initialize(g_pDevice, g_pDeviceContext);
 
 	// This early return happens before InitHooks(), so a failure here means no Present
 	// hook and therefore no overlay at all.
@@ -1142,12 +1181,20 @@ void Setup(void)
 
 void Unhook(void)
 {
+	// Installed in DllMain, before Setup, so it comes out even when Setup never finished
+	HeapScale::Uninstall();
+
 	// Nothing below exists if Setup() bailed out: RestoreMemory() __debugbreak()s on the
 	// never-initialized patch structs, ImGui has no backend and oWndProc is null.
 	if (!s_bSetupComplete)
 		return;
 
 	MaterialTint::Shutdown();
+	MotionPlayer::Shutdown();
+
+	// Only if the slot still holds ours
+	if (CRIMainCallbackLog)
+		InterlockedCompareExchangePointer((PVOID*)CRIMainCallbackLog, NULL, (PVOID)&CRILogCallbackConsole);
 
 	RestoreMemory(&bp_NoTutorialDialogs);
 	RestoreMemory(&bp_Framecap);
@@ -1203,11 +1250,15 @@ void Unhook(void)
 
 BOOL WINAPI DllMain(HINSTANCE hInstDll, DWORD dwReason, LPVOID lpContext)
 {
+	UNREFERENCED_PARAMETER(lpContext);
+
 	g_hInstance = hInstDll;
 
 	switch (dwReason)
 	{
 	case DLL_PROCESS_ATTACH:
+		// Before the game makes its heaps, if it hasn't yet (the mods folder at startup)
+		HeapScale::InstallEarly(hInstDll);
 		CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)Setup, NULL, 0, NULL);
 		break;
 	case DLL_PROCESS_DETACH:

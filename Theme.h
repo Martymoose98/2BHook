@@ -1,9 +1,10 @@
 #pragma once
 
-#include <Windows.h>
+#include "WinInclude.h"
+
 #include <stdint.h>
 
-#include "ImGui/imgui.h"
+#include "imgui/imgui.h"
 
 // Menu theme: a preset (the base palette and style) plus per-colour overrides on top.
 //

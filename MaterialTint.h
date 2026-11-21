@@ -1,8 +1,8 @@
 #pragma once
 
-#include <Windows.h>
+#include "WinInclude.h"
 
-#include "ImGui/imgui.h"
+#include "imgui/imgui.h"
 
 class CModelShader;
 

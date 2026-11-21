@@ -1,13 +1,15 @@
 #pragma once
 
-#include <Fluorine\Memory.h>
+#include "WinInclude.h"
+
+#include <vector>
+
+#include <Fluorine/Memory.h>
 
 #include "ReversedStructs.h"
 #include "Vector3.h"
 #include "Log.h"
 #include "Console.h"
-
-#include <vector>
 
 CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, EntityHandle hEntity);
 CBehaviorAppBase* GetEntityFromHandleGlobal(EntityHandle_t* phEntity);
@@ -277,7 +279,7 @@ namespace Features
 	struct HiddenPod
 	{
 		EntityHandle_t m_hPod;
-		float m_flAlpha;		// what it had before Hide Pod set it to 0
+		float m_flAlpha = 0.0f;	// what it had before Hide Pod set it to 0
 	};
 
 	inline void ApplyHidePod(CBehaviorAppBase* pCameraEnt)
@@ -932,6 +934,9 @@ namespace Features
 	//doesn't work tbh
 	static void ModelSwap(Pl0000* pEntA, Pl0000* pEntB)
 	{
+		UNREFERENCED_PARAMETER(pEntA);
+		UNREFERENCED_PARAMETER(pEntB);
+
 		//CModel tmp;
 
 		//memcpy(&tmp, pEntB, sizeof(CModel));
@@ -939,10 +944,68 @@ namespace Features
 		//memcpy(pEntA, &tmp, sizeof(CModel));
 	}
 
+	// Where the sun is now, as Move Sun's elevation and azimuth, so ticking it doesn't move the sun.
+	// From the direction CLightManager::Update last built, which is right whether the angles came
+	// from the light set or from the turning sun's accumulators.
+	static bool GetSunAngles(float* pflElevation, float* pflAzimuth)
+	{
+		if (!g_pLightManager)
+			return false;
+
+		const float* pvToSun = g_pLightManager->m_DirLightDirLocal[g_pLightManager->m_ActiveLightSet.m_iActiveSlot & 7];
+		const float flY = min(max(pvToSun[1], -1.0f), 1.0f);
+
+		*pflElevation = 90.0f - RADTODEG(acosf(flY));
+		*pflAzimuth = RADTODEG(atan2f(pvToSun[0], pvToSun[2]));
+
+		if (*pflAzimuth < 0.0f)
+			*pflAzimuth += 360.0f;
+
+		return true;
+	}
+
+	// Move Sun (Visuals): holds the sun at the elevation and azimuth set there; hkPresent calls this
+	// every frame. CLightManager::Update (0x140796170) builds the sun's direction each frame from the
+	// active light set's angle pair, so that pair is set, and the set's turning-sun flags are cleared
+	// while it holds: with them the game reads the angles from g_flSunPolarDeg / g_flSunAzimuthDeg and
+	// uses the pair as their speeds. Unticking puts back the pair and the flags of the bound set, the
+	// room's own set the active one is made from (ExcitedDelirium, LightManager.cpp).
+	// While a light set fades into the next (entering another area), the game blends the active set
+	// towards the new one each frame, so the sun can move until the fade ends.
+	// (This used to read a v1.02 address for Dennis's Sun struct and change nothing.)
 	static void MoveSun()
 	{
-		Sun* sun = (Sun*)0x14160EB40;
-		//sun->m_vPosition.x += 3;
+		static bool s_bHolding = false;
+
+		if (!g_pLightManager)
+			return;
+
+		CLightSetParams* pSet = &g_pLightManager->m_ActiveLightSet;
+		const int iSun = pSet->m_iActiveSlot & 7;
+
+		if (!Vars.Visuals.bMoveSun)
+		{
+			const CLightSetParams* pBound = g_pLightManager->m_pBoundLightSetCur;
+
+			if (s_bHolding && pBound)
+			{
+				pSet->m_DirAng[iSun][0] = pBound->m_DirAng[iSun][0];
+				pSet->m_DirAng[iSun][1] = pBound->m_DirAng[iSun][1];
+				pSet->m_uFlags = (pSet->m_uFlags & ~LIGHTSET_FLAGS_SUN_TURNS) | (pBound->m_uFlags & LIGHTSET_FLAGS_SUN_TURNS);
+			}
+
+			s_bHolding = false;
+			return;
+		}
+
+		pSet->m_DirAng[iSun][0] = 90.0f - Vars.Visuals.flSunElevation;
+		pSet->m_DirAng[iSun][1] = Vars.Visuals.flSunAzimuth;
+
+		// Only light 0 turns
+		if (iSun == 0)
+			pSet->m_uFlags &= ~LIGHTSET_FLAGS_SUN_TURNS;
+
+		s_bHolding = true;
 	}
 
 	static void __fastcall _SetTaskFunction(CJobManager* pMgr, void (*pFunc)(void*), void* pParams)

@@ -1,12 +1,15 @@
 #pragma once
-#include <Windows.h>
-#include <OleCtl.h>
+#include "WinInclude.h"
 #include <d3d11.h>
+#include <OleCtl.h>
 #include <Xinput.h>
-#include "ImGui/imgui.h"
-#include "ImGui/backends/imgui_impl_dx11.h"
-#include "ImGui/backends/imgui_impl_win32.h"
-#include <Fluorine\VirtualTableHook.h>
+
+#include <Fluorine/VirtualTableHook.h>
+
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_dx11.h"
+#include "imgui/backends/imgui_impl_win32.h"
+
 #include "Console.h"
 #include "Log.h"
 #include "Overlay.h"

@@ -1,8 +1,11 @@
 #pragma once
-#include <vector>
+#include "WinInclude.h"
 #include <d3d11.h>
-#include <DirectXMath.h>
 #include <D3Dcompiler.h>
+#include <DirectXMath.h>
+
+#include <vector>
+
 #include "Globals.h"
 #include "Color.h"
 #include "Log.h"
@@ -217,8 +220,8 @@ public:
 
 	~Renderer();
 
-	HRESULT Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, ID3D11Buffer* pVertexBuffer);
-	HRESULT Initalize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
+	HRESULT Initialize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext, ID3D11Buffer* pVertexBuffer);
+	HRESULT Initialize(ID3D11Device* pDevice, ID3D11DeviceContext* pDeviceContext);
 	void Release();
 
 	HRESULT Begin(void);

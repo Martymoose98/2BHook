@@ -1,8 +1,8 @@
 #pragma once
 
-#include "..\Common.h"
+#include "../Common.h"
 
-#include "..\FileSystem\dat.h"
+#include "../FileSystem/dat.h"
 
 #include "CModel.h"
 
@@ -214,6 +214,7 @@ struct CEntityList
 	struct IteratorByName : public Iterator
 	{
 		IteratorByName(const char* szClassname)
+			: m_szClassname(szClassname)
 		{
 			First();
 		}
@@ -274,7 +275,7 @@ struct CEntityList
 	uint32_t m_uItems;								//0x0000 | capacity: slots in m_pItems; iterate to this
 	uint32_t m_uSize;								//0x0004 | live count (CEntityInfo::Release 0x140745DB0 takes one off); slots are not compacted, so not a bound
 	uint32_t m_uBase;								//0x0008 | What the indices start at for handles
-	uint32_t m_uSector;								//0x000C | Which group of 256
+	uint32_t m_uSector;								//0x000C | Which group of 256: its handles' generation (EntityHandle_t::m_uGeneration)
 	std::pair<EntityHandle_t, CEntityInfo*>* m_pItems;//0x0010
 	CReadWriteLock m_Lock;							//0x0018
 
@@ -325,6 +326,23 @@ struct CEntityList
 		return nullptr;
 	}
 };
+
+extern CEntityList* g_pEntityList;	// Globals.h
+
+// The handle of entity list slot uIndex: the list's sector is the handle's generation, the same
+// bits GenerateEntityHandle (Utils.h) builds. Invalid while there is no entity list.
+inline EntityHandle_t::EntityHandle_t(uint16_t uIndex)
+{
+	if (!g_pEntityList)
+	{
+		m_uValue = INVALID_EHANDLE_INDEX;
+		return;
+	}
+
+	m_uValue = 0;
+	m_Parts.m_uIndex = uIndex;
+	m_Parts.m_uGeneration = g_pEntityList->m_uSector;
+}
 
 
 struct BXMEntry
@@ -385,23 +403,23 @@ public:
 	typedef CParticle* (*InitializeFn)(CParticle* pThis);
 	typedef void (*ReserveInfoSlotFn)(CParticle* pThis, CEntityInfo* pInfo, uint8_t uValue);
 
-	uint64_t m_unk0;							//0x0000 | pointer
-	uint32_t m_uFlags;							//0x0008 | init to 0x80000000
-	uint32_t m_unkC;							//0x000C
-	int64_t m_unk10;							//0x0010
-	CObj* m_pParent;							//0x0020
-	int64_t m_unk28;							//0x0028
-	int64_t m_unk30;							//0x0030
-	float m_flScale;							//0x0038 | init to 1.0f (applies to matTransform)
-	uint32_t m_unk3C;							//0x003C
+	uint64_t m_unk0{};							//0x0000 | pointer
+	uint32_t m_uFlags{};							//0x0008 | init to 0x80000000
+	uint32_t m_unkC{};							//0x000C
+	int64_t m_unk10{};							//0x0010
+	CObj* m_pParent{};							//0x0020
+	int64_t m_unk28{};							//0x0028
+	int64_t m_unk30{};							//0x0030
+	float m_flScale{};							//0x0038 | init to 1.0f (applies to matTransform)
+	uint32_t m_unk3C{};							//0x003C
 	Matrix4x4 m_matTransform;					//0x0040
-	uint16_t m_word80;							//0x0080
-	uint8_t gap82[14];							//0x0082
-	uint32_t dword90;							//0x0090
-	uint8_t gap94[4];							//0x0094
-	uint32_t m_uIndexInfo;						//0x0098
-	CEntityInfo* m_pInfos[PARTICLE_MAX_INFO];	//0x00A0
-	uint8_t m_pInfosSet[PARTICLE_MAX_INFO];
+	uint16_t m_word80{};							//0x0080
+	uint8_t gap82[14]{};							//0x0082
+	uint32_t dword90{};							//0x0090
+	uint8_t gap94[4]{};							//0x0094
+	uint32_t m_uIndexInfo{};						//0x0098
+	CEntityInfo* m_pInfos[PARTICLE_MAX_INFO]{};	//0x00A0
+	uint8_t m_pInfosSet[PARTICLE_MAX_INFO]{};
 };
 
 // Sig: 33 C0 C7 41 08 00 00 00 80 48 89 01

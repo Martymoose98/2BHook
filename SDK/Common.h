@@ -1,10 +1,11 @@
 #pragma once
 
 // TODO: maybe temp include stdint.h
-#include <minwindef.h>
+#include "../WinInclude.h"
+
 #include <stdint.h>
 
-#include "..\Math.h"
+#include "../Math.h"
 
 //#include "tgmath.h" wtf???
 
@@ -75,16 +76,62 @@ typedef unsigned __int64 QWORD;
 struct Unknown_t;
 
 /*
-Nier Automata's lib::Array<T>
+Nier Automata's lib::Array<T>. Its vtable has five slots (ExcitedDelirium, LibContainers.h, read out
+of lib::StaticArray<int,64,4>::`vftable' at 0x140CEAD10), and their bodies are the game's, small
+enough to copy. 2BHook never makes one, so a call on one of the game's arrays still goes through
+the game's vtable. Slots 2 and 3 were declared as GetItem and Find, but they append and insert.
 */
 template<typename T>
 class Array
 {
 public:
-	virtual Array<T>* Clear(BYTE flags);
-	virtual size_t GetSize(void);
-	virtual bool GetItem(OUT T* pItem);
-	virtual T* Find(IN T* pSearchItem, OUT T* pFound);
+	// Slot 0, the scalar deleting destructor: empties the array. The game then frees the object when
+	// bit 0 of flags is set, with its own allocator; 2BHook never deletes one of the game's arrays.
+	virtual Array<T>* Clear(BYTE flags)
+	{
+		UNREFERENCED_PARAMETER(flags);
+
+		if (m_pItems && m_Count)
+			m_Count = 0;
+
+		m_pItems = NULL;
+		m_Size = 0;
+		return this;
+	}
+
+	// Slot 1: the capacity, m_Size, not the live count
+	virtual size_t GetSize(void) { return m_Size; }
+
+	// Slot 2: appends a copy of *pItem. False when there is no buffer or it is full.
+	virtual bool PushBack(IN const T* pItem)
+	{
+		if (!m_pItems || m_Count >= m_Size)
+			return false;
+
+		m_pItems[m_Count++] = *pItem;
+		return true;
+	}
+
+	// Slot 3: inserts a copy of *pItem at pWhere, moving the rest up one. Answers pWhere, or the end
+	// of the live items when it refuses (no buffer, full, or pWhere outside them), which is how the
+	// game's callers tell.
+	virtual T* Insert(IN T* pWhere, IN const T* pItem)
+	{
+		T* pEnd = m_pItems + m_Count;
+
+		if (!m_pItems || m_Count >= m_Size || (size_t)(pWhere - m_pItems) > m_Count)
+			return pEnd;
+
+		for (T* pWalk = pEnd; pWalk != pWhere; --pWalk)
+			*pWalk = *(pWalk - 1);
+
+		*pWhere = *pItem;
+		++m_Count;
+		return pWhere;
+	}
+
+	// Slot 4: reserve. Empty here; lib::DynamicArray's grows the buffer before PushBack and Insert.
+	virtual void Reserve(size_t uCapacity) { UNREFERENCED_PARAMETER(uCapacity); }
 
 	T& operator[](int32_t i) { return m_pItems[i]; }
 
@@ -186,8 +233,8 @@ struct CReadWriteLock
 
 	CReadWriteLock(DWORD dwSpinCount)
 	{
-		InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
-		m_bCriticalSectionInitialized = TRUE;
+		// It can fail (before Vista, out of memory); Lock and Unlock then do nothing
+		m_bCriticalSectionInitialized = InitializeCriticalSectionAndSpinCount(&m_CriticalSection, dwSpinCount);
 	}
 
 	~CReadWriteLock(void)

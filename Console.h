@@ -1,12 +1,14 @@
 ﻿#pragma once
 
-#include <Windows.h>
+#include "WinInclude.h"
+
+#include <stdio.h>
 #include <deque>
 #include <mutex>
 #include <string>
 #include <unordered_map>
-#include <stdio.h>
-#include "ImGui/imgui.h"
+
+#include "imgui/imgui.h"
 
 #include "Utils.h"
 

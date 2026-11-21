@@ -1,7 +1,7 @@
 #ifndef __NPC_H__
 #define __NPC_H__
 
-#include "..\Common.h"
+#include "../Common.h"
 
 #include "CBehavior.h"
 

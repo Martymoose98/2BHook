@@ -18,42 +18,56 @@ Variables Vars;
 template<>
 void CConfigItemXml<bool&>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value = !_wcsicmp(szValue, L"TRUE");
 }
 
 template<>
 void CConfigItemXml<int32_t&>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value = _wtoi(szValue); // wcstol
 }
 
 template<>
 void CConfigItemXml<uint32_t&>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value = wcstoul(szValue, NULL, 16);
 }
 
 template<>
 void CConfigItemXml<float&>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value = (float)_wtof(szValue);
 }
 
 template<>
 void CConfigItemXml<ImColor&>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value = wcstoul(szValue, NULL, 16);
 }
 
 template<>
 void CConfigItemXml<CKeybindToggleable>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
 template<>
 void CConfigItemXml<CKeybindFunctional<void>>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
@@ -61,6 +75,8 @@ template<>
 void CConfigItemXml<CKeybindFunctional<void, eTransformMatrix, float>>::SetValue(
 	LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
@@ -68,18 +84,24 @@ template<>
 void CConfigItemXml<CKeybindDynamicToggleable<decltype(&Features::GetModelGravity)>>::SetValue(
 	LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
 template<>
 void CConfigItemXml<CKeybindDynamicIncremental<float>>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
 template<>
 void CConfigItemXml<CKeybindDynamicDecremental<float>>::SetValue(LPCWSTR szValue, uint32_t cchValue)
 {
+	UNREFERENCED_PARAMETER(cchValue);
+
 	m_Value.SetKeycode(wcstol(szValue, NULL, 16));
 }
 
@@ -399,11 +421,11 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 		return hr;
 
 	{
-		CConfigItemXmlNamespace RootNamespace(m_pWriter, L"Root", m_Items.size(), CONFIG_XML_VERSION);
+		CConfigItemXmlNamespace RootNamespace(m_pWriter, L"Root", (uint32_t)m_Items.size(), CONFIG_XML_VERSION);
 
-		for (auto& It = m_Items.begin(); It != m_Items.end();)
+		for (auto It = m_Items.begin(); It != m_Items.end();)
 		{
-			uint32_t uChildren = m_Items.count(It->first);
+			uint32_t uChildren = (uint32_t)m_Items.count(It->first);
 			CConfigItemXmlNamespace Namespace(m_pWriter, It->first.c_str(), uChildren);
 
 			auto Sector = m_Items.equal_range(It->first);
@@ -430,7 +452,9 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 
 HRESULT CConfigXml::WriteNode(XmlNodeType Type)
 {
-	HRESULT hr = S_OK;
+	UNREFERENCED_PARAMETER(Type);
+
+	[[maybe_unused]] HRESULT hr = S_OK;
 
 	return E_NOTIMPL;
 }
@@ -441,6 +465,10 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_traceline", Vars.Visuals.bTraceLine));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_traceline", Vars.Visuals.flTraceLength));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_chams", Vars.Visuals.bChams));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_npc_chams", Vars.Visuals.bNPCChams));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_move_sun", Vars.Visuals.bMoveSun));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_sun_elevation", Vars.Visuals.flSunElevation));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"fl_sun_azimuth", Vars.Visuals.flSunAzimuth));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"i_cham_type", Vars.Visuals.iChamType));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_espbox", Vars.Visuals.bEspBox));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_VISUALS, L"t_2despbox", Vars.Visuals.b2DEspBox));
@@ -529,6 +557,7 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_anti_framecap", Vars.Misc.bAntiFramerateCap));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_anti_vsync", Vars.Misc.bAntiVSync));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_console_show_game_errors", Vars.Misc.bConsoleShowGameErrors));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"i_heap_scale", Vars.Misc.iHeapScale));
 #pragma endregion misc
 
 }
@@ -545,7 +574,7 @@ bool CConfigXml::SetFilename(LPCWSTR szFilename)
 {
 	WCHAR szDLLFilename[MAX_PATH];
 	LPCWSTR	szExtension;
-	SIZE_T uPathSize;
+	[[maybe_unused]] SIZE_T uPathSize;
 
 	ZeroMemory(m_szFilename, sizeof(m_szFilename));
 	GetModuleFileNameW(g_hInstance, szDLLFilename, MAX_PATH);
@@ -766,6 +795,10 @@ void CConfig::InitializeConfig()
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_traceline", Vars.Visuals.bTraceLine));
 	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_traceline", Vars.Visuals.flTraceLength));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_chams", Vars.Visuals.bChams));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_npc_chams", Vars.Visuals.bNPCChams));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_move_sun", Vars.Visuals.bMoveSun));
+	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_sun_elevation", Vars.Visuals.flSunElevation));
+	m_Items.emplace_back(new ConfigItemFloat(CATEGORY_VISUALS, "fl_sun_azimuth", Vars.Visuals.flSunAzimuth));
 	m_Items.emplace_back(new ConfigItemInt(CATEGORY_VISUALS, "i_cham_type", Vars.Visuals.iChamType));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_espbox", Vars.Visuals.bEspBox));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_VISUALS, "t_2despbox", Vars.Visuals.b2DEspBox));

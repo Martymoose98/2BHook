@@ -8,7 +8,8 @@ typedef struct Variables_t
 	{
 		bool bTraceLine;
 		float flTraceLength;
-		bool bChams;
+		bool bChams;		// enemies
+		bool bNPCChams;
 		int iChamType;
 		bool bEspBox;
 		bool b2DEspBox;
@@ -20,6 +21,9 @@ typedef struct Variables_t
 		bool bSkeleton;
 		bool bDebugLocalPlayerSkeleton;
 		float flFov;
+		bool bMoveSun;
+		float flSunElevation;	// degrees above the horizon
+		float flSunAzimuth;		// degrees, the game's own azimuth
 	} Visuals;
 
 	struct Gameplay_t
@@ -45,7 +49,6 @@ typedef struct Variables_t
 		float flModelTintHue;
 		int iSelectedModelMesh;
 		bool bSelectedMeshEnable;
-		Vector4 vModelTint;
 		char szModelTextureName[MAX_PATH];
 		bool bRainbowPod;
 		bool bHidePod;
@@ -96,6 +99,7 @@ typedef struct Variables_t
 		bool bConsoleShowGameErrors;
 		bool bLoading;
 		int nSlot;
+		int iHeapScale;		// HeapScale: read from default.xml at startup, so a change takes the next start
 	} Misc;
 
 	struct Animation

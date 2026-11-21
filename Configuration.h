@@ -1,16 +1,16 @@
 #pragma once
-#include <Windows.h>
+#include "WinInclude.h"
 #include <Shlwapi.h>
+#include <wrl.h>
 //#include <Wsdxml.h>
 #include <xmllite.h>
-#include <wrl.h>
-#include <tchar.h>
 
-#include <vector>
+#include <tchar.h>
+#include <functional>
 #include <map>
 #include <stack>
-#include <functional>
 #include <string>
+#include <vector>
 
 #include "Globals.h"
 
@@ -549,6 +549,8 @@ public:
 	// process; MSVC flags the old form as C4717.
 	virtual HRESULT Write(IXmlWriter* pWriter) override
 	{
+		UNREFERENCED_PARAMETER(pWriter);
+
 		return E_NOTIMPL;
 	}
 
@@ -670,6 +672,10 @@ public:
 class IConfigItem
 {
 public:
+
+	// CConfig::PurgeConfig deletes the items through this base, and without a virtual destructor
+	// that was undefined behaviour and the derived destructors never ran (C5205)
+	virtual ~IConfigItem(void) = default;
 
 	virtual void Read(const char* szFilename) = 0;
 	virtual void Write(const char* szFilename) = 0;

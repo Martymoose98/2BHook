@@ -1,14 +1,15 @@
 #pragma once
-#include <Windows.h>
+#include "WinInclude.h"
 #include <d3d11.h>
 #include <dinput.h>
 #include <xinput.h>
 
 #include <vector> //should be temp
 
+#include <Fluorine/ImportTableHook.h>
+#include <Fluorine/VirtualTableHook.h>
+
 #include "ReversedStructs.h"
-#include <Fluorine\VirtualTableHook.h>
-#include <Fluorine\ImportTableHook.h>
 #include "MemoryDeviceHook.h"
 
 #define MAX_LEVELS 99
@@ -151,7 +152,10 @@ typedef void(*CObjReadSystem_ReleaseRequestFn)(CObjReadSystem* pThis, uint32_t u
 typedef bool(*CpkMountFn)(int iLoadOrder, const char* szPath);
 typedef BOOL(*CpkMount2Fn)(CpkMountInfo* pCpk); // 0x140644000
 
-typedef void(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*);
+// CRI's error callback. CriLogInternal (0x140098454) passes the message (a format string), then
+// the high and the low half of a pointer to two 64-bit argument slots, and returns what the
+// callback returns.
+typedef const char*(*CRILogCallbackFn)(const char* szFormat, unsigned int, unsigned int, void*);
 
 // XInput Function Defs
 
@@ -254,7 +258,7 @@ extern Pl0000_SetFlightUnitFn Pl0000_SetFlightUnit;
 extern Pl0000_TurnTowardHeadingFn Pl0000_TurnTowardHeading;
 extern CCameraInstance_SetZNearFn CameraInstance_SetZNear;
 extern CpkMountFn CpkMount;
-extern CRILogCallbackFn CRILogCallback;
+extern CRILogCallbackFn* CRIMainCallbackLog;	// CRI's main error callback slot, which the game leaves null
 
 // XInput Functions
 
@@ -282,7 +286,6 @@ extern HANDLE* g_phHeaps;
 extern LPSTR g_szDataDirectoryPath;
 extern CpkEntry* g_pCpkEntries;		// g_HwRofsFstMounts, the game's CPK mount table
 extern CpkEntry* g_pCpkEntriesEnd;	// one past its last entry
-extern LPSTR g_szCRILogBuffer;
 extern std::vector<LPTOP_LEVEL_EXCEPTION_FILTER> g_pExceptionHandlers;
 extern std::vector<MrubyImpl*> g_pRubyInstances;
 
@@ -297,6 +300,7 @@ extern CItemManager* g_pGameItemManager;	// what the game passes CItemManager::A
 extern CYorhaManager* g_pYorhaManager;
 extern CUserManager* g_pUserManager;
 extern CNPCManager* g_pNPCManager;
+extern CLightManager* g_pLightManager;
 extern CEmBaseManager* g_pEnemyManager;
 extern void* g_pUiFileSlots;		// g_UiFileSlots, what DialogUI::System::GetText looks texts up in
 extern void* g_pDialogUISystem;		// g_DialogUISystem, the dialog system CreateBlackBanner works on
@@ -330,6 +334,8 @@ extern ID3D11Device* g_pDevice;
 extern ID3D11DeviceContext* g_pDeviceContext;
 extern ID3D11PixelShader* g_pRed;
 extern ID3D11PixelShader* g_pGreen;
+extern ID3D11PixelShader* g_pBlue;
+extern ID3D11PixelShader* g_pCyan;
 extern ID3D11RenderTargetView* g_pRenderTargetView;
 extern ID3D11RasterizerState* g_pRenderWireframeState;
 extern ID3D11RasterizerState* g_pRenderSolidState;
@@ -339,6 +345,8 @@ extern ID3D11Texture2D* g_pTexRed;
 extern ID3D11Texture2D* g_pTexGreen;
 extern ID3D11ShaderResourceView* g_pRedSRV;
 extern ID3D11ShaderResourceView* g_pGreenSRV;
+extern ID3D11ShaderResourceView* g_pBlueSRV;
+extern ID3D11ShaderResourceView* g_pCyanSRV;
 extern IDXGISwapChain* g_pSwapChain;
 extern IDXGISwapChain* g_pSecondarySwapChain;
 extern IDXGIFactory* g_pFactory;

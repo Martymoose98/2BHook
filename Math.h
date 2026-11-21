@@ -1,11 +1,13 @@
 #pragma once
-#include <Windows.h>
+#include "WinInclude.h"
 #include <DirectXMath.h>
-#include <xmmintrin.h>
+
 #include <immintrin.h>
-#include <ostream>
-#include <time.h>
 #include <math.h>
+#include <time.h>
+#include <xmmintrin.h>
+#include <ostream>
+
 #include "Vector2.h"
 #include "Vector3.h"
 #include "Vector4.h"

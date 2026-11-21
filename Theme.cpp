@@ -5,8 +5,8 @@
 #include <string.h>
 #include <wchar.h>
 
-#include "ImGui/imgui_internal.h"
-#include "ImGui/backends/imgui_impl_win32.h"
+#include "imgui/imgui_internal.h"
+#include "imgui/backends/imgui_impl_win32.h"
 
 const ImColor Theme::s_DefaultAccent = ImColor(7, 74, 25, 255);
 const ImColor Theme::s_DefaultAccentBg = ImColor(7, 17, 74, 255);

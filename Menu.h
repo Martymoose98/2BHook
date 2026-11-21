@@ -1,10 +1,10 @@
 #pragma once
-#include <Windows.h>
+#include "WinInclude.h"
 
 #include <string>
 #include <string_view>
 
-#include "ImGui/imgui_internal.h"
+#include "imgui/imgui_internal.h"
 
 #include "Console.h"
 #include "Utils.h"

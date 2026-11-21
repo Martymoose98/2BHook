@@ -397,7 +397,7 @@ void Overlay::Render(OverlayDrawList* pList)
 
 						if (fov < best)
 						{
-							iTarget = i;
+							iTarget = (int)i;
 							best = fov;
 						}
 					}
@@ -437,7 +437,10 @@ void Overlay::Render(OverlayDrawList* pList)
 		if (GetAsyncKeyState(VK_END) & 0x1)
 			--s_iDebugCameraType;
 
-		pList->AddTextArgs(ImVec2(100, 100), ImColor(255, 255, 0), FRF_CENTER_H,
+		// A named position: AddTextArgs moves it by the alignment, so it takes a reference
+		ImVec2 vDebugPos(100, 100);
+
+		pList->AddTextArgs(vDebugPos, ImColor(255, 255, 0), FRF_CENTER_H,
 			"ang (%f,%f,%f) fov: %f cam type: %i",
 			RADTODEG(g_pCamera->m_vViewangles.x),
 			RADTODEG(g_pCamera->m_vViewangles.y),

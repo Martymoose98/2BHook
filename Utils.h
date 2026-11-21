@@ -1,8 +1,9 @@
 #pragma once
-#include <dbghelp.h>
+#include "WinInclude.h"
 #include <d3dcompiler.h>
-#include <wincodec.h>
+#include <dbghelp.h>
 #include <Shlobj.h>
+#include <wincodec.h>
 
 #include "Globals.h"
 #include "Matrix4x4.h"
@@ -265,19 +266,19 @@ static NTSTATUS QueryNierBinaryHash(NierVersionInfo& Version)
 
 	// Query the file size of the nier binary
 	DWORD dwFileSize = GetFileSize(hFile, NULL);
-	DWORD dwBytesRead;
+	DWORD dwBytesRead = 0;
 
 	// Allocate the memory for the nier binary
 	BYTE* pBinary = new BYTE[dwFileSize];
 
 	// Read the binary file
-	ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
+	BOOL bRead = ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
 
 	// Close the file handle to the nier binary
 	CloseHandle(hFile);
 
-	// Bail out if there was a partial read
-	if (dwFileSize != dwBytesRead)
+	// Bail out if the read failed or was partial
+	if (!bRead || dwFileSize != dwBytesRead)
 	{
 		delete[] pBinary;
 		return STATUS_PARTIAL_COPY;
@@ -323,19 +324,19 @@ static NTSTATUS QueryNierBinaryHash(BYTE*& pHash, ULONG& uHashSize)
 
 	// Query the file size of the nier binary
 	DWORD dwFileSize = GetFileSize(hFile, NULL);
-	DWORD dwBytesRead;
+	DWORD dwBytesRead = 0;
 
 	// Allocate the memory for the nier binary
 	BYTE* pBinary = new BYTE[dwFileSize];
 
 	// Read the binary file
-	ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
+	BOOL bRead = ReadFile(hFile, pBinary, dwFileSize, &dwBytesRead, NULL);
 
 	// Close the file handle to the nier binary
 	CloseHandle(hFile);
 
-	// Bail out if there was a partial read
-	if (dwFileSize != dwBytesRead)
+	// Bail out if the read failed or was partial
+	if (!bRead || dwFileSize != dwBytesRead)
 	{
 		delete[] pBinary;
 		return STATUS_PARTIAL_COPY;
@@ -667,11 +668,11 @@ static bool WorldToScreen(const Vector3& vIn, Vector2& vOut)
 	// multiply by inverse w (vTransform /= w)
 	vTransform *= 1.0f / w;
 
-	float width = g_pGraphicDevice->m_iScreenWidth;
-	float height = g_pGraphicDevice->m_iScreenHeight;
+	float width = (float)g_pGraphicDevice->m_iScreenWidth;
+	float height = (float)g_pGraphicDevice->m_iScreenHeight;
 
 	float flFocalLengthY = 1.0f / tanf(g_pCamera->m_flFov * 0.5f);
-	float flFocalLengthX = flFocalLengthY / (width / height);
+	[[maybe_unused]] float flFocalLengthX = flFocalLengthY / (width / height);
 
 	float x = (1.f + (vTransform.x/* * flFocalLengthX * (1.0f / vTransform.z))*/));
 	float y = (1.f - (vTransform.y /** flFocalLengthY*/ /* * (1.0f / vTransform.z)*/));
@@ -704,7 +705,7 @@ static CBehaviorAppBase* GetEntityByHandle(const CEntityList* pList, const Entit
 	int32_t idx = EntityHandleToListIndex(hEntity);
 
 	// Check if the index is valid and the top 24-bits of the handles match
-	if (idx > pList->m_uItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
+	if ((uint32_t)idx > pList->m_uItems || idx < 0 || (hEntity ^ pList->m_pItems[idx].first) & 0xFFFFFF00)
 		return NULL;
 
 	CEntityInfo* pEntityInfo = pList->m_pItems[idx].second;
@@ -951,20 +952,24 @@ static bool GetGameDataPath(CSaveDataDevice* pSavedata, char(&szPath)[N])
 {
 	if (GetSaveFolderPath(szPath))
 	{
+		// Appended, not printed over: sprintf_s with szPath as both the buffer and an argument was
+		// undefined behaviour
+		char szName[32];
+
 		switch (pSavedata->m_nSlot)
 		{
 		case CSaveDataDevice::SLOT_SAVE_SYSTEMDATA:
-			//strcat_s(szPath, "SystemData.dat");
-			sprintf_s(szPath, "%sSystemData.dat", szPath);
+			strcpy_s(szName, "SystemData.dat");
 			break;
 		case CSaveDataDevice::SLOT_SAVE_GAMEDATA:
-			//strcat_s(szPath, "SystemData.dat");
-			sprintf_s(szPath, "%sGameData.dat", szPath);
+			strcpy_s(szName, "GameData.dat");
 			break;
 		default:
-			sprintf_s(szPath, "%sSlotData_%d.dat", szPath, pSavedata->m_nSlot);
+			sprintf_s(szName, "SlotData_%d.dat", pSavedata->m_nSlot);
 			break;
 		}
+
+		strcat_s(szPath, szName);
 		return true;
 	}
 	return false;
@@ -974,7 +979,7 @@ static bool GetGameDataPath(CSaveDataDevice* pSavedata, char(&szPath)[N])
 // will complicate things in the hook otherwise
 static void CSaveDataDevice_DeleteSaveData(CSaveDataDevice* pSavedata)
 {
-	char szFilename[MAX_PATH];
+	char szFilename[MAX_PATH] = {};
 
 	switch (pSavedata->m_Status)
 	{
@@ -1076,6 +1081,7 @@ static int16_t GetBoneIndex(const CModelData* pModelData, int16_t Id)
 
 static int16_t GetBoneId(int16_t index)
 {
+	UNREFERENCED_PARAMETER(index);
 }
 
 static void SwapTexture(uint32_t srcid, CTexture* pReplace)
@@ -1088,13 +1094,16 @@ static void SwapTexture(uint32_t srcid, CTexture* pReplace)
 
 static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 {
+	UNREFERENCED_PARAMETER(Desc);
+
 	IWICImagingFactory* pFactory;
 	IWICFormatConverter* pConverter;
 	IWICBitmapDecoder* pDecoder;
 	IWICBitmapFrameDecode* pFrame;
 	WICPixelFormatGUID Format;
 
-	uint32_t w, h, uFrames, uStride, uSize, * rgba;
+	uint32_t w = 0, h = 0, uFrames, uStride, uSize;
+	std::vector<uint32_t> Pixels;	// rgba was never allocated, so CopyPixels wrote through a garbage pointer
 
 	HRESULT hr = CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_IWICImagingFactory, (void**)&pFactory);
 
@@ -1141,6 +1150,9 @@ static HRESULT CreateTextureEx(const wchar_t* szFile, CTextureDescription& Desc)
 
 	uStride = w * sizeof(uint32_t);
 	uSize = uStride * h;
+	Pixels.resize((size_t)w * h);
+
+	uint32_t* rgba = Pixels.data();
 
 	if (!IsEqualGUID(Format, GUID_WICPixelFormat32bppBGRA))
 	{
@@ -1371,7 +1383,7 @@ static HRESULT MyPreloadModel(uint32_t uObjectId)
 		QueryHeap(&lmao, uObjectId, 1);
 		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(uObjectId), ".dtt");
 		pWork = FindObjectWork(uObjectId);
-		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, (byte)lmao.Succeeded, pWork);
 
 		if (pDesc)
 		{
@@ -1381,7 +1393,7 @@ static HRESULT MyPreloadModel(uint32_t uObjectId)
 		}
 
 		snprintf(szFilename, ARRAYSIZE(szFilename), "%s\\%s%04x%s", pConvert->m_szPrefix, pConvert->m_szPrefix, HIWORD(uObjectId), ".dat");
-		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, lmao.Succeeded, pWork);
+		pDesc = PreloadFile(0, PRELOAD_TYPE_MODELDATA, szFilename, lmao.Pointer, (byte)lmao.Succeeded, pWork);
 
 		if (pDesc)
 		{
@@ -1394,40 +1406,32 @@ static HRESULT MyPreloadModel(uint32_t uObjectId)
 	return E_FAIL;
 }
 
+// A pixel shader that outputs one colour, for Chams' "Use Shader". It takes no inputs: a pixel
+// shader's inputs have to line up with what the game's vertex shader outputs, and an empty input
+// list fits any of them. (It used to read a COLOR0 the game's vertex shaders may not write.)
 static HRESULT GeneratePixelShader(ID3D11Device* pDevice, ID3D11PixelShader** ppPixelShader, float r, float g, float b)
 {
-	char szCast[] = "struct VS_OUT"
-		"{"
-		" float4 Position : SV_Position;"
-		" float4 Color : COLOR0;"
-		"};"
-		"float4 main( VS_OUT input ) : SV_Target"
-		"{"
-		" float4 fake;"
-		" fake.a = 1.0f;"
-		" fake.r = %f;"
-		" fake.g = %f;"
-		" fake.b = %f;"
-		" return fake;"
-		"}";
+	char szPixelShader[256];
 
-	ID3DBlob* pBlob;
-	ID3DBlob* pErrorMsgBlob;
-	char szPixelShader[1000];
+	sprintf_s(szPixelShader, "float4 main() : SV_Target { return float4(%f, %f, %f, 1.0f); }", r, g, b);
 
-	sprintf_s(szPixelShader, szCast, r, g, b);
+	ID3DBlob* pBlob = NULL;
+	ID3DBlob* pErrorMsgBlob = NULL;
 
-	HRESULT hr = D3DCompile(szPixelShader, sizeof(szPixelShader), "shader", NULL, NULL, "main", "ps_4_0", NULL, NULL, &pBlob, &pErrorMsgBlob);
+	// The source's length, not the buffer's: the bytes after the terminator used to go in too
+	HRESULT hr = D3DCompile(szPixelShader, strlen(szPixelShader), "shader", NULL, NULL, "main", "ps_4_0", 0, 0, &pBlob, &pErrorMsgBlob);
+
+	if (pErrorMsgBlob)
+		pErrorMsgBlob->Release();
 
 	if (FAILED(hr))
 		return hr;
 
 	hr = pDevice->CreatePixelShader(pBlob->GetBufferPointer(), pBlob->GetBufferSize(), NULL, ppPixelShader);
 
-	if (FAILED(hr))
-		return hr;
+	pBlob->Release();
 
-	return S_OK;
+	return hr;
 }
 
 /*
@@ -1560,67 +1564,51 @@ static LONG UnhandledExceptionHandler(EXCEPTION_POINTERS* pException)
 }
 
 
-/*
-Rebuilt from the debug build
-*/
-static char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsigned int arg_ptr_low)
+// Formats a CRI message. CRI never formats its messages itself: CriLogInternal (0x140098454) hands
+// the callback the format string and a pointer, split into its high and low halves, to two 64-bit
+// argument slots, and leaves the substitution to it (ExcitedDelirium, Criware.cpp). Both slots are
+// passed whatever the format asks for: on x64 a %d reads the low half of its slot, and a format
+// that uses fewer ignores the rest.
+// Into a buffer of this thread's own. CRI logs from its own threads, and the game's 0x100-byte
+// g_szCRILogBuffer, which this used to write 512 bytes into, is where CriFsLogSystemError builds
+// the very message it then passes as the format.
+static const char* CRIGetBuffer(const char* szFormat, unsigned int arg_ptr_high, unsigned int arg_ptr_low)
 {
-	BOOL IsStringVar[3] = { FALSE, FALSE, FALSE };
+	static thread_local char s_szBuffer[512];
 
-	const char* szFmt = szFormat;
-	QWORD v4 = *(QWORD*)(arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32));	// 1st arg
-	QWORD v5 = *(QWORD*)((arg_ptr_low | ((unsigned __int64)arg_ptr_high << 32)) + 8); //2nd arg
-	SIZE_T length = strlen(szFormat);
-	SIZE_T j = 0;
-	DWORD i = 0;
+	const QWORD* pArgs = (const QWORD*)(((QWORD)arg_ptr_high << 32) | arg_ptr_low);
 
-	if (length)
-	{
-		do
-		{
-			if (szFmt[j] == '%')
-			{
-				if (szFmt[j + 1] == 's')
-					IsStringVar[i] = TRUE;
+	if (!szFormat)
+		return "(null)";
 
-				if (++i == 3)
-					break;
-			}
-		} while (++j < length);
-
-		// there is no format params just return the format string
-		if (i > 2)
-			return (char*)szFmt;
-	}
-
-	if (IsStringVar[0])
-	{
-		if (IsStringVar[0] != TRUE || IsStringVar[1])
-			snprintf(g_szCRILogBuffer, 512, szFmt, v4, v5);
-		else
-			snprintf(g_szCRILogBuffer, 512, szFmt, v4, (unsigned int)v5);
-	}
-	else if (IsStringVar[1])
-		snprintf(g_szCRILogBuffer, 512, szFmt, (unsigned int)v4, v5);
+#pragma warning(push)
+#pragma warning(disable : 4774)	// the format isn't a literal: it is CRI's message
+	if (pArgs)
+		snprintf(s_szBuffer, sizeof(s_szBuffer), szFormat, pArgs[0], pArgs[1]);
 	else
-		snprintf(g_szCRILogBuffer, 512, szFmt, (unsigned int)v4, (unsigned int)v5);
+		snprintf(s_szBuffer, sizeof(s_szBuffer), "%s", szFormat);
+#pragma warning(pop)
 
-	return g_szCRILogBuffer;
+	return s_szBuffer;
 }
 
 static void CRILogCallbackWinConsole(const char* szFormat, unsigned int callback_arg_ptr_high, 
 	unsigned int callback_arg_ptr_low, void* a4)
 {
+	UNREFERENCED_PARAMETER(a4);
+
 	QWORD stack_ptr = (((QWORD)callback_arg_ptr_high << 32) | callback_arg_ptr_low) + 0x28;
 	QWORD caller_return_address = *(QWORD*)stack_ptr;
 	printf("[%llx]: %s\n", caller_return_address, CRIGetBuffer(szFormat, callback_arg_ptr_high, callback_arg_ptr_low));
 }
 
-void CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high,
+const char* CRILogCallbackConsole(const char* szFormat, unsigned int callback_arg_ptr_high,
 	unsigned int callback_arg_ptr_low, void* a4);
 
 static void CRILogCallbackWinConsoleVerbose(const char* szFormat, unsigned int callback_arg_ptr_high, unsigned int callback_arg_ptr_low, void* a4)
 {
+	UNREFERENCED_PARAMETER(a4);
+
 	QWORD stack[100];
 	SYMBOL_INFO_PACKAGE symbol;
 

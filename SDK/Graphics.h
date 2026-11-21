@@ -1,11 +1,12 @@
 #pragma once
 
+#include "../WinInclude.h"
 #include <d3d11.h>
 #include <dxgi1_2.h>
 
 #include "Common.h"
 
-#include "FileSystem\dat.h"
+#include "FileSystem/dat.h"
 
 #define MAX_MATERIAL_TEXTURES 16
 
@@ -58,7 +59,7 @@ struct CVertexBuffer
 {
 	void* m_pVtbl;
 	QWORD qword8;						//0x08
-	BOOL m_bInitalized;					//0x10
+	BOOL m_bInitialized;					//0x10
 	UINT m_uVertexSize;					//0x14
 	INT m_nVertices;					//0x18
 	char pad1c[12];						//0x1C
@@ -67,18 +68,24 @@ struct CVertexBuffer
 };
 VALIDATE_SIZE(CVertexBuffer, 0x38);
 
-// Size of struct is 48 (0x30) bytes
+// Hw::cIndexBufferImpl. Size of struct is 40 (0x28) bytes (ExcitedDelirium: v1.02 reserves 40 per
+// element). m_pInfo was placed at 0x20, where m_uIndexStart is. CGraphicContextDx11_SetIndexBuffer
+// (0x1402563C0) reads both: it binds m_pInfo->m_pBuffer and adds m_uIndexStart to every draw's
+// start index, since one D3D buffer can hold more than one index buffer.
 struct CIndexBuffer
 {
 	void* m_pVtbl;						//0x00
-	BOOL m_bInitalized;					//0x0C
-	UINT m_uIndiceSize;					//0x08	
+	BOOL m_bInitialized;					//0x08
+	UINT m_uIndiceSize;					//0x0C | 2 or 4 bytes
 	INT m_nIndices;						//0x10
-	char pad14[12];						//0x14
-	CBufferInfo* m_pInfo;				//0x20
-	DWORD dword28;
+	INT m_iUsage;						//0x14
+	CBufferInfo* m_pInfo;				//0x18
+	UINT m_uIndexStart;					//0x20 | in indices, into m_pInfo->m_pBuffer
+	DWORD dword24;						//0x24
 };
-VALIDATE_SIZE(CIndexBuffer, 0x30);
+VALIDATE_SIZE(CIndexBuffer, 0x28);
+VALIDATE_OFFSET(CIndexBuffer, m_pInfo, 0x18);
+VALIDATE_OFFSET(CIndexBuffer, m_uIndexStart, 0x20);
 
 enum TextureFlags
 {
@@ -134,7 +141,7 @@ struct CTargetTexture
 {
 	void* m_vtbl;
 	CTexture* m_pTexture;
-	BOOL m_bInitalized;
+	BOOL m_bInitialized;
 };
 
 struct CTextureResource
@@ -1048,7 +1055,7 @@ struct COtManager
 	BYTE gap94[4];							//0x94
 	COtManagerPtr98* m_ptr98;				//0x98
 	BYTE gapA0[4];							//0xA0
-	BOOL m_bGraphicListInitalized;			//0xA4
+	BOOL m_bGraphicListInitialized;			//0xA4
 };
-VALIDATE_OFFSET(COtManager, m_bGraphicListInitalized, 0xA4);
+VALIDATE_OFFSET(COtManager, m_bGraphicListInitialized, 0xA4);
 VALIDATE_SIZE(COtManager, 0xA8);

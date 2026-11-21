@@ -2,7 +2,7 @@
 #ifndef __CSAVE_DATA_DEVICE_H__
 #define __CSAVE_DATA_DEVICE_H__
 
-#include "SDK\Common.h"
+#include "Common.h"
 
 struct CSaveSlot
 {
