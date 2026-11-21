@@ -52,13 +52,16 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 
 **Visuals**
 - ESP for the player and enemies: a box fitted to the skeleton (2D or 3D), HP bar, skeleton and trace line.
+- Chams: enemies through walls, red where something hides them and green where you can see them, and NPC Chams for NPCs and Emil in blue and cyan. Use Shader switches between flat colours and the game's own shading.
 - Enemy, NPC and world info text.
 - Collision info: the loaded collision trees and the live collision objects' bounds.
 - Wireframe.
 - Rainbow Hair and Rainbow Pod.
 - Hide Pod.
-- Per-mesh colour and visibility.
+- Per-mesh colour and visibility, and Model Tint Color for the whole model (its alpha makes it see-through).
 - Material Tint: give each material of a mesh its own colour (e.g. 2B's boots or tights apart from her skin). It multiplies with the mesh colour, so Rainbow Hair still shows.
+- Move Sun: hold the sun, and the light and shadows it casts, at the elevation and azimuth you set.
+- Motion: play one of the camera entity's own motions, or a .mot file from disk, through the game's own motion system.
 - Menu themes: Default, YoRHa (the game's own menu colours) or Custom, with per-colour overrides, a resizable menu and UI scaling that follows DPI and resolution.
 
 **Spawning**
@@ -81,9 +84,8 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 - Frame Budget.
 - Backup Save: copies the chosen save slot.
 - Raw editors for the game's debug, camera and game flags.
-- Console, with logging.
-
-**Not working on the current build:** ☢️ Chams, ☢️ Use Shader, ☢️ Model Tint Color, ☢️ Show Game Errors.
+- Heap Scale: make every game memory heap 1x to 4x bigger, for loading more than a map plans for. It takes effect the next time the game starts, and only with 2BHook in the `mods` folder.
+- Console, with logging, and Show Game Errors for the game's CRI errors and warnings.
 
 ## Building
 
@@ -127,7 +129,7 @@ Turn it off for one build with `-p:PostBuildEventUseInBuild=false`. It is off au
 
 2BHook is a DLL, so something has to load it into the game. Use one of these:
 
-- **The 2B Hook Launcher** (recommended): the official launcher, currently v1.4. It's open source, and you can get it from the Files tab of the [2B Hook Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10?tab=files) or from GitHub at [Martymoose98/2B-Mod-Launcher](https://github.com/Martymoose98/2B-Mod-Launcher).
+- **The 2B Hook Launcher** (recommended): the official launcher, currently v1.5. It's open source, and you can get it from the Files tab of the [2B Hook Nexus Mods page](https://www.nexusmods.com/nierautomata/mods/10?tab=files) or from GitHub at [Martymoose98/2B-Mod-Launcher](https://github.com/Martymoose98/2B-Mod-Launcher).
   1. Put `2BHook.dll` in the `mods` folder next to `NieRAutomata.exe`. The launcher creates that folder the first time it runs if it's missing.
   2. Run the launcher. It finds the game, starts it (or attaches to it if it's already running), and loads every DLL in `mods`.
 - **A proxy DLL loader**: a DLL the game loads by itself, which then loads the DLLs from a `mods` folder.

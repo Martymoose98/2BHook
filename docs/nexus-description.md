@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.1[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. 1.2.0 checked many features against the game again and reworked them; its changes and 1.2.1's fixes are at the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.2[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It brings back Chams (now an ESP for enemies and NPCs), Model Tint Color and Show Game Errors, and adds Move Sun, a motion player and Heap Scale; see the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -27,11 +27,14 @@
 [b]Visuals[/b]
 [list]
 [*]ESP for the player and enemies: a box fitted to the skeleton (2D or 3D), HP bar, skeleton and trace line
+[*]Chams: enemies through walls in red and green, NPCs and Emil in blue and cyan
 [*]Enemy, NPC and world info, plus collision info
 [*]Rainbow Hair, Rainbow Pod, Hide Pod
-[*]Per-mesh colour and visibility
+[*]Per-mesh colour and visibility, and Model Tint Color for the whole model
 [*]Material Tint: give each material its own colour, e.g. 2B's boots or tights apart from her skin
 [*]Wireframe
+[*]Move Sun: hold the sun, and the light and shadows it casts, where you want it
+[*]Motion: play the camera entity's own motions, or a .mot file from disk, through the game's own motion system
 [*]Menu themes: Default, YoRHa (the game's own menu colours) and Custom, with UI scaling
 [/list]
 
@@ -54,14 +57,15 @@
 [*]Anti-VSync
 [*]Anti-Framerate Cap (the game runs faster above 60 FPS)
 [*]Backup Save
-[*]A console with logging
+[*]Heap Scale: bigger game memory heaps, for loading more than a map plans for
+[*]A console with logging, and Show Game Errors
 [/list]
 
 [line]
 [size=4][b]Installation[/b][/size]
 
 [b]With the 2B Hook Launcher (recommended)[/b]
-The official launcher (v1.4) is open source. Get it from this page's Files tab or [url=https://github.com/Martymoose98/2B-Mod-Launcher]GitHub[/url].
+The official launcher (v1.5) is open source. Get it from this page's Files tab or [url=https://github.com/Martymoose98/2B-Mod-Launcher]GitHub[/url].
 [list=1]
 [*]Put [b]2BHook.dll[/b] in the [b]mods[/b] folder next to NieRAutomata.exe. The launcher creates the folder if it's missing.
 [*]Run the launcher. It finds the game, starts it (or attaches to it if it's already running) and loads every DLL in [b]mods[/b].
@@ -95,7 +99,7 @@ Change the keybinds in the menu's Config tab.
 [line]
 [size=4][b]Known issues[/b][/size]
 [list]
-[*]Chams, Use Shader, Model Tint Color and Show Game Errors don't work on the current build yet.
+[*]Chams colours an enemy's own model only; weapons and parts drawn from a separate model keep their normal look.
 [*]First person also hides the head's shadow.
 [/list]
 
@@ -107,6 +111,25 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [line]
 [size=4][b]Changelog[/b][/size]
 [spoiler]
+[b]Version 1.2.2[/b] (November 2026)
+[i]Working again[/i]
+[list]
+[*][b]Chams:[/b] an ESP for enemies, red where something is in front of them and green where you can see them. The new NPC Chams does the same for NPCs and Emil in blue and cyan. Use Shader switches between flat colours and the game's own shading.
+[*][b]Model Tint Color:[/b] the picker changes the model's colour again, and its alpha makes the model see-through.
+[*][b]Show Game Errors:[/b] the game's CRI errors and warnings show in the Console.
+[/list]
+[i]New[/i]
+[list]
+[*][b]Move Sun[/b] (Visuals): holds the sun, and the light and shadows it casts, at the elevation and azimuth you set.
+[*][b]Motion[/b] (Visuals): plays one of the camera entity's own motions, or a .mot file from disk, through the game's own motion system, with a slot, blend, rate and loop.
+[*][b]Heap Scale[/b] (Miscellaneous): makes every game memory heap 1x to 4x bigger. It takes effect the next time the game starts, and only with 2BHook in the mods folder. Each step adds about 4.4 GB of committed memory.
+[/list]
+[i]Fixes[/i]
+[list]
+[*]Deleting a save no longer builds its file name by printing the path into itself.
+[*]The texture loader no longer writes the image through a pointer that was never allocated.
+[/list]
+
 [b]Version 1.2.1[/b] (November 2026)
 [i]Fixes[/i]
 [list]
