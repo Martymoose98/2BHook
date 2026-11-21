@@ -532,6 +532,7 @@ void LogOffsets(void)
 	LOG_OFFSET("CObjReadSystem::RequestStartAsscessory", ObjReadSystem_RequestStartAsscessory);
 	LOG_OFFSET("CObjReadSystem::RequestStartFilter", ObjReadSystem_RequestStartFilter);
 	LOG_OFFSET("ExCollision::GetOBBMax", ExCollision_GetOBBMax);
+	LOG_OFFSET("ExCollision_ResetOrigin", ExCollision_ResetOrigin);
 	LOG_OFFSET("HashLowercaseStringNoLenCRC32", HashLowercaseStringNoLenCRC32);
 	LOG_OFFSET("DialogUI::System::GetText", DialogUI_System_GetText);
 	LOG_OFFSET("DialogUI::System::CreateBlackBanner", DialogUI_System_CreateBlackBanner);
@@ -817,6 +818,12 @@ void FindSteamOffsets(void)
 	// CCameraInstance_SetZNear (0x14027ADA0, v1.02 0x14027ACA0), the whole function: store the near
 	// plane at +0x268 and raise the projection dirty flag at +0x284
 	CameraInstance_SetZNear = (CCameraInstance_SetZNearFn)FindPatternOrNull("48 8B 01 F3 0F 11 88 68 02 00 00 C7 80 84 02 00 00 01 00 00 00 C3");
+
+	// ExCollision_ResetOrigin (0x14040D1F0, v1.02 0x14040D0F0), for No Model Collision. The whole
+	// function but the tail jmp: GetOrigin, IsZero, IsNaN, copy into m_vOrigin (+0xE0), then
+	// lea rcx, [rbx+100h] (m_vPreviousOrigin). Without that last lea it also matches
+	// ExCollision_UpdateOrigin (0x1404118A0). Unique in v1.02 and build 26534214.
+	ExCollision_ResetOrigin = (ExCollision_ResetOriginFn)FindPatternOrNull("40 53 48 83 EC 30 48 8D 54 24 20 48 8B D9 E8 ? ? ? ? 48 8D 4C 24 20 E8 ? ? ? ? 85 C0 75 1F 48 8D 4C 24 20 E8 ? ? ? ? 85 C0 75 11 48 8D 8B E0 00 00 00 48 8D 54 24 20 E8 ? ? ? ? 48 8D 93 E0 00 00 00 48 8D 8B 00 01 00 00");
 
 	// The checks the game makes before a free spawn, for Create Entity. ModelSetSpawnList_Update
 	// (0x14082B190, v1.02 0x14082AD70) spawns its "FreeEnemy" only once both answer 1:

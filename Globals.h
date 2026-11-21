@@ -105,6 +105,7 @@ typedef CEntityInfo*(*CSceneEntitySystem_CreateEntityFn)(CSceneEntitySystem* pTh
 typedef void*(*AllocHeapMemoryFn)(QWORD size, CHeapInstance** ppHeap);
 
 typedef void(*ExCollision_GetOBBMaxFn)(ExCollision* pThis, Vector3Aligned* pvMax);
+typedef void(*ExCollision_ResetOriginFn)(ExCollision* pThis);
 
 // render funcs
 typedef bool(*COtManager_SetTextureFn)(void* pThis, int nTextures, int iTextureIndex, CTargetTexture* pTexture, void* pSamplerState, unsigned int iShaderResourceView);
@@ -206,6 +207,7 @@ extern CSceneStateSystem_SetFn SceneStateSystem_Set;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAt;
 extern CCameraGame::SetLookAtFn CameraGame_SetLookAtNoDistance;
 extern ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
+extern ExCollision_ResetOriginFn ExCollision_ResetOrigin;
 extern SetSceneEntityFn SetSceneEntity;
 extern GetConstructorFn GetConstructionInfo;
 

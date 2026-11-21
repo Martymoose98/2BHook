@@ -60,9 +60,9 @@ public:
 	Vector4 v0xB0;
 	Vector4 v0xC0;
 	Vector4 m_vSphereRadius;
-	Vector3Aligned m_vMin;	// vector pos of collision
-	void* unk[2];
-	Vector3Aligned m_vMax;
+	Vector3Aligned m_vOrigin;	// 0x00E0 | the shape's origin (bone + offset) at the last check
+	void* unk[2];				// 0x00F0 | +0xF0 is m_bEnabled as of last frame (ExCollision_LatchState)
+	Vector3Aligned m_vPreviousOrigin;	// 0x0100 | last frame's m_vOrigin; ExCollision_SweepFromPrevious sweeps from it
 	DWORD dword110;
 	DWORD dword114;
 	DWORD dword118;
@@ -72,6 +72,8 @@ public:
 VALIDATE_OFFSET(ExCollision, m_iBoneId, 0x8C);
 VALIDATE_OFFSET(ExCollision, m_iBoneId2, 0x90);
 VALIDATE_OFFSET(ExCollision, m_vExtents, 0xA0);
+VALIDATE_OFFSET(ExCollision, m_vOrigin, 0xE0);
+VALIDATE_OFFSET(ExCollision, m_vPreviousOrigin, 0x100);
 VALIDATE_SIZE(ExCollision, 0x130);
 
 class ExLockOn : public CBehaviorExtension

@@ -62,6 +62,7 @@ Pl0000_SetFlightUnitFn Pl0000_SetFlightUnit;
 Pl0000_TurnTowardHeadingFn Pl0000_TurnTowardHeading;
 CCameraInstance_SetZNearFn CameraInstance_SetZNear;
 ExCollision_GetOBBMaxFn ExCollision_GetOBBMax;
+ExCollision_ResetOriginFn ExCollision_ResetOrigin;
 CpkMountFn CpkMount;
 CRILogCallbackFn CRILogCallback;
 

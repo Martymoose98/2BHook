@@ -421,6 +421,16 @@ namespace Features
 	// when the tick or the camera entity changes: it switches the collision off once, and unticking
 	// (or the camera moving on) puts back the owner and enabled state that entity had. Entities
 	// are tracked by handle, since a pointer from an earlier frame may be gone.
+	// This is the body sphere Pl0000::CollisionCheck (0x1404E1390) runs. That function sets
+	// m_bEnabled itself every frame, which is why the owner handle is cleared too: without an
+	// owner, UpdateOrigin, SweepFromPrevious, Check and PushOut all stop early. But m_vOrigin also
+	// stops following her, so it stays where she was when the collision went off, and every frame
+	// Pl0000::Update copies it into m_vPreviousOrigin. Putting the owner back without anything
+	// else made the next SweepFromPrevious sweep from that old spot to where she is now; it hit
+	// the first wall she had walked through and moved her back to it. So restoring calls
+	// ExCollision_ResetOrigin, as the game does wherever it turns the sphere off or moves her
+	// (CollisionCheck, events, ExcitedDelirium PlayerGround.cpp): both origins are set to where
+	// she is now, and the sweep starts from there.
 	inline void ApplyNoCollision(CBehaviorAppBase* pCameraEnt)
 	{
 		static EntityHandle s_hApplied = 0;		// the entity whose collision is off
@@ -442,6 +452,10 @@ namespace Features
 			{
 				pApplied->m_HorizontalCollision.m_hOwner = s_hSavedOwner;
 				pApplied->m_HorizontalCollision.m_bEnabled = s_bSavedEnabled;
+
+				// Needs the owner back first: the origin is found through it.
+				if (ExCollision_ResetOrigin)
+					ExCollision_ResetOrigin(&pApplied->m_HorizontalCollision);
 			}
 		}
 
@@ -456,7 +470,6 @@ namespace Features
 		pWanted->m_HorizontalCollision.m_hOwner = 0;
 		pWanted->m_HorizontalCollision.m_bEnabled = FALSE;
 		pWanted->m_HorizontalCollision.m_bCollision = FALSE;
-		pWanted->m_HorizontalCollision.m_vMin = pWanted->m_vPosition;
 	}
 
 	// UnlockAchievement is only resolved for the Denuvo build; on v1.02 and build 26534214 it stayed
