@@ -146,8 +146,29 @@ void CConsole::Write(const ImVec4& color, const char* szFormat, va_list args)
 
 void CConsole::Draw(const char* szTitle, const ImVec2 WindowSize)
 {
-	// NOTE: sending a zero vector for window size enables auto sizing
-	if (!ImGui::BeginChild(szTitle, WindowSize, ImGuiChildFlags_Borders,
+	ImVec2 vLogSize = WindowSize;
+
+	// A zero width fills the width (BeginChild does that itself). A zero height fills down to the
+	// rows drawn after the log: the command row, a separator and Show Game Errors. It used to be
+	// a fixed 820x400, unscaled, so it stayed small in a bigger menu and at higher DPI. Below a
+	// few lines (the smallest menu) it keeps that floor and the menu scrolls instead.
+	if (vLogSize.y <= 0.0f)
+	{
+		// The gap under the log, the command row and its gap, the separator (Separator() draws it
+		// at least 1 high) and its gap, and the checkbox row. Short by even a pixel, and the menu
+		// gets a scrollbar.
+		const ImGuiStyle& Style = ImGui::GetStyle();
+		const float flSeparator = (Style.SeparatorSize > 1.0f) ? Style.SeparatorSize : 1.0f;
+		const float flFooter = (Style.ItemSpacing.y * 3.0f) + (ImGui::GetFrameHeight() * 2.0f) + flSeparator;
+		const float flMinHeight = ImGui::GetTextLineHeightWithSpacing() * 8.0f;
+
+		vLogSize.y = ImGui::GetContentRegionAvail().y - flFooter;
+
+		if (vLogSize.y < flMinHeight)
+			vLogSize.y = flMinHeight;
+	}
+
+	if (!ImGui::BeginChild(szTitle, vLogSize, ImGuiChildFlags_Borders,
 		ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove))
 	{
 		ImGui::EndChild();

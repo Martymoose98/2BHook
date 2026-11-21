@@ -55,7 +55,9 @@ public:
 
 	void Write(const ImVec4& color, const char* szFormat, va_list args);
 
-	void Draw(const char* szTitle, const ImVec2 WindowSize = ImVec2(820, 400));
+	// A zero size fills the space it is drawn in: the whole width, and the height down to the rows
+	// drawn under the log (see Draw)
+	void Draw(const char* szTitle, const ImVec2 WindowSize = ImVec2(0.0f, 0.0f));
 private:
 
 	// Widget labels, shared by the layout measurement and the widgets themselves. Kept in
