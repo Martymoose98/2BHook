@@ -43,6 +43,14 @@ public:
 	void LoadConfig(LPCWSTR szConfig);
 	void SaveConfig(LPCWSTR szConfig);
 
+	// Save Appearance: writes only the saved colour edits into the config the Config tab's
+	// Save would write to, leaving the rest of that file as it is
+	void SaveAppearance(void);
+
+	// The config the Config tab's Save (and Save Appearance) writes to: the name box, or else
+	// the selected file. False when there is neither.
+	bool GetTargetConfigName(wchar_t (&szName)[MAX_PATH]);
+
 private:
 	void GameplayTab(Pl0000* pCameraEnt);
 	void VisualsTab(CBehaviorAppBase* pCameraEnt);

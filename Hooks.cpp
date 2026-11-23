@@ -1,4 +1,5 @@
 #include "Hooks.h"
+#include "Appearance.h"
 #include "EspRenderer.h"
 #include "MaterialTint.h"
 
@@ -652,6 +653,8 @@ HRESULT hkPresent(IDXGISwapChain* pThis, UINT SyncInterval, UINT Flags)
 	Features::ApplyHealthMods();
 	Features::ApplyFreeCamFlags();
 
+	// Saved colours onto models that just appeared, before the tints they set are uploaded
+	Appearance::Update();
 	MaterialTint::Update();
 
 	if (Vars.Gameplay.bNoTutorialDialogs)

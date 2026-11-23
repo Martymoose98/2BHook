@@ -61,7 +61,9 @@ namespace
 	constexpr size_t CB_CREATED = 0x4C;			// int, 0 until the buffer exists
 	constexpr size_t CB_LAST_SLOT = 0x58;		// int, the slot committed last, -1 before the first
 
-	constexpr int MAX_TINTS = 32;
+	// Saved material tints (Appearance.h) are applied to every model of that name, so a
+	// tinted material on a model with several copies around takes several slots
+	constexpr int MAX_TINTS = 64;
 
 	// The cb4 buffers one material is drawn with. CModelWork_PublishLodWeights hands out one
 	// per run of meshes with the same colour, per draw slot (twice over when the work is

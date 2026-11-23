@@ -1,4 +1,5 @@
 #include "Menu.h"
+#include "Appearance.h"
 #include "EspRenderer.h"
 #include "MaterialTint.h"
 #include "SpawnList.h"
@@ -277,8 +278,10 @@ void CMenu::Draw(const ImVec2 vSize)
 				ImGui::EndTabItem();
 			}
 
-			// The tab shows ImGui's unsaved-document dot while the theme differs from the config
-			if (ImGui::BeginTabItem("Config", NULL, (m_Theme != m_SavedTheme) ? ImGuiTabItemFlags_UnsavedDocument : 0))
+			// The tab shows ImGui's unsaved-document dot while the theme or the saved colours
+			// differ from the config
+			if (ImGui::BeginTabItem("Config", NULL,
+				(m_Theme != m_SavedTheme || Appearance::IsDirty()) ? ImGuiTabItemFlags_UnsavedDocument : 0))
 			{
 				ConfigTab();
 				ImGui::EndTabItem();
@@ -376,6 +379,10 @@ void CMenu::LoadConfig(LPCWSTR szConfig)
 	// preset's colour" - not "keep the previous config's override".
 	memset(m_Theme.m_bOverride, 0, sizeof(m_Theme.m_bOverride));
 
+	// The same for the saved colours: a config without them means none. The models they were
+	// written to get their own colours back, and the loaded ones apply from the next frame.
+	Appearance::BeginLoad();
+
 	HRESULT hr = m_pConfig->Load(szConfig);
 
 	if (FAILED(hr))
@@ -391,9 +398,49 @@ void CMenu::SaveConfig(LPCWSTR szConfig)
 	HRESULT hr = m_pConfig->Save(szConfig);
 
 	if (SUCCEEDED(hr))
+	{
 		m_SavedTheme = m_Theme;
+		Appearance::MarkSaved();
+	}
 	else
+	{
 		g_pConsole->Warn("Saving config %ls failed (%08X)", szConfig, hr);
+	}
+}
+
+void CMenu::SaveAppearance(void)
+{
+	wchar_t szConfig[MAX_PATH];
+
+	if (!GetTargetConfigName(szConfig))
+	{
+		g_pConsole->Warn("Save Appearance: no config selected - pick one in the Config tab");
+		return;
+	}
+
+	g_pConsole->Log(ImGui::GetStyle().Colors[ImGuiCol_TextSelectedBg], "Saving appearance. (%ls)", szConfig);
+
+	HRESULT hr = m_pConfig->SaveSection(szConfig, CATEGORY_APPEARANCE);
+
+	if (SUCCEEDED(hr))
+		Appearance::MarkSaved();
+	else
+		g_pConsole->Warn("Saving the appearance to %ls failed (%08X); the config file was left as it was", szConfig, hr);
+}
+
+bool CMenu::GetTargetConfigName(wchar_t (&szName)[MAX_PATH])
+{
+	// FindDataListNav returns NULL past the end, and the name box can be empty, so there may
+	// be no name at all - which would trip the CRT invalid parameter handler in mbstowcs_s.
+	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
+	LPCTSTR szConfig = (Config.szName[0]) ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
+
+	if (!szConfig)
+		return false;
+
+	mbstowcs_s(nullptr, szName, szConfig, _TRUNCATE);
+
+	return true;
 }
 
 // 40 53 48 83 EC 20 48 8B 91 80 72 - pl0000::SetStateMosaic
@@ -1294,8 +1341,6 @@ void CMenu::MiscTab(void)
 
 void CMenu::ConfigTab(void)
 {
-	LPCTSTR szConfig;
-
 	ImGui::Checkbox("Ignore Input", &m_bIgnoreInputWhenOpened);
 
 	auto [begin, end] = m_pConfig->GetKeybinds();
@@ -1344,22 +1389,14 @@ void CMenu::ConfigTab(void)
 	}
 
 	// Resolve the name *after* Refresh. This used to be read above it, so clicking Refresh
-	// freed the node szConfig pointed into and the mbstowcs_s below read freed memory.
-	PWIN32_FIND_DATA_LIST pSelected = FindDataListNav(Config.pHead, Config.iSelectedConfig);
+	// freed the node the name pointed into and the conversion read freed memory.
+	wchar_t cfgname[MAX_PATH];
 
-	szConfig = (Config.szName[0]) ? Config.szName : (pSelected) ? pSelected->m_Data.cFileName : NULL;
-
-	// FindDataListNav returns NULL past the end, and the name box can be empty, so szConfig
-	// is genuinely reachable as NULL - which trips the CRT invalid parameter handler and
-	// takes the process down.
-	if (!szConfig)
+	if (!GetTargetConfigName(cfgname))
 	{
 		ImGui::TextDisabled("No config selected");
 		return;
 	}
-
-	wchar_t cfgname[MAX_PATH];
-	mbstowcs_s(nullptr, cfgname, szConfig, _TRUNCATE);
 
 	if (ImGui::Button("Load"))
 		LoadConfig(cfgname);
@@ -1367,7 +1404,7 @@ void CMenu::ConfigTab(void)
 	ImGui::SameLine();
 
 	// "###Save" keeps the button's ID stable while its label changes
-	if (ImGui::Button((m_Theme != m_SavedTheme) ? "Save *###Save" : "Save###Save"))
+	if (ImGui::Button((m_Theme != m_SavedTheme || Appearance::IsDirty()) ? "Save *###Save" : "Save###Save"))
 		SaveConfig(cfgname);
 }
 
@@ -1675,16 +1712,25 @@ void ApplyPodMods(Pl0000* pOwner)
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	ImGui::ColorPicker4(szModelPart, (float*)&pPodMesh->m_vColor);
+	// Edited on a copy and written through Appearance when it changes, which saves it for every
+	// pod of this model and sets the mesh's update flag. The flag used to be set every frame,
+	// and before that the edit indexed the pod's meshes with the *player's* mesh selection
+	// (iSelectedModelMesh), touching an unrelated pod mesh or writing past the end of the
+	// pod's much shorter mesh array, and forced the mesh visible, undoing the Enabled checkbox.
+	ImVec4 vPodColor(pPodMesh->m_vColor.x, pPodMesh->m_vColor.y, pPodMesh->m_vColor.z, pPodMesh->m_vColor.w);
+
+	if (ImGui::ColorPicker4(szModelPart, (float*)&vPodColor))
+		Appearance::RecordMeshColor(pPod, pPodMesh, vPodColor);
 
 	ImGui::PopItemWidth();
 
-	// Push the colour edit through. This used to index the pod's meshes with the *player's*
-	// mesh selection (iSelectedModelMesh) - another model's index - so it touched an unrelated
-	// pod mesh, or wrote past the end of the pod's much shorter mesh array. It also forced
-	// that mesh visible every frame; pointed at the right mesh, that would undo the Enabled
-	// checkbox above as soon as it was unticked, so only the update flag is set now.
-	pPodMesh->m_bUpdate = TRUE;
+	ImGui::BeginDisabled(!Appearance::HasMeshColor(pPod, pPodMesh));
+
+	if (ImGui::Button("Reset##PodMesh"))
+		Appearance::ResetMeshColor(pPod, pPodMesh);
+
+	ImGui::EndDisabled();
+	ImGui::SetItemTooltip("Put back the mesh's own colour and forget the saved one");
 }
 
 // Issue #16: the mesh colour tints every material of a mesh at once (2B's "Body" mesh holds the
@@ -1727,11 +1773,13 @@ static void MaterialTintEditor(Pl0000* pEntity, CMeshPart* pMesh)
 
 		ImGui::PushID(i);
 
+		// Through Appearance, which saves the tint by material name and frees the slot again
+		// when this model goes away
 		if (ImGui::Checkbox(szMaterial, &bTinted))
 		{
 			if (!bTinted)
-				MaterialTint::Clear(pShader);
-			else if (!MaterialTint::Set(pShader, vColor, flIntensity))
+				Appearance::ClearMaterialTint(pEntity, pShader);
+			else if (!Appearance::SetMaterialTint(pEntity, pShader, vColor, flIntensity))
 				g_pConsole->Warn("Material tint: no free slots - clear another material first");
 		}
 
@@ -1746,7 +1794,7 @@ static void MaterialTintEditor(Pl0000* pEntity, CMeshPart* pMesh)
 			ImGui::SetItemTooltip("Intensity");
 
 			if (bChanged)
-				MaterialTint::Set(pShader, vColor, flIntensity);
+				Appearance::SetMaterialTint(pEntity, pShader, vColor, flIntensity);
 		}
 
 		ImGui::PopID();
@@ -1798,6 +1846,32 @@ void ApplyModelMods(Pl0000* pEntity)
 	ImGui::InputFloat3("Model Rotation (Pitch, Yaw, Roll)", (float*)&pEntity->m_matModelToWorld.GetAxis(3));
 
 	ImGui::Checkbox("Rainbow Hair", &Vars.Gameplay.bRainbowHair);
+
+	// The colour edits below (mesh, Model Tint, material and pod colours) are kept for every model
+	// of the same name; this writes them alone into the config, without the other settings
+	ImGui::SameLine();
+
+	if (ImGui::Button(Appearance::IsDirty() ? "Save Appearance *###SaveAppearance" : "Save Appearance###SaveAppearance"))
+		g_pMenu->SaveAppearance();
+
+	// Names the file: it is the Config tab's target, which can be another config than the
+	// default.xml loaded at startup, and this button sits far from the Config tab's name box
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_ForTooltip))
+	{
+		wchar_t szTarget[MAX_PATH];
+		char szTargetUtf8[MAX_PATH * 3];
+
+		if (g_pMenu->GetTargetConfigName(szTarget) &&
+			WideCharToMultiByte(CP_UTF8, 0, szTarget, -1, szTargetUtf8, sizeof(szTargetUtf8), NULL, NULL))
+		{
+			ImGui::SetTooltip("Saves only the colours to %s (the Config tab's target; default.xml is the one "
+				"loaded at startup). Settings you haven't saved stay unsaved.", szTargetUtf8);
+		}
+		else
+		{
+			ImGui::SetTooltip("No config selected - pick one in the Config tab");
+		}
+	}
 
 	if (pEntity->m_Work.m_nMeshes <= 0)
 	{
@@ -1862,25 +1936,54 @@ void ApplyModelMods(Pl0000* pEntity)
 
 	ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.3f);
 
-	ImGui::ColorPicker4(szModelPart, (float*)&pSelectedMesh->m_vColor);
-	pSelectedMesh->m_bUpdate = TRUE;
+	// Edited on a copy and written through Appearance when it changes, which saves it for every
+	// model of this name and sets the mesh's update flag (this used to set it every frame)
+	ImVec4 vMeshColor(pSelectedMesh->m_vColor.x, pSelectedMesh->m_vColor.y, pSelectedMesh->m_vColor.z,
+		pSelectedMesh->m_vColor.w);
+
+	if (ImGui::ColorPicker4(szModelPart, (float*)&vMeshColor))
+		Appearance::RecordMeshColor(pEntity, pSelectedMesh, vMeshColor);
 
 	ImGui::SameLine();
 
-	// The model's own colour (w is its alpha), edited in place like the mesh colour beside it. This
-	// used to edit Vars.Gameplay.vModelTint, which nothing read. The game leaves it white: its only
-	// setter, CModelInfo_SetColor (0x140198C00), is called by the Esp103 effect alone. A change
-	// needs MODELINFO_FLAG_TINT_DIRTY, which CModelWork_Update (0x140196620) tests to pass the
-	// colour on to the model's draw entries (see Features::SetModelAlpha), so every edit raises it.
+	// The model's own colour (w is its alpha), edited like the mesh colour beside it. This used to
+	// edit Vars.Gameplay.vModelTint, which nothing read. The game leaves it white: its only setter,
+	// CModelInfo_SetColor (0x140198C00), is called by the Esp103 effect alone. A change needs
+	// MODELINFO_FLAG_TINT_DIRTY, which CModelWork_Update (0x140196620) tests to pass the colour on
+	// to the model's draw entries (see Features::SetModelAlpha); Appearance raises it with every edit.
 	CModelInfo* pModelInfo = pEntity->m_pModelInfo;
+	const bool bModelTint = !Vars.Gameplay.bRainbowModel && pModelInfo;
 
-	if (!Vars.Gameplay.bRainbowModel && pModelInfo)
+	if (bModelTint)
 	{
-		if (ImGui::ColorPicker4("Model Tint Color", (float*)&pModelInfo->m_vTint))
-			pModelInfo->m_uFlags |= MODELINFO_FLAG_TINT_DIRTY;
+		ImVec4 vTint(pModelInfo->m_vTint.x, pModelInfo->m_vTint.y, pModelInfo->m_vTint.z, pModelInfo->m_vTint.w);
+
+		if (ImGui::ColorPicker4("Model Tint Color", (float*)&vTint))
+			Appearance::RecordModelTint(pEntity, vTint);
 	}
 
 	ImGui::PopItemWidth();
+
+	// One per picker above: back to the model's own colour, and the saved one forgotten
+	ImGui::BeginDisabled(!Appearance::HasMeshColor(pEntity, pSelectedMesh));
+
+	if (ImGui::Button("Reset Mesh Color"))
+		Appearance::ResetMeshColor(pEntity, pSelectedMesh);
+
+	ImGui::EndDisabled();
+	ImGui::SetItemTooltip("Put back the mesh's own colour and forget the saved one");
+
+	if (bModelTint)
+	{
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!Appearance::HasModelTint(pEntity));
+
+		if (ImGui::Button("Reset Model Tint"))
+			Appearance::ResetModelTint(pEntity);
+
+		ImGui::EndDisabled();
+		ImGui::SetItemTooltip("Put back the model's own tint and forget the saved one");
+	}
 
 	MaterialTintEditor(pEntity, pSelectedMesh);
 

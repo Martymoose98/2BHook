@@ -1,4 +1,6 @@
 #include "Configuration.h"
+#include "Appearance.h"
+#include "ConfigXmlSection.h"
 
 #pragma comment(lib, "xmllite.lib")
 #pragma comment(lib, "shlwapi.lib")
@@ -350,6 +352,13 @@ HRESULT CConfigXml::Load(LPCWSTR szFilename)
 			else if (uDepth == 2 && !bEmpty)
 			{
 				pItem = FindItem(Section, szName);
+
+				// While the reader is still on the element, before its text
+				if (pItem)
+				{
+					pItem->ReadAttributes(m_pReader.Get());
+					m_pReader->MoveToElement();
+				}
 			}
 		}
 		else if (NodeType == XmlNodeType_Text)
@@ -392,6 +401,13 @@ IConfigItemXml* CConfigXml::FindItem(const std::wstring& Section, LPCWSTR szName
 			return It->second;
 	}
 
+	// No item has this name; a list item takes every element of its section
+	for (auto It = Range.first; It != Range.second; ++It)
+	{
+		if (It->second && It->second->MatchesAnyName())
+			return It->second;
+	}
+
 	return NULL;
 }
 
@@ -408,10 +424,40 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 		FILE_ATTRIBUTE_NORMAL, TRUE, NULL, &pStream)))
 		return hr;
 
+	return WriteDocument(pStream.Get(), NULL);
+}
+
+HRESULT CConfigXml::SaveSection(LPCWSTR szFilename, LPCWSTR szSection)
+{
+	if (!szSection || !SetFilename(szFilename))
+		return E_FAIL;
+
+	const std::wstring Section(szSection);
+
+	HRESULT hr = RewriteXmlSection(m_szFilename, szSection,
+		[this, &Section](IXmlWriter* pWriter) { return WriteSection(pWriter, Section); });
+
+	if (hr != HRESULT_FROM_WIN32(ERROR_FILE_NOT_FOUND))
+		return hr;
+
+	// No config of that name yet: one holding just this section
+	ComPtr<IStream> pStream;
+
+	if (FAILED(hr = SHCreateStreamOnFileEx(m_szFilename, STGM_CREATE | STGM_READWRITE,
+		FILE_ATTRIBUTE_NORMAL, TRUE, NULL, &pStream)))
+		return hr;
+
+	return WriteDocument(pStream.Get(), szSection);
+}
+
+HRESULT CConfigXml::WriteDocument(IStream* pStream, LPCWSTR szOnlySection)
+{
+	HRESULT hr = S_OK;
+
 	if (FAILED(hr = CreateXmlWriter(IID_IXmlWriter, (void**)&m_pWriter, NULL)))
 		return hr;
 
-	if (FAILED(hr = m_pWriter->SetOutput(pStream.Get())))
+	if (FAILED(hr = m_pWriter->SetOutput(pStream)))
 		return hr;
 
 	if (FAILED(hr = m_pWriter->SetProperty(XmlWriterProperty_Indent, TRUE)))
@@ -423,19 +469,12 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 	{
 		CConfigItemXmlNamespace RootNamespace(m_pWriter, L"Root", (uint32_t)m_Items.size(), CONFIG_XML_VERSION);
 
-		for (auto It = m_Items.begin(); It != m_Items.end();)
+		// One pass per section: upper_bound skips the rest of this section's items
+		for (auto It = m_Items.begin(); It != m_Items.end(); It = m_Items.upper_bound(It->first))
 		{
-			uint32_t uChildren = (uint32_t)m_Items.count(It->first);
-			CConfigItemXmlNamespace Namespace(m_pWriter, It->first.c_str(), uChildren);
-
-			auto Sector = m_Items.equal_range(It->first);
-
-			for (auto i = Sector.first; i != Sector.second; ++i)
-			{
- 				i->second->Write(m_pWriter.Get());
-			}
-
-			std::advance(It, uChildren);
+			// An item that fails to write still leaves a well-formed section, as it always has
+			if (!szOnlySection || It->first == szOnlySection)
+				WriteSection(m_pWriter.Get(), It->first);
 		}
 	}
 
@@ -446,6 +485,25 @@ HRESULT CConfigXml::Save(LPCWSTR szFilename)
 
 	// Close the file now rather than keeping it open until the next Save
 	m_pWriter.Reset();
+
+	return hr;
+}
+
+HRESULT CConfigXml::WriteSection(IXmlWriter* pWriter, const std::wstring& Section)
+{
+	HRESULT hr = S_OK;
+	auto Range = m_Items.equal_range(Section);
+
+	// Ends the section element when it goes out of scope
+	CConfigItemXmlNamespace Namespace(pWriter, Section.c_str(), (uint32_t)m_Items.count(Section));
+
+	for (auto It = Range.first; It != Range.second; ++It)
+	{
+		HRESULT hrItem = It->second->Write(pWriter);
+
+		if (FAILED(hrItem) && SUCCEEDED(hr))
+			hr = hrItem;
+	}
 
 	return hr;
 }
@@ -562,6 +620,8 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"i_heap_scale", Vars.Misc.iHeapScale));
 #pragma endregion misc
 
+	// The saved colour edits, one item for the whole list
+	m_Items.emplace(CATEGORY_APPEARANCE, new CAppearanceItem(Appearance::GetTable()));
 }
 
 std::pair<

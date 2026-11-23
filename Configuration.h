@@ -12,6 +12,7 @@
 #include <string>
 #include <vector>
 
+#include "ConfigItemXml.h"
 #include "Globals.h"
 
 // c++ btw (just a friendly reminder to myself)
@@ -100,6 +101,10 @@
 // every later item for them.
 #define CATEGORY_HACKING _CRT_WIDE("Hacking")
 #define CATEGORY_THEME _CRT_WIDE("Theme")
+// Saved colour edits, as a list: <mesh>, <model_tint> and <material> elements whose model,
+// mesh and material names are attributes (CAppearanceItem, AppearanceTable.h). Version 2
+// loaders that predate it skip the section.
+#define CATEGORY_APPEARANCE _CRT_WIDE("Appearance")
 #define CONFIG_EXTENSION TEXT(".xml")
 
 // Root version="" of configs this build writes.
@@ -114,6 +119,7 @@
 #define CATEGORY_MENU "Menu"
 #define CATEGORY_HACKING "Hacking"
 #define CATEGORY_THEME "Theme"
+#define CATEGORY_APPEARANCE "Appearance"
 
 #define CONFIG_EXTENSION TEXT(".ini")
 #endif // CONFIG_XML
@@ -481,36 +487,7 @@ private:
 };
 
 
-class IConfigItemXml
-{
-public:
-	virtual ~IConfigItemXml(void) = default;
-
-	// The element name this item is stored under, e.g. L"t_godmode"
-	virtual const wchar_t* GetName(void) const = 0;
-
-	// Takes the text of this item's element. CConfigXml::Load finds the item by its section
-	// and name, so items can be added, removed or reordered without breaking old configs.
-	virtual void ReadValue(LPCWSTR szValue, uint32_t cchValue) = 0;
-
-	virtual HRESULT Write(IXmlWriter* pWriter) = 0;
-
-	//template<typename T>
-	//static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(const wchar_t* szSector,
-	//	const wchar_t* szName, T& Value) noexcept
-	//{		
-	//	return std::make_pair(szSector, new CConfigItemXml<std::add_lvalue_reference_t<T>>(szSector, szName, Value));
-	//}
-
-	template<typename T>
-	static constexpr std::pair<const wchar_t*, IConfigItemXml*> MakePair(
-		const wchar_t* szSector,
-		const wchar_t* szName, T&& Value) noexcept
-	{
-		return std::make_pair(szSector,
-			new CConfigItemXml<T>(szSector, szName, std::forward<T>(Value)));
-	}
-};
+// IConfigItemXml is in ConfigItemXml.h
 
 // TODO: make make like a setting class for templates with a desc and
 template<typename T> // std::enable_if_t<std::is_fundamental_v<T>>
@@ -1273,6 +1250,11 @@ public:
 	virtual HRESULT Load(LPCWSTR szFilename) override;
 	virtual HRESULT Save(LPCWSTR szFilename) override;
 
+	// Writes only szSection of the config, leaving everything else in the file as it is on
+	// disk, so settings changed but not saved stay unsaved (Save Appearance). A config that
+	// doesn't exist yet gets a root holding just that section.
+	HRESULT SaveSection(LPCWSTR szFilename, LPCWSTR szSection);
+
 	HRESULT WriteNode(XmlNodeType Type);
 
 	// The version="" of the last config Load read: CONFIG_XML_VERSION for current files, 1 for
@@ -1297,6 +1279,12 @@ private:
 	void PurgeConfig(void);
 
 	IConfigItemXml* FindItem(const std::wstring& Section, LPCWSTR szName) const;
+
+	// The whole document into pStream: every section, or szOnlySection alone if it isn't NULL
+	HRESULT WriteDocument(IStream* pStream, LPCWSTR szOnlySection);
+
+	// One section element with all its items
+	HRESULT WriteSection(IXmlWriter* pWriter, const std::wstring& Section);
 
 	static BOOL CConfigXml::FileExists(LPCWSTR szFilename);
 

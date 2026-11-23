@@ -526,50 +526,70 @@ namespace Features
 	// pitch held 10 degrees short of straight down, the look held within reach of her heading,
 	// the eye in front of her face toward the look and a near plane of a few centimetres
 	// (hkCCameraGameSetViewAngles, ApplyFirstPersonNearPlane).
+	inline const char* const g_szFirstPersonHeadMeshes[] =
+	{
+		"Hair", "Eyelash", "Eyelash_serious", "Eyemask", "facial_normal", "facial_serious",
+		"Feather", "Armor_Head", "Face"
+	};
+
+	// The entity whose head first person hides now, and the alphas it will put back
+	inline CBehaviorAppBase* g_pFirstPersonHidden = NULL;
+	inline float g_flFirstPersonSavedAlpha[ARRAYSIZE(g_szFirstPersonHeadMeshes)];
+
+	// True while first person hides szMesh of pEntity, with the alpha it will put back. Saving a
+	// colour edit uses it, so the 0 that hides the head is never what gets saved.
+	inline bool GetFirstPersonRestoreAlpha(const CBehaviorAppBase* pEntity, const char* szMesh, float& flAlpha)
+	{
+		if (!pEntity || pEntity != g_pFirstPersonHidden || !szMesh)
+			return false;
+
+		for (size_t i = 0; i < ARRAYSIZE(g_szFirstPersonHeadMeshes); ++i)
+		{
+			if (!strcmp(g_szFirstPersonHeadMeshes[i], szMesh))
+			{
+				flAlpha = g_flFirstPersonSavedAlpha[i];
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	inline void UpdateFirstPersonHead(CBehaviorAppBase* pEntity)
 	{
-		static const char* const s_szHeadMeshes[] =
-		{
-			"Hair", "Eyelash", "Eyelash_serious", "Eyemask", "facial_normal", "facial_serious",
-			"Feather", "Armor_Head", "Face"
-		};
-
-		static CBehaviorAppBase* s_pHidden = NULL;
-		static float s_flSavedAlpha[ARRAYSIZE(s_szHeadMeshes)];
-
-		if (s_pHidden && s_pHidden != pEntity)
+		if (g_pFirstPersonHidden && g_pFirstPersonHidden != pEntity)
 		{
 			// Only restored while that entity is still the one the camera shows; a pointer
 			// from an earlier frame may be gone
-			if (g_pCamera && g_pCamera->m_pCamEntity == s_pHidden)
+			if (g_pCamera && g_pCamera->m_pCamEntity == g_pFirstPersonHidden)
 			{
-				for (size_t i = 0; i < ARRAYSIZE(s_szHeadMeshes); ++i)
+				for (size_t i = 0; i < ARRAYSIZE(g_szFirstPersonHeadMeshes); ++i)
 				{
-					CMeshPart* pMesh = GetModelMesh(&s_pHidden->m_Work, s_szHeadMeshes[i]);
+					CMeshPart* pMesh = GetModelMesh(&g_pFirstPersonHidden->m_Work, g_szFirstPersonHeadMeshes[i]);
 
 					if (pMesh)
 					{
-						pMesh->m_vColor.w = s_flSavedAlpha[i];
+						pMesh->m_vColor.w = g_flFirstPersonSavedAlpha[i];
 						pMesh->m_bUpdate = TRUE;
 					}
 				}
 			}
 
-			s_pHidden = NULL;
+			g_pFirstPersonHidden = NULL;
 		}
 
 		if (!pEntity)
 			return;
 
-		for (size_t i = 0; i < ARRAYSIZE(s_szHeadMeshes); ++i)
+		for (size_t i = 0; i < ARRAYSIZE(g_szFirstPersonHeadMeshes); ++i)
 		{
-			CMeshPart* pMesh = GetModelMesh(&pEntity->m_Work, s_szHeadMeshes[i]);
+			CMeshPart* pMesh = GetModelMesh(&pEntity->m_Work, g_szFirstPersonHeadMeshes[i]);
 
 			if (!pMesh)
 				continue;
 
-			if (s_pHidden != pEntity)
-				s_flSavedAlpha[i] = pMesh->m_vColor.w;
+			if (g_pFirstPersonHidden != pEntity)
+				g_flFirstPersonSavedAlpha[i] = pMesh->m_vColor.w;
 
 			if (pMesh->m_vColor.w != 0.0f)
 			{
@@ -578,7 +598,7 @@ namespace Features
 			}
 		}
 
-		s_pHidden = pEntity;
+		g_pFirstPersonHidden = pEntity;
 	}
 
 	// First person turns her to face the look, after the port's CFirstPerson::OnPlayerUpdate
