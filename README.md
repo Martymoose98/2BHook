@@ -61,6 +61,7 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 - Hide Pod.
 - Per-mesh colour and visibility, and Model Tint Color for the whole model (its alpha makes it see-through).
 - Material Tint: give each material of a mesh its own colour (e.g. 2B's boots or tights apart from her skin). It multiplies with the mesh colour, so Rainbow Hair still shows.
+- Saved colours: mesh colours, Model Tint Color, material tints and the pod's mesh colours are kept in the config (Save Appearance, or the Config tab's Save) and put back whenever that model appears. Hidden meshes aren't saved.
 - Move Sun: hold the sun, and the light and shadows it casts, at the elevation and azimuth you set.
 - Motion: play one of the camera entity's own motions, or a .mot file from disk, through the game's own motion system.
 - Menu themes: Default, YoRHa (the game's own menu colours) or Custom, with per-colour overrides, a resizable menu and UI scaling that follows DPI and resolution.
@@ -181,6 +182,8 @@ The gamepad works through the game's own free camera controls.
 ## Configuration
 
 Settings are saved as XML next to the DLL. `default.xml` loads at startup, and the Config tab can save and load named configs. Configs from older versions are migrated on load.
+
+Colour edits are kept in the config's `<Appearance>` section, by model and mesh or material name. **Save Appearance** (Visuals) rewrites only that section of the config the Config tab's Save would write to, and leaves the rest of the file as it is; the Config tab's Save writes everything. Saving a config from a version before 1.2.4 drops the section.
 
 ## Troubleshooting
 

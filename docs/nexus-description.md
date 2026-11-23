@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.3.1[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It adds a Glow ESP, and chams now show through every wall; 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.4[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It saves your colour edits (hair, Model Tint, material tints and the pod) in the config, so they come back every launch; 1.2.3 added a Glow ESP and chams through every wall, and 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -33,6 +33,7 @@
 [*]Rainbow Hair, Rainbow Pod, Hide Pod
 [*]Per-mesh colour and visibility, and Model Tint Color for the whole model
 [*]Material Tint: give each material its own colour, e.g. 2B's boots or tights apart from her skin
+[*]Colour edits saved in the config and put back every launch (Save Appearance)
 [*]Wireframe
 [*]Move Sun: hold the sun, and the light and shadows it casts, where you want it
 [*]Motion: play the camera entity's own motions, or a .mot file from disk, through the game's own motion system
@@ -112,6 +113,18 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [line]
 [size=4][b]Changelog[/b][/size]
 [spoiler]
+[b]Version 1.2.4[/b] (November 2026)
+[i]New[/i]
+[list]
+[*][b]Saved colours:[/b] mesh colours (hair and the rest), Model Tint Color, material tints and the pod's mesh colours are saved in the config and put back whenever that model appears: after a relaunch, an area load or a respawn.
+[*][b]Save Appearance[/b] (Visuals): saves only the colours, leaving the config's other settings as they are. The Config tab's Save saves them too.
+[*]Reset buttons for mesh colours, Model Tint and pod mesh colours.
+[/list]
+[i]Fixes[/i]
+[list]
+[*][b]Material Tint:[/b] a tint's slot is freed when its model unloads, and there are 64 slots, up from 32.
+[/list]
+
 [b]Version 1.2.3.1[/b] (November 2026)
 [list]
 [*]Chams and Glow work with MSAA on. In 1.2.3 they showed nothing with it, and before that they could put the light's view of the enemies on the screen.
