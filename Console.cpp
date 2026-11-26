@@ -3,7 +3,8 @@
 CConsole* g_pConsole = new CConsole();
 
 CConsole::CConsole(void)
-	: m_uFlags(CONFLAGS_ENABLE_AUTOSCROLL | CONFLAGS_ENABLE_TIMESTAMPS), m_Items(), m_Commands(),
+	: m_uFlags(CONFLAGS_ENABLE_AUTOSCROLL | CONFLAGS_ENABLE_TIMESTAMPS), m_Items(s_uMaxEntries),
+	m_Text(s_cchMaxText), m_Commands(),
 	m_flTrailingWidth(0.0f), m_flTrailingFontSize(-1.0f)
 {
 	ZeroMemory(m_szInput, sizeof(m_szInput));
@@ -18,7 +19,8 @@ void CConsole::Clear(void)
 {
 	std::lock_guard<std::mutex> Lock(m_Mutex);
 
-	m_Items.clear();
+	m_Items.Clear();
+	m_Text.Clear();
 }
 
 void CConsole::Log(const ImVec4& color, const char* szFormat, ...)
@@ -90,30 +92,43 @@ static void FormatTimestamp(char* szBuffer, size_t cchBuffer, const SYSTEMTIME& 
 		Time.wHour, Time.wMinute, Time.wSecond, Time.wMilliseconds);
 }
 
-void CConsole::Append(const ImVec4& color, std::string&& Text)
+void CConsole::Append(const ImVec4& color, const std::string& Text)
 {
 	Entry Next;
-
-	Next.m_Color = color;
-	Next.m_Text = std::move(Text);
+	size_t cchText = Text.size();
 
 	// Most callers end their format string with \n, which is right for the stdout logger
 	// but leaves a blank line per entry here - the console is already line-based. It shows
 	// up badly once timestamps put each entry on its own labelled row.
-	while (!Next.m_Text.empty() &&
-		(Next.m_Text.back() == '\n' || Next.m_Text.back() == '\r'))
-	{
-		Next.m_Text.pop_back();
-	}
+	while (cchText && (Text[cchText - 1] == '\n' || Text[cchText - 1] == '\r'))
+		--cchText;
+
+	Next.m_Color = color;
 
 	GetLocalTime(&Next.m_Time);
 
 	std::lock_guard<std::mutex> Lock(m_Mutex);
 
-	m_Items.emplace_back(std::move(Next));
+	if (!m_Items.IsValid() || !m_Text.IsValid())
+		return;
 
-	while (m_Items.size() > s_uMaxEntries)
-		m_Items.pop_front();
+	// A line longer than the whole text ring keeps its start.
+	if (cchText > m_Text.Capacity())
+		cchText = m_Text.Capacity();
+
+	// Entries and their text go in and come out in the same order, so the oldest entry's text
+	// is always at the front of m_Text.
+	while (!m_Items.IsEmpty() && (m_Items.IsFull() || m_Text.Free() < cchText))
+	{
+		m_Text.PopFront(m_Items.Front().m_cchText);
+		m_Items.PopFront();
+	}
+
+	Next.m_uTextPos = m_Text.EndPos();
+	Next.m_cchText = (uint32_t)cchText;
+
+	m_Text.PushBack(Text.data(), cchText);
+	m_Items.PushBack(Next);
 
 	m_uFlags |= CONFLAGS_SHOULD_AUTOSCROLL;
 }
@@ -131,7 +146,7 @@ void CConsole::WritePrefixed(const ImVec4& color, const char* szPrefix, const ch
 
 	Text.insert(0, szPrefix);
 
-	Append(color, std::move(Text));
+	Append(color, Text);
 }
 
 void CConsole::Write(const ImVec4& color, const char* szFormat, va_list args)
@@ -141,7 +156,7 @@ void CConsole::Write(const ImVec4& color, const char* szFormat, va_list args)
 	if (!szFormat || !FormatToString(Text, szFormat, args))
 		return;
 
-	Append(color, std::move(Text));
+	Append(color, Text);
 }
 
 void CConsole::Draw(const char* szTitle, const ImVec2 WindowSize)
@@ -321,11 +336,19 @@ void CConsole::EnumConsoleData(void)
 		const float flMessageColumn = (bTimestamps)
 			? ImGui::CalcTextSize("[00:00:00.000] ").x : 0.0f;
 
-		for (const Entry& Item : m_Items)
+		// Both rings are mirrored, so the entries are one array and each text one run, even
+		// where they wrap.
+		const Entry* pItems = m_Items.Data();
+
+		for (size_t i = 0; i < m_Items.Size(); i++)
 		{
+			const Entry& Item = pItems[i];
+			const char* szText = m_Text.At(Item.m_uTextPos);
+			const char* szTextEnd = szText + Item.m_cchText;
+
 			// Filter on the message only - matching against the timestamp would make an
 			// innocent filter like "01" hit half the buffer.
-			if (!m_TextFilter.PassFilter(Item.m_Text.c_str()))
+			if (!m_TextFilter.PassFilter(szText, szTextEnd))
 				continue;
 
 			if (bTimestamps)
@@ -342,7 +365,7 @@ void CConsole::EnumConsoleData(void)
 			}
 
 			ImGui::PushStyleColor(ImGuiCol_Text, Item.m_Color);
-			ImGui::TextUnformatted(Item.m_Text.c_str());
+			ImGui::TextUnformatted(szText, szTextEnd);
 			ImGui::PopStyleColor();
 		}
 

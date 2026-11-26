@@ -188,6 +188,7 @@
     <ClInclude Include="ConfigItemXml.h" />
     <ClInclude Include="Appearance.h" />
     <ClInclude Include="AppearanceTable.h" />
+    <ClInclude Include="CircularBuffer.h" />
     <ClInclude Include="Console.h" />
     <ClInclude Include="cpk.h" />
     <ClInclude Include="Features.h" />
@@ -244,6 +245,7 @@
     <ClCompile Include="ConfigXmlSection.cpp" />
     <ClCompile Include="Appearance.cpp" />
     <ClCompile Include="AppearanceTable.cpp" />
+    <ClCompile Include="CircularBuffer.cpp" />
     <ClCompile Include="Console.cpp" />
     <ClCompile Include="DLLMain.cpp" />
     <ClCompile Include="Globals.cpp" />

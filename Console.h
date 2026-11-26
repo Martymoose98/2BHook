@@ -3,13 +3,13 @@
 #include "WinInclude.h"
 
 #include <stdio.h>
-#include <deque>
 #include <mutex>
 #include <string>
 #include <unordered_map>
 
 #include "imgui/imgui.h"
 
+#include "CircularBuffer.h"
 #include "Utils.h"
 
 class CConsole
@@ -26,9 +26,12 @@ class CConsole
 		const char* m_szName;
 	};
 
+	// An entry's text is a run in m_Text, not a string of its own: no allocation per line, and
+	// the ring's mirror keeps every run in one piece, so it goes straight to the filter and ImGui.
 	struct Entry
 	{
-		std::string m_Text;
+		uint64_t    m_uTextPos;	// where the text starts in m_Text
+		uint32_t    m_cchText;	// no terminator
 		ImVec4      m_Color;
 		// Captured when the entry is logged, not when it is drawn, so toggling timestamps
 		// on shows the real times of lines that are already in the buffer.
@@ -40,6 +43,9 @@ public:
 	// Oldest entries are dropped past this. Bounds both memory and the per-frame cost of
 	// walking the list, which is what made the console crawl once it filled up.
 	static constexpr size_t s_uMaxEntries = 4096;
+
+	// The text of every entry together. Oldest entries are dropped to make room past this too.
+	static constexpr size_t s_cchMaxText = 1024 * 1024;
 
 	CConsole(void);
 
@@ -83,7 +89,7 @@ private:
 	float GetTrailingWidth(void);
 
 	void WritePrefixed(const ImVec4& color, const char* szPrefix, const char* szFormat, va_list args);
-	void Append(const ImVec4& color, std::string&& Text);
+	void Append(const ImVec4& color, const std::string& Text);
 
 private:
 	char						m_szInput[256];
@@ -92,11 +98,13 @@ private:
 
 	// Log entries are produced from whatever thread happens to be logging - the game's CRI
 	// callback threads and the Setup thread both do - while Draw() walks the list on the
-	// render thread. Everything touching m_Items or m_uFlags takes this.
+	// render thread. Everything touching m_Items, m_Text or m_uFlags takes this.
 	mutable std::mutex			m_Mutex;
 
-	// deque, not vector: dropping the oldest entry is O(1) and never reallocates the rest.
-	std::deque<Entry>			m_Items;
+	// Two fixed rings, allocated once: the entries, and their text back to back in the same
+	// order. Adding a line drops the oldest entries, with their text, until it fits in both.
+	CircularBuffer<Entry>		m_Items;
+	CircularBuffer<char>		m_Text;
 	std::unordered_map<std::string, ConCmd> m_Commands;
 
 	// Cached width of the controls trailing the command box. Only depends on the style and
