@@ -87,6 +87,7 @@ Legend: 🧪 experimental, ☢️ known not to work on the current build.
 - Backup Save: copies the chosen save slot.
 - Raw editors for the game's debug, camera and game flags.
 - Heap Scale: make every game memory heap 1x to 4x bigger, for loading more than a map plans for. It takes effect the next time the game starts, and only with 2BHook in the `mods` folder.
+- Heap Overflow: when a game memory heap is full, what it can't fit goes to an extra heap (256 MB at a time, up to 4 GB) instead of the out-of-memory box. Off by default; it works however 2BHook is loaded.
 - Console, with logging, and Show Game Errors for the game's CRI errors and warnings.
 
 ## Building

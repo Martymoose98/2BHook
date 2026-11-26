@@ -3,7 +3,7 @@
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
-[b]Version 1.2.4[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It saves your colour edits (hair, Model Tint, material tints and the pod) in the config, so they come back every launch; 1.2.3 added a Glow ESP and chams through every wall, and 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
+[b]Version 1.2.4[/b] supports the November 2026 Steam update (build 26534214) and the v1.02 build unpacked with Steamless. It saves your colour edits (hair, Model Tint, material tints and the pod) in the config, so they come back every launch, and Heap Overflow keeps the game going when a memory heap fills up; 1.2.3 added a Glow ESP and chams through every wall, and 1.2.2 brought back Chams, Model Tint Color and Show Game Errors and added Move Sun, a motion player and Heap Scale. See the top of the changelog below. The old Denuvo build is no longer supported.
 
 [line]
 [size=4][b]Features[/b][/size]
@@ -60,6 +60,7 @@
 [*]Anti-Framerate Cap (the game runs faster above 60 FPS)
 [*]Backup Save
 [*]Heap Scale: bigger game memory heaps, for loading more than a map plans for
+[*]Heap Overflow: extra memory heaps when one fills up, instead of the out-of-memory box
 [*]A console with logging, and Show Game Errors
 [/list]
 
@@ -119,6 +120,7 @@ Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach 
 [*][b]Saved colours:[/b] mesh colours (hair and the rest), Model Tint Color, material tints and the pod's mesh colours are saved in the config and put back whenever that model appears: after a relaunch, an area load or a respawn.
 [*][b]Save Appearance[/b] (Visuals): saves only the colours, leaving the config's other settings as they are. The Config tab's Save saves them too.
 [*]Reset buttons for mesh colours, Model Tint and pod mesh colours.
+[*][b]Heap Overflow[/b] (Miscellaneous, off by default): when a game memory heap is full, what it can't fit goes to an extra heap instead of the out-of-memory box. Extra heaps are made 256 MB at a time, up to 4 GB. It works however 2BHook is loaded.
 [/list]
 [i]Fixes[/i]
 [list]
