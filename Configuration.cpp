@@ -618,6 +618,7 @@ void CConfigXml::InitializeConfig(void)
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_anti_vsync", Vars.Misc.bAntiVSync));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_console_show_game_errors", Vars.Misc.bConsoleShowGameErrors));
 	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"i_heap_scale", Vars.Misc.iHeapScale));
+	m_Items.emplace(IConfigItemXml::MakePair(CATEGORY_MISC, L"t_heap_overflow", Vars.Misc.bHeapOverflow));
 #pragma endregion misc
 
 	// The saved colour edits, one item for the whole list
@@ -924,6 +925,7 @@ void CConfig::InitializeConfig()
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_anti_framecap", Vars.Misc.bAntiFramerateCap));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_anti_vsync", Vars.Misc.bAntiVSync));
 	m_Items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_console_show_game_errors", Vars.Misc.bConsoleShowGameErrors));
+	m_Items.emplace_back(new ConfigItemBool(CATEGORY_MISC, "t_heap_overflow", Vars.Misc.bHeapOverflow));
 #pragma endregion
 
 #pragma region menu

@@ -1330,6 +1330,31 @@ void CMenu::MiscTab(void)
 		break;
 	}
 
+	ImGui::BeginDisabled(HeapOverflow::GetStatus() != HeapOverflow::HEAPOVERFLOW_INSTALLED);
+	ImGui::Checkbox("Heap Overflow", &Vars.Misc.bHeapOverflow);
+	ImGui::EndDisabled();
+
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		ImGui::SetTooltip("When a game memory heap is full, its allocations go to an extra heap instead of\n"
+			"stopping the game with the out-of-memory box. Extra heaps are made as needed, %llu MB at\n"
+			"a time and %llu MB at most. Works whenever 2BHook is loaded, unlike Heap Scale.",
+			HeapOverflow::OVERFLOW_HEAP_SIZE >> 20, HeapOverflow::MAX_OVERFLOW_TOTAL >> 20);
+
+	if (HeapOverflow::GetStatus() == HeapOverflow::HEAPOVERFLOW_NOT_FOUND)
+	{
+		ImGui::TextDisabled("Not available: not found in this game build.");
+	}
+	else
+	{
+		const HeapOverflow::Stats_t Stats = HeapOverflow::GetStats();
+
+		if (Stats.nHeaps || Stats.nFailed)
+			ImGui::TextDisabled("%u extra heaps, %llu MB; %llu allocations taken, %llu failed.",
+				Stats.nHeaps, Stats.cbHeaps >> 20, Stats.nAllocations, Stats.nFailed);
+		else
+			ImGui::TextDisabled("No heap has run out.");
+	}
+
 	ImGui::Separator();
 
 	// new test shit

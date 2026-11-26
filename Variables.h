@@ -102,6 +102,7 @@ typedef struct Variables_t
 		bool bLoading;
 		int nSlot;
 		int iHeapScale;		// HeapScale: read from default.xml at startup, so a change takes the next start
+		bool bHeapOverflow;	// HeapOverflow: a full heap's allocations go to an overflow heap
 	} Misc;
 
 	struct Animation

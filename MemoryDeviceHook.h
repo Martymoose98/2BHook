@@ -136,8 +136,8 @@ private:
 // injected later, it finds the heaps already made and leaves them alone. ExcitedDelirium does the
 // same at a fixed 2x (MemSystem.h, HEAP_SCALE_MAIN / HEAP_SCALE_VRAM).
 //
-// It replaces MemoryDeviceHook above, whose grow-when-full path moved a heap's memory with
-// HeapReAlloc and so left every pointer into the heap dangling.
+// MemoryDeviceHook above is the vtable approach, still a work in progress (off behind
+// ENABLE_MEMORYDEVICE_HOOK in DLLMain.cpp); HeapOverflow below takes the same vtable route.
 namespace HeapScale
 {
 	enum Status_t
@@ -156,6 +156,51 @@ namespace HeapScale
 
 	int GetScale(void);			// what the heaps were made with, 1 when off
 	Status_t GetStatus(void);
+}
+
+// Overflow heaps, for a heap that is full: the vtable way, which needs no early start. Every game heap
+// allocates through its vtable's AllocPartition (slot 4), and they all share one of two vtables:
+// cHeapInstance, or cHeapVramInstance for the VRAM root (index 4) and its children. With the slot
+// patched, an allocation the heap can't make goes to an overflow heap of the same kind and index, the
+// game's own root heap made on demand with CMemorySystem::CreateHeap, instead of failing into the
+// out-of-memory box.
+//
+// Nothing moves: the full heap isn't grown, so no pointer into it changes. A block's header names
+// the heap it was carved from (+0x08) and the heap it was allocated for (+0x10), and the game's free
+// path reads both, so a block from an overflow heap frees back into it. The game's own fallback heap
+// (CHeapInfo::m_pFallbackInfo, CHeapInstance::ReserveMemory 0x1402616F0) works the same way.
+//
+// A heap released whole (a map block, CMemoryDevice::ReleaseHeap 0x140261A90) frees the blocks in its
+// own memory by giving that memory back, never one by one, so its blocks in an overflow heap would
+// stay. Destroy (slot 0), which ReleaseHeap calls last, frees them first.
+namespace HeapOverflow
+{
+	enum Status_t
+	{
+		HEAPOVERFLOW_OFF,			// not installed (yet)
+		HEAPOVERFLOW_INSTALLED,		// the vtables are patched; Heap Overflow in the menu turns it on
+		HEAPOVERFLOW_NOT_FOUND,		// CreateHeap or a heap vtable wasn't found
+	};
+
+	// An overflow heap is this big, or bigger for a bigger block, and all of them together no more
+	// than MAX_OVERFLOW_TOTAL: a heap the game fills until an allocation fails (a cache) stops there.
+	constexpr unsigned __int64 OVERFLOW_HEAP_SIZE = 256ull << 20;
+	constexpr unsigned __int64 MAX_OVERFLOW_TOTAL = 4ull << 30;
+
+	struct Stats_t
+	{
+		unsigned int		nHeaps;			// overflow heaps made
+		unsigned __int64	cbHeaps;		// their total size
+		unsigned __int64	nAllocations;	// allocations they took for a full heap
+		unsigned __int64	nFailed;		// allocations that failed anyway, past MAX_OVERFLOW_TOTAL
+	};
+
+	// From Setup, with g_pMemoryDevice found: the game has made its heaps by then
+	void Install(void);
+	void Uninstall(void);
+
+	Status_t GetStatus(void);
+	Stats_t GetStats(void);
 }
 
 #include "Globals.h" // cyclic dependancy if on top

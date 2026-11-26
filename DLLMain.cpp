@@ -81,6 +81,9 @@ void InitHooks(void)
 	g_pMemoryDeviceHook = new MemoryDeviceHook(g_pMemoryDevice); // for larger child heap sizes
 #endif
 
+	// Patches the heap vtables now; Heap Overflow in the menu decides whether a full heap uses it
+	HeapOverflow::Install();
+
 	for (MrubyImpl* it : g_pRubyInstances)
 	{
 		g_pRubyInstancesHooks.emplace_back(new VirtualTableHook((ULONG_PTR**)it));
@@ -1213,6 +1216,7 @@ void Unhook(void)
 
 	MaterialTint::Shutdown();
 	MotionPlayer::Shutdown();
+	HeapOverflow::Uninstall();
 
 	// Only if the slot still holds ours
 	if (CRIMainCallbackLog)
