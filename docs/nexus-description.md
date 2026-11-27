@@ -1,5 +1,6 @@
 [center][size=5][b]2B Hook[/b][/size]
 [size=3]A mod menu for NieR:Automata[/size][/center]
+[left]
 
 2B Hook is an in-game menu (Insert) with gameplay, camera, visual, spawning and debugging tools. It's open source: the code, releases and issue tracker are on [url=https://github.com/Martymoose98/2BHook]GitHub[/url].
 
@@ -468,3 +469,4 @@ due to build paths.
 [*]Inital Release (Debug build only)[/*]
 [/list]
 [/spoiler]
+[/left]
