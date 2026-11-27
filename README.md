@@ -15,6 +15,7 @@ visual, spawning and debugging tools.
 - [Troubleshooting](#troubleshooting)
 - [Releasing](#releasing)
 - [Todo](#todo)
+- [Support](#support)
 - [Contact](#contact)
 
 ## Supported Game Versions
@@ -253,6 +254,12 @@ The upload goes through `Nexus-Mods/upload-action`, which uses Nexus Mods' v3 Up
 
 ## Old Denuvo IDA Database
 https://mega.nz/folder/PiRDHSiZ#6BLoGaVzAEuVKdoJGTcmTA
+
+## Support
+
+If 2BHook made your game more fun, you can buy me a Watermelon Red Bull. Totally optional; bug reports and crash dumps help just as much.
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/pagefault)
 
 ## Contact
 
