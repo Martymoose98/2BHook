@@ -114,11 +114,13 @@ Change the keybinds in the menu's Config tab.
 Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach both to a [url=https://github.com/Martymoose98/2BHook/issues]GitHub issue[/url], or post in the [url=https://discord.gg/v8Yyrrg]NieR:Automata Modding Discord[/url] (xmmword).
 
 [line]
-[size=4][b]Endorsements and feature requests[/b][/size]
+[size=4][b]Support and feature requests[/b][/size]
 
 If 2B Hook makes the game more fun for you, an endorsement (the button at the top of this page) helps a ton. It's what pushes the mod up Nexus's lists so other players find it.
 
 Want something added? Post your idea in the Posts tab, open a [url=https://github.com/Martymoose98/2BHook/issues]GitHub issue[/url], or message me on the [url=https://discord.gg/v8Yyrrg]NieR:Automata Modding Discord[/url] (xmmword). I read them all.
+
+Want to say thanks another way? You can [url=https://ko-fi.com/pagefault]buy me a Watermelon Red Bull on Ko-fi[/url]. Totally optional; bug reports and crash dumps help just as much.
 
 [line]
 [size=4][b]Changelog[/b][/size]
