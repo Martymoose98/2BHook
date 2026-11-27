@@ -13,9 +13,9 @@ visual, spawning and debugging tools.
 - [Usage](#usage)
 - [Configuration](#configuration)
 - [Troubleshooting](#troubleshooting)
+- [Support](#support)
 - [Releasing](#releasing)
 - [Todo](#todo)
-- [Support](#support)
 - [Contact](#contact)
 
 ## Supported Game Versions
@@ -193,6 +193,12 @@ Colour edits are kept in the config's `<Appearance>` section, by model and mesh 
 - **Crash dumps:** they're written to the game folder as `NieRAutomata_<date>_<time>.dmp`. Attach the dump and the log to a [GitHub issue](https://github.com/Martymoose98/2BHook/issues). A dump may not be written if you close the "has stopped working" dialog too early.
 - **Wrong game version:** if the log says the build isn't recognised, see [Supported Game Versions](#supported-game-versions).
 
+## Support
+
+If 2BHook made your game more fun, you can buy me a Watermelon Red Bull. Totally optional; bug reports and crash dumps help just as much.
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/pagefault)
+
 ## Releasing
 
 CI runs on GitHub Actions, on the `windows-2025-vs2026` runner (Visual Studio 2026, MSVC v145):
@@ -254,12 +260,6 @@ The upload goes through `Nexus-Mods/upload-action`, which uses Nexus Mods' v3 Up
 
 ## Old Denuvo IDA Database
 https://mega.nz/folder/PiRDHSiZ#6BLoGaVzAEuVKdoJGTcmTA
-
-## Support
-
-If 2BHook made your game more fun, you can buy me a Watermelon Red Bull. Totally optional; bug reports and crash dumps help just as much.
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/pagefault)
 
 ## Contact
 
