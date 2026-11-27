@@ -263,5 +263,5 @@ https://mega.nz/folder/PiRDHSiZ#6BLoGaVzAEuVKdoJGTcmTA
 
 ## Contact
 
-- [NieR:Automata Modding Discord](https://discord.gg/v8Yyrrg): Martino#1552 (probably the best way).
+- [NieR:Automata Modding Discord](https://discord.gg/v8Yyrrg): xmmword (probably the best way).
 - GitHub: open an issue here.

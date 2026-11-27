@@ -109,7 +109,7 @@ Change the keybinds in the menu's Config tab.
 [line]
 [size=4][b]Bugs and crash reports[/b][/size]
 
-Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach both to a [url=https://github.com/Martymoose98/2BHook/issues]GitHub issue[/url], or post in the [url=https://discord.gg/v8Yyrrg]NieR:Automata Modding Discord[/url] (Martino#1552).
+Crash dumps (.dmp) and [b]2BHook.log[/b] are written to the game folder. Attach both to a [url=https://github.com/Martymoose98/2BHook/issues]GitHub issue[/url], or post in the [url=https://discord.gg/v8Yyrrg]NieR:Automata Modding Discord[/url] (xmmword).
 
 [line]
 [size=4][b]Changelog[/b][/size]
